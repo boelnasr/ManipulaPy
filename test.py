@@ -11,7 +11,7 @@ urdf_processor = URDFToSerialManipulator(urdf_file_path)
 serial_manipulator = urdf_processor.serial_manipulator
 
 # Example joint angles (thetalist) for the manipulator
-thetalist = [0.5, -0.1, 0.5, 0.75, -0.2, 0.3]
+thetalist = [2.5, 1, 0.5, -0.75, -0.2, 0.3]
 print(serial_manipulator.M_list)
 
 # Perform forward kinematics using the space frame
@@ -33,6 +33,6 @@ print("\nJoint Velocities (Space Frame):")
 print(joint_velocities)
 
 # Simulate the robot using PyBullet (this will open a PyBullet GUI window)
-urdf_processor.simulate_robot()
+urdf_processor.simulate_robot_with_desired_angles(thetalist)
 
 # Note: The simulation part will run indefinitely until you manually close the PyBullet window.

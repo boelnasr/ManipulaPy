@@ -39,11 +39,9 @@ class URDFToSerialManipulator:
     def get_joint(robot: URDF, link_name: str):
         """
         Retrieves a joint from the robot by link name.
-
         Args:
             robot (URDF): The robot object.
             link_name (str): The name of the link.
-
         Returns:
             The joint object if found, otherwise None.
         """
@@ -69,7 +67,7 @@ class URDFToSerialManipulator:
         for i in range(robot_dof):
             w_ = w[i]
             p_ = p[i]
-            v_ = -np.cross(w_, p_)
+            v_ = np.cross(w_, -p_)
             Slist.append([w_[0], w_[1], w_[2], v_[0], v_[1], v_[2]])
         return np.transpose(Slist)
 
@@ -131,7 +129,6 @@ class URDFToSerialManipulator:
             B_list=data["Blist"],
             S_list=data["Slist"]
         )
-
     def simulate_robot(self):
         """
         Simulates the robot using PyBullet.
@@ -142,18 +139,16 @@ class URDFToSerialManipulator:
         Mlist = self.robot_data["M"]
         Glist = self.robot_data["Glist"]
         actuated_joints_num = self.robot_data["actuated_joints_num"]
-
         p.connect(p.GUI)
-        p.setGravity(0, 0, -9.8)
+        p.setGravity(0, 0, 0)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         robotID = p.loadURDF(self.urdf_name, [0, 0, 0], [0, 0, 0, 1], useFixedBase=1)
         numJoints = p.getNumJoints(robotID)
         p.resetBasePositionAndOrientation(robotID, [0, 0, 0], [0, 0, 0, 1])
         for i in range(numJoints):
-            p.setJointMotorControl2(robotID, i, p.VELOCITY_CONTROL, targetVelocity=0, force=0)
+            p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetVelocity=0, force=0)
         for i in range(numJoints):
             p.resetJointState(robotID, i, np.pi/3.0)
-
         # Simulation loop
         timeStep = 1/240.0
         p.setTimeStep(timeStep)
@@ -161,10 +156,44 @@ class URDFToSerialManipulator:
             # Perform simulation steps here...
             # You can use the code from your script to perform the necessary calculations
             # and control the robot in the PyBullet simulation environment.
-
             # Step simulation
             p.stepSimulation()
             time.sleep(timeStep)
-
         # Disconnect PyBullet
+        p.disconnect()
+
+    def simulate_robot_with_desired_angles(self, desired_angles):
+        """
+        Simulates the robot using PyBullet with desired joint angles.
+
+        Args:
+            desired_angles (np.ndarray): Desired joint angles.
+        """
+        # Connect to PyBullet and set up the environment
+        p.connect(p.GUI)
+        p.setGravity(0, 0, -9.8)
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
+
+        # Load the robot from the URDF file
+        robotID = p.loadURDF(self.urdf_name, [0, 0, 0], [0, 0, 0, 1], useFixedBase=1)
+
+        # Set the desired joint angles using POSITION_CONTROL
+        numJoints = p.getNumJoints(robotID)
+        
+        for i in range(numJoints):
+            if i < len(desired_angles):
+                # Apply position control to each joint
+                p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetPosition=desired_angles[i], force=500)
+            else:
+                # If desired_angles list is shorter than numJoints, set remaining joints to a default position
+                p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetPosition=0, force=500)
+
+        # Simulation loop
+        timeStep = 1/100.0
+        p.setTimeStep(timeStep)
+        while p.isConnected():
+            p.stepSimulation()
+            time.sleep(timeStep)  # Simulation time step
+        time.sleep(10*np.exp(100))
+        # Disconnect from PyBullet
         p.disconnect()
