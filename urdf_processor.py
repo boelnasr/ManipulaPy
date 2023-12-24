@@ -5,7 +5,8 @@ import pybullet as p
 import pybullet_data
 import time
 from kinematics import SerialManipulator
-
+from dynamics import ManipulatorDynamics
+import utils
 class URDFToSerialManipulator:
     """
     A class to convert URDF files to SerialManipulator objects and simulate them using PyBullet.
@@ -88,36 +89,27 @@ class URDFToSerialManipulator:
         w_ = []  # Rotation axes of each joint
         M_list = np.eye(4)  # Home position matrix
         Glist = []  # Inertia matrices
-
         for joint in robot.actuated_joints:
             child_link = self.get_joint(robot, joint.child)
             p_.append(self.transform_to_xyz(robot.link_fk()[child_link]))
-
             G = np.eye(6)
             if child_link.inertial:
                 G[0:3, 0:3] = child_link.inertial.inertia
                 G[3:6, 3:6] = child_link.inertial.mass * np.eye(3)
             Glist.append(G)
-
             child_M = robot.link_fk()[child_link]
             child_w = np.array(child_M[0:3, 0:3] @ np.array(joint.axis).T)
             w_.append(child_w)
-
             if child_link.inertial and child_link.inertial.origin is not None:
                 child_M = child_M @ child_link.inertial.origin
             M_list = np.dot(M_list, child_M)
-
         Slist = self.w_p_to_slist(w_, p_, joint_num)
         Blist = mr.Adjoint(mr.TransInv(M_list)) @ Slist
-
         return {"M": M_list, "Slist": Slist, "Blist": Blist, "Glist": Glist, "actuated_joints_num": joint_num}
-
-    # ... other methods ...
 
     def initialize_serial_manipulator(self) -> SerialManipulator:
         """
         Initializes a SerialManipulator object using the extracted URDF data.
-
         Returns:
             SerialManipulator: The initialized serial manipulator object.
         """
@@ -125,10 +117,45 @@ class URDFToSerialManipulator:
         return SerialManipulator(
             M_list=data["M"],  # Use 'M' instead of 'Mlist'
             omega_list=data["Slist"][:, :3],
-            r_list=data["Slist"][:, 3:],
             B_list=data["Blist"],
-            S_list=data["Slist"]
+            S_list=data["Slist"],
+            r_list=utils.extract_r_list(data["Slist"]),
+            G_list=data["Glist"])
+    def initialize_manipulator_dynamics(self):
+        """
+        Initializes the ManipulatorDynamics object using the extracted URDF data.
+        """
+        data = self.robot_data
+        Glist = self.extract_inertia_matrices()
+
+        # Initialize the ManipulatorDynamics object
+        self.manipulator_dynamics = ManipulatorDynamics(
+            M_list=data["M"],
+            omega_list=data["Slist"][:, :3],
+            r_list=data["Slist"][:, 3:],
+            b_list=data["Blist"],
+            S_list=data["Slist"],
+            B_list=data["Blist"],
+            Glist=Glist
         )
+
+    def extract_inertia_matrices(self):
+        """
+        Extracts the spatial inertia matrices from the URDF data.
+        """
+        Glist = []
+        for link in self.robot.links:
+            if link.inertial:
+                inertia = link.inertial.inertia
+                mass = link.inertial.mass
+                G = np.zeros((6, 6))
+                G[:3, :3] = inertia
+                G[3:, 3:] = mass * np.eye(3)
+                Glist.append(G)
+            else:
+                Glist.append(np.zeros((6, 6)))  # Add zero matrix for links without inertia
+        return Glist
+
     def simulate_robot(self):
         """
         Simulates the robot using PyBullet.
@@ -140,7 +167,7 @@ class URDFToSerialManipulator:
         Glist = self.robot_data["Glist"]
         actuated_joints_num = self.robot_data["actuated_joints_num"]
         p.connect(p.GUI)
-        p.setGravity(0, 0, 0)
+        p.setGravity(0, 0, -9.8)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         robotID = p.loadURDF(self.urdf_name, [0, 0, 0], [0, 0, 0, 1], useFixedBase=1)
         numJoints = p.getNumJoints(robotID)
@@ -183,11 +210,10 @@ class URDFToSerialManipulator:
         for i in range(numJoints):
             if i < len(desired_angles):
                 # Apply position control to each joint
-                p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetPosition=desired_angles[i], force=500)
+                p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetPosition=desired_angles[i], force=1000)
             else:
                 # If desired_angles list is shorter than numJoints, set remaining joints to a default position
-                p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetPosition=0, force=500)
-
+                p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetPosition=0, force=1000)
         # Simulation loop
         timeStep = 1/100.0
         p.setTimeStep(timeStep)

@@ -1,8 +1,7 @@
 import numpy as np
 import modern_robotics as mr
-
 class SerialManipulator:
-    def __init__(self, M_list, omega_list, r_list=None, b_list=None, S_list=None, B_list=None):
+    def __init__(self, M_list, omega_list, r_list=None, b_list=None, S_list=None, B_list=None,G_list=None):
         """
         Initialize the serial manipulator with given parameters.
 
@@ -15,6 +14,7 @@ class SerialManipulator:
             B_list (np.ndarray, optional): List of screw axes in the body frame.
         """
         self.M_list = M_list
+        self.G_list = G_list
         self.omega_list = omega_list
         self.r_list = r_list if r_list is not None else np.zeros_like(omega_list)
         self.b_list = b_list if b_list is not None else np.zeros_like(omega_list)
