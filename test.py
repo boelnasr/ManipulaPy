@@ -12,19 +12,18 @@ urdf_processor = URDFToSerialManipulator(urdf_file_path)
 
 # Extract the SerialManipulator object
 ur5 = urdf_processor.serial_manipulator
-print("rlist:", ur5.r_list)
-print("vlist:", ur5.S_list[3:])
+print("\n rlist:\n", np.array(ur5.r_list))
+print("\n vlist:\n", np.array(ur5.S_list[3:]).T)
 
 # Initialize ManipulatorDynamics
 ur5_dynamics = ManipulatorDynamics(ur5.M_list, ur5.omega_list, ur5.r_list, ur5.b_list, ur5.S_list, ur5.B_list, urdf_processor.robot_data["Glist"])
 
 # Example joint angles (thetalist) for the manipulator
-thetalist = np.array([0, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)])
-print(ur5.M_list)
+thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)])
 
 # Perform forward kinematics using the space frame
 T_space = ur5.forward_kinematics(thetalist, frame='space')
-print("Forward Kinematics (Space Frame):")
+print("\nForward Kinematics (Space Frame):")
 print(T_space)
 
 # Perform forward kinematics using the body frame
