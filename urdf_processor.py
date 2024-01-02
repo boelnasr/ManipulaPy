@@ -14,11 +14,15 @@ class URDFToSerialManipulator:
 
     def __init__(self, urdf_name: str):
         """
-        Initializes the URDFToSerialManipulator object.
+        Initializes the object with the given urdf_name.
 
-        Args:
-            urdf_name (str): Path to the URDF file.
+        Parameters:
+            urdf_name (str): The name of the URDF file.
+
+        Returns:
+            None
         """
+        
         self.urdf_name = urdf_name
         self.robot_data = self.load_urdf(urdf_name)
         self.serial_manipulator = self.initialize_serial_manipulator()
@@ -39,12 +43,14 @@ class URDFToSerialManipulator:
     @staticmethod
     def get_joint(robot: URDF, link_name: str):
         """
-        Retrieves a joint from the robot by link name.
-        Args:
-            robot (URDF): The robot object.
-            link_name (str): The name of the link.
+            Given a robot URDF and a link name, returns the joint associated with that link.
+
+        Parameters:
+            robot (URDF): The robot URDF object.
+            link_name (str): The name of the link to find the joint for.
+
         Returns:
-            The joint object if found, otherwise None.
+            Joint or None: The joint associated with the link, or None if no joint is found.
         """
         for link in robot.links:
             if link.name == link_name:
@@ -54,15 +60,12 @@ class URDFToSerialManipulator:
     @staticmethod
     def w_p_to_slist(w: np.ndarray, p: np.ndarray, robot_dof: int) -> np.ndarray:
         """
-        Converts angular and linear positions to a screw axis list.
+        Convert the input angular velocity and linear position vectors to the screw list representation.
 
-        Args:
-            w (np.ndarray): Angular positions.
-            p (np.ndarray): Linear positions.
-            robot_dof (int): Degree of freedom of the robot.
-
-        Returns:
-            np.ndarray: Screw axis list.
+        :param w: A numpy array representing the angular velocity vectors.
+        :param p: A numpy array representing the linear position vectors.
+        :param robot_dof: An integer representing the number of degrees of freedom of the robot.
+        :return: A numpy array representing the screw list.
         """
         Slist = []
         for i in range(robot_dof):
@@ -74,14 +77,19 @@ class URDFToSerialManipulator:
 
     def load_urdf(self, urdf_name: str) -> dict:
         """
-        Loads a URDF file and extracts necessary data.
+        Load the URDF file and extract the necessary information to create the robot model.
 
-        Args:
-            urdf_name (str): Path to the URDF file.
+        Parameters:
+            urdf_name (str): The name of the URDF file to load.
 
         Returns:
-            dict: A dictionary containing robot data.
-        """
+            dict: A dictionary containing the following:
+                - "M" (np.ndarray): The home position matrix.
+                - "Slist" (list): The screw axes of each joint.
+                - "Blist" (list): The inertia matrices.
+                - "Glist" (list): The mass matrices.
+                - "actuated_joints_num" (int): The number of actuated joints in the robot.
+        """        
         robot = URDF.load(urdf_name)
         joint_num = len(robot.actuated_joints)
 
