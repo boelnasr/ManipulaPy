@@ -1,4 +1,4 @@
-from urdfpy import URDF
+from urdfpy import URDF 
 import numpy as np
 import modern_robotics as mr
 import pybullet as p
@@ -7,6 +7,9 @@ import time
 from kinematics import SerialManipulator
 from dynamics import ManipulatorDynamics
 import utils
+import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
+from utils import adjoint_transform, transform_from_twist
 class URDFToSerialManipulator:
     """
     A class to convert URDF files to SerialManipulator objects and simulate them using PyBullet.
@@ -112,7 +115,10 @@ class URDFToSerialManipulator:
                 child_M = child_M @ child_link.inertial.origin
             M_list = np.dot(M_list, child_M)
         Slist = self.w_p_to_slist(w_, p_, joint_num)
-        Blist = mr.Adjoint(mr.TransInv(M_list)) @ Slist
+        
+        # Replace mr.Adjoint and mr.TransInv with custom functions
+        Blist = adjoint_transform(transform_from_twist(M_list)) @ Slist
+
         return {"M": M_list, "Slist": Slist, "Blist": Blist, "Glist": Glist, "actuated_joints_num": joint_num}
 
     def initialize_serial_manipulator(self) -> SerialManipulator:
@@ -134,19 +140,18 @@ class URDFToSerialManipulator:
         Initializes the ManipulatorDynamics object using the extracted URDF data.
         """
         data = self.robot_data
-        Glist = self.extract_inertia_matrices()
-
         # Initialize the ManipulatorDynamics object
         self.manipulator_dynamics = ManipulatorDynamics(
             M_list=data["M"],
             omega_list=data["Slist"][:, :3],
-            r_list=data["Slist"][:, 3:],
-            b_list=data["Blist"],
+            r_list=utils.extract_r_list(data["Slist"]),
+            b_list=None,  # Assuming b_list is not provided in URDF data
             S_list=data["Slist"],
             B_list=data["Blist"],
-            Glist=Glist
+            Glist=data["Glist"]
         )
 
+        return self.manipulator_dynamics
     def extract_inertia_matrices(self):
         """
         Extracts the spatial inertia matrices from the URDF data.
@@ -164,6 +169,38 @@ class URDFToSerialManipulator:
                 Glist.append(np.zeros((6, 6)))  # Add zero matrix for links without inertia
         return Glist
 
+    def visualize_robot(self, thetalist):
+        """
+        Visualize the robot using Matplotlib based on the provided joint angles.
+
+        Args:
+            thetalist (np.ndarray): The joint angles of the robot.
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Starting point (base of the robot)
+        T = np.eye(4)
+        x, y, z = T[0, 3], T[1, 3], T[2, 3]
+        ax.scatter(x, y, z, color='k')  # Base point
+
+        for i in range(len(thetalist)):
+            # Compute the forward kinematics for each joint
+            T = np.dot(T, self.serial_manipulator.forward_kinematics(thetalist[:i + 1], 'space'))
+            x, y, z = T[0, 3], T[1, 3], T[2, 3]
+            ax.scatter(x, y, z, color='r')  # Joint points
+
+            # Plot the links between joints
+            if i > 0:
+                prev_x, prev_y, prev_z = prev_T[0, 3], prev_T[1, 3], prev_T[2, 3]
+                ax.plot([prev_x, x], [prev_y, y], [prev_z, z], color='b')  # Links
+
+            prev_T = T
+
+        ax.set_xlabel('X axis')
+        ax.set_ylabel('Y axis')
+        ax.set_zlabel('Z axis')
+        ax
     def simulate_robot(self):
         """
         Simulates the robot using PyBullet.
@@ -231,3 +268,4 @@ class URDFToSerialManipulator:
         time.sleep(10*np.exp(100))
         # Disconnect from PyBullet
         p.disconnect()
+

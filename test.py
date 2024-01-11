@@ -4,6 +4,7 @@ from dynamics import ManipulatorDynamics
 from math import pi
 import numpy as np
 from singularity import Singularity
+
 # Path to your URDF file
 urdf_file_path = "ur5/ur5/ur5.urdf"
 
@@ -44,14 +45,7 @@ mass_matrix = ur5_dynamics.mass_matrix(thetalist)
 print("\nMass Matrix:")
 print(np.array(mass_matrix))
 
-#plot the manipuality elipsoide:
-elips = Singularity(ur5)
-elips = elips.manipulability_ellipsoid(thetalist, ax=None)
-# Simulate the robot using PyBullet (this will open a PyBullet GUI window)
-urdf_processor.simulate_robot_with_desired_angles([pi/2, pi/2, -pi/2, 0, 0, 0])
+
+urdf_processor.simulate_robot_with_desired_angles(thetalist)
 
 
-#plot the manipuality elipsoide:
-elips = Singularity(ur5)
-elips = elips.manipulability_ellipsoid(thetalist, ax=None)
-# Note: The simulation part will run indefinitely until you manually close the PyBullet window.

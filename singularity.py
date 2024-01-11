@@ -84,7 +84,7 @@ class Singularity:
             ax.set_zlabel('Z axis')
 
         plt.show()
-        time.sleep(10)
+
 
     def workspace_analysis(self, joint_limits, resolution=0.1):
         """

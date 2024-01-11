@@ -1,121 +1,154 @@
 import numpy as np
-import modern_robotics as mr
-class SerialManipulator:
-    def __init__(self, M_list, omega_list, r_list=None, b_list=None, S_list=None, B_list=None,G_list=None):
-        """
-        Initialize the serial manipulator with given parameters.
+import utils
 
-        Args:
-            M_list (np.ndarray): Home position matrix of the end-effector.
-            omega_list (np.ndarray): List of rotation axes for each joint.
-            r_list (np.ndarray, optional): List of positions of each screw axis in the base frame.
-            b_list (np.ndarray, optional): List of positions of each screw axis in the body frame.
-            S_list (np.ndarray, optional): List of screw axes in the space frame.
-            B_list (np.ndarray, optional): List of screw axes in the body frame.
+class SerialManipulator:
+    def __init__(self, M_list, omega_list, r_list=None, b_list=None, S_list=None, B_list=None, G_list=None):
         """
+    	    Initialize the class with the given parameters.
+    	
+    	    Parameters:
+    	        M_list (list): A list of M values.
+    	        omega_list (list): A list of omega values.
+    	        r_list (list, optional): A list of r values. Defaults to None.
+    	        b_list (list, optional): A list of b values. Defaults to None.
+    	        S_list (list, optional): A list of S values. Defaults to None.
+    	        B_list (list, optional): A list of B values. Defaults to None.
+    	        G_list (list, optional): A list of G values. Defaults to None.
+        """
+    
         self.M_list = M_list
         self.G_list = G_list
         self.omega_list = omega_list
-        self.r_list = r_list if r_list is not None else np.zeros_like(omega_list)
-        self.b_list = b_list if b_list is not None else np.zeros_like(omega_list)
-        self.S_list = S_list if S_list is not None else self.calculate_screw_list(self.omega_list, self.r_list, space=True)
-        self.B_list = B_list if B_list is not None else self.calculate_screw_list(self.omega_list, self.b_list, space=False)
-
-    @staticmethod
-    def calculate_screw_list(omega_list, position_list, space=True):
-        """
-        Calculate the screw axes in either the space frame or the body frame.
-
-        Args:
-            omega_list (np.ndarray): List of rotation axes for each joint.
-            position_list (np.ndarray): List of positions of each screw axis.
-            space (bool): Flag indicating if the screw list is for the space frame (True) or body frame (False).
-
-        Returns:
-            np.ndarray: List of screw axes.
-        """
-        V_list = [np.cross(-omega, position) if space else np.cross(omega, position) for omega, position in zip(omega_list, position_list)]
-        return np.vstack((omega_list.T, np.array(V_list).T)).T
+        self.r_list = r_list if r_list is not None else utils.extract_r_list(S_list)
+        self.b_list = b_list if b_list is not None else utils.extract_r_list(B_list)
+        self.S_list = S_list if S_list is not None else utils.extract_screw_list(omega_list, self.r_list)
+        self.B_list = B_list if B_list is not None else utils.extract_screw_list(omega_list, self.b_list)
 
     def forward_kinematics(self, thetalist, frame='space'):
         """
-        Compute forward kinematics in the specified frame.
+        Compute the forward kinematics of a robotic arm.
 
         Args:
-            thetalist (np.ndarray): Array of joint angles.
-            frame (str): The frame of reference ('space' or 'body').
+            thetalist (numpy.ndarray): A 1D array of joint angles in radians.
+            frame (str, optional): The frame in which to compute the forward kinematics. 
+                                    Either 'space' (default) or 'body'.
 
         Returns:
-            np.ndarray: Transformation matrix of the end-effector in the specified frame.
+            numpy.ndarray: The transformation matrix representing the end-effector's pose.
         """
+        
+        T = np.eye(4)
         if frame == 'space':
-            T = mr.FKinSpace(self.M_list, self.S_list, thetalist)
+            for i, theta in enumerate(thetalist):
+                T = np.dot(T, utils.transform_from_twist(self.S_list[:, i], theta))
         elif frame == 'body':
-            T = mr.FKinBody(self.M_list, self.B_list, thetalist)
+            for i, theta in reversed(list(enumerate(thetalist))):
+                T = np.dot(utils.transform_from_twist(self.B_list[:, i], theta), T)
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
-        return np.around(T, decimals=2)
+        return T
 
-    def end_effector_velocity(self, thetalist, theta_dot, frame='space'):
+    def end_effector_velocity(self, thetalist, dthetalist, frame='space'):
         """
-        Compute the end effector velocity in the specified frame.
+        Calculate the end effector velocity given the joint angles and joint velocities.
 
-        Args:
-            thetalist (np.ndarray): Array of joint angles.
-            theta_dot (np.ndarray): Array of joint velocities.
-            frame (str): The frame of reference ('space' or 'body').
+        Parameters:
+            thetalist (list): A list of joint angles.
+            dthetalist (list): A list of joint velocities.
+            frame (str): The frame in which the Jacobian is calculated. Valid values are 'space' and 'body'.
 
         Returns:
-            np.ndarray: The twist of the end effector velocities.
-        """
-        try:
-            J = mr.JacobianSpace(self.S_list, thetalist) if frame == 'space' else mr.JacobianBody(self.B_list, thetalist)
-            V = np.dot(J, theta_dot)
-            return np.around(V, 2)
-        except Exception as e:
-            return f"Error in end_effector_velocity: {e}"
+            numpy.ndarray: The end effector velocity.
 
-    def iterative_inverse_kinematics(self, T, thetalist0, eomg, ev, max_iterations=50):
+        Raises:
+            ValueError: If an invalid frame is specified.
         """
-        Iteratively compute inverse kinematics in the body frame.
+        
+        if frame == 'space':
+            J = self.jacobian_space(thetalist)
+        elif frame == 'body':
+            J = self.jacobian_body(thetalist)
+        else:
+            raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
+        return np.dot(J, dthetalist)
 
-        Args:
-            T (np.ndarray): The desired end-effector configuration.
-            thetalist0 (np.ndarray): An initial guess of joint angles.
-            eomg (float): Tolerance on the end-effector orientation error.
-            ev (float): Tolerance on the end-effector linear position error.
-            max_iterations (int): Maximum number of iterations for the algorithm.
+    def jacobian(self, thetalist, frame='space'):
+        """
+        Calculate the Jacobian matrix for the given joint angles.
+
+        Parameters:
+            thetalist (list): A list of joint angles.
+            frame (str): The reference frame for the Jacobian calculation. 
+                        Valid values are 'space' or 'body'. Defaults to 'space'.
 
         Returns:
-            (np.ndarray, bool): Tuple containing the final joint angles and a boolean indicating success.
+            numpy.ndarray: The Jacobian matrix of shape (6, len(thetalist)).
+
+        Raises:
+            ValueError: If an invalid frame is specified.
+
         """
-        thetalist = np.array(thetalist0).copy()
-        for i in range(max_iterations):
-            T_current = mr.FKinBody(self.M_list, self.B_list, thetalist)
-            Vb = mr.se3ToVec(mr.MatrixLog6(np.dot(mr.TransInv(T_current), T)))
-            if np.linalg.norm(Vb[0:3]) < eomg and np.linalg.norm(Vb[3:6]) < ev:
+        
+        J = np.zeros((6, len(thetalist)))
+        T = np.eye(4)
+        if frame == 'space':
+            for i in range(len(thetalist)):
+                J[:, i] = np.dot(utils.adjoint_transform(T), self.S_list[:, i])
+                T = np.dot(T, utils.transform_from_twist(self.S_list[:, i], thetalist[i]))
+        elif frame == 'body':
+            T = self.forward_kinematics(thetalist, frame='body')
+            for i in reversed(range(len(thetalist))):
+                J[:, i] = np.dot(utils.adjoint_transform(np.linalg.inv(T)), self.B_list[:, i])
+                T = np.dot(T, np.linalg.inv(utils.transform_from_twist(self.B_list[:, i], thetalist[i])))
+        else:
+            raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
+        return J
+
+    def iterative_inverse_kinematics(self, T_desired, thetalist0, eomg =1*10^-4, ev=1*10^-4, max_iterations=50):
+        """
+        Perform iterative inverse kinematics to find the joint angles that achieve a desired end-effector pose.
+
+        Parameters:
+            T_desired (numpy.ndarray): The desired end-effector pose as a 4x4 transformation matrix.
+            thetalist0 (list): The initial guess for the joint angles.
+            eomg (float): The maximum error allowed for the orientation of the end-effector.
+            ev (float): The maximum error allowed for the position of the end-effector.
+            max_iterations (int, optional): The maximum number of iterations to perform. Defaults to 50.
+
+        Returns:
+            tuple: A tuple containing the joint angles (thetalist) and a boolean value indicating whether the solution was found.
+        """
+        
+        thetalist = np.array(thetalist0)
+        for _ in range(max_iterations):
+            T_current = self.forward_kinematics(thetalist, frame='body')
+            Vb = utils.logm(np.dot(utils.adjoint_transform(np.linalg.inv(T_current)), T_desired))
+            if np.linalg.norm(Vb[:3]) < eomg and np.linalg.norm(Vb[3:]) < ev:
                 return thetalist, True
-
-            Jb = mr.JacobianBody(self.B_list, thetalist)
+            Jb = self.jacobian_body(thetalist)
             thetalist += np.dot(np.linalg.pinv(Jb), Vb)
-
         return thetalist, False
 
     def joint_velocity(self, thetalist, V_ee, frame='space'):
         """
-        Compute the joint velocities to achieve a desired end effector twist.
+        Calculates the joint velocity given the joint positions, end-effector velocity, and frame type.
 
-        Args:
-            thetalist (np.ndarray): Array of joint angles.
-            V_ee (np.ndarray): Desired twist of the end effector.
-            frame (str): The frame of reference ('space' or 'body').
+        Parameters:
+            thetalist (list): A list of joint positions.
+            V_ee (array-like): The end-effector velocity.
+            frame (str, optional): The frame type. Defaults to 'space'.
 
         Returns:
-            np.ndarray: Array of joint velocities.
+            array-like: The joint velocity.
+
+        Raises:
+            ValueError: If an invalid frame type is specified.
         """
-        try:
-            J = mr.JacobianSpace(self.S_list, thetalist) if frame == 'space' else mr.JacobianBody(self.B_list, thetalist)
-            theta_dot = np.linalg.pinv(J) @ V_ee
-            return np.around(theta_dot, 2)
-        except Exception as e:
-            return f"Error in compute_joint_velocity: {e}"
+        
+        if frame == 'space':
+            J = self.jacobian(thetalist)
+        elif frame == 'body':
+            J = self.jacobian(thetalist,frame='body')
+        else:
+            raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
+        return np.linalg.pinv(J) @ V_ee
