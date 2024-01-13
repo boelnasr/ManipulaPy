@@ -115,10 +115,10 @@ class URDFToSerialManipulator:
                 child_M = child_M @ child_link.inertial.origin
             M_list = np.dot(M_list, child_M)
         Slist = self.w_p_to_slist(w_, p_, joint_num)
-        
+        Tsb_inv = np.linalg.inv(M_list)
+        Ad_Tsb_inv = adjoint_transform(Tsb_inv)
         # Replace mr.Adjoint and mr.TransInv with custom functions
-        Blist = adjoint_transform(transform_from_twist(M_list)) @ Slist
-
+        Blist = np.dot(Ad_Tsb_inv, Slist)
         return {"M": M_list, "Slist": Slist, "Blist": Blist, "Glist": Glist, "actuated_joints_num": joint_num}
 
     def initialize_serial_manipulator(self) -> SerialManipulator:
