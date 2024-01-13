@@ -1,7 +1,7 @@
 import numpy as np
 import modern_robotics as mr
 from kinematics import SerialManipulator
-
+from utils import adjoint_transform as ad
 class ManipulatorDynamics(SerialManipulator):
     def __init__(self, M_list, omega_list, r_list, b_list, S_list, B_list, Glist):
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
@@ -29,7 +29,7 @@ class ManipulatorDynamics(SerialManipulator):
 
         for i in range(n):
             T = self.forward_kinematics(thetalist[:i + 1], 'space')
-            AdT[:, :, i + 1] = mr.Adjoint(T)
+            AdT[:, :, i + 1] = ad(T)
 
         for i in range(n):
             F = np.zeros(6)
@@ -40,7 +40,7 @@ class ManipulatorDynamics(SerialManipulator):
                 dV = np.zeros(6)
                 dV[5] = 1 if i == j else 0
                 F += np.dot(Ia, dV)
-            M[i, i:] = np.dot(mr.JacobianSpace(self.S_list, thetalist).T, F)[i:]
+            M[i, i:] = np.dot(self.jacobian( thetalist).T, F)[i:]
 
         M = M + M.T - np.diag(np.diag(M))
         self._mass_matrix_cache[thetalist_key] = M
@@ -84,7 +84,7 @@ class ManipulatorDynamics(SerialManipulator):
         """
         n = len(thetalist)
         c = np.zeros(n)
-        J = mr.JacobianSpace(self.S_list, thetalist)
+        J = self.jacobian(thetalist)
         for i in range(n):
             c[i] = sum([self.partial_derivative(self.mass_matrix(thetalist), i, j, k, thetalist) * dthetalist[j] * dthetalist[k] for j in range(n) for k in range(n)])
         return c
@@ -107,7 +107,7 @@ class ManipulatorDynamics(SerialManipulator):
         G[5] = -1
         for i in range(n):
             for j in range(i, n):
-                AdT = mr.Adjoint(self.forward_kinematics(thetalist[:j + 1], 'space'))
+                AdT =ad(self.forward_kinematics(thetalist[:j + 1], 'space'))
                 Gj = np.dot(AdT.T, G)
                 grav[i] += np.dot(M[i, :], Gj.flatten())
         return grav
@@ -135,7 +135,7 @@ class ManipulatorDynamics(SerialManipulator):
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)
-        J_transpose = mr.JacobianSpace(self.S_list, thetalist).T
+        J_transpose = self.jacobian(thetalist).T
         taulist = np.dot(M, ddthetalist) + c + g_forces + np.dot(J_transpose, Ftip)
         return taulist
 
@@ -153,7 +153,7 @@ class ManipulatorDynamics(SerialManipulator):
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)
-        J_transpose = mr.JacobianSpace(self.S_list, thetalist).T
+        J_transpose = self.jacobian(thetalist).T
         rhs = taulist - c - g_forces - np.dot(J_transpose, Ftip)
         ddthetalist = np.linalg.solve(M, rhs)
         return ddthetalist
