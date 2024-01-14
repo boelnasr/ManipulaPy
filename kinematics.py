@@ -1,6 +1,6 @@
 import numpy as np
 import utils
-
+import matplotlib.pyplot as plt
 class SerialManipulator:
     def __init__(self, M_list, omega_list, r_list=None, b_list=None, S_list=None, B_list=None, G_list=None):
         """
@@ -104,30 +104,68 @@ class SerialManipulator:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return J
 
-    def iterative_inverse_kinematics(self, T_desired, thetalist0, eomg =1*10^-4, ev=1*10^-4, max_iterations=50):
+    def iterative_inverse_kinematics(self, T_desired, thetalist0, eomg=1e-6, ev=1e-6, max_iterations=5000, plot_residuals=False):
         """
-        Perform iterative inverse kinematics to find the joint angles that achieve a desired end-effector pose.
+        Performs iterative inverse kinematics to calculate joint angles that achieve a desired end-effector pose.
 
         Parameters:
-            T_desired (numpy.ndarray): The desired end-effector pose as a 4x4 transformation matrix.
-            thetalist0 (list): The initial guess for the joint angles.
-            eomg (float): The maximum error allowed for the orientation of the end-effector.
-            ev (float): The maximum error allowed for the position of the end-effector.
+            T_desired (np.ndarray): The desired end-effector pose as a 4x4 transformation matrix.
+            thetalist0 (List[float]): The initial guess for the joint angles.
+            eomg (float, optional): The tolerance for rotational error convergence. Defaults to 1e-6.
+            ev (float, optional): The tolerance for translational error convergence. Defaults to 1e-6.
             max_iterations (int, optional): The maximum number of iterations to perform. Defaults to 50.
+            plot_residuals (bool, optional): Whether to plot the residual norm over iterations. Defaults to False.
 
         Returns:
-            tuple: A tuple containing the joint angles (thetalist) and a boolean value indicating whether the solution was found.
+            Tuple[List[float], bool]: A tuple containing the resulting joint angles and a boolean value indicating the success of convergence.
+
+        Raises:
+            None
         """
-        
         thetalist = np.array(thetalist0)
+        residuals = []  # List to store the error at each iteration
+        num_iterations = 0  # Initialize iteration counter
+
         for _ in range(max_iterations):
-            T_current = self.forward_kinematics(thetalist, frame='body')
-            Vb = utils.logm(np.dot(utils.adjoint_transform(np.linalg.inv(T_current)), T_desired))
-            if np.linalg.norm(Vb[:3]) < eomg and np.linalg.norm(Vb[3:]) < ev:
-                return thetalist, True
-            Jb = self.jacobian_body(thetalist)
-            thetalist += np.dot(np.linalg.pinv(Jb), Vb)
-        return thetalist, False
+            T_current = self.forward_kinematics(thetalist, frame='space')
+            num_iterations += 1
+            # Calculate the current twist
+            J = self.jacobian(thetalist, frame='space')
+            V_current = utils.se3ToVec(utils.MatrixLog6(T_current))
+            V_desired = utils.se3ToVec(utils.MatrixLog6(T_desired))
+
+            # Calculate the error twist
+            V_error = V_desired - V_current
+            trans_error = V_error[3:6]
+            rot_error = V_error[0:3]
+            trans_error_norm = np.linalg.norm(trans_error)
+            rot_error_norm = np.linalg.norm(rot_error)
+            residuals.append((trans_error_norm, rot_error_norm))
+
+            # Check for convergence independently
+            if trans_error_norm < ev and rot_error_norm < eomg:
+                break
+
+            # Update thetalist using the pseudoinverse of the Jacobian
+            delta_theta = np.dot(np.linalg.pinv(J), V_error)
+            thetalist += 0.058 * delta_theta
+
+        success = trans_error_norm < ev and rot_error_norm < eomg
+
+        # Plotting the residual if requested
+        if plot_residuals:
+            plt.plot([r[0] for r in residuals], label='Translational Error')
+            plt.plot([r[1] for r in residuals], label='Rotational Error')
+            plt.xlabel('Iteration')
+            plt.ylabel('Error Norm')
+            plt.title('Inverse Kinematics Convergence')
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+
+        return np.array(thetalist), success , num_iterations
+    
+
 
     def joint_velocity(self, thetalist, V_ee, frame='space'):
         """

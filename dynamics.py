@@ -1,5 +1,4 @@
 import numpy as np
-import modern_robotics as mr
 from kinematics import SerialManipulator
 from utils import adjoint_transform as ad
 class ManipulatorDynamics(SerialManipulator):
@@ -16,7 +15,7 @@ class ManipulatorDynamics(SerialManipulator):
             thetalist (list): A list of joint angles.
         
         Returns:
-            numpy.ndarray: The mass matrix of the robot.
+            The mass matrix of the robot.
         """
         thetalist_key = tuple(thetalist)
         if thetalist_key in self._mass_matrix_cache:
