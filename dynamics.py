@@ -85,7 +85,7 @@ class ManipulatorDynamics(SerialManipulator):
         c = np.zeros(n)
         J = self.jacobian(thetalist)
         for i in range(n):
-            c[i] = sum([self.partial_derivative(self.mass_matrix(thetalist), i, j, k, thetalist) * dthetalist[j] * dthetalist[k] for j in range(n) for k in range(n)])
+            c[i] = sum([self.partial_derivative(i, j, k, thetalist) * dthetalist[j] * dthetalist[k] for j in range(n) for k in range(n)])
         return c
 
     def gravity_forces(self, thetalist, g=[0, 0, -9.81]):
@@ -140,15 +140,19 @@ class ManipulatorDynamics(SerialManipulator):
 
     def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
         """
-        Compute the forward dynamics of a robot given the joint angles, joint velocities, joint torques, gravitational forces, and external forces.
-
-        :param thetalist: A list of joint angles (n elements)
-        :param dthetalist: A list of joint velocities (n elements)
-        :param taulist: A list of joint torques (n elements)
-        :param g: A list of gravitational forces (n elements)
-        :param Ftip: A list of external forces (6 elements)
-        :return: A list of joint accelerations (n elements)
+        Compute the forward dynamics of the robot given the current joint angles, joint velocities, applied torques, gravity vector, and external forces.
+        
+        Parameters:
+            thetalist (list): List of joint angles (radians) [theta_1, theta_2, ..., theta_n].
+            dthetalist (list): List of joint velocities (radians/s) [dtheta_1, dtheta_2, ..., dtheta_n].
+            taulist (list): List of applied torques (Nm) [tau_1, tau_2, ..., tau_n].
+            g (list): Gravity vector (m/s^2) [g_x, g_y, g_z].
+            Ftip (list): External force applied at the end effector (N) [Fx, Fy, Fz].
+        
+        Returns:
+            ddthetalist (list): List of joint accelerations (rad/s^2) [ddtheta_1, ddtheta_2, ..., ddtheta_n].
         """
+        
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.linalg import expm
 
 def extract_r_list(Slist):
     """
@@ -21,7 +22,18 @@ def extract_r_list(Slist):
         else:
             r_list.append([0, 0, 0])  # For prismatic joints
     return np.array(r_list)
+def NearZero(z):
+    """
+    Determines if a given number is near zero.
 
+    Parameters:
+        z (float): The number to check.
+
+    Returns:
+        bool: True if the number is near zero, False otherwise.
+    """
+    
+    return abs(z) < 1e-6
 def extract_omega_list(Slist):
     """
     Extracts the first three elements from each sublist in the given list and returns them as a numpy array.
@@ -171,3 +183,101 @@ def rotation_logm(R):
     else:
         omega = (1 / (2 * np.sin(theta))) * np.array([R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]])
         return omega, theta
+def MatrixLog6(T):
+    """
+    Compute the matrix logarithm of a given transformation matrix T.
+    
+    Parameters:
+        T (ndarray): The transformation matrix of shape (4, 4).
+        
+    Returns:
+        ndarray: The matrix logarithm of T, with shape (4, 4).
+    """
+    R, p = TransToRp(T)
+    omgmat = MatrixLog3(R)
+    if np.array_equal(omgmat, np.zeros((3, 3))):
+        return np.r_[np.c_[np.zeros((3, 3)),
+                           [T[0][3], T[1][3], T[2][3]]],
+                     [[0, 0, 0, 0]]]
+    else:
+        theta = np.arccos((np.trace(R) - 1) / 2.0)
+        return np.r_[np.c_[omgmat,
+                           np.dot(np.eye(3) - omgmat / 2.0 \
+                           + (1.0 / theta - 1.0 / np.tan(theta / 2.0) / 2) \
+                              * np.dot(omgmat,omgmat) / theta,[T[0][3],
+                                                               T[1][3],
+                                                               T[2][3]])],
+                                                            [[0, 0, 0, 0]]]
+    
+def MatrixLog3(R):
+    
+    acosinput = (np.trace(R) - 1) / 2.0
+    if acosinput >= 1:
+        return np.zeros((3, 3))
+    elif acosinput <= -1:
+        if not NearZero(1 + R[2][2]):
+            omg = (1.0 / np.sqrt(2 * (1 + R[2][2]))) \
+                  * np.array([R[0][2], R[1][2], 1 + R[2][2]])
+        elif not NearZero(1 + R[1][1]):
+            omg = (1.0 / np.sqrt(2 * (1 + R[1][1]))) \
+                  * np.array([R[0][1], 1 + R[1][1], R[2][1]])
+        else:
+            omg = (1.0 / np.sqrt(2 * (1 + R[0][0]))) \
+                  * np.array([1 + R[0][0], R[1][0], R[2][0]])
+        return VecToso3(np.pi * omg)
+    else:
+        theta = np.arccos(acosinput)
+        return theta / 2.0 / np.sin(theta) * (R - np.array(R).T)
+    
+
+def VecToso3(omg):
+   
+    return np.array([[0,      -omg[2],  omg[1]],
+                     [omg[2],       0, -omg[0]],
+                     [-omg[1], omg[0],       0]])
+def VecTose3(V):
+    
+    return np.r_[np.c_[VecToso3([V[0], V[1], V[2]]), [V[3], V[4], V[5]]],
+                 np.zeros((1, 4))]
+
+def MatrixExp6(se3mat):
+    """
+    Computes the matrix exponential of a matrix in se(3).
+
+    Parameters:
+    se3mat (np.ndarray): A 4x4 matrix representing a twist in se(3).
+
+    Returns:
+    np.ndarray: The corresponding 4x4 transformation matrix in SE(3).
+    """
+    if se3mat.shape != (4, 4):
+        raise ValueError("Input matrix must be of shape (4, 4)")
+
+    # Extract the angular velocity vector (omega) and linear velocity vector (v) from the se3 matrix
+    omega = np.array([se3mat[2, 1], se3mat[0, 2], se3mat[1, 0]])
+    v = np.array([se3mat[0, 3], se3mat[1, 3], se3mat[2, 3]])
+
+    # Compute the magnitude of omega
+    omega_magnitude = np.linalg.norm(omega)
+
+    if omega_magnitude < 1e-6:
+        # If omega is very small, use the first-order Taylor expansion of matrix exponential
+        return np.eye(4) + se3mat
+
+    # Compute the skew-symmetric matrix of omega
+    omega_skew = skew_symmetric(omega)
+
+    # Compute the matrix exponential of the skew-symmetric matrix of omega
+    omega_exp = expm(omega_skew * omega_magnitude)
+
+    # Compute the additional term for the linear velocity part
+    omega_skew_squared = np.dot(omega_skew, omega_skew)
+    v_term = (np.eye(3) * omega_magnitude + (1 - np.cos(omega_magnitude)) * omega_skew + (omega_magnitude - np.sin(omega_magnitude)) * omega_skew_squared) / omega_magnitude**2
+    v_term = np.dot(v_term, v)
+
+    # Construct the final transformation matrix
+    T = np.eye(4)
+    T[:3, :3] = omega_exp
+    T[:3, 3] = v_term
+
+    return T

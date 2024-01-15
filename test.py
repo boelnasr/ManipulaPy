@@ -17,6 +17,8 @@ ur5 = urdf_processor.serial_manipulator
 
 # Example joint angles (thetalist) for the manipulator
 thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)])
+dthetalist = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
+ddthetalist = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 
 # Perform forward kinematics using the space frame
 T_space = ur5.forward_kinematics(thetalist, frame='space')
@@ -27,7 +29,8 @@ print(T_space)
 T_body = ur5.forward_kinematics(thetalist, frame='body')
 print("\nForward Kinematics (Body Frame):")
 print(T_body)
-
+g = [0, 0, -9.81]  # Gravity vector
+Ftip = np.array([1, 1, 1, 1, 1, 1])  # External forces on the end-effector
 # Example end-effector twist
 V_ee = [0.1, 3, 3, -0.1, -0.2, 0.1]
 
@@ -39,17 +42,23 @@ print(joint_velocities)
 new_initial_thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)]) + np.random.normal(0, 0.2, 6)
 
 # Perform inverse kinematics with the new initial guess
-thetalistd = ur5.iterative_inverse_kinematics(T_space, new_initial_thetalist, max_iterations=5000,plot_residuals=True)
+thetalistd = ur5.iterative_inverse_kinematics(T_space, new_initial_thetalist)
 
 print("\nInverse Kinematics with Adjusted Initial Guess (Space Frame):")
 print(thetalistd)
 T_d= ur5.forward_kinematics(np.array([ 3.14579196,  0.56079453,  0.71427021, -1.00188078, -1.56211583,-2.1069051 ]), frame='space')
 print("\nForward Kinematics (Space Frame):")
 print(T_d)
+#define the dynamics 
+ur5_dynamics = urdf_processor.initialize_manipulator_dynamics()
 # Calculate the mass matrix
-#mass_matrix = ur5_dynamics.mass_matrix(thetalist)
-#print("\nMass Matrix:")
-#print(np.array(mass_matrix))
+mass_matrix = ur5_dynamics.mass_matrix(thetalist)
+print("\nMass Matrix:")
+print(np.array(mass_matrix))
+
+# Test inverse dynamics
+taulist = ur5_dynamics.inverse_dynamics(thetalist, dthetalist, ddthetalist, g, Ftip)
+print("Inverse Dynamics (Joint Torques):\n", taulist)
 
 
 
