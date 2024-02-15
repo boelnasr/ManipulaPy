@@ -60,6 +60,7 @@ print(np.array(mass_matrix))
 taulist = ur5_dynamics.inverse_dynamics(thetalist, dthetalist, ddthetalist, g, Ftip)
 print("Inverse Dynamics (Joint Torques):\n", taulist)
 
+urdf_processor.simulate_robot_with_desired_angles(thetalist)
 
 
 
