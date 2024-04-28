@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.linalg import expm
-
 def extract_r_list(Slist):
     """
     Extracts the r_list from the given Slist.

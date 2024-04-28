@@ -2,7 +2,8 @@ import numpy as np
 import utils
 import matplotlib.pyplot as plt
 class SerialManipulator:
-    def __init__(self, M_list, omega_list, r_list=None, b_list=None, S_list=None, B_list=None, G_list=None):
+    def __init__(self, M_list, omega_list, r_list=None, b_list=None, S_list=None,
+                B_list=None, G_list=None,joint_limits=None):
         """
     	    Initialize the class with the given parameters.
     	
@@ -23,6 +24,8 @@ class SerialManipulator:
         self.b_list = b_list if b_list is not None else utils.extract_r_list(B_list)
         self.S_list = S_list if S_list is not None else utils.extract_screw_list(omega_list, self.r_list)
         self.B_list = B_list if B_list is not None else utils.extract_screw_list(omega_list, self.b_list)
+        self.joint_limits = joint_limits if joint_limits is not None else [(None, None)] * len(M_list)
+
 
     def forward_kinematics(self, thetalist, frame='space'):
         """
@@ -149,6 +152,13 @@ class SerialManipulator:
             # Update thetalist using the pseudoinverse of the Jacobian
             delta_theta = np.dot(np.linalg.pinv(J), V_error)
             thetalist += 0.058 * delta_theta
+
+            # Enforce joint limits
+            for i, (theta_min, theta_max) in enumerate(self.joint_limits):
+                if theta_min is not None and thetalist[i] < theta_min:
+                    thetalist[i] = theta_min
+                elif theta_max is not None and thetalist[i] > theta_max:
+                    thetalist[i] = theta_max
 
         success = trans_error_norm < ev and rot_error_norm < eomg
 

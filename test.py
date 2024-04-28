@@ -1,14 +1,14 @@
-from urdf_processor import URDFToSerialManipulator
-from kinematics import SerialManipulator
-from dynamics import ManipulatorDynamics
+#!/usr/bin/env python3
+
+from ManipulaPy.urdf_processor import URDFToSerialManipulator
+from ManipulaPy.kinematics import SerialManipulator
+from ManipulaPy.dynamics import ManipulatorDynamics
 from math import pi
 import numpy as np
-from singularity import Singularity
-import utils 
-
+from ManipulaPy.singularity import Singularity
+import ManipulaPy.utils 
 # Path to your URDF file
-urdf_file_path = "ur5/ur5/ur5.urdf"
-
+urdf_file_path = "xarm/xarm6_robot.urdf"
 # Initialize the URDFToSerialManipulator with the URDF file
 urdf_processor = URDFToSerialManipulator(urdf_file_path)
 
@@ -42,7 +42,7 @@ print(joint_velocities)
 new_initial_thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)]) + np.random.normal(0, 0.2, 6)
 
 # Perform inverse kinematics with the new initial guess
-thetalistd = ur5.iterative_inverse_kinematics(T_space, new_initial_thetalist)
+thetalistd = ur5.iterative_inverse_kinematics(T_space, new_initial_thetalist,plot_residuals=False)
 
 print("\nInverse Kinematics with Adjusted Initial Guess (Space Frame):")
 print(thetalistd)

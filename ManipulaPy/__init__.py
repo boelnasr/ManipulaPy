@@ -8,5 +8,5 @@ from .path_planning import *
 from .utils import *
 from urdf_processor import *
 # Define package-level variables
-__version__ = '1.0.0'
+__version__ = '1.0.0.1'
 __author__ = 'Mohamed Aboelnar'

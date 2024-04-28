@@ -1,6 +1,5 @@
-from urdfpy import URDF 
+from urchin.urdf import URDF 
 import numpy as np
-import modern_robotics as mr
 import pybullet as p
 import pybullet_data
 import time
@@ -116,7 +115,7 @@ class URDFToSerialManipulator:
             M_list = np.dot(M_list, child_M)
         Slist = self.w_p_to_slist(w_, p_, joint_num)
         Tsb_inv = np.linalg.inv(M_list)
-        Ad_Tsb_inv = adjoint_transform(Tsb_inv)
+        Ad_Tsb_inv = utils.adjoint_transform(Tsb_inv)
         # Replace mr.Adjoint and mr.TransInv with custom functions
         Blist = np.dot(Ad_Tsb_inv, Slist)
         return {"M": M_list, "Slist": Slist, "Blist": Blist, "Glist": Glist, "actuated_joints_num": joint_num}
@@ -268,4 +267,3 @@ class URDFToSerialManipulator:
         time.sleep(10*np.exp(100))
         # Disconnect from PyBullet
         p.disconnect()
-
