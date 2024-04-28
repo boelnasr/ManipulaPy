@@ -1,14 +1,16 @@
+#!/usr/bin/env python3
+
 from urchin.urdf import URDF 
 import numpy as np
 import pybullet as p
 import pybullet_data
 import time
-from kinematics import SerialManipulator
-from dynamics import ManipulatorDynamics
-import utils
+from .kinematics import SerialManipulator
+from .dynamics import ManipulatorDynamics
+from . import utils
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
-from utils import adjoint_transform, transform_from_twist
+from .utils import adjoint_transform, transform_from_twist
 class URDFToSerialManipulator:
     """
     A class to convert URDF files to SerialManipulator objects and simulate them using PyBullet.

@@ -1,5 +1,7 @@
+#!/usr/bin/env python3
+
 import numpy as np
-import utils
+from . import utils
 import matplotlib.pyplot as plt
 class SerialManipulator:
     def __init__(self, M_list, omega_list, r_list=None, b_list=None, S_list=None,

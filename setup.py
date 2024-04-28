@@ -5,13 +5,13 @@ from setuptools import setup, find_packages
 
 setup(
     name='ManipulaPy',
-    version='1.0.0',
+    version='1.0.0.2',
     author='Mohamed Aboelnar',
-    author_email='your-email@example.com',  # Optional
+    author_email='aboelnasr1997@gmail.com',  # Optional
     description='A package for robotic serial manipulator operations',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',  # if your README is in markdown
-    url='https://github.com/yourusername/serial_manipulator',  # Optional
+    url='https://github.com/boelnasr/ManipulaPy',  # Optional
     packages=find_packages(),
     install_requires=[
         # Add your package dependencies here

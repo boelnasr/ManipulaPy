@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
+
 import numpy as np
-from kinematics import SerialManipulator
-from utils import adjoint_transform as ad
+from .kinematics import SerialManipulator
+from .utils import adjoint_transform as ad
 class ManipulatorDynamics(SerialManipulator):
     def __init__(self, M_list, omega_list, r_list, b_list, S_list, B_list, Glist):
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)

@@ -1,6 +1,8 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import MatrixLog6, TransInv, MatrixExp6
+from .utils import MatrixLog6, TransInv, MatrixExp6
 class TrajectoryPlanning:
     def __init__(self, serial_manipulator, dynamics):
         self.serial_manipulator = serial_manipulator
