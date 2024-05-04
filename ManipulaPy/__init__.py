@@ -1,4 +1,4 @@
-# serial_manipulator/__init__.py
+
 
 # Import main modules for easier access
 from .kinematics import *

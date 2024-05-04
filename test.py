@@ -14,6 +14,8 @@ urdf_processor = URDFToSerialManipulator(urdf_file_path)
 
 # Extract the SerialManipulator object
 ur5 = urdf_processor.serial_manipulator
+# Initialize Singularity Analysis
+singularity_analyzer = Singularity(ur5)
 
 # Example joint angles (thetalist) for the manipulator
 thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)])
@@ -24,6 +26,19 @@ ddthetalist = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 T_space = ur5.forward_kinematics(thetalist, frame='space')
 print("\nForward Kinematics (Space Frame):")
 print(T_space)
+# Initialize Singularity Analysis
+singularity_analyzer = Singularity(ur5)
+# Example to plot manipulability ellipsoid
+#singularity_analyzer.manipulability_ellipsoid(thetalist)
+joint_limits = [
+    (-np.pi, np.pi),  # Joint 1
+    (-np.pi/2, np.pi/2),  # Joint 2
+    (-np.pi/2, np.pi/2),  # Joint 3
+    (-np.pi, np.pi/3),  # Joint 4
+    (-np.pi/2, np.pi),  # Joint 5
+    (-np.pi, np.pi)   # Joint 6
+]
+singularity_analyzer.plot_workspace_monte_carlo(joint_limits,num_samples=200000)
 
 # Perform forward kinematics using the body frame
 T_body = ur5.forward_kinematics(thetalist, frame='body')
@@ -60,7 +75,7 @@ print(np.array(mass_matrix))
 taulist = ur5_dynamics.inverse_dynamics(thetalist, dthetalist, ddthetalist, g, Ftip)
 print("Inverse Dynamics (Joint Torques):\n", taulist)
 
-urdf_processor.simulate_robot_with_desired_angles(thetalist)
+#urdf_processor.simulate_robot_with_desired_angles(thetalist)
 
 
 
