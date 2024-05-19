@@ -307,6 +307,23 @@ class TrajectoryPlanning:
         return {'positions': thetamat, 'velocities': dthetamat, 'accelerations': ddthetamat}
 
     def CartesianTrajectory(self, Xstart, Xend, Tf, N, method):
+        """
+        Calculates a Cartesian trajectory between two given end-effector poses.
+
+        Parameters:
+            Xstart (numpy.ndarray): The starting end-effector pose.
+            Xend (numpy.ndarray): The ending end-effector pose.
+            Tf (float): The total time of the trajectory.
+            N (int): The number of waypoints in the trajectory.
+            method (int): The method to use for trajectory generation (3 for cubic, otherwise quintic).
+
+        Returns:
+            dict: A dictionary containing the trajectory information:
+                - 'positions' (numpy.ndarray): The Cartesian positions of the end-effector along the trajectory.
+                - 'velocities' (numpy.ndarray): The Cartesian velocities of the end-effector along the trajectory.
+                - 'accelerations' (numpy.ndarray): The Cartesian accelerations of the end-effector along the trajectory.
+                - 'orientations' (numpy.ndarray): The orientations of the end-effector along the trajectory.
+        """
         N = int(N)
         timegap = Tf / (N - 1.0)
         traj = [None] * N
