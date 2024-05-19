@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 from urchin.urdf import URDF 
 import numpy as np
 import pybullet as p
@@ -8,9 +9,8 @@ import time
 from .kinematics import SerialManipulator
 from .dynamics import ManipulatorDynamics
 from . import utils
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-from .utils import adjoint_transform, transform_from_twist
+
+
 class URDFToSerialManipulator:
     """
     A class to convert URDF files to SerialManipulator objects and simulate them using PyBullet.
@@ -26,10 +26,11 @@ class URDFToSerialManipulator:
         Returns:
             None
         """
-        
         self.urdf_name = urdf_name
+        self.robot = URDF.load(urdf_name)
         self.robot_data = self.load_urdf(urdf_name)
         self.serial_manipulator = self.initialize_serial_manipulator()
+        self.dynamics = self.initialize_manipulator_dynamics()
 
     @staticmethod
     def transform_to_xyz(T: np.ndarray) -> np.ndarray:
@@ -75,7 +76,7 @@ class URDFToSerialManipulator:
         for i in range(robot_dof):
             w_ = w[i]
             p_ = p[i]
-            v_ = np.cross(w_, -p_)
+            v_ = np.cross(-1*w_, p_)
             Slist.append([w_[0], w_[1], w_[2], v_[0], v_[1], v_[2]])
         return np.transpose(Slist)
 
@@ -151,7 +152,21 @@ class URDFToSerialManipulator:
             B_list=data["Blist"],
             Glist=data["Glist"]
         )
-
+    def initialize_manipulator_dynamics(self):
+        """
+        Initializes the ManipulatorDynamics object using the extracted URDF data.
+        """
+        data = self.robot_data
+        # Initialize the ManipulatorDynamics object
+        self.manipulator_dynamics = ManipulatorDynamics(
+            M_list=data["M"],
+            omega_list=data["Slist"][:, :3],
+            r_list=utils.extract_r_list(data["Slist"]),
+            b_list=None,  # Assuming b_list is not provided in URDF data
+            S_list=data["Slist"],
+            B_list=data["Blist"],
+            Glist=data["Glist"]
+        )
         return self.manipulator_dynamics
     def extract_inertia_matrices(self):
         """
@@ -170,38 +185,6 @@ class URDFToSerialManipulator:
                 Glist.append(np.zeros((6, 6)))  # Add zero matrix for links without inertia
         return Glist
 
-    def visualize_robot(self, thetalist):
-        """
-        Visualize the robot using Matplotlib based on the provided joint angles.
-
-        Args:
-            thetalist (np.ndarray): The joint angles of the robot.
-        """
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-
-        # Starting point (base of the robot)
-        T = np.eye(4)
-        x, y, z = T[0, 3], T[1, 3], T[2, 3]
-        ax.scatter(x, y, z, color='k')  # Base point
-
-        for i in range(len(thetalist)):
-            # Compute the forward kinematics for each joint
-            T = np.dot(T, self.serial_manipulator.forward_kinematics(thetalist[:i + 1], 'space'))
-            x, y, z = T[0, 3], T[1, 3], T[2, 3]
-            ax.scatter(x, y, z, color='r')  # Joint points
-
-            # Plot the links between joints
-            if i > 0:
-                prev_x, prev_y, prev_z = prev_T[0, 3], prev_T[1, 3], prev_T[2, 3]
-                ax.plot([prev_x, x], [prev_y, y], [prev_z, z], color='b')  # Links
-
-            prev_T = T
-
-        ax.set_xlabel('X axis')
-        ax.set_ylabel('Y axis')
-        ax.set_zlabel('Z axis')
-        ax
     def simulate_robot(self):
         """
         Simulates the robot using PyBullet.
@@ -269,3 +252,43 @@ class URDFToSerialManipulator:
         time.sleep(10*np.exp(100))
         # Disconnect from PyBullet
         p.disconnect()
+
+    def visualize_robot(self):
+        """
+        Visualizes the URDF model using matplotlib.
+        """
+        
+        self.robot.show()
+    
+
+    def visualize_trajectory(self, cfg_trajectory=None, loop_time=3.0, use_collision=False):
+        # Filter out fixed joints
+        actuated_joints = [joint for joint in self.robot.joints if joint.joint_type != 'fixed']
+        
+        if cfg_trajectory is not None:
+            if isinstance(cfg_trajectory, np.ndarray):
+                expected_columns = len(actuated_joints)
+                if cfg_trajectory.shape[1] != expected_columns:
+                    raise ValueError(f"Expected cfg_trajectory to have {expected_columns} columns, got {cfg_trajectory.shape[1]}.")
+                cfg_trajectory = {joint.name: cfg_trajectory[:, i] for i, joint in enumerate(actuated_joints) if i < cfg_trajectory.shape[1]}
+            elif isinstance(cfg_trajectory, dict):
+                if len(cfg_trajectory) != len(actuated_joints):
+                    raise ValueError(f"Expected cfg_trajectory keys to match the number of robot joints ({len(actuated_joints)}), got {len(cfg_trajectory)}.")
+            else:
+                raise TypeError("cfg_trajectory must be either a numpy array or a dictionary mapping joint names to configurations.")
+        else:
+            cfg_trajectory = {joint.name: [0, np.pi / 2] for joint in actuated_joints}
+
+        self.robot.animate(cfg_trajectory=cfg_trajectory, loop_time=loop_time, use_collision=use_collision)
+
+    def print_joint_info(self):
+        """
+        Prints the number of joints and their names.
+        """
+        joint_names = [joint.name for joint in self.robot.joints]
+        print(f"Number of joints: {len(joint_names)}")
+        for i, joint_name in enumerate(joint_names):
+            print(f"Joint {i}: {joint_name}")
+
+
+
