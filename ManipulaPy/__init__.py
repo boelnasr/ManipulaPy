@@ -12,8 +12,9 @@ from .singularity import *
 from .path_planning import *
 from .utils import *
 from .urdf_processor import *
+from .controller import *
 # Define package-level variables
-__version__ = '1.0.0.2'
+__version__ = '1.0.1'
 __author__ = 'Mohamed Aboelnar'
 
 __all__ = [
@@ -22,5 +23,7 @@ __all__ = [
     'singularity',
     'path_planning',
     'utils',
-    'urdf_processor'
+    'urdf_processor',
+    'controller'
+
 ]

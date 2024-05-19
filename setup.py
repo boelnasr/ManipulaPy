@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='ManipulaPy',
-    version='1.0.0.2',
+    version='1.0.1',
     author='Mohamed Aboelnar',
     author_email='aboelnasr1997@gmail.com',  # Optional
     description='A package for robotic serial manipulator operations',
@@ -14,13 +14,13 @@ setup(
     url='https://github.com/boelnasr/ManipulaPy',  # Optional
     packages=find_packages(),
     install_requires=[
-        # Add your package dependencies here
-        'numpy',
-        'scipy',
-        'urchin',
-        'pybullet'
-        # 'pybullet', # If this is a dependency, it should be listed here
-    ],
+    'numpy>=1.19.2',
+    'scipy>=1.5.2',
+    'urchin>=0.9.0',
+    'pybullet>=3.0.6',
+    'pycuda>=2021.1'
+        ],
+
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
