@@ -3,6 +3,7 @@
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.kinematics import SerialManipulator
 from ManipulaPy.dynamics import ManipulatorDynamics
+from ManipulaPy.path_planning import TrajectoryPlanning as tp
 from math import pi
 import numpy as np
 from ManipulaPy.singularity import Singularity
@@ -11,21 +12,21 @@ import ManipulaPy.utils
 urdf_file_path = "xarm/xarm6_robot.urdf"
 # Initialize the URDFToSerialManipulator with the URDF file
 urdf_processor = URDFToSerialManipulator(urdf_file_path)
-
 # Extract the SerialManipulator object
 ur5 = urdf_processor.serial_manipulator
 # Initialize Singularity Analysis
 singularity_analyzer = Singularity(ur5)
-
+traj = tp(ur5,urdf_processor.dynamics)
 # Example joint angles (thetalist) for the manipulator
 thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)])
 dthetalist = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 ddthetalist = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
-
 # Perform forward kinematics using the space frame
 T_space = ur5.forward_kinematics(thetalist, frame='space')
 print("\nForward Kinematics (Space Frame):")
 print(T_space)
+traj = tp.JointTrajectory(ur5,thetalist,[0,0,0,0,0,0],Tf=5,N=1000,method=5)
+tp.plot_trajectory(trajectory=traj,Tf=5)
 # Initialize Singularity Analysis
 singularity_analyzer = Singularity(ur5)
 # Example to plot manipulability ellipsoid
@@ -38,7 +39,7 @@ joint_limits = [
     (-np.pi/2, np.pi),  # Joint 5
     (-np.pi, np.pi)   # Joint 6
 ]
-singularity_analyzer.plot_workspace_monte_carlo(joint_limits,num_samples=200000)
+#singularity_analyzer.plot_workspace_monte_carlo(joint_limits,num_samples=200000)
 
 # Perform forward kinematics using the body frame
 T_body = ur5.forward_kinematics(thetalist, frame='body')

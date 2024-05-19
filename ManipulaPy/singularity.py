@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -5,6 +7,7 @@ from scipy.spatial import ConvexHull
 from numba import cuda
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
 from numpy import linalg as la
+
 class Singularity:
     def __init__(self, serial_manipulator):
         """
@@ -30,6 +33,13 @@ class Singularity:
         return abs(det_J) < 1e-4
 
     def manipulability_ellipsoid(self, thetalist, ax=None):
+        """
+        Plot the manipulability ellipsoid for a given set of joint angles.
+
+        Parameters:
+            thetalist (numpy.ndarray): Array of joint angles in radians.
+            ax (matplotlib.axes._subplots.Axes3DSubplot, optional): Matplotlib 3D axis to plot on. Defaults to None.
+        """
         J = self.serial_manipulator.jacobian(thetalist, frame='space')
         J_v = J[:3, :]  # Linear velocity part of the Jacobian
         J_w = J[3:, :]  # Angular velocity part of the Jacobian
@@ -70,8 +80,14 @@ class Singularity:
         if ax is None:
             plt.show()
 
-
     def plot_workspace_monte_carlo(self, joint_limits, num_samples=10000):
+        """
+        Estimate the robot workspace using Monte Carlo sampling.
+
+        Parameters:
+            joint_limits (list): A list of tuples representing the joint limits.
+            num_samples (int, optional): Number of samples for Monte Carlo simulation. Defaults to 10000.
+        """
         # Initialize device arrays
         joint_samples = cuda.device_array((num_samples, len(joint_limits)), dtype=np.float32)
 
@@ -110,17 +126,29 @@ class Singularity:
         ax.set_title('Robot Workspace (Smooth Convex Hull)')
         plt.show()
 
-    def condition_number(self, Thetalist):
+    def condition_number(self, thetalist):
         """
         Calculate the condition number of the Jacobian for a given set of joint angles.
-        """
-        J_s = self.serial_manipulator.jacobian(Thetalist, frame='space')
-        cond_number = np.linalg.cond(J_s)
-        return cond_number
 
-    def near_singularity_detection(self, Thetalist, threshold=1e-2):
+        Parameters:
+            thetalist (numpy.ndarray): Array of joint angles in radians.
+
+        Returns:
+            float: The condition number of the Jacobian matrix.
+        """
+        J = self.serial_manipulator.jacobian(thetalist, frame='space')
+        return np.linalg.cond(J)
+
+    def near_singularity_detection(self, thetalist, threshold=1e-2):
         """
         Detect if the manipulator is near a singularity by comparing the condition number with a threshold.
+
+        Parameters:
+            thetalist (numpy.ndarray): Array of joint angles in radians.
+            threshold (float, optional): Threshold value for the condition number. Defaults to 1e-2.
+
+        Returns:
+            bool: True if the manipulator is near a singularity, False otherwise.
         """
-        cond_number = self.condition_number(Thetalist)
+        cond_number = self.condition_number(thetalist)
         return cond_number > threshold
