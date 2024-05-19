@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 
-from urchin.urdf import URDF 
+from urchin.urdf import URDF
 import numpy as np
 import pybullet as p
 import pybullet_data
@@ -76,7 +76,7 @@ class URDFToSerialManipulator:
         for i in range(robot_dof):
             w_ = w[i]
             p_ = p[i]
-            v_ = np.cross(-1*w_, p_)
+            v_ = np.cross(-1 * w_, p_)
             Slist.append([w_[0], w_[1], w_[2], v_[0], v_[1], v_[2]])
         return np.transpose(Slist)
 
@@ -94,7 +94,7 @@ class URDFToSerialManipulator:
                 - "Blist" (list): The inertia matrices.
                 - "Glist" (list): The mass matrices.
                 - "actuated_joints_num" (int): The number of actuated joints in the robot.
-        """        
+        """
         robot = URDF.load(urdf_name)
         joint_num = len(robot.actuated_joints)
 
@@ -121,7 +121,13 @@ class URDFToSerialManipulator:
         Ad_Tsb_inv = utils.adjoint_transform(Tsb_inv)
         # Replace mr.Adjoint and mr.TransInv with custom functions
         Blist = np.dot(Ad_Tsb_inv, Slist)
-        return {"M": M_list, "Slist": Slist, "Blist": Blist, "Glist": Glist, "actuated_joints_num": joint_num}
+        return {
+            "M": M_list,
+            "Slist": Slist,
+            "Blist": Blist,
+            "Glist": Glist,
+            "actuated_joints_num": joint_num,
+        }
 
     def initialize_serial_manipulator(self) -> SerialManipulator:
         """
@@ -136,22 +142,9 @@ class URDFToSerialManipulator:
             B_list=data["Blist"],
             S_list=data["Slist"],
             r_list=utils.extract_r_list(data["Slist"]),
-            G_list=data["Glist"])
-    def initialize_manipulator_dynamics(self):
-        """
-        Initializes the ManipulatorDynamics object using the extracted URDF data.
-        """
-        data = self.robot_data
-        # Initialize the ManipulatorDynamics object
-        self.manipulator_dynamics = ManipulatorDynamics(
-            M_list=data["M"],
-            omega_list=data["Slist"][:, :3],
-            r_list=utils.extract_r_list(data["Slist"]),
-            b_list=None,  # Assuming b_list is not provided in URDF data
-            S_list=data["Slist"],
-            B_list=data["Blist"],
-            Glist=data["Glist"]
+            G_list=data["Glist"],
         )
+
     def initialize_manipulator_dynamics(self):
         """
         Initializes the ManipulatorDynamics object using the extracted URDF data.
@@ -165,9 +158,26 @@ class URDFToSerialManipulator:
             b_list=None,  # Assuming b_list is not provided in URDF data
             S_list=data["Slist"],
             B_list=data["Blist"],
-            Glist=data["Glist"]
+            Glist=data["Glist"],
+        )
+
+    def initialize_manipulator_dynamics(self):
+        """
+        Initializes the ManipulatorDynamics object using the extracted URDF data.
+        """
+        data = self.robot_data
+        # Initialize the ManipulatorDynamics object
+        self.manipulator_dynamics = ManipulatorDynamics(
+            M_list=data["M"],
+            omega_list=data["Slist"][:, :3],
+            r_list=utils.extract_r_list(data["Slist"]),
+            b_list=None,  # Assuming b_list is not provided in URDF data
+            S_list=data["Slist"],
+            B_list=data["Blist"],
+            Glist=data["Glist"],
         )
         return self.manipulator_dynamics
+
     def extract_inertia_matrices(self):
         """
         Extracts the spatial inertia matrices from the URDF data.
@@ -182,7 +192,9 @@ class URDFToSerialManipulator:
                 G[3:, 3:] = mass * np.eye(3)
                 Glist.append(G)
             else:
-                Glist.append(np.zeros((6, 6)))  # Add zero matrix for links without inertia
+                Glist.append(
+                    np.zeros((6, 6))
+                )  # Add zero matrix for links without inertia
         return Glist
 
     def simulate_robot(self):
@@ -202,11 +214,13 @@ class URDFToSerialManipulator:
         numJoints = p.getNumJoints(robotID)
         p.resetBasePositionAndOrientation(robotID, [0, 0, 0], [0, 0, 0, 1])
         for i in range(numJoints):
-            p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetVelocity=0, force=0)
+            p.setJointMotorControl2(
+                robotID, i, p.POSITION_CONTROL, targetVelocity=0, force=0
+            )
         for i in range(numJoints):
-            p.resetJointState(robotID, i, np.pi/3.0)
+            p.resetJointState(robotID, i, np.pi / 3.0)
         # Simulation loop
-        timeStep = 1/240.0
+        timeStep = 1 / 240.0
         p.setTimeStep(timeStep)
         while p.isConnected():
             # Perform simulation steps here...
@@ -235,21 +249,29 @@ class URDFToSerialManipulator:
 
         # Set the desired joint angles using POSITION_CONTROL
         numJoints = p.getNumJoints(robotID)
-        
+
         for i in range(numJoints):
             if i < len(desired_angles):
                 # Apply position control to each joint
-                p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetPosition=desired_angles[i], force=1000)
+                p.setJointMotorControl2(
+                    robotID,
+                    i,
+                    p.POSITION_CONTROL,
+                    targetPosition=desired_angles[i],
+                    force=1000,
+                )
             else:
                 # If desired_angles list is shorter than numJoints, set remaining joints to a default position
-                p.setJointMotorControl2(robotID, i, p.POSITION_CONTROL, targetPosition=0, force=1000)
+                p.setJointMotorControl2(
+                    robotID, i, p.POSITION_CONTROL, targetPosition=0, force=1000
+                )
         # Simulation loop
-        timeStep = 1/100.0
+        timeStep = 1 / 100.0
         p.setTimeStep(timeStep)
         while p.isConnected():
             p.stepSimulation()
             time.sleep(timeStep)  # Simulation time step
-        time.sleep(10*np.exp(100))
+        time.sleep(10 * np.exp(100))
         # Disconnect from PyBullet
         p.disconnect()
 
@@ -257,29 +279,46 @@ class URDFToSerialManipulator:
         """
         Visualizes the URDF model using matplotlib.
         """
-        
-        self.robot.show()
-    
 
-    def visualize_trajectory(self, cfg_trajectory=None, loop_time=3.0, use_collision=False):
+        self.robot.show()
+
+    def visualize_trajectory(
+        self, cfg_trajectory=None, loop_time=3.0, use_collision=False
+    ):
         # Filter out fixed joints
-        actuated_joints = [joint for joint in self.robot.joints if joint.joint_type != 'fixed']
-        
+        actuated_joints = [
+            joint for joint in self.robot.joints if joint.joint_type != "fixed"
+        ]
+
         if cfg_trajectory is not None:
             if isinstance(cfg_trajectory, np.ndarray):
                 expected_columns = len(actuated_joints)
                 if cfg_trajectory.shape[1] != expected_columns:
-                    raise ValueError(f"Expected cfg_trajectory to have {expected_columns} columns, got {cfg_trajectory.shape[1]}.")
-                cfg_trajectory = {joint.name: cfg_trajectory[:, i] for i, joint in enumerate(actuated_joints) if i < cfg_trajectory.shape[1]}
+                    raise ValueError(
+                        f"Expected cfg_trajectory to have {expected_columns} columns, got {cfg_trajectory.shape[1]}."
+                    )
+                cfg_trajectory = {
+                    joint.name: cfg_trajectory[:, i]
+                    for i, joint in enumerate(actuated_joints)
+                    if i < cfg_trajectory.shape[1]
+                }
             elif isinstance(cfg_trajectory, dict):
                 if len(cfg_trajectory) != len(actuated_joints):
-                    raise ValueError(f"Expected cfg_trajectory keys to match the number of robot joints ({len(actuated_joints)}), got {len(cfg_trajectory)}.")
+                    raise ValueError(
+                        f"Expected cfg_trajectory keys to match the number of robot joints ({len(actuated_joints)}), got {len(cfg_trajectory)}."
+                    )
             else:
-                raise TypeError("cfg_trajectory must be either a numpy array or a dictionary mapping joint names to configurations.")
+                raise TypeError(
+                    "cfg_trajectory must be either a numpy array or a dictionary mapping joint names to configurations."
+                )
         else:
             cfg_trajectory = {joint.name: [0, np.pi / 2] for joint in actuated_joints}
 
-        self.robot.animate(cfg_trajectory=cfg_trajectory, loop_time=loop_time, use_collision=use_collision)
+        self.robot.animate(
+            cfg_trajectory=cfg_trajectory,
+            loop_time=loop_time,
+            use_collision=use_collision,
+        )
 
     def print_joint_info(self):
         """
@@ -289,6 +328,3 @@ class URDFToSerialManipulator:
         print(f"Number of joints: {len(joint_names)}")
         for i, joint_name in enumerate(joint_names):
             print(f"Joint {i}: {joint_name}")
-
-
-

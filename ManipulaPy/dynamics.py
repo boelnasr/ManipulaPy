@@ -3,6 +3,8 @@
 import numpy as np
 from .kinematics import SerialManipulator
 from .utils import adjoint_transform as ad
+
+
 class ManipulatorDynamics(SerialManipulator):
     def __init__(self, M_list, omega_list, r_list, b_list, S_list, B_list, Glist):
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
@@ -15,7 +17,7 @@ class ManipulatorDynamics(SerialManipulator):
 
         Parameters:
             thetalist (list): A list of joint angles.
-        
+
         Returns:
             The mass matrix of the robot.
         """
@@ -29,7 +31,7 @@ class ManipulatorDynamics(SerialManipulator):
         AdT[:, :, 0] = np.eye(6)
 
         for i in range(n):
-            T = self.forward_kinematics(thetalist[:i + 1], 'space')
+            T = self.forward_kinematics(thetalist[: i + 1], "space")
             AdT[:, :, i + 1] = ad(T)
 
         for i in range(n):
@@ -41,7 +43,7 @@ class ManipulatorDynamics(SerialManipulator):
                 dV = np.zeros(6)
                 dV[5] = 1 if i == j else 0
                 F += np.dot(Ia, dV)
-            M[i, i:] = np.dot(self.jacobian( thetalist).T, F)[i:]
+            M[i, i:] = np.dot(self.jacobian(thetalist).T, F)[i:]
 
         M = M + M.T - np.diag(np.diag(M))
         self._mass_matrix_cache[thetalist_key] = M
@@ -87,7 +89,15 @@ class ManipulatorDynamics(SerialManipulator):
         c = np.zeros(n)
         J = self.jacobian(thetalist)
         for i in range(n):
-            c[i] = sum([self.partial_derivative(i, j, k, thetalist) * dthetalist[j] * dthetalist[k] for j in range(n) for k in range(n)])
+            c[i] = sum(
+                [
+                    self.partial_derivative(i, j, k, thetalist)
+                    * dthetalist[j]
+                    * dthetalist[k]
+                    for j in range(n)
+                    for k in range(n)
+                ]
+            )
         return c
 
     def gravity_forces(self, thetalist, g=[0, 0, -9.81]):
@@ -108,7 +118,7 @@ class ManipulatorDynamics(SerialManipulator):
         G[5] = -1
         for i in range(n):
             for j in range(i, n):
-                AdT =ad(self.forward_kinematics(thetalist[:j + 1], 'space'))
+                AdT = ad(self.forward_kinematics(thetalist[: j + 1], "space"))
                 Gj = np.dot(AdT.T, G)
                 grav[i] += np.dot(M[i, :], Gj.flatten())
         return grav
@@ -143,18 +153,18 @@ class ManipulatorDynamics(SerialManipulator):
     def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
         """
         Compute the forward dynamics of the robot given the current joint angles, joint velocities, applied torques, gravity vector, and external forces.
-        
+
         Parameters:
             thetalist (list): List of joint angles (radians) [theta_1, theta_2, ..., theta_n].
             dthetalist (list): List of joint velocities (radians/s) [dtheta_1, dtheta_2, ..., dtheta_n].
             taulist (list): List of applied torques (Nm) [tau_1, tau_2, ..., tau_n].
             g (list): Gravity vector (m/s^2) [g_x, g_y, g_z].
             Ftip (list): External force applied at the end effector (N) [Fx, Fy, Fz].
-        
+
         Returns:
             ddthetalist (list): List of joint accelerations (rad/s^2) [ddtheta_1, ddtheta_2, ..., ddtheta_n].
         """
-        
+
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)
@@ -162,4 +172,3 @@ class ManipulatorDynamics(SerialManipulator):
         rhs = taulist - c - g_forces - np.dot(J_transpose, Ftip)
         ddthetalist = np.linalg.solve(M, rhs)
         return ddthetalist
-

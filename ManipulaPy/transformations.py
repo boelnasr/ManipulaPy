@@ -1,32 +1,39 @@
 import numpy as np
 
+
 class Transformations:
     @staticmethod
     def rotation_matrix_x(angle: float) -> np.ndarray:
         """Create a rotation matrix for a rotation around the X-axis."""
-        return np.array([
-            [1, 0, 0],
-            [0, np.cos(angle), -np.sin(angle)],
-            [0, np.sin(angle), np.cos(angle)]
-        ])
+        return np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(angle), -np.sin(angle)],
+                [0, np.sin(angle), np.cos(angle)],
+            ]
+        )
 
     @staticmethod
     def rotation_matrix_y(angle: float) -> np.ndarray:
         """Create a rotation matrix for a rotation around the Y-axis."""
-        return np.array([
-            [np.cos(angle), 0, np.sin(angle)],
-            [0, 1, 0],
-            [-np.sin(angle), 0, np.cos(angle)]
-        ])
+        return np.array(
+            [
+                [np.cos(angle), 0, np.sin(angle)],
+                [0, 1, 0],
+                [-np.sin(angle), 0, np.cos(angle)],
+            ]
+        )
 
     @staticmethod
     def rotation_matrix_z(angle: float) -> np.ndarray:
         """Create a rotation matrix for a rotation around the Z-axis."""
-        return np.array([
-            [np.cos(angle), -np.sin(angle), 0],
-            [np.sin(angle), np.cos(angle), 0],
-            [0, 0, 1]
-        ])
+        return np.array(
+            [
+                [np.cos(angle), -np.sin(angle), 0],
+                [np.sin(angle), np.cos(angle), 0],
+                [0, 0, 1],
+            ]
+        )
 
     @staticmethod
     def vector_2_matrix(vector: np.ndarray) -> np.ndarray:

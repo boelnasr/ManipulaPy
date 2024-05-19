@@ -4,6 +4,7 @@ import numpy as np
 from .dynamics import ManipulatorDynamics
 import matplotlib.pyplot as plt
 
+
 class ManipulatorController:
     def __init__(self, dynamics):
         self.dynamics = dynamics
@@ -12,23 +13,47 @@ class ManipulatorController:
         self.P = None
         self.x_hat = None
 
-    def computed_torque_control(self, thetalistd, dthetalistd, ddthetalistd, thetalist, dthetalist, g, dt, Kp, Ki, Kd):
+    def computed_torque_control(
+        self,
+        thetalistd,
+        dthetalistd,
+        ddthetalistd,
+        thetalist,
+        dthetalist,
+        g,
+        dt,
+        Kp,
+        Ki,
+        Kd,
+    ):
         """
         Computed Torque Control
         """
         if self.eint is None:
             self.eint = np.zeros_like(thetalist)
-        
+
         e = np.subtract(thetalistd, thetalist)
         self.eint += e * dt
-        
+
         M = self.dynamics.mass_matrix(thetalist)
-        tau = np.dot(M, Kp * e + Ki * self.eint + Kd * np.subtract(dthetalistd, dthetalist))
-        tau += self.dynamics.inverse_dynamics(thetalist, dthetalist, ddthetalistd, g, [0, 0, 0, 0, 0, 0])
-        
+        tau = np.dot(
+            M, Kp * e + Ki * self.eint + Kd * np.subtract(dthetalistd, dthetalist)
+        )
+        tau += self.dynamics.inverse_dynamics(
+            thetalist, dthetalist, ddthetalistd, g, [0, 0, 0, 0, 0, 0]
+        )
+
         return tau
 
-    def pd_control(self, desired_position, desired_velocity, current_position, current_velocity, Kp, Kd):
+    def pd_control(
+        self,
+        desired_position,
+        desired_velocity,
+        current_position,
+        current_velocity,
+        Kp,
+        Kd,
+    ):
         """
         PD Control
         """
@@ -37,21 +62,32 @@ class ManipulatorController:
         pd_signal = Kp * e + Kd * edot
         return pd_signal
 
-    def pid_control(self, thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd):
+    def pid_control(
+        self, thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd
+    ):
         """
         PID Control
         """
         if self.eint is None:
             self.eint = np.zeros_like(thetalist)
-        
+
         e = np.subtract(thetalistd, thetalist)
         self.eint += e * dt
-        
+
         e_dot = np.subtract(dthetalistd, dthetalist)
         tau = Kp * e + Ki * self.eint + Kd * e_dot
         return tau
 
-    def robust_control(self, thetalist, dthetalist, ddthetalist, g, Ftip, disturbance_estimate, adaptation_gain):
+    def robust_control(
+        self,
+        thetalist,
+        dthetalist,
+        ddthetalist,
+        g,
+        Ftip,
+        disturbance_estimate,
+        adaptation_gain,
+    ):
         """
         Robust Control
         """
@@ -59,22 +95,43 @@ class ManipulatorController:
         c = self.dynamics.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.dynamics.gravity_forces(thetalist, g)
         J_transpose = self.dynamics.jacobian(thetalist).T
-        tau = np.dot(M, ddthetalist) + c + g_forces + np.dot(J_transpose, Ftip) + adaptation_gain * disturbance_estimate
+        tau = (
+            np.dot(M, ddthetalist)
+            + c
+            + g_forces
+            + np.dot(J_transpose, Ftip)
+            + adaptation_gain * disturbance_estimate
+        )
         return tau
 
-    def adaptive_control(self, thetalist, dthetalist, ddthetalist, g, Ftip, measurement_error, adaptation_gain):
+    def adaptive_control(
+        self,
+        thetalist,
+        dthetalist,
+        ddthetalist,
+        g,
+        Ftip,
+        measurement_error,
+        adaptation_gain,
+    ):
         """
         Adaptive Control
         """
         if self.parameter_estimate is None:
             self.parameter_estimate = np.zeros_like(self.dynamics.Glist)
-            
+
         self.parameter_estimate += adaptation_gain * measurement_error
         M = self.dynamics.mass_matrix(thetalist)
         c = self.dynamics.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.dynamics.gravity_forces(thetalist, g)
         J_transpose = self.dynamics.jacobian(thetalist).T
-        tau = np.dot(M, ddthetalist) + c + g_forces + np.dot(J_transpose, Ftip) + self.parameter_estimate
+        tau = (
+            np.dot(M, ddthetalist)
+            + c
+            + g_forces
+            + np.dot(J_transpose, Ftip)
+            + self.parameter_estimate
+        )
         return tau
 
     def kalman_filter_predict(self, thetalist, dthetalist, taulist, g, Ftip, dt, Q):
@@ -84,8 +141,20 @@ class ManipulatorController:
         if self.x_hat is None:
             self.x_hat = np.concatenate((thetalist, dthetalist))
 
-        thetalist_pred = self.x_hat[:len(thetalist)] + self.x_hat[len(thetalist):] * dt
-        dthetalist_pred = self.dynamics.forward_dynamics(self.x_hat[:len(thetalist)], self.x_hat[len(thetalist):], taulist, g, Ftip) * dt + self.x_hat[len(thetalist):]
+        thetalist_pred = (
+            self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist) :] * dt
+        )
+        dthetalist_pred = (
+            self.dynamics.forward_dynamics(
+                self.x_hat[: len(thetalist)],
+                self.x_hat[len(thetalist) :],
+                taulist,
+                g,
+                Ftip,
+            )
+            * dt
+            + self.x_hat[len(thetalist) :]
+        )
         x_hat_pred = np.concatenate((thetalist_pred, dthetalist_pred))
 
         if self.P is None:
@@ -106,36 +175,53 @@ class ManipulatorController:
         self.x_hat += np.dot(K, y)
         self.P = np.dot(np.eye(len(self.x_hat)) - np.dot(K, H), self.P)
 
-    def kalman_filter_control(self, thetalistd, dthetalistd, thetalist, dthetalist, taulist, g, Ftip, dt, Q, R):
+    def kalman_filter_control(
+        self, thetalistd, dthetalistd, thetalist, dthetalist, taulist, g, Ftip, dt, Q, R
+    ):
         """
         Kalman Filter Control
         """
         self.kalman_filter_predict(thetalist, dthetalist, taulist, g, Ftip, dt, Q)
         self.kalman_filter_update(np.concatenate((thetalist, dthetalist)), R)
-        return self.x_hat[:len(thetalist)], self.x_hat[len(thetalist):]
+        return self.x_hat[: len(thetalist)], self.x_hat[len(thetalist) :]
 
-    def feedforward_control(self, desired_position, desired_velocity, desired_acceleration, g, Ftip):
+    def feedforward_control(
+        self, desired_position, desired_velocity, desired_acceleration, g, Ftip
+    ):
         """
         Computes the feedforward torque required to achieve the desired position, velocity, and acceleration, given the robot dynamics and external forces.
-        
+
         Args:
             desired_position (numpy.ndarray): The desired joint positions.
             desired_velocity (numpy.ndarray): The desired joint velocities.
             desired_acceleration (numpy.ndarray): The desired joint accelerations.
             g (numpy.ndarray): The gravitational acceleration vector.
             Ftip (numpy.ndarray): The external force/torque vector applied at the end-effector.
-        
+
         Returns:
             numpy.ndarray: The feedforward torque required to achieve the desired motion.
         """
-        
-        tau = self.dynamics.inverse_dynamics(desired_position, desired_velocity, desired_acceleration, g, Ftip)
+
+        tau = self.dynamics.inverse_dynamics(
+            desired_position, desired_velocity, desired_acceleration, g, Ftip
+        )
         return tau
 
-    def pd_feedforward_control(self, desired_position, desired_velocity, desired_acceleration, current_position, current_velocity, Kp, Kd, g, Ftip):
+    def pd_feedforward_control(
+        self,
+        desired_position,
+        desired_velocity,
+        desired_acceleration,
+        current_position,
+        current_velocity,
+        Kp,
+        Kd,
+        g,
+        Ftip,
+    ):
         """
         Computes the control signal for a PD (Proportional-Derivative) feedback controller with feedforward compensation.
-        
+
         Args:
             desired_position (float): The desired position of the system.
             desired_velocity (float): The desired velocity of the system.
@@ -146,13 +232,22 @@ class ManipulatorController:
             Kd (float): The derivative gain of the PD controller.
             g (float): The gravitational acceleration.
             Ftip (float): The force applied at the tip of the system.
-        
+
         Returns:
             float: The computed control signal.
         """
-        
-        pd_signal = self.pd_control(desired_position, desired_velocity, current_position, current_velocity, Kp, Kd)
-        ff_signal = self.feedforward_control(desired_position, desired_velocity, desired_acceleration, g, Ftip)
+
+        pd_signal = self.pd_control(
+            desired_position,
+            desired_velocity,
+            current_position,
+            current_velocity,
+            Kp,
+            Kd,
+        )
+        ff_signal = self.feedforward_control(
+            desired_position, desired_velocity, desired_acceleration, g, Ftip
+        )
         control_signal = pd_signal + ff_signal
         return control_signal
 
@@ -171,12 +266,14 @@ class ManipulatorController:
         Returns:
             tuple: A tuple containing the clipped joint angles, joint velocities, and torques.
         """
-        
+
         thetalist = np.clip(thetalist, joint_limits[:, 0], joint_limits[:, 1])
         tau = np.clip(tau, torque_limits[:, 0], torque_limits[:, 1])
         return thetalist, dthetalist, tau
 
-    def plot_steady_state_response(self, time, response, set_point, title='Steady State Response'):
+    def plot_steady_state_response(
+        self, time, response, set_point, title="Steady State Response"
+    ):
         """
         Plot the steady-state response of the controller.
 
@@ -186,8 +283,8 @@ class ManipulatorController:
         :param title: Title of the plot.
         """
         plt.figure(figsize=(10, 5))
-        plt.plot(time, response, label='Response')
-        plt.axhline(y=set_point, color='r', linestyle='--', label='Set Point')
+        plt.plot(time, response, label="Response")
+        plt.axhline(y=set_point, color="r", linestyle="--", label="Set Point")
 
         # Calculate key metrics
         rise_time = self.calculate_rise_time(time, response, set_point)
@@ -196,13 +293,30 @@ class ManipulatorController:
         steady_state_error = self.calculate_steady_state_error(response, set_point)
 
         # Annotate metrics on the plot
-        plt.axvline(x=rise_time, color='g', linestyle='--', label=f'Rise Time: {rise_time:.2f}s')
-        plt.axhline(y=set_point * (1 + percent_overshoot / 100), color='b', linestyle='--', label=f'Overshoot: {percent_overshoot:.2f}%')
-        plt.axvline(x=settling_time, color='m', linestyle='--', label=f'Settling Time: {settling_time:.2f}s')
-        plt.axhline(y=set_point + steady_state_error, color='c', linestyle='--', label=f'Steady State Error: {steady_state_error:.2f}')
+        plt.axvline(
+            x=rise_time, color="g", linestyle="--", label=f"Rise Time: {rise_time:.2f}s"
+        )
+        plt.axhline(
+            y=set_point * (1 + percent_overshoot / 100),
+            color="b",
+            linestyle="--",
+            label=f"Overshoot: {percent_overshoot:.2f}%",
+        )
+        plt.axvline(
+            x=settling_time,
+            color="m",
+            linestyle="--",
+            label=f"Settling Time: {settling_time:.2f}s",
+        )
+        plt.axhline(
+            y=set_point + steady_state_error,
+            color="c",
+            linestyle="--",
+            label=f"Steady State Error: {steady_state_error:.2f}",
+        )
 
-        plt.xlabel('Time (s)')
-        plt.ylabel('Response')
+        plt.xlabel("Time (s)")
+        plt.ylabel("Response")
         plt.title(title)
         plt.legend()
         plt.grid(True)

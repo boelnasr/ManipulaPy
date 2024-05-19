@@ -1,0 +1,12 @@
+[MASTER]
+ignore=venv
+ignore-patterns=^test_
+persistent=yes
+load-plugins=pylint_django
+
+[MESSAGES CONTROL]
+disable=C0111, C0103, C0330, R0903, R0201, R0801
+
+[FORMAT]
+max-line-length=88
+
