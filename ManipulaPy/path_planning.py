@@ -4,6 +4,7 @@ from numba import cuda, float32
 import numpy as np
 import matplotlib.pyplot as plt
 from .utils import TransToRp, MatrixLog3, MatrixExp3, CubicTimeScaling, QuinticTimeScaling
+
 @cuda.jit
 def trajectory_kernel(thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method):
     """
@@ -32,9 +33,9 @@ def trajectory_kernel(thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N,
             traj_vel[idx, j] = s_dot * (thetaend[j] - thetastart[j])
             traj_acc[idx, j] = s_ddot * (thetaend[j] - thetastart[j])
 
-
 @cuda.jit
-def inverse_dynamics_kernel(thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector, Ftip, Glist, Slist, M, torques_trajectory):
+def inverse_dynamics_kernel(thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector, Ftip, Glist, Slist, M, torques_trajectory, torque_limits):
+    # Same as before, but add torque limits enforcement
     idx = cuda.grid(1)
     if idx < thetalist_trajectory.shape[0]:
         thetalist = thetalist_trajectory[idx]
@@ -71,10 +72,13 @@ def inverse_dynamics_kernel(thetalist_trajectory, dthetalist_trajectory, ddtheta
                 tau_temp[row] += M_temp[row, col] * ddthetalist[col]
             tau_temp[row] += c_temp[row] + g_temp[row] + F_ext[row]
         for j in range(len(tau_temp)):
+            # Enforce torque limits
+            tau_temp[j] = max(torque_limits[j, 0], min(tau_temp[j], torque_limits[j, 1]))
             torques_trajectory[idx, j] = tau_temp[j]
 
 @cuda.jit
-def forward_dynamics_kernel(thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes, Glist, Slist, M, thetamat, dthetamat, ddthetamat):
+def forward_dynamics_kernel(thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes, Glist, Slist, M, thetamat, dthetamat, ddthetamat, joint_limits):
+    # Same as before, but add joint limits enforcement
     idx = cuda.grid(1)
     if idx < taumat.shape[0]:
         # Initialize local variables
@@ -106,6 +110,10 @@ def forward_dynamics_kernel(thetalist, dthetalist, taumat, g, Ftipmat, dt, intRe
             for i in range(len(thetalist)):
                 current_dthetalist[i] += ddthetalist_local[i] * (dt / intRes)
                 current_thetalist[i] += current_dthetalist[i] * (dt / intRes)
+
+            # Enforce joint limits
+            for i in range(len(thetalist)):
+                current_thetalist[i] = max(joint_limits[i, 0], min(current_thetalist[i], joint_limits[i, 1]))
 
         # Store results
         for i in range(len(thetalist)):
@@ -148,7 +156,7 @@ class TrajectoryPlanning:
         self.serial_manipulator = serial_manipulator
         self.dynamics = dynamics
         self.joint_limits = np.array(joint_limits)
-        self.torque_limits = np.array(torque_limits) if torque_limits else None
+        self.torque_limits = np.array(torque_limits) if torque_limits else np.array([[-np.inf, np.inf]] * len(joint_limits))
 
     def JointTrajectory(self, thetastart, thetaend, Tf, N, method):
         """
@@ -191,6 +199,10 @@ class TrajectoryPlanning:
         d_traj_vel.copy_to_host(traj_vel)
         d_traj_acc.copy_to_host(traj_acc)
 
+        # Enforce joint limits
+        for i in range(num_joints):
+            traj_pos[:, i] = np.clip(traj_pos[:, i], self.joint_limits[i, 0], self.joint_limits[i, 1])
+
         return {'positions': traj_pos, 'velocities': traj_vel, 'accelerations': traj_acc}
 
     def InverseDynamicsTrajectory(self, thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector=None, Ftip=None):
@@ -230,9 +242,12 @@ class TrajectoryPlanning:
         d_Slist = cuda.to_device(np.array(self.dynamics.S_list, dtype=np.float32))
         d_M = cuda.to_device(np.array(self.dynamics.M_list, dtype=np.float32))
         d_torques_trajectory = cuda.device_array_like(torques_trajectory)
+        d_torque_limits = cuda.to_device(self.torque_limits)
 
         # Execute CUDA kernel
-        inverse_dynamics_kernel[blocks_per_grid, threads_per_block](d_thetalist_trajectory, d_dthetalist_trajectory, d_ddthetalist_trajectory, d_gravity_vector, d_Ftip, d_Glist, d_Slist, d_M, d_torques_trajectory)
+        inverse_dynamics_kernel[blocks_per_grid, threads_per_block](
+            d_thetalist_trajectory, d_dthetalist_trajectory, d_ddthetalist_trajectory,
+            d_gravity_vector, d_Ftip, d_Glist, d_Slist, d_M, d_torques_trajectory, d_torque_limits)
 
         # Copy computed results back to host memory
         d_torques_trajectory.copy_to_host(torques_trajectory)
@@ -283,13 +298,13 @@ class TrajectoryPlanning:
         d_thetamat = cuda.device_array_like(thetamat)
         d_dthetamat = cuda.device_array_like(dthetamat)
         d_ddthetamat = cuda.device_array_like(ddthetamat)
+        d_joint_limits = cuda.to_device(self.joint_limits)
         forward_dynamics_kernel[blocks_per_grid, threads_per_block](
-            d_thetalist, d_dthetalist, d_taumat, d_g, d_Ftipmat, dt, intRes, d_Glist, d_Slist, d_M, d_thetamat, d_dthetamat, d_ddthetamat)
+            d_thetalist, d_dthetalist, d_taumat, d_g, d_Ftipmat, dt, intRes, d_Glist, d_Slist, d_M, d_thetamat, d_dthetamat, d_ddthetamat, d_joint_limits)
         d_thetamat.copy_to_host(thetamat)
         d_dthetamat.copy_to_host(dthetamat)
         d_ddthetamat.copy_to_host(ddthetamat)
-        return {'thetamat': thetamat, 'dthetamat': dthetamat, 'ddthetamat': ddthetamat}
-
+        return {'positions': thetamat, 'velocities': dthetamat, 'accelerations': ddthetamat}
 
     def CartesianTrajectory(self, Xstart, Xend, Tf, N, method):
         N = int(N)
@@ -343,15 +358,6 @@ class TrajectoryPlanning:
 
     @staticmethod
     def plot_trajectory(trajectory_data, Tf, title='Joint Trajectory', labels=None):
-        """
-        Plot the joint trajectory over time for positions, velocities, and accelerations.
-
-        Args:
-            trajectory_data (dict): Dictionary containing 'positions', 'velocities', 'accelerations'.
-            Tf (float): Total duration of the trajectory in seconds.
-            title (str): Title for the plot.
-            labels (list): Optional list of labels for each joint. Should match the number of joints.
-        """
         positions = trajectory_data['positions']
         velocities = trajectory_data['velocities']
         accelerations = trajectory_data['accelerations']
@@ -363,7 +369,6 @@ class TrajectoryPlanning:
         fig, axs = plt.subplots(3, num_joints, figsize=(15, 10), sharex='col')
         fig.suptitle(title)
 
-        # Plot each joint for positions, velocities, and accelerations
         for i in range(num_joints):
             if labels and len(labels) == num_joints:
                 label = labels[i]
@@ -389,19 +394,7 @@ class TrajectoryPlanning:
         plt.show()
 
     def plot_tcp_trajectory(self, trajectory, dt):
-        """
-        Generate a plot of the TCP trajectory.
-
-        Args:
-            trajectory (list): A list of joint angles.
-            dt (float): The time step between each joint angle.
-
-        Returns:
-            None
-        """
-        # Convert joint angles to TCP poses using forward kinematics
         tcp_trajectory = [self.serial_manipulator.forward_kinematics(joint_angles) for joint_angles in trajectory]
-        # Extract TCP positions from poses
         tcp_positions = [pose[:3, 3] for pose in tcp_trajectory]
 
         velocity, acceleration, jerk = self.calculate_derivatives(tcp_positions, dt)
@@ -434,17 +427,6 @@ class TrajectoryPlanning:
         plt.show()
 
     def plot_cartesian_trajectory(self, trajectory_data, Tf, title='Cartesian Trajectory'):
-        """
-        Plot the cartesian trajectory over time for positions, velocities, and accelerations.
-
-        Args:
-            trajectory_data (dict): Dictionary containing 'positions', 'velocities', 'accelerations'.
-            Tf (float): Total duration of the trajectory in seconds.
-            title (str, optional): Title for the plot. Defaults to 'Cartesian Trajectory'.
-
-        Returns:
-            None
-        """
         positions = trajectory_data['positions']
         velocities = trajectory_data['velocities']
         accelerations = trajectory_data['accelerations']
@@ -479,16 +461,6 @@ class TrajectoryPlanning:
         plt.show()
 
     def calculate_derivatives(self, positions, dt):
-        """
-        Calculate the first, second, and third derivatives of a position array (velocity, acceleration, and jerk).
-
-        Args:
-            positions (np.ndarray): Array of positions.
-            dt (float): Time step between positions.
-
-        Returns:
-            tuple: Tuple containing arrays of velocity, acceleration, and jerk.
-        """
         positions = np.array(positions)
         velocity = np.diff(positions, axis=0) / dt
         acceleration = np.diff(velocity, axis=0) / dt
@@ -508,9 +480,15 @@ class TrajectoryPlanning:
             None
         """
         positions = trajectory_data['positions']
-        orientations = trajectory_data['orientations']
         num_steps = positions.shape[0]
         time_steps = np.linspace(0, Tf, num_steps)
+
+        # If orientations are provided, use them; otherwise, compute them
+        if 'orientations' in trajectory_data:
+            orientations = trajectory_data['orientations']
+        else:
+            # Compute orientations using forward kinematics
+            orientations = np.array([self.serial_manipulator.forward_kinematics(pos)[:3, :3] for pos in positions])
 
         fig = plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(111, projection='3d')
@@ -523,9 +501,9 @@ class TrajectoryPlanning:
         for i in range(0, num_steps, max(1, num_steps // 20)):  # Plot a few orientations along the trajectory
             R = orientations[i]
             pos = positions[i]
-            ax.quiver(pos[0], pos[1], pos[2], R[0, 0], R[1, 0], R[2, 0], length=0.1, color='r')  # X direction
-            ax.quiver(pos[0], pos[1], pos[2], R[0, 1], R[1, 1], R[2, 1], length=0.1, color='g')  # Y direction
-            ax.quiver(pos[0], pos[1], pos[2], R[0, 2], R[1, 2], R[2, 2], length=0.1, color='b')  # Z direction
+            ax.quiver(pos[0], pos[1], pos[2], R[0, 0], R[1, 0], R[2, 0], length=1, color='r')  # X direction
+            ax.quiver(pos[0], pos[1], pos[2], R[0, 1], R[1, 1], R[2, 1], length=1, color='g')  # Y direction
+            ax.quiver(pos[0], pos[1], pos[2], R[0, 2], R[1, 2], R[2, 2], length=1, color='b')  # Z direction
 
         ax.set_xlabel('X Position')
         ax.set_ylabel('Y Position')
