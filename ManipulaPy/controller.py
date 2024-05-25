@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from .dynamics import ManipulatorDynamics
 import matplotlib.pyplot as plt
+from .dynamics import ManipulatorDynamics
 
 
 class ManipulatorController:
     def __init__(self, dynamics):
+        """
+        Initialize the ManipulatorController with the dynamics of the manipulator.
+
+        Parameters:
+            dynamics (ManipulatorDynamics): An instance of ManipulatorDynamics.
+        """
         self.dynamics = dynamics
         self.eint = None
         self.parameter_estimate = None
@@ -27,7 +33,22 @@ class ManipulatorController:
         Kd,
     ):
         """
-        Computed Torque Control
+        Computed Torque Control.
+
+        Parameters:
+            thetalistd (np.ndarray): Desired joint angles.
+            dthetalistd (np.ndarray): Desired joint velocities.
+            ddthetalistd (np.ndarray): Desired joint accelerations.
+            thetalist (np.ndarray): Current joint angles.
+            dthetalist (np.ndarray): Current joint velocities.
+            g (np.ndarray): Gravity vector.
+            dt (float): Time step.
+            Kp (np.ndarray): Proportional gain.
+            Ki (np.ndarray): Integral gain.
+            Kd (np.ndarray): Derivative gain.
+
+        Returns:
+            np.ndarray: Torque command.
         """
         if self.eint is None:
             self.eint = np.zeros_like(thetalist)
@@ -55,7 +76,18 @@ class ManipulatorController:
         Kd,
     ):
         """
-        PD Control
+        PD Control.
+
+        Parameters:
+            desired_position (np.ndarray): Desired joint positions.
+            desired_velocity (np.ndarray): Desired joint velocities.
+            current_position (np.ndarray): Current joint positions.
+            current_velocity (np.ndarray): Current joint velocities.
+            Kp (np.ndarray): Proportional gain.
+            Kd (np.ndarray): Derivative gain.
+
+        Returns:
+            np.ndarray: PD control signal.
         """
         e = np.subtract(desired_position, current_position)
         edot = np.subtract(desired_velocity, current_velocity)
@@ -66,7 +98,20 @@ class ManipulatorController:
         self, thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd
     ):
         """
-        PID Control
+        PID Control.
+
+        Parameters:
+            thetalistd (np.ndarray): Desired joint angles.
+            dthetalistd (np.ndarray): Desired joint velocities.
+            thetalist (np.ndarray): Current joint angles.
+            dthetalist (np.ndarray): Current joint velocities.
+            dt (float): Time step.
+            Kp (np.ndarray): Proportional gain.
+            Ki (np.ndarray): Integral gain.
+            Kd (np.ndarray): Derivative gain.
+
+        Returns:
+            np.ndarray: PID control signal.
         """
         if self.eint is None:
             self.eint = np.zeros_like(thetalist)
@@ -89,7 +134,19 @@ class ManipulatorController:
         adaptation_gain,
     ):
         """
-        Robust Control
+        Robust Control.
+
+        Parameters:
+            thetalist (np.ndarray): Current joint angles.
+            dthetalist (np.ndarray): Current joint velocities.
+            ddthetalist (np.ndarray): Desired joint accelerations.
+            g (np.ndarray): Gravity vector.
+            Ftip (np.ndarray): External forces applied at the end effector.
+            disturbance_estimate (np.ndarray): Estimate of disturbances.
+            adaptation_gain (float): Gain for the adaptation term.
+
+        Returns:
+            np.ndarray: Robust control torque.
         """
         M = self.dynamics.mass_matrix(thetalist)
         c = self.dynamics.velocity_quadratic_forces(thetalist, dthetalist)
@@ -115,7 +172,19 @@ class ManipulatorController:
         adaptation_gain,
     ):
         """
-        Adaptive Control
+        Adaptive Control.
+
+        Parameters:
+            thetalist (np.ndarray): Current joint angles.
+            dthetalist (np.ndarray): Current joint velocities.
+            ddthetalist (np.ndarray): Desired joint accelerations.
+            g (np.ndarray): Gravity vector.
+            Ftip (np.ndarray): External forces applied at the end effector.
+            measurement_error (np.ndarray): Error in measurement.
+            adaptation_gain (float): Gain for the adaptation term.
+
+        Returns:
+            np.ndarray: Adaptive control torque.
         """
         if self.parameter_estimate is None:
             self.parameter_estimate = np.zeros_like(self.dynamics.Glist)
@@ -136,7 +205,19 @@ class ManipulatorController:
 
     def kalman_filter_predict(self, thetalist, dthetalist, taulist, g, Ftip, dt, Q):
         """
-        Kalman Filter Prediction
+        Kalman Filter Prediction.
+
+        Parameters:
+            thetalist (np.ndarray): Current joint angles.
+            dthetalist (np.ndarray): Current joint velocities.
+            taulist (np.ndarray): Applied torques.
+            g (np.ndarray): Gravity vector.
+            Ftip (np.ndarray): External forces applied at the end effector.
+            dt (float): Time step.
+            Q (np.ndarray): Process noise covariance.
+
+        Returns:
+            None
         """
         if self.x_hat is None:
             self.x_hat = np.concatenate((thetalist, dthetalist))
@@ -166,7 +247,14 @@ class ManipulatorController:
 
     def kalman_filter_update(self, z, R):
         """
-        Kalman Filter Update
+        Kalman Filter Update.
+
+        Parameters:
+            z (np.ndarray): Measurement vector.
+            R (np.ndarray): Measurement noise covariance.
+
+        Returns:
+            None
         """
         H = np.eye(len(self.x_hat))
         y = z - np.dot(H, self.x_hat)
@@ -179,7 +267,22 @@ class ManipulatorController:
         self, thetalistd, dthetalistd, thetalist, dthetalist, taulist, g, Ftip, dt, Q, R
     ):
         """
-        Kalman Filter Control
+        Kalman Filter Control.
+
+        Parameters:
+            thetalistd (np.ndarray): Desired joint angles.
+            dthetalistd (np.ndarray): Desired joint velocities.
+            thetalist (np.ndarray): Current joint angles.
+            dthetalist (np.ndarray): Current joint velocities.
+            taulist (np.ndarray): Applied torques.
+            g (np.ndarray): Gravity vector.
+            Ftip (np.ndarray): External forces applied at the end effector.
+            dt (float): Time step.
+            Q (np.ndarray): Process noise covariance.
+            R (np.ndarray): Measurement noise covariance.
+
+        Returns:
+            tuple: Estimated joint angles and velocities.
         """
         self.kalman_filter_predict(thetalist, dthetalist, taulist, g, Ftip, dt, Q)
         self.kalman_filter_update(np.concatenate((thetalist, dthetalist)), R)
@@ -189,19 +292,18 @@ class ManipulatorController:
         self, desired_position, desired_velocity, desired_acceleration, g, Ftip
     ):
         """
-        Computes the feedforward torque required to achieve the desired position, velocity, and acceleration, given the robot dynamics and external forces.
+        Feedforward Control.
 
-        Args:
-            desired_position (numpy.ndarray): The desired joint positions.
-            desired_velocity (numpy.ndarray): The desired joint velocities.
-            desired_acceleration (numpy.ndarray): The desired joint accelerations.
-            g (numpy.ndarray): The gravitational acceleration vector.
-            Ftip (numpy.ndarray): The external force/torque vector applied at the end-effector.
+        Parameters:
+            desired_position (np.ndarray): Desired joint positions.
+            desired_velocity (np.ndarray): Desired joint velocities.
+            desired_acceleration (np.ndarray): Desired joint accelerations.
+            g (np.ndarray): Gravity vector.
+            Ftip (np.ndarray): External forces applied at the end effector.
 
         Returns:
-            numpy.ndarray: The feedforward torque required to achieve the desired motion.
+            np.ndarray: Feedforward torque.
         """
-
         tau = self.dynamics.inverse_dynamics(
             desired_position, desired_velocity, desired_acceleration, g, Ftip
         )
@@ -220,23 +322,22 @@ class ManipulatorController:
         Ftip,
     ):
         """
-        Computes the control signal for a PD (Proportional-Derivative) feedback controller with feedforward compensation.
+        PD Feedforward Control.
 
-        Args:
-            desired_position (float): The desired position of the system.
-            desired_velocity (float): The desired velocity of the system.
-            desired_acceleration (float): The desired acceleration of the system.
-            current_position (float): The current position of the system.
-            current_velocity (float): The current velocity of the system.
-            Kp (float): The proportional gain of the PD controller.
-            Kd (float): The derivative gain of the PD controller.
-            g (float): The gravitational acceleration.
-            Ftip (float): The force applied at the tip of the system.
+        Parameters:
+            desired_position (np.ndarray): Desired joint positions.
+            desired_velocity (np.ndarray): Desired joint velocities.
+            desired_acceleration (np.ndarray): Desired joint accelerations.
+            current_position (np.ndarray): Current joint positions.
+            current_velocity (np.ndarray): Current joint velocities.
+            Kp (np.ndarray): Proportional gain.
+            Kd (np.ndarray): Derivative gain.
+            g (np.ndarray): Gravity vector.
+            Ftip (np.ndarray): External forces applied at the end effector.
 
         Returns:
-            float: The computed control signal.
+            np.ndarray: Control signal.
         """
-
         pd_signal = self.pd_control(
             desired_position,
             desired_velocity,
@@ -256,17 +357,16 @@ class ManipulatorController:
         """
         Enforce joint and torque limits.
 
-        Args:
-            thetalist (numpy.ndarray): The joint angles.
-            dthetalist (numpy.ndarray): The joint velocities.
-            tau (numpy.ndarray): The torques.
-            joint_limits (numpy.ndarray): The limits of the joint angles.
-            torque_limits (numpy.ndarray): The limits of the torques.
+        Parameters:
+            thetalist (np.ndarray): Joint angles.
+            dthetalist (np.ndarray): Joint velocities.
+            tau (np.ndarray): Torques.
+            joint_limits (np.ndarray): Joint angle limits.
+            torque_limits (np.ndarray): Torque limits.
 
         Returns:
-            tuple: A tuple containing the clipped joint angles, joint velocities, and torques.
+            tuple: Clipped joint angles, velocities, and torques.
         """
-
         thetalist = np.clip(thetalist, joint_limits[:, 0], joint_limits[:, 1])
         tau = np.clip(tau, torque_limits[:, 0], torque_limits[:, 1])
         return thetalist, dthetalist, tau
@@ -277,10 +377,14 @@ class ManipulatorController:
         """
         Plot the steady-state response of the controller.
 
-        :param time: Array of time steps.
-        :param response: Array of response values.
-        :param set_point: Desired set point value.
-        :param title: Title of the plot.
+        Parameters:
+            time (np.ndarray): Array of time steps.
+            response (np.ndarray): Array of response values.
+            set_point (float): Desired set point value.
+            title (str, optional): Title of the plot.
+
+        Returns:
+            None
         """
         plt.figure(figsize=(10, 5))
         plt.plot(time, response, label="Response")
@@ -326,10 +430,13 @@ class ManipulatorController:
         """
         Calculate the rise time.
 
-        :param time: Array of time steps.
-        :param response: Array of response values.
-        :param set_point: Desired set point value.
-        :return: Rise time.
+        Parameters:
+            time (np.ndarray): Array of time steps.
+            response (np.ndarray): Array of response values.
+            set_point (float): Desired set point value.
+
+        Returns:
+            float: Rise time.
         """
         rise_start = 0.1 * set_point
         rise_end = 0.9 * set_point
@@ -342,9 +449,12 @@ class ManipulatorController:
         """
         Calculate the percent overshoot.
 
-        :param response: Array of response values.
-        :param set_point: Desired set point value.
-        :return: Percent overshoot.
+        Parameters:
+            response (np.ndarray): Array of response values.
+            set_point (float): Desired set point value.
+
+        Returns:
+            float: Percent overshoot.
         """
         max_response = np.max(response)
         percent_overshoot = ((max_response - set_point) / set_point) * 100
@@ -354,11 +464,14 @@ class ManipulatorController:
         """
         Calculate the settling time.
 
-        :param time: Array of time steps.
-        :param response: Array of response values.
-        :param set_point: Desired set point value.
-        :param tolerance: Tolerance for settling time calculation.
-        :return: Settling time.
+        Parameters:
+            time (np.ndarray): Array of time steps.
+            response (np.ndarray): Array of response values.
+            set_point (float): Desired set point value.
+            tolerance (float): Tolerance for settling time calculation.
+
+        Returns:
+            float: Settling time.
         """
         settling_threshold = set_point * tolerance
         settling_idx = np.where(np.abs(response - set_point) <= settling_threshold)[0]
@@ -369,9 +482,66 @@ class ManipulatorController:
         """
         Calculate the steady-state error.
 
-        :param response: Array of response values.
-        :param set_point: Desired set point value.
-        :return: Steady-state error.
+        Parameters:
+            response (np.ndarray): Array of response values.
+            set_point (float): Desired set point value.
+
+        Returns:
+            float: Steady-state error.
         """
         steady_state_error = response[-1] - set_point
         return steady_state_error
+
+    def joint_space_control(
+        self,
+        desired_joint_angles,
+        current_joint_angles,
+        current_joint_velocities,
+        Kp,
+        Kd,
+    ):
+        """
+        Joint Space Control.
+
+        Parameters:
+            desired_joint_angles (np.ndarray): Desired joint angles.
+            current_joint_angles (np.ndarray): Current joint angles.
+            current_joint_velocities (np.ndarray): Current joint velocities.
+            Kp (np.ndarray): Proportional gain.
+            Kd (np.ndarray): Derivative gain.
+
+        Returns:
+            np.ndarray: Control torque.
+        """
+        e = np.subtract(desired_joint_angles, current_joint_angles)
+        edot = np.subtract(0, current_joint_velocities)
+        tau = Kp * e + Kd * edot
+        return tau
+
+    def cartesian_space_control(
+        self,
+        desired_position,
+        current_joint_angles,
+        current_joint_velocities,
+        Kp,
+        Kd,
+    ):
+        """
+        Cartesian Space Control.
+
+        Parameters:
+            desired_position (np.ndarray): Desired end-effector position.
+            current_joint_angles (np.ndarray): Current joint angles.
+            current_joint_velocities (np.ndarray): Current joint velocities.
+            Kp (np.ndarray): Proportional gain.
+            Kd (np.ndarray): Derivative gain.
+
+        Returns:
+            np.ndarray: Control torque.
+        """
+        current_position = self.dynamics.forward_kinematics(current_joint_angles)[:3, 3]
+        e = np.subtract(desired_position, current_position)
+        dthetalist = current_joint_velocities
+        J = self.dynamics.jacobian(current_joint_angles)
+        tau = np.dot(J.T, Kp * e - Kd * np.dot(J, dthetalist))
+        return tau

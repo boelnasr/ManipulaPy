@@ -3,6 +3,8 @@
 from numba import cuda, float32
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.spatial import ConvexHull
+
 from .utils import (
     TransToRp,
     MatrixLog3,
@@ -10,6 +12,8 @@ from .utils import (
     CubicTimeScaling,
     QuinticTimeScaling,
 )
+from urchin.urdf import URDF
+
 
 
 @cuda.jit
@@ -201,17 +205,41 @@ def cartesian_trajectory_kernel(
             traj_acc[idx, j] = s_ddot * (pend[j] - pstart[j])
 
 
-class TrajectoryPlanning:
-    def __init__(self, serial_manipulator, dynamics, joint_limits, torque_limits=None):
-        """
-        Initialize TrajectoryPlanning with manipulator, dynamics, and limit constraints.
+class CollisionChecker:
+    def __init__(self, urdf_path):
+        self.robot = URDF.load(urdf_path)
+        self.convex_hulls = self._create_convex_hulls()
 
-        Args:
-            serial_manipulator (SerialManipulator): Kinematics module.
-            dynamics (ManipulatorDynamics): Dynamics module.
-            joint_limits (list of tuples): List where each tuple is (min, max) for each joint.
-            torque_limits (list of tuples, optional): List where each tuple is (min, max) for each joint.
-        """
+    def _create_convex_hulls(self):
+        convex_hulls = {}
+        for link in self.robot.links:
+            if link.visuals:
+                for visual in link.visuals:
+                    mesh = visual.geometry.mesh
+                    if hasattr(mesh, 'vertices'):
+                        vertices = np.array(mesh.vertices)
+                        convex_hull = ConvexHull(vertices)
+                        convex_hulls[link.name] = convex_hull
+        return convex_hulls
+
+    def _transform_convex_hull(self, convex_hull, transform):
+        transformed_points = transform[:3, :3] @ convex_hull.points.T + transform[:3, 3].reshape(-1, 1)
+        return ConvexHull(transformed_points.T)
+
+    def check_collision(self, thetalist):
+        fk_results = self.robot.link_fk(cfg=thetalist)
+        for link_name, transform in fk_results.items():
+            if link_name in self.convex_hulls:
+                transformed_hull = self._transform_convex_hull(self.convex_hulls[link_name], transform)
+                for other_link_name, other_transform in fk_results.items():
+                    if link_name != other_link_name and other_link_name in self.convex_hulls:
+                        other_transformed_hull = self._transform_convex_hull(self.convex_hulls[other_link_name], other_transform)
+                        if transformed_hull.intersects(other_transformed_hull):
+                            return True
+        return False
+
+class TrajectoryPlanning:
+    def __init__(self, serial_manipulator, urdf_path, dynamics, joint_limits, torque_limits=None):
         self.serial_manipulator = serial_manipulator
         self.dynamics = dynamics
         self.joint_limits = np.array(joint_limits)
@@ -220,61 +248,49 @@ class TrajectoryPlanning:
             if torque_limits
             else np.array([[-np.inf, np.inf]] * len(joint_limits))
         )
+        self.collision_checker = CollisionChecker(urdf_path)
 
     def JointTrajectory(self, thetastart, thetaend, Tf, N, method):
-        """
-        Generates joint trajectories with positions, velocities, and accelerations using CUDA acceleration.
-
-        Args:
-            thetastart (list or np.ndarray): Starting joint angles.
-            thetaend (list or np.ndarray): Ending joint angles.
-            Tf (float): Total duration of the trajectory.
-            N (int): Number of points in the trajectory.
-            method (int): Time-scaling method (3 for cubic, 5 for quintic, or 6 for Bezier curve).
-
-        Returns:
-            dict: Dictionary containing 'positions', 'velocities', and 'accelerations'.
-        """
         thetastart = np.array(thetastart, dtype=np.float32)
         thetaend = np.array(thetaend, dtype=np.float32)
         num_joints = len(thetastart)
 
-        # Initialize arrays to hold position, velocity, and acceleration trajectories
         traj_pos = np.zeros((N, num_joints), dtype=np.float32)
         traj_vel = np.zeros((N, num_joints), dtype=np.float32)
         traj_acc = np.zeros((N, num_joints), dtype=np.float32)
 
-        # Set up GPU memory and kernel execution
         threads_per_block = 1024
         blocks_per_grid = (N + threads_per_block - 1) // threads_per_block
-        blocks_per_grid = max(blocks_per_grid, 1)  # Ensure at least one block
+        blocks_per_grid = max(blocks_per_grid, 1)
         d_thetastart = cuda.to_device(thetastart)
         d_thetaend = cuda.to_device(thetaend)
         d_traj_pos = cuda.device_array_like(traj_pos)
         d_traj_vel = cuda.device_array_like(traj_vel)
         d_traj_acc = cuda.device_array_like(traj_acc)
 
-        # Execute CUDA kernel
         trajectory_kernel[blocks_per_grid, threads_per_block](
             d_thetastart, d_thetaend, d_traj_pos, d_traj_vel, d_traj_acc, Tf, N, method
         )
 
-        # Copy computed results back to host memory
         d_traj_pos.copy_to_host(traj_pos)
         d_traj_vel.copy_to_host(traj_vel)
         d_traj_acc.copy_to_host(traj_acc)
 
-        # Enforce joint limits
         for i in range(num_joints):
             traj_pos[:, i] = np.clip(
                 traj_pos[:, i], self.joint_limits[i, 0], self.joint_limits[i, 1]
             )
+
+        for step in traj_pos:
+            if self.collision_checker.check_collision(step):
+                raise ValueError("Collision detected in the planned trajectory")
 
         return {
             "positions": traj_pos,
             "velocities": traj_vel,
             "accelerations": traj_acc,
         }
+
 
     def InverseDynamicsTrajectory(
         self,
@@ -306,10 +322,9 @@ class TrajectoryPlanning:
         num_joints = thetalist_trajectory.shape[1]
         torques_trajectory = np.zeros((num_points, num_joints), dtype=np.float32)
 
-        # Set up GPU memory and kernel execution
         threads_per_block = 1024
         blocks_per_grid = (num_points + threads_per_block - 1) // threads_per_block
-        blocks_per_grid = max(blocks_per_grid, 1)  # Ensure at least one block
+        blocks_per_grid = max(blocks_per_grid, 1)
 
         d_thetalist_trajectory = cuda.to_device(thetalist_trajectory)
         d_dthetalist_trajectory = cuda.to_device(dthetalist_trajectory)
@@ -322,7 +337,6 @@ class TrajectoryPlanning:
         d_torques_trajectory = cuda.device_array_like(torques_trajectory)
         d_torque_limits = cuda.to_device(self.torque_limits)
 
-        # Execute CUDA kernel
         inverse_dynamics_kernel[blocks_per_grid, threads_per_block](
             d_thetalist_trajectory,
             d_dthetalist_trajectory,
@@ -336,10 +350,8 @@ class TrajectoryPlanning:
             d_torque_limits,
         )
 
-        # Copy computed results back to host memory
         d_torques_trajectory.copy_to_host(torques_trajectory)
 
-        # Enforce torque limits if they exist
         if self.torque_limits is not None:
             torques_trajectory = np.clip(
                 torques_trajectory, self.torque_limits[:, 0], self.torque_limits[:, 1]
@@ -377,7 +389,7 @@ class TrajectoryPlanning:
         dthetamat[0, :] = dthetalist
         threads_per_block = 1024
         blocks_per_grid = (num_steps + threads_per_block - 1) // threads_per_block
-        blocks_per_grid = max(blocks_per_grid, 1)  # Ensure at least one block
+        blocks_per_grid = max(blocks_per_grid, 1)
         d_thetalist = cuda.to_device(thetalist)
         d_dthetalist = cuda.to_device(dthetalist)
         d_taumat = cuda.to_device(taumat)
@@ -416,30 +428,13 @@ class TrajectoryPlanning:
         }
 
     def CartesianTrajectory(self, Xstart, Xend, Tf, N, method):
-        """
-        Calculates a Cartesian trajectory between two given end-effector poses.
-
-        Parameters:
-            Xstart (numpy.ndarray): The starting end-effector pose.
-            Xend (numpy.ndarray): The ending end-effector pose.
-            Tf (float): The total time of the trajectory.
-            N (int): The number of waypoints in the trajectory.
-            method (int): The method to use for trajectory generation (3 for cubic, otherwise quintic).
-
-        Returns:
-            dict: A dictionary containing the trajectory information:
-                - 'positions' (numpy.ndarray): The Cartesian positions of the end-effector along the trajectory.
-                - 'velocities' (numpy.ndarray): The Cartesian velocities of the end-effector along the trajectory.
-                - 'accelerations' (numpy.ndarray): The Cartesian accelerations of the end-effector along the trajectory.
-                - 'orientations' (numpy.ndarray): The orientations of the end-effector along the trajectory.
-        """
         N = int(N)
         timegap = Tf / (N - 1.0)
         traj = [None] * N
         Rstart, pstart = TransToRp(Xstart)
         Rend, pend = TransToRp(Xend)
 
-        orientations = np.zeros((N, 3, 3), dtype=np.float32)  # To store orientations
+        orientations = np.zeros((N, 3, 3), dtype=np.float32)
 
         for i in range(N):
             if method == 3:
@@ -459,12 +454,10 @@ class TrajectoryPlanning:
 
         traj_pos = np.array([TransToRp(T)[1] for T in traj], dtype=np.float32)
 
-        # Ensure the arrays are contiguous
         pstart = np.ascontiguousarray(pstart)
         pend = np.ascontiguousarray(pend)
         traj_pos = np.ascontiguousarray(traj_pos)
 
-        # Use CUDA to compute velocities and accelerations
         traj_vel = np.zeros((N, 3), dtype=np.float32)
         traj_acc = np.zeros((N, 3), dtype=np.float32)
 
@@ -612,26 +605,13 @@ class TrajectoryPlanning:
         return velocity, acceleration, jerk
 
     def plot_ee_trajectory(self, trajectory_data, Tf, title="End-Effector Trajectory"):
-        """
-        Plot the end-effector trajectory in 3D space for positions and orientations.
-
-        Args:
-            trajectory_data (dict): Dictionary containing 'positions', 'velocities', 'accelerations', and 'orientations'.
-            Tf (float): Total duration of the trajectory in seconds.
-            title (str, optional): Title for the plot. Defaults to 'End-Effector Trajectory'.
-
-        Returns:
-            None
-        """
         positions = trajectory_data["positions"]
         num_steps = positions.shape[0]
         time_steps = np.linspace(0, Tf, num_steps)
 
-        # If orientations are provided, use them; otherwise, compute them
         if "orientations" in trajectory_data:
             orientations = trajectory_data["orientations"]
         else:
-            # Compute orientations using forward kinematics
             orientations = np.array(
                 [
                     self.serial_manipulator.forward_kinematics(pos)[:3, :3]
@@ -643,7 +623,6 @@ class TrajectoryPlanning:
         ax = fig.add_subplot(111, projection="3d")
         fig.suptitle(title)
 
-        # Plot the EE position as a 3D spline
         ax.plot(
             positions[:, 0],
             positions[:, 1],
@@ -652,21 +631,20 @@ class TrajectoryPlanning:
             color="b",
         )
 
-        # Plot orientation as quivers
         for i in range(
             0, num_steps, max(1, num_steps // 20)
-        ):  # Plot a few orientations along the trajectory
+        ):
             R = orientations[i]
             pos = positions[i]
             ax.quiver(
-                pos[0], pos[1], pos[2], R[0, 0], R[1, 0], R[2, 0], length=1, color="r"
-            )  # X direction
+                pos[0], pos[1], pos[2], R[0, 0], R[1, 0], R[2, 0], length=0.01, color="r"
+            )
             ax.quiver(
-                pos[0], pos[1], pos[2], R[0, 1], R[1, 1], R[2, 1], length=1, color="g"
-            )  # Y direction
+                pos[0], pos[1], pos[2], R[0, 1], R[1, 1], R[2, 1], length=0.01, color="g"
+            )
             ax.quiver(
-                pos[0], pos[1], pos[2], R[0, 2], R[1, 2], R[2, 2], length=1, color="b"
-            )  # Z direction
+                pos[0], pos[1], pos[2], R[0, 2], R[1, 2], R[2, 2], length=0.01, color="b"
+            )
 
         ax.set_xlabel("X Position")
         ax.set_ylabel("Y Position")
