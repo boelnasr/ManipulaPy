@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 Manipulapy Package
 
@@ -12,7 +14,8 @@ from .singularity import *
 from .path_planning import *
 from .utils import *
 from .urdf_processor import *
-from .controller import *
+from .control import *
+from .sim import *
 
 
 # Define package-level variables
@@ -26,5 +29,6 @@ __all__ = [
     "path_planning",
     "utils",
     "urdf_processor",
-    "controller",
+    "control",
+    "sim",
 ]

@@ -60,6 +60,24 @@ def inverse_dynamics_kernel(
     torques_trajectory,
     torque_limits,
 ):
+    """
+    Computes the inverse dynamics of a robot manipulator given the joint angle, velocity, and acceleration trajectories, as well as the external forces acting on the end-effector.
+    
+    Args:
+        thetalist_trajectory (numpy.ndarray): The joint angle trajectory.
+        dthetalist_trajectory (numpy.ndarray): The joint velocity trajectory.
+        ddthetalist_trajectory (numpy.ndarray): The joint acceleration trajectory.
+        gravity_vector (numpy.ndarray): The gravity vector.
+        Ftip (numpy.ndarray): The external forces acting on the end-effector.
+        Glist (numpy.ndarray): The link-frame inertia matrices.
+        Slist (numpy.ndarray): The screw axes in the body frame.
+        M (numpy.ndarray): The end-effector frame.
+        torques_trajectory (numpy.ndarray): The output joint torque trajectory.
+        torque_limits (numpy.ndarray): The joint torque limits.
+    
+    Returns:
+        None
+    """
     # Same as before, but add torque limits enforcement
     idx = cuda.grid(1)
     if idx < thetalist_trajectory.shape[0]:
@@ -207,10 +225,25 @@ def cartesian_trajectory_kernel(
 
 class CollisionChecker:
     def __init__(self, urdf_path):
+        """
+        Initializes a CollisionChecker object.
+
+        Args:
+            urdf_path (str): The path to the URDF file.
+
+        Returns:
+            None
+        """
         self.robot = URDF.load(urdf_path)
         self.convex_hulls = self._create_convex_hulls()
 
     def _create_convex_hulls(self):
+        """
+        Creates a dictionary of convex hulls for each visual mesh in the robot's links.
+
+        Returns:
+            dict: A dictionary where the keys are the names of the robot links and the values are the corresponding convex hulls.
+        """
         convex_hulls = {}
         for link in self.robot.links:
             if link.visuals:
@@ -240,6 +273,19 @@ class CollisionChecker:
 
 class TrajectoryPlanning:
     def __init__(self, serial_manipulator, urdf_path, dynamics, joint_limits, torque_limits=None):
+        """
+        Initializes a TrajectoryPlanning object.
+
+        Args:
+            serial_manipulator (SerialManipulator): An instance of SerialManipulator.
+            urdf_path (str): The path to the URDF file.
+            dynamics (ManipulatorDynamics): An instance of ManipulatorDynamics.
+            joint_limits (list): A list of tuples representing the joint limits.
+            torque_limits (list, optional): A list of tuples representing the torque limits. Defaults to None.
+
+        Returns:
+            None
+        """
         self.serial_manipulator = serial_manipulator
         self.dynamics = dynamics
         self.joint_limits = np.array(joint_limits)
@@ -251,6 +297,20 @@ class TrajectoryPlanning:
         self.collision_checker = CollisionChecker(urdf_path)
 
     def JointTrajectory(self, thetastart, thetaend, Tf, N, method):
+        """
+        Generates a joint trajectory for a robot based on the given start and end joint angles, final time, and number of steps.
+        
+        Args:
+            thetastart (numpy.ndarray): The starting joint angles.
+            thetaend (numpy.ndarray): The ending joint angles.
+            Tf (float): The final time for the trajectory.
+            N (int): The number of steps in the trajectory.
+            method (str): The method to use for generating the trajectory.
+        
+        Returns:
+            dict: A dictionary containing the positions, velocities, and accelerations of the joint trajectory.
+        """
+        
         thetastart = np.array(thetastart, dtype=np.float32)
         thetaend = np.array(thetaend, dtype=np.float32)
         num_joints = len(thetastart)
@@ -428,6 +488,23 @@ class TrajectoryPlanning:
         }
 
     def CartesianTrajectory(self, Xstart, Xend, Tf, N, method):
+        """
+        Generates a Cartesian trajectory between two end-effector configurations in SE(3).
+
+        Args:
+            Xstart (np.ndarray): The initial end-effector configuration (SE(3) matrix).
+            Xend (np.ndarray): The final end-effector configuration (SE(3) matrix).
+            Tf (float): The total time of the motion in seconds from rest to rest.
+            N (int): The number of points N > 1 (Start and stop) in the discrete representation of the trajectory.
+            method (int): The time-scaling method, where 3 indicates cubic (third-order polynomial) time scaling and 5 indicates quintic (fifth-order polynomial) time scaling.
+
+        Returns:
+            dict: A dictionary containing the following keys:
+                - "positions" (np.ndarray): The trajectory positions as an array of shape (N, 3).
+                - "velocities" (np.ndarray): The trajectory velocities as an array of shape (N, 3).
+                - "accelerations" (np.ndarray): The trajectory accelerations as an array of shape (N, 3).
+                - "orientations" (np.ndarray): The trajectory orientations as an array of shape (N, 3, 3).
+        """
         N = int(N)
         timegap = Tf / (N - 1.0)
         traj = [None] * N
@@ -488,6 +565,23 @@ class TrajectoryPlanning:
 
     @staticmethod
     def plot_trajectory(trajectory_data, Tf, title="Joint Trajectory", labels=None):
+        """
+        Plot the joint trajectory.
+
+        Parameters:
+            trajectory_data (dict): A dictionary containing the joint trajectory data.
+                It should have the following keys:
+                - "positions" (ndarray): The array of joint positions.
+                - "velocities" (ndarray): The array of joint velocities.
+                - "accelerations" (ndarray): The array of joint accelerations.
+            Tf (float): The total duration of the trajectory.
+            title (str, optional): The title of the plot. Defaults to "Joint Trajectory".
+            labels (list, optional): The labels for each joint. If provided, it should have the same length as the number of joints.
+                Defaults to None.
+
+        Returns:
+            None
+        """
         positions = trajectory_data["positions"]
         velocities = trajectory_data["velocities"]
         accelerations = trajectory_data["accelerations"]
@@ -526,6 +620,16 @@ class TrajectoryPlanning:
         plt.show()
 
     def plot_tcp_trajectory(self, trajectory, dt):
+        """
+        Plots the trajectory of the TCP (Tool Center Point) of a serial manipulator.
+        
+        Args:
+            trajectory (list): A list of joint angle configurations representing the trajectory.
+            dt (float): The time step between consecutive points in the trajectory.
+        
+        Returns:
+            None
+        """
         tcp_trajectory = [
             self.serial_manipulator.forward_kinematics(joint_angles)
             for joint_angles in trajectory
@@ -564,6 +668,17 @@ class TrajectoryPlanning:
     def plot_cartesian_trajectory(
         self, trajectory_data, Tf, title="Cartesian Trajectory"
     ):
+        """
+        Plots the Cartesian trajectory of a robot's motion, including position, velocity, and acceleration.
+        
+        Args:
+            trajectory_data (dict): A dictionary containing the position, velocity, and acceleration data for the Cartesian trajectory.
+            Tf (float): The final time of the trajectory.
+            title (str, optional): The title of the plot. Defaults to "Cartesian Trajectory".
+        
+        Returns:
+            None
+        """
         positions = trajectory_data["positions"]
         velocities = trajectory_data["velocities"]
         accelerations = trajectory_data["accelerations"]
@@ -598,6 +713,18 @@ class TrajectoryPlanning:
         plt.show()
 
     def calculate_derivatives(self, positions, dt):
+        """
+        Calculate the velocity, acceleration, and jerk of a trajectory.
+
+        Parameters:
+            positions (list or numpy.ndarray): A list or array of positions.
+            dt (float): The time step between each position.
+
+        Returns:
+            velocity (numpy.ndarray): An array of velocities.
+            acceleration (numpy.ndarray): An array of accelerations.
+            jerk (numpy.ndarray): An array of jerks.
+        """
         positions = np.array(positions)
         velocity = np.diff(positions, axis=0) / dt
         acceleration = np.diff(velocity, axis=0) / dt
@@ -605,6 +732,17 @@ class TrajectoryPlanning:
         return velocity, acceleration, jerk
 
     def plot_ee_trajectory(self, trajectory_data, Tf, title="End-Effector Trajectory"):
+        """
+        Plots the end-effector trajectory of a serial manipulator.
+        
+        Args:
+            trajectory_data (dict): A dictionary containing the position and orientation data of the end-effector trajectory.
+            Tf (float): The final time of the trajectory.
+            title (str, optional): The title of the plot. Defaults to "End-Effector Trajectory".
+        
+        Returns:
+            None
+        """
         positions = trajectory_data["positions"]
         num_steps = positions.shape[0]
         time_steps = np.linspace(0, Tf, num_steps)

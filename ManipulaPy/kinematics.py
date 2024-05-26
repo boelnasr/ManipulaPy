@@ -38,12 +38,12 @@ class SerialManipulator:
         self.S_list = (
             S_list
             if S_list is not None
-            else utils.extract_screw_list(omega_list, self.r_list)
+            else utils.extract_screw_list(-omega_list, self.r_list)
         )
         self.B_list = (
             B_list
             if B_list is not None
-            else utils.extract_screw_list(omega_list, self.b_list)
+            else utils.extract_screw_list(-omega_list, self.b_list)
         )
         self.joint_limits = (
             joint_limits if joint_limits is not None else [(None, None)] * len(M_list)

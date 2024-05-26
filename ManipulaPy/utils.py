@@ -3,16 +3,9 @@
 import numpy as np
 from scipy.linalg import expm
 
-
 def extract_r_list(Slist):
     """
     Extracts the r_list from the given Slist.
-
-    Parameters:
-        Slist (list): A list of S vectors representing the joint screws.
-
-    Returns:
-        np.ndarray: An array of r vectors.
     """
     r_list = []
     for S in np.array(Slist).T:
@@ -25,18 +18,30 @@ def extract_r_list(Slist):
             r_list.append([0, 0, 0])  # For prismatic joints
     return np.array(r_list)
 
-
 def extract_omega_list(Slist):
     """
     Extracts the first three elements from each sublist in the given list and returns them as a numpy array.
-
-    Parameters:
-        Slist (list): A list of sublists.
-
-    Returns:
-        np.array: A numpy array containing the first three elements from each sublist.
     """
     return np.array(Slist)[:, :3]
+
+# New function to be added
+def extract_screw_list(omega_list, r_list):
+    """
+    Extracts the screw list from omega and r lists.
+
+    Parameters:
+        omega_list (list): A list of omega vectors.
+        r_list (list): A list of r vectors.
+
+    Returns:
+        np.ndarray: An array of screw vectors.
+    """
+    screw_list = []
+    for omega, r in zip(omega_list, r_list):
+        v = -np.cross(omega, r)
+        screw_list.append(np.concatenate((omega, v)))
+    return np.array(screw_list)
+
 
 
 def NearZero(z):
