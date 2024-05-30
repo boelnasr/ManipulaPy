@@ -4,7 +4,6 @@ import numpy as np
 from . import utils
 import matplotlib.pyplot as plt
 
-
 class SerialManipulator:
     def __init__(
         self,
@@ -28,22 +27,18 @@ class SerialManipulator:
             S_list (list, optional): A list of S values. Defaults to None.
             B_list (list, optional): A list of B values. Defaults to None.
             G_list (list, optional): A list of G values. Defaults to None.
+            joint_limits (list, optional): A list of joint limits. Defaults to None.
         """
-
         self.M_list = M_list
         self.G_list = G_list
         self.omega_list = omega_list
         self.r_list = r_list if r_list is not None else utils.extract_r_list(S_list)
         self.b_list = b_list if b_list is not None else utils.extract_r_list(B_list)
         self.S_list = (
-            S_list
-            if S_list is not None
-            else utils.extract_screw_list(-omega_list, self.r_list)
+            S_list if S_list is not None else utils.extract_screw_list(-omega_list, self.r_list)
         )
         self.B_list = (
-            B_list
-            if B_list is not None
-            else utils.extract_screw_list(-omega_list, self.b_list)
+            B_list if B_list is not None else utils.extract_screw_list(omega_list, self.b_list)
         )
         self.joint_limits = (
             joint_limits if joint_limits is not None else [(None, None)] * len(M_list)
@@ -61,7 +56,6 @@ class SerialManipulator:
         Returns:
             numpy.ndarray: The transformation matrix representing the end-effector's pose.
         """
-
         T = np.eye(4)
         if frame == "space":
             for i, theta in enumerate(thetalist):
@@ -84,11 +78,7 @@ class SerialManipulator:
 
         Returns:
             numpy.ndarray: The end effector velocity.
-
-        Raises:
-            ValueError: If an invalid frame is specified.
         """
-
         if frame == "space":
             J = self.jacobian_space(thetalist)
         elif frame == "body":
@@ -108,32 +98,18 @@ class SerialManipulator:
 
         Returns:
             numpy.ndarray: The Jacobian matrix of shape (6, len(thetalist)).
-
-        Raises:
-            ValueError: If an invalid frame is specified.
-
         """
-
         J = np.zeros((6, len(thetalist)))
         T = np.eye(4)
         if frame == "space":
             for i in range(len(thetalist)):
                 J[:, i] = np.dot(utils.adjoint_transform(T), self.S_list[:, i])
-                T = np.dot(
-                    T, utils.transform_from_twist(self.S_list[:, i], thetalist[i])
-                )
+                T = np.dot(T, utils.transform_from_twist(self.S_list[:, i], thetalist[i]))
         elif frame == "body":
             T = self.forward_kinematics(thetalist, frame="body")
             for i in reversed(range(len(thetalist))):
-                J[:, i] = np.dot(
-                    utils.adjoint_transform(np.linalg.inv(T)), self.B_list[:, i]
-                )
-                T = np.dot(
-                    T,
-                    np.linalg.inv(
-                        utils.transform_from_twist(self.B_list[:, i], thetalist[i])
-                    ),
-                )
+                J[:, i] = np.dot(utils.adjoint_transform(np.linalg.inv(T)), self.B_list[:, i])
+                T = np.dot(T, np.linalg.inv(utils.transform_from_twist(self.B_list[:, i], thetalist[i])))
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return J
@@ -155,14 +131,11 @@ class SerialManipulator:
             thetalist0 (List[float]): The initial guess for the joint angles.
             eomg (float, optional): The tolerance for rotational error convergence. Defaults to 1e-6.
             ev (float, optional): The tolerance for translational error convergence. Defaults to 1e-6.
-            max_iterations (int, optional): The maximum number of iterations to perform. Defaults to 50.
+            max_iterations (int, optional): The maximum number of iterations to perform. Defaults to 5000.
             plot_residuals (bool, optional): Whether to plot the residual norm over iterations. Defaults to False.
 
         Returns:
-            Tuple[List[float], bool]: A tuple containing the resulting joint angles and a boolean value indicating the success of convergence.
-
-        Raises:
-            None
+            Tuple[List[float], bool, int]: A tuple containing the resulting joint angles, a boolean value indicating the success of convergence, and the number of iterations.
         """
         thetalist = np.array(thetalist0)
         residuals = []  # List to store the error at each iteration
@@ -190,7 +163,7 @@ class SerialManipulator:
 
             # Update thetalist using the pseudoinverse of the Jacobian
             delta_theta = np.dot(np.linalg.pinv(J), V_error)
-            thetalist += 0.058 * delta_theta
+            thetalist += 0.058 * delta_theta  # Ensure this step size is appropriate for convergence
 
             # Enforce joint limits
             for i, (theta_min, theta_max) in enumerate(self.joint_limits):
@@ -225,11 +198,7 @@ class SerialManipulator:
 
         Returns:
             array-like: The joint velocity.
-
-        Raises:
-            ValueError: If an invalid frame type is specified.
         """
-
         if frame == "space":
             J = self.jacobian(thetalist)
         elif frame == "body":

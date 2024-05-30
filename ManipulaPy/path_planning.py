@@ -4,7 +4,6 @@ from numba import cuda, float32
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
-
 from .utils import (
     TransToRp,
     MatrixLog3,
@@ -14,12 +13,8 @@ from .utils import (
 )
 from urchin.urdf import URDF
 
-
-
 @cuda.jit
-def trajectory_kernel(
-    thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
-):
+def trajectory_kernel(thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method):
     """
     CUDA kernel to compute positions, velocities, and accelerations using cubic or quintic time scaling.
     """
@@ -34,10 +29,6 @@ def trajectory_kernel(
             s = 10 * (t / Tf) ** 3 - 15 * (t / Tf) ** 4 + 6 * (t / Tf) ** 5
             s_dot = 30 * (t / Tf) ** 2 * (1 - 2 * (t / Tf) + t / Tf**2)
             s_ddot = 60 / (Tf**2) * (t / Tf) * (1 - 2 * (t / Tf))
-        elif method == 6:  # Bezier curve
-            s = (1 - t / Tf) ** 3
-            s_dot = -3 * (1 - t / Tf) ** 2 / Tf
-            s_ddot = 6 * (1 - t / Tf) / Tf**2
         else:
             s = s_dot = s_ddot = 0
 
@@ -46,22 +37,13 @@ def trajectory_kernel(
             traj_vel[idx, j] = s_dot * (thetaend[j] - thetastart[j])
             traj_acc[idx, j] = s_ddot * (thetaend[j] - thetastart[j])
 
-
 @cuda.jit
 def inverse_dynamics_kernel(
-    thetalist_trajectory,
-    dthetalist_trajectory,
-    ddthetalist_trajectory,
-    gravity_vector,
-    Ftip,
-    Glist,
-    Slist,
-    M,
-    torques_trajectory,
-    torque_limits,
-):
+    thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector, Ftip,
+    Glist, Slist, M, torques_trajectory, torque_limits):
     """
-    Computes the inverse dynamics of a robot manipulator given the joint angle, velocity, and acceleration trajectories, as well as the external forces acting on the end-effector.
+    Computes the inverse dynamics of a robot manipulator given the joint angle, velocity, and acceleration trajectories,
+    as well as the external forces acting on the end-effector.
     
     Args:
         thetalist_trajectory (numpy.ndarray): The joint angle trajectory.
@@ -78,7 +60,6 @@ def inverse_dynamics_kernel(
     Returns:
         None
     """
-    # Same as before, but add torque limits enforcement
     idx = cuda.grid(1)
     if idx < thetalist_trajectory.shape[0]:
         thetalist = thetalist_trajectory[idx]
@@ -90,26 +71,20 @@ def inverse_dynamics_kernel(
         for i in range(len(thetalist)):
             for row in range(6):
                 for col in range(6):
-                    M_temp[row, col] += Glist[
-                        i, row, col
-                    ]  # Simplified for demonstration, replace with full computation
+                    M_temp[row, col] += Glist[i, row, col]  # Simplified for demonstration
 
         # Velocity quadratic forces computation
         c_temp = cuda.local.array(6, dtype=float32)
         for i in range(len(thetalist)):
             for j in range(6):
-                c_temp[j] += (
-                    Slist[i, j] * dthetalist[i]
-                )  # Simplified for demonstration, replace with full computation
+                c_temp[j] += Slist[i, j] * dthetalist[i]  # Simplified for demonstration
 
         # Gravity forces computation
         g_temp = cuda.local.array(6, dtype=float32)
         for i in range(len(thetalist)):
-            g_temp[2] += gravity_vector[
-                i
-            ]  # Simplified for demonstration, replace with full computation
+            g_temp[2] += gravity_vector[i]  # Simplified for demonstration
 
-        # External forces (Ftip) are considered in the dynamics
+        # External forces (Ftip)
         F_ext = cuda.local.array(6, dtype=float32)
         for i in range(len(Ftip)):
             F_ext[i] += Ftip[i]
@@ -122,30 +97,16 @@ def inverse_dynamics_kernel(
             tau_temp[row] += c_temp[row] + g_temp[row] + F_ext[row]
         for j in range(len(tau_temp)):
             # Enforce torque limits
-            tau_temp[j] = max(
-                torque_limits[j, 0], min(tau_temp[j], torque_limits[j, 1])
-            )
+            tau_temp[j] = max(torque_limits[j, 0], min(tau_temp[j], torque_limits[j, 1]))
             torques_trajectory[idx, j] = tau_temp[j]
-
 
 @cuda.jit
 def forward_dynamics_kernel(
-    thetalist,
-    dthetalist,
-    taumat,
-    g,
-    Ftipmat,
-    dt,
-    intRes,
-    Glist,
-    Slist,
-    M,
-    thetamat,
-    dthetamat,
-    ddthetamat,
-    joint_limits,
-):
-    # Same as before, but add joint limits enforcement
+    thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes,
+    Glist, Slist, M, thetamat, dthetamat, ddthetamat, joint_limits):
+    """
+    CUDA kernel to compute forward dynamics for a robotic system.
+    """
     idx = cuda.grid(1)
     if idx < taumat.shape[0]:
         # Initialize local variables
@@ -165,21 +126,13 @@ def forward_dynamics_kernel(
             for i in range(len(thetalist)):
                 for row in range(6):
                     for col in range(6):
-                        M_temp[row, col] = Glist[
-                            i, row, col
-                        ]  # Replace with full computation
-                    c_temp[row] = (
-                        Slist[i, row] * current_dthetalist[i]
-                    )  # Replace with full computation
-                    g_temp[row] = g[row]  # Replace with full computation
+                        M_temp[row, col] = Glist[i, row, col]  # Simplified
+                    c_temp[row] = Slist[i, row] * current_dthetalist[i]  # Simplified
+                    g_temp[row] = g[row]  # Simplified
 
             # Compute joint accelerations
             for i in range(len(thetalist)):
-                ddthetalist_local[i] = (
-                    current_tau[i] - c_temp[i] - g_temp[i]
-                ) / M_temp[
-                    i, i
-                ]  # Simplified
+                ddthetalist_local[i] = (current_tau[i] - c_temp[i] - g_temp[i]) / M_temp[i, i]  # Simplified
 
             # Integrate to get velocities and positions
             for i in range(len(thetalist)):
@@ -188,9 +141,7 @@ def forward_dynamics_kernel(
 
             # Enforce joint limits
             for i in range(len(thetalist)):
-                current_thetalist[i] = max(
-                    joint_limits[i, 0], min(current_thetalist[i], joint_limits[i, 1])
-                )
+                current_thetalist[i] = max(joint_limits[i, 0], min(current_thetalist[i], joint_limits[i, 1]))
 
         # Store results
         for i in range(len(thetalist)):
@@ -198,11 +149,11 @@ def forward_dynamics_kernel(
             dthetamat[idx, i] = current_dthetalist[i]
             ddthetamat[idx, i] = ddthetalist_local[i]
 
-
 @cuda.jit
-def cartesian_trajectory_kernel(
-    pstart, pend, traj_pos, traj_vel, traj_acc, Tf, N, method
-):
+def cartesian_trajectory_kernel(pstart, pend, traj_pos, traj_vel, traj_acc, Tf, N, method):
+    """
+    CUDA kernel to compute Cartesian trajectory positions, velocities, and accelerations.
+    """
     idx = cuda.grid(1)
     if idx < N:
         t = idx * (Tf / (N - 1))
@@ -222,7 +173,6 @@ def cartesian_trajectory_kernel(
             traj_vel[idx, j] = s_dot * (pend[j] - pstart[j])
             traj_acc[idx, j] = s_ddot * (pend[j] - pstart[j])
 
-
 class CollisionChecker:
     def __init__(self, urdf_path):
         """
@@ -230,9 +180,6 @@ class CollisionChecker:
 
         Args:
             urdf_path (str): The path to the URDF file.
-
-        Returns:
-            None
         """
         self.robot = URDF.load(urdf_path)
         self.convex_hulls = self._create_convex_hulls()
@@ -282,9 +229,6 @@ class TrajectoryPlanning:
             dynamics (ManipulatorDynamics): An instance of ManipulatorDynamics.
             joint_limits (list): A list of tuples representing the joint limits.
             torque_limits (list, optional): A list of tuples representing the torque limits. Defaults to None.
-
-        Returns:
-            None
         """
         self.serial_manipulator = serial_manipulator
         self.dynamics = dynamics
@@ -296,7 +240,7 @@ class TrajectoryPlanning:
         )
         self.collision_checker = CollisionChecker(urdf_path)
 
-    def JointTrajectory(self, thetastart, thetaend, Tf, N, method):
+    def joint_trajectory(self, thetastart, thetaend, Tf, N, method):
         """
         Generates a joint trajectory for a robot based on the given start and end joint angles, final time, and number of steps.
         
@@ -351,15 +295,8 @@ class TrajectoryPlanning:
             "accelerations": traj_acc,
         }
 
-
-    def InverseDynamicsTrajectory(
-        self,
-        thetalist_trajectory,
-        dthetalist_trajectory,
-        ddthetalist_trajectory,
-        gravity_vector=None,
-        Ftip=None,
-    ):
+    def inverse_dynamics_trajectory(
+        self, thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector=None, Ftip=None):
         """
         Compute joint torques with enforced torque limits based on a trajectory using CUDA acceleration.
 
@@ -398,30 +335,19 @@ class TrajectoryPlanning:
         d_torque_limits = cuda.to_device(self.torque_limits)
 
         inverse_dynamics_kernel[blocks_per_grid, threads_per_block](
-            d_thetalist_trajectory,
-            d_dthetalist_trajectory,
-            d_ddthetalist_trajectory,
-            d_gravity_vector,
-            d_Ftip,
-            d_Glist,
-            d_Slist,
-            d_M,
-            d_torques_trajectory,
-            d_torque_limits,
-        )
+            d_thetalist_trajectory, d_dthetalist_trajectory, d_ddthetalist_trajectory,
+            d_gravity_vector, d_Ftip, d_Glist, d_Slist, d_M, d_torques_trajectory, d_torque_limits)
 
         d_torques_trajectory.copy_to_host(torques_trajectory)
 
         if self.torque_limits is not None:
             torques_trajectory = np.clip(
-                torques_trajectory, self.torque_limits[:, 0], self.torque_limits[:, 1]
-            )
+                torques_trajectory, self.torque_limits[:, 0], self.torque_limits[:, 1])
 
         return torques_trajectory
 
     def forward_dynamics_trajectory(
-        self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
-    ):
+        self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes):
         """
         Calculates the forward dynamics trajectory of a robotic system given the joint angles, joint velocities, joint torques, gravity vector, and external forces.
 
@@ -463,21 +389,8 @@ class TrajectoryPlanning:
         d_ddthetamat = cuda.device_array_like(ddthetamat)
         d_joint_limits = cuda.to_device(self.joint_limits)
         forward_dynamics_kernel[blocks_per_grid, threads_per_block](
-            d_thetalist,
-            d_dthetalist,
-            d_taumat,
-            d_g,
-            d_Ftipmat,
-            dt,
-            intRes,
-            d_Glist,
-            d_Slist,
-            d_M,
-            d_thetamat,
-            d_dthetamat,
-            d_ddthetamat,
-            d_joint_limits,
-        )
+            d_thetalist, d_dthetalist, d_taumat, d_g, d_Ftipmat, dt, intRes,
+            d_Glist, d_Slist, d_M, d_thetamat, d_dthetamat, d_ddthetamat, d_joint_limits)
         d_thetamat.copy_to_host(thetamat)
         d_dthetamat.copy_to_host(dthetamat)
         d_ddthetamat.copy_to_host(ddthetamat)
@@ -487,7 +400,7 @@ class TrajectoryPlanning:
             "accelerations": ddthetamat,
         }
 
-    def CartesianTrajectory(self, Xstart, Xend, Tf, N, method):
+    def cartesian_trajectory(self, Xstart, Xend, Tf, N, method):
         """
         Generates a Cartesian trajectory between two end-effector configurations in SE(3).
 
@@ -607,9 +520,7 @@ class TrajectoryPlanning:
             axs[1, i].set_ylabel("Velocity")
             axs[1, i].legend()
 
-            axs[2, i].plot(
-                time_steps, accelerations[:, i], label=f"{label} Acceleration"
-            )
+            axs[2, i].plot(time_steps, accelerations[:, i], label=f"{label} Acceleration")
             axs[2, i].set_ylabel("Acceleration")
             axs[2, i].legend()
 
@@ -665,9 +576,7 @@ class TrajectoryPlanning:
         plt.tight_layout()
         plt.show()
 
-    def plot_cartesian_trajectory(
-        self, trajectory_data, Tf, title="Cartesian Trajectory"
-    ):
+    def plot_cartesian_trajectory(self, trajectory_data, Tf, title="Cartesian Trajectory"):
         """
         Plots the Cartesian trajectory of a robot's motion, including position, velocity, and acceleration.
         
@@ -762,16 +671,10 @@ class TrajectoryPlanning:
         fig.suptitle(title)
 
         ax.plot(
-            positions[:, 0],
-            positions[:, 1],
-            positions[:, 2],
-            label="EE Position",
-            color="b",
+            positions[:, 0], positions[:, 1], positions[:, 2], label="EE Position", color="b"
         )
 
-        for i in range(
-            0, num_steps, max(1, num_steps // 20)
-        ):
+        for i in range(0, num_steps, max(1, num_steps // 20)):
             R = orientations[i]
             pos = positions[i]
             ax.quiver(

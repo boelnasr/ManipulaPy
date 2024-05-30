@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 from urchin.urdf import URDF
 import numpy as np
 import pybullet as p
@@ -46,16 +45,16 @@ class URDFToSerialManipulator:
         return np.array(T[0:3, 3])
 
     @staticmethod
-    def get_joint(robot: URDF, link_name: str):
+    def get_link(robot: URDF, link_name: str):
         """
-            Given a robot URDF and a link name, returns the joint associated with that link.
+        Given a robot URDF and a link name, returns the link associated with that name.
 
         Parameters:
             robot (URDF): The robot URDF object.
-            link_name (str): The name of the link to find the joint for.
+            link_name (str): The name of the link to find.
 
         Returns:
-            Joint or None: The joint associated with the link, or None if no joint is found.
+            Link or None: The link object, or None if no link is found.
         """
         for link in robot.links:
             if link.name == link_name:
@@ -96,31 +95,47 @@ class URDFToSerialManipulator:
                 - "actuated_joints_num" (int): The number of actuated joints in the robot.
         """
         robot = URDF.load(urdf_name)
-        joint_num = len(robot.actuated_joints)
+        joint_num = len([joint for joint in robot.actuated_joints if joint.joint_type != "fixed"])
 
         p_ = []  # Positions of each joint
         w_ = []  # Rotation axes of each joint
         M_list = np.eye(4)  # Home position matrix
         Glist = []  # Inertia matrices
+
+        link_fk = robot.link_fk()
+        link_fk = {link.name: fk for link, fk in link_fk.items()}  # Use link names as keys
+        link_fk_keys = list(link_fk.keys())  # Get the keys of link_fk for debugging
+
         for joint in robot.actuated_joints:
-            child_link = self.get_joint(robot, joint.child)
-            p_.append(self.transform_to_xyz(robot.link_fk()[child_link]))
+            if joint.joint_type == "fixed":
+                continue
+
+            child_link_name = joint.child
+            child_link = self.get_link(robot, child_link_name)
+            if not child_link:
+                continue
+
+            if joint.child not in link_fk:
+                raise KeyError(f"Link {joint.child} not found in link_fk dictionary. Available keys: {link_fk_keys}")
+
+            p_.append(self.transform_to_xyz(link_fk[joint.child]))
             G = np.eye(6)
             if child_link.inertial:
                 G[0:3, 0:3] = child_link.inertial.inertia
                 G[3:6, 3:6] = child_link.inertial.mass * np.eye(3)
             Glist.append(G)
-            child_M = robot.link_fk()[child_link]
+            child_M = link_fk[joint.child]
             child_w = np.array(child_M[0:3, 0:3] @ np.array(joint.axis).T)
             w_.append(child_w)
             if child_link.inertial and child_link.inertial.origin is not None:
                 child_M = child_M @ child_link.inertial.origin
             M_list = np.dot(M_list, child_M)
+
         Slist = self.w_p_to_slist(w_, p_, joint_num)
         Tsb_inv = np.linalg.inv(M_list)
         Ad_Tsb_inv = utils.adjoint_transform(Tsb_inv)
-        # Replace mr.Adjoint and mr.TransInv with custom functions
         Blist = np.dot(Ad_Tsb_inv, Slist)
+
         return {
             "M": M_list,
             "Slist": Slist,
@@ -150,23 +165,6 @@ class URDFToSerialManipulator:
         Initializes the ManipulatorDynamics object using the extracted URDF data.
         """
         data = self.robot_data
-        # Initialize the ManipulatorDynamics object
-        self.manipulator_dynamics = ManipulatorDynamics(
-            M_list=data["M"],
-            omega_list=data["Slist"][:, :3],
-            r_list=utils.extract_r_list(data["Slist"]),
-            b_list=None,  # Assuming b_list is not provided in URDF data
-            S_list=data["Slist"],
-            B_list=data["Blist"],
-            Glist=data["Glist"],
-        )
-
-    def initialize_manipulator_dynamics(self):
-        """
-        Initializes the ManipulatorDynamics object using the extracted URDF data.
-        """
-        data = self.robot_data
-        # Initialize the ManipulatorDynamics object
         self.manipulator_dynamics = ManipulatorDynamics(
             M_list=data["M"],
             omega_list=data["Slist"][:, :3],
@@ -178,25 +176,6 @@ class URDFToSerialManipulator:
         )
         return self.manipulator_dynamics
 
-    def extract_inertia_matrices(self):
-        """
-        Extracts the spatial inertia matrices from the URDF data.
-        """
-        Glist = []
-        for link in self.robot.links:
-            if link.inertial:
-                inertia = link.inertial.inertia
-                mass = link.inertial.mass
-                G = np.zeros((6, 6))
-                G[:3, :3] = inertia
-                G[3:, 3:] = mass * np.eye(3)
-                Glist.append(G)
-            else:
-                Glist.append(
-                    np.zeros((6, 6))
-                )  # Add zero matrix for links without inertia
-        return Glist
-
     def simulate_robot(self):
         """
         Simulates the robot using PyBullet.
@@ -204,32 +183,30 @@ class URDFToSerialManipulator:
         M = self.robot_data["M"]
         Slist = self.robot_data["Slist"]
         Blist = self.robot_data["Blist"]
-        Mlist = self.robot_data["M"]
         Glist = self.robot_data["Glist"]
         actuated_joints_num = self.robot_data["actuated_joints_num"]
+
         p.connect(p.GUI)
         p.setGravity(0, 0, -9.8)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         robotID = p.loadURDF(self.urdf_name, [0, 0, 0], [0, 0, 0, 1], useFixedBase=1)
         numJoints = p.getNumJoints(robotID)
         p.resetBasePositionAndOrientation(robotID, [0, 0, 0], [0, 0, 0, 1])
+
         for i in range(numJoints):
             p.setJointMotorControl2(
                 robotID, i, p.POSITION_CONTROL, targetVelocity=0, force=0
             )
         for i in range(numJoints):
             p.resetJointState(robotID, i, np.pi / 3.0)
+
         # Simulation loop
         timeStep = 1 / 240.0
         p.setTimeStep(timeStep)
         while p.isConnected():
-            # Perform simulation steps here...
-            # You can use the code from your script to perform the necessary calculations
-            # and control the robot in the PyBullet simulation environment.
-            # Step simulation
             p.stepSimulation()
             time.sleep(timeStep)
-        # Disconnect PyBullet
+
         p.disconnect()
 
     def simulate_robot_with_desired_angles(self, desired_angles):
@@ -239,20 +216,14 @@ class URDFToSerialManipulator:
         Args:
             desired_angles (np.ndarray): Desired joint angles.
         """
-        # Connect to PyBullet and set up the environment
         p.connect(p.GUI)
         p.setGravity(0, 0, -9.8)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-
-        # Load the robot from the URDF file
         robotID = p.loadURDF(self.urdf_name, [0, 0, 0], [0, 0, 0, 1], useFixedBase=1)
 
-        # Set the desired joint angles using POSITION_CONTROL
         numJoints = p.getNumJoints(robotID)
-
         for i in range(numJoints):
             if i < len(desired_angles):
-                # Apply position control to each joint
                 p.setJointMotorControl2(
                     robotID,
                     i,
@@ -261,31 +232,28 @@ class URDFToSerialManipulator:
                     force=1000,
                 )
             else:
-                # If desired_angles list is shorter than numJoints, set remaining joints to a default position
                 p.setJointMotorControl2(
                     robotID, i, p.POSITION_CONTROL, targetPosition=0, force=1000
                 )
-        # Simulation loop
+
         timeStep = 1 / 100.0
         p.setTimeStep(timeStep)
         while p.isConnected():
             p.stepSimulation()
-            time.sleep(timeStep)  # Simulation time step
+            time.sleep(timeStep)
+
         time.sleep(10 * np.exp(100))
-        # Disconnect from PyBullet
         p.disconnect()
 
     def visualize_robot(self):
         """
         Visualizes the URDF model using matplotlib.
         """
-
         self.robot.show()
 
     def visualize_trajectory(
         self, cfg_trajectory=None, loop_time=3.0, use_collision=False
     ):
-        # Filter out fixed joints
         actuated_joints = [
             joint for joint in self.robot.joints if joint.joint_type != "fixed"
         ]

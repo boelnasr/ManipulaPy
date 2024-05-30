@@ -58,63 +58,37 @@ def NearZero(z):
 
 
 def skew_symmetric(v):
-    """
-    Returns the skew symmetric matrix of a 3D vector.
-
-    Parameters:
-        v (array-like): A 3D vector.
-
-    Returns:
-        np.ndarray: The corresponding skew symmetric matrix.
-    """
-    return np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-
-
-def transform_from_twist(S, theta):
-    """
-    Computes the transformation matrix from a twist and a joint angle.
-
-    Parameters:
-        S (array-like): A 6D twist vector.
-        theta (float): The joint angle.
-
-    Returns:
-        np.ndarray: The corresponding transformation matrix.
-    """
-    omega = S[:3]
-    v = S[3:]
-    if np.linalg.norm(omega) == 0:  # Prismatic joint
-        return np.vstack((np.eye(3), v * theta)).T
-    else:  # Revolute joint
-        skew_omega = skew_symmetric(omega)
-        R = (
-            np.eye(3)
-            + np.sin(theta) * skew_omega
-            + (1 - np.cos(theta)) * np.dot(skew_omega, skew_omega)
-        )
-        p = np.dot(
-            np.eye(3) * theta
-            + (1 - np.cos(theta)) * skew_omega
-            + (theta - np.sin(theta)) * np.dot(skew_omega, skew_omega),
-            v,
-        )
-        return np.vstack((np.hstack((R, p.reshape(-1, 1))), [0, 0, 0, 1]))
-
+    return np.array([
+        [0, -v[2], v[1]],
+        [v[2], 0, -v[0]],
+        [-v[1], v[0], 0]
+    ])
 
 def adjoint_transform(T):
-    """
-    Computes the adjoint transformation matrix for a given transformation matrix.
-
-    Parameters:
-        T (np.ndarray): A 4x4 transformation matrix.
-
-    Returns:
-        np.ndarray: The corresponding adjoint transformation matrix.
-    """
-    R = T[0:3, 0:3]
-    p = T[0:3, 3]
+    R = T[:3, :3]
+    p = T[:3, 3]
     skew_p = skew_symmetric(p)
-    return np.vstack((np.hstack((R, np.zeros((3, 3)))), np.hstack((skew_p @ R, R))))
+    return np.block([
+        [R, np.zeros((3, 3))],
+        [skew_p @ R, R]
+    ])
+
+def transform_from_twist(S, theta):
+    omega = S[:3]
+    v = S[3:]
+    if np.linalg.norm(omega) < 1e-6:  # Prismatic joint
+        return np.eye(4) + np.block([
+            [np.zeros((3, 3)), v[:, None] * theta],
+            [0, 0, 0, 0]
+        ])
+    else:  # Revolute joint
+        omega_skew = skew_symmetric(omega)
+        R = np.eye(3) + np.sin(theta) * omega_skew + (1 - np.cos(theta)) * omega_skew @ omega_skew
+        p = (np.eye(3) * theta + (1 - np.cos(theta)) * omega_skew + (theta - np.sin(theta)) * omega_skew @ omega_skew) @ v
+        return np.block([
+            [R, p[:, None]],
+            [0, 0, 0, 1]
+        ])
 
 
 def logm(T):

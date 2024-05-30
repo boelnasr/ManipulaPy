@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-import pybullet as p  # Add this import statement
+
+import pybullet as p
 import pybullet_data
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
-from ManipulaPy.kinematics import SerialManipulator
-from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.path_planning import TrajectoryPlanning as tp
-from ManipulaPy.singularity import Singularity
-from ManipulaPy.control import ManipulatorController 
-from math import pi
+from ManipulaPy.control import ManipulatorController
 import numpy as np
 import time
 import logging
+import matplotlib.pyplot as plt
 
 class Simulation:
     def __init__(self, urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0):
@@ -21,6 +19,7 @@ class Simulation:
         self.real_time_factor = real_time_factor
         self.logger = self.setup_logger()
         self.physics_client = None
+        self.joint_params = []
         self.setup_simulation()
 
     def setup_logger(self):
@@ -59,6 +58,7 @@ class Simulation:
         urdf_processor = URDFToSerialManipulator(self.urdf_file_path)
         self.robot = urdf_processor.serial_manipulator
         self.dynamics = urdf_processor.dynamics
+        self.non_fixed_joints = [i for i in range(p.getNumJoints(self.robot_id)) if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED]
 
         # Initialize the Trajectory Planner
         self.trajectory_planner = tp(
@@ -69,6 +69,7 @@ class Simulation:
         # Initialize the Controller
         self.controller = ManipulatorController(self.dynamics)
         self.logger.info("Simulation environment initialized.")
+        self.add_joint_parameters()
 
     def reset_simulation(self):
         self.logger.info("Resetting simulation...")
@@ -76,12 +77,21 @@ class Simulation:
         self.setup_simulation()
         self.logger.info("Simulation reset.")
 
+    def add_joint_parameters(self):
+        """
+        Adds GUI sliders for each joint.
+        """
+        self.joint_params = []
+        for i, joint_index in enumerate(self.non_fixed_joints):
+            param_id = p.addUserDebugParameter(f'Joint {joint_index}', self.joint_limits[i][0], self.joint_limits[i][1], 0)
+            self.joint_params.append(param_id)
+
     def set_joint_positions(self, joint_positions):
-        for i in range(len(joint_positions)):
-            p.resetJointState(self.robot_id, i, joint_positions[i])
+        for i, joint_index in enumerate(self.non_fixed_joints):
+            p.resetJointState(self.robot_id, joint_index, joint_positions[i])
 
     def get_joint_positions(self):
-        joint_positions = [p.getJointState(self.robot_id, i)[0] for i in range(p.getNumJoints(self.robot_id))]
+        joint_positions = [p.getJointState(self.robot_id, i)[0] for i in self.non_fixed_joints]
         return np.array(joint_positions)
 
     def run_trajectory(self, joint_trajectory):
@@ -119,6 +129,12 @@ class Simulation:
             time.sleep(self.time_step / self.real_time_factor)
         self.logger.info("Controller run completed.")
 
+    def get_joint_parameters(self):
+        """
+        Gets the current values of the GUI sliders.
+        """
+        return [p.readUserDebugParameter(param_id) for param_id in self.joint_params]
+
     def simulate_robot_motion(self, desired_angles_trajectory):
         """
         Simulates the robot's motion using a given trajectory of desired joint angles.
@@ -142,22 +158,17 @@ class Simulation:
         """
         self.logger.info("Simulating robot with desired joint angles...")
 
-        numJoints = p.getNumJoints(self.robot_id)
-        for i in range(numJoints):
+        for i, joint_index in enumerate(self.non_fixed_joints):
             if i < len(desired_angles):
                 p.setJointMotorControl2(
                     self.robot_id,
-                    i,
+                    joint_index,
                     p.POSITION_CONTROL,
                     targetPosition=desired_angles[i],
                     force=1000,
                 )
-            else:
-                p.setJointMotorControl2(
-                    self.robot_id, i, p.POSITION_CONTROL, targetPosition=0, force=1000
-                )
 
-        time_step = 1 
+        time_step = 0.00001 
         p.setTimeStep(time_step)
         try:
             while True:
@@ -171,3 +182,36 @@ class Simulation:
         self.logger.info("Closing simulation...")
         self.disconnect_simulation()
         self.logger.info("Simulation closed.")
+    
+    def manual_control(self):
+        """
+        Allows manual control of the robot through the PyBullet UI sliders.
+        """
+        self.logger.info("Starting manual control...")
+        try:
+            while True:
+                joint_positions = self.get_joint_parameters()
+                if len(joint_positions) != len(self.non_fixed_joints):
+                    raise ValueError(f"Number of joint positions ({len(joint_positions)}) does not match number of non-fixed joints ({len(self.non_fixed_joints)}).")
+                self.set_joint_positions(joint_positions)
+                p.stepSimulation()
+                time.sleep(self.time_step / self.real_time_factor)
+        except KeyboardInterrupt:
+            print("Manual control stopped by user.")
+            self.logger.info("Manual control stopped.")
+
+    def plot_trajectory_in_scene(self, joint_trajectory, end_effector_trajectory):
+        self.logger.info("Plotting trajectory in simulation scene...")
+        ee_positions = np.array(end_effector_trajectory)
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot(ee_positions[:, 0], ee_positions[:, 1], ee_positions[:, 2], label='End-Effector Trajectory')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        plt.legend()
+        plt.show()
+        
+        self.run_trajectory(joint_trajectory)
+        self.logger.info("Trajectory plotted and simulation completed.")
