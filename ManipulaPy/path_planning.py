@@ -12,6 +12,7 @@ from .utils import (
     QuinticTimeScaling,
 )
 from urchin.urdf import URDF
+<<<<<<< HEAD
 from .cuda_kernels import (
     trajectory_kernel,
     inverse_dynamics_kernel,
@@ -20,6 +21,10 @@ from .cuda_kernels import (
 )
 from .potential_field import CollisionChecker, PotentialField
 
+=======
+from .cuda_kernels import trajectory_kernel, inverse_dynamics_kernel, forward_dynamics_kernel, cartesian_trajectory_kernel
+from .potential_field import CollisionChecker, PotentialField
+>>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 
 class TrajectoryPlanning:
     def __init__(
@@ -99,9 +104,13 @@ class TrajectoryPlanning:
         for idx, step in enumerate(traj_pos):
             if self.collision_checker.check_collision(step):
                 for _ in range(100):  # Max iterations to adjust trajectory
+<<<<<<< HEAD
                     gradient = self.potential_field.compute_gradient(
                         step, q_goal, obstacles
                     )
+=======
+                    gradient = self.potential_field.compute_gradient(step, q_goal, obstacles)
+>>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
                     step -= 0.01 * gradient  # Adjust step size as needed
                     if not self.collision_checker.check_collision(step):
                         break

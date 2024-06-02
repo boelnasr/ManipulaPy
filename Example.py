@@ -74,8 +74,13 @@ def main():
     # Create an instance of the Simulation class
     simulation = Simulation(urdf_file_path, Joint_limits, torque_limits)
     # Generate a joint trajectory (example)
+<<<<<<< HEAD
     thetastart = np.array([0, 0, 0, 0, 0, 0])
     thetaend = np.array([pi / 2, -pi / 4, pi / 6, -pi / 3, pi / 4, pi / 2])
+=======
+    thetastart = np.array([0, 0, 0, 0, 0, 0]) 
+    thetaend = np.array([pi/2, -pi/4, pi/6, -pi/3, pi/4, pi/2])
+>>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
     Tf = 5  # Total time for the trajectory
     N = 100  # Number of trajectory points
     method = 5  # Quintic time scaling
@@ -88,7 +93,11 @@ def main():
     joint_accelerations = trajectory["accelerations"]
 
     # Plot the generated trajectory
+<<<<<<< HEAD
     # trajectory_planner.plot_trajectory(trajectory, Tf, title="Generated Joint Trajectory")
+=======
+    #trajectory_planner.plot_trajectory(trajectory, Tf, title="Generated Joint Trajectory")
+>>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 
     # Simulate the robot motion with the generated joint trajectory
     simulation.run_trajectory(joint_positions)
