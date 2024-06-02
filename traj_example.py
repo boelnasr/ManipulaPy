@@ -21,33 +21,37 @@ ur5 = urdf_processor.serial_manipulator
 singularity_analyzer = Singularity(ur5)
 
 # Example joint angles (thetalist) for the manipulator
-thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, -2*pi/3])
+thetalist = np.array([pi, pi / 6, pi / 4, -pi / 3, -pi / 2, -2 * pi / 3])
 dthetalist = np.array([0.1] * 6)
 ddthetalist = np.array([0.1] * 6)
 
 # Perform forward kinematics using the space frame
-T_space = ur5.forward_kinematics(thetalist, frame='space')
+T_space = ur5.forward_kinematics(thetalist, frame="space")
 print("\nForward Kinematics (Space Frame):")
 print(T_space)
 
 # Define joint limits
 Joint_limits = [
     (-np.pi, np.pi),  # Joint 1
-    (-np.pi/2, np.pi/2),  # Joint 2
-    (-np.pi/2, np.pi/2),  # Joint 3
-    (-np.pi, np.pi/3),  # Joint 4
-    (-np.pi/2, np.pi),  # Joint 5
-    (-np.pi, np.pi)   # Joint 6
+    (-np.pi / 2, np.pi / 2),  # Joint 2
+    (-np.pi / 2, np.pi / 2),  # Joint 3
+    (-np.pi, np.pi / 3),  # Joint 4
+    (-np.pi / 2, np.pi),  # Joint 5
+    (-np.pi, np.pi),  # Joint 6
 ]
 
 # Initialize the Trajectory Planning object
-trr = tp(ur5, dynamics=urdf_processor.dynamics, joint_limits=Joint_limits, torque_limits=None)
+trr = tp(
+    ur5, dynamics=urdf_processor.dynamics, joint_limits=Joint_limits, torque_limits=None
+)
 
 # Generate the joint trajectory
-traj = trr.JointTrajectory(thetastart=[0]*6, thetaend=thetalist, Tf=5, N=10000, method=5)
-positions = traj['positions']
-velocities = traj['velocities']
-accelerations = traj['accelerations']
+traj = trr.JointTrajectory(
+    thetastart=[0] * 6, thetaend=thetalist, Tf=5, N=10000, method=5
+)
+positions = traj["positions"]
+velocities = traj["velocities"]
+accelerations = traj["accelerations"]
 
 # Compute inverse dynamics trajectory
 traj_tau = trr.InverseDynamicsTrajectory(positions, velocities, accelerations)
@@ -64,24 +68,21 @@ forward_dynamics_result = trr.forward_dynamics_trajectory(
     g=np.array([0, 0, -9.81]),  # Assuming a gravity vector
     Ftipmat=np.zeros((positions.shape[0], 6)),  # Assuming no external forces
     dt=0.001,
-    intRes=1000
+    intRes=1000,
 )
 
 # Extract the results from the forward dynamics simulation
-thetamat = forward_dynamics_result['positions']
-dthetamat = forward_dynamics_result['velocities']
-ddthetamat = forward_dynamics_result['accelerations']
+thetamat = forward_dynamics_result["positions"]
+dthetamat = forward_dynamics_result["velocities"]
+ddthetamat = forward_dynamics_result["accelerations"]
 
 # Plot the joint trajectory
-trr.plot_trajectory({'positions': thetamat, 'velocities': dthetamat, 'accelerations': ddthetamat}, Tf=5)
+trr.plot_trajectory(
+    {"positions": thetamat, "velocities": dthetamat, "accelerations": ddthetamat}, Tf=5
+)
 
 # Define start and end configurations for Cartesian trajectory
-Xstart = np.array([
-    [1, 0, 0, 0.5],
-    [0, 1, 0, 0.5],
-    [0, 0, 1, 0.5],
-    [0, 0, 0, 1]
-])
+Xstart = np.array([[1, 0, 0, 0.5], [0, 1, 0, 0.5], [0, 0, 1, 0.5], [0, 0, 0, 1]])
 
 Xend = T_space
 
@@ -93,7 +94,7 @@ method = 5  # Quintic time scaling
 cartesian_traj = trr.CartesianTrajectory(Xstart, Xend, Tf, N, method)
 
 # Plot the Cartesian trajectory
-trr.plot_cartesian_trajectory(cartesian_traj, Tf, title='Cartesian Trajectory')
+trr.plot_cartesian_trajectory(cartesian_traj, Tf, title="Cartesian Trajectory")
 
 # Plot the end-effector trajectory
-trr.plot_ee_trajectory(forward_dynamics_result, Tf, title='End-Effector Trajectory')
+trr.plot_ee_trajectory(forward_dynamics_result, Tf, title="End-Effector Trajectory")
