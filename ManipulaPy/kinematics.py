@@ -163,7 +163,7 @@ class SerialManipulator:
 
             # Update thetalist using the pseudoinverse of the Jacobian
             delta_theta = np.dot(np.linalg.pinv(J), V_error)
-            thetalist += 0.058 * delta_theta  # Ensure this step size is appropriate for convergence
+            thetalist += 1* delta_theta  # Ensure this step size is appropriate for convergence
 
             # Enforce joint limits
             for i, (theta_min, theta_max) in enumerate(self.joint_limits):

@@ -8,15 +8,14 @@ dynamics, singularity analysis, path planning, and URDF processing utilities.
 """
 
 # Import main modules for easier access
-from .kinematics import *
-from .dynamics import *
-from .singularity import *
-from .path_planning import *
-from .utils import *
-from .urdf_processor import *
-from .control import *
-from .sim import *
-
+from ManipulaPy.kinematics import *
+from ManipulaPy.dynamics import *
+from ManipulaPy.singularity import *
+from ManipulaPy.path_planning import *
+from ManipulaPy.utils import *
+from ManipulaPy.urdf_processor import *
+from ManipulaPy.control import *
+from ManipulaPy.sim import *
 
 # Define package-level variables
 __version__ = "1.0.1"

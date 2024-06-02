@@ -16,7 +16,6 @@ urdf_processor = URDFToSerialManipulator(urdf_file_path)
 ur5 = urdf_processor.serial_manipulator
 # Initialize Singularity Analysis
 singularity_analyzer = Singularity(ur5)
-traj = tp(ur5,urdf_processor.dynamics)
 # Example joint angles (thetalist) for the manipulator
 thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)])
 dthetalist = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
@@ -25,8 +24,6 @@ ddthetalist = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
 T_space = ur5.forward_kinematics(thetalist, frame='space')
 print("\nForward Kinematics (Space Frame):")
 print(T_space)
-traj = tp.JointTrajectory(ur5,thetalist,[0,0,0,0,0,0],Tf=5,N=1000,method=5)
-tp.plot_trajectory(trajectory=traj,Tf=5)
 # Initialize Singularity Analysis
 singularity_analyzer = Singularity(ur5)
 # Example to plot manipulability ellipsoid

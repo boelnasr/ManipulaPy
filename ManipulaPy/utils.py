@@ -3,9 +3,16 @@
 import numpy as np
 from scipy.linalg import expm
 
+
 def extract_r_list(Slist):
     """
     Extracts the r_list from the given Slist.
+
+    Parameters:
+        Slist (list): A list of S vectors representing the joint screws.
+
+    Returns:
+        np.ndarray: An array of r vectors.
     """
     r_list = []
     for S in np.array(Slist).T:
@@ -18,30 +25,18 @@ def extract_r_list(Slist):
             r_list.append([0, 0, 0])  # For prismatic joints
     return np.array(r_list)
 
+
 def extract_omega_list(Slist):
     """
     Extracts the first three elements from each sublist in the given list and returns them as a numpy array.
-    """
-    return np.array(Slist)[:, :3]
-
-# New function to be added
-def extract_screw_list(omega_list, r_list):
-    """
-    Extracts the screw list from omega and r lists.
 
     Parameters:
-        omega_list (list): A list of omega vectors.
-        r_list (list): A list of r vectors.
+        Slist (list): A list of sublists.
 
     Returns:
-        np.ndarray: An array of screw vectors.
+        np.array: A numpy array containing the first three elements from each sublist.
     """
-    screw_list = []
-    for omega, r in zip(omega_list, r_list):
-        v = -np.cross(omega, r)
-        screw_list.append(np.concatenate((omega, v)))
-    return np.array(screw_list)
-
+    return np.array(Slist)[:, :3]
 
 
 def NearZero(z):
@@ -58,37 +53,63 @@ def NearZero(z):
 
 
 def skew_symmetric(v):
-    return np.array([
-        [0, -v[2], v[1]],
-        [v[2], 0, -v[0]],
-        [-v[1], v[0], 0]
-    ])
+    """
+    Returns the skew symmetric matrix of a 3D vector.
 
-def adjoint_transform(T):
-    R = T[:3, :3]
-    p = T[:3, 3]
-    skew_p = skew_symmetric(p)
-    return np.block([
-        [R, np.zeros((3, 3))],
-        [skew_p @ R, R]
-    ])
+    Parameters:
+        v (array-like): A 3D vector.
+
+    Returns:
+        np.ndarray: The corresponding skew symmetric matrix.
+    """
+    return np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+
 
 def transform_from_twist(S, theta):
+    """
+    Computes the transformation matrix from a twist and a joint angle.
+
+    Parameters:
+        S (array-like): A 6D twist vector.
+        theta (float): The joint angle.
+
+    Returns:
+        np.ndarray: The corresponding transformation matrix.
+    """
     omega = S[:3]
     v = S[3:]
-    if np.linalg.norm(omega) < 1e-6:  # Prismatic joint
-        return np.eye(4) + np.block([
-            [np.zeros((3, 3)), v[:, None] * theta],
-            [0, 0, 0, 0]
-        ])
+    if np.linalg.norm(omega) == 0:  # Prismatic joint
+        return np.vstack((np.eye(3), v * theta)).T
     else:  # Revolute joint
-        omega_skew = skew_symmetric(omega)
-        R = np.eye(3) + np.sin(theta) * omega_skew + (1 - np.cos(theta)) * omega_skew @ omega_skew
-        p = (np.eye(3) * theta + (1 - np.cos(theta)) * omega_skew + (theta - np.sin(theta)) * omega_skew @ omega_skew) @ v
-        return np.block([
-            [R, p[:, None]],
-            [0, 0, 0, 1]
-        ])
+        skew_omega = skew_symmetric(omega)
+        R = (
+            np.eye(3)
+            + np.sin(theta) * skew_omega
+            + (1 - np.cos(theta)) * np.dot(skew_omega, skew_omega)
+        )
+        p = np.dot(
+            np.eye(3) * theta
+            + (1 - np.cos(theta)) * skew_omega
+            + (theta - np.sin(theta)) * np.dot(skew_omega, skew_omega),
+            v,
+        )
+        return np.vstack((np.hstack((R, p.reshape(-1, 1))), [0, 0, 0, 1]))
+
+
+def adjoint_transform(T):
+    """
+    Computes the adjoint transformation matrix for a given transformation matrix.
+
+    Parameters:
+        T (np.ndarray): A 4x4 transformation matrix.
+
+    Returns:
+        np.ndarray: The corresponding adjoint transformation matrix.
+    """
+    R = T[0:3, 0:3]
+    p = T[0:3, 3]
+    skew_p = skew_symmetric(p)
+    return np.vstack((np.hstack((R, np.zeros((3, 3)))), np.hstack((skew_p @ R, R))))
 
 
 def logm(T):

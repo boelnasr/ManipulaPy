@@ -1,0 +1,4 @@
+include ManipulaPy/ManipulaPy_data/ur5/ur5.urdf
+include ManipulaPy/ManipulaPy_data/ur5/visual/*.dae
+include ManipulaPy/ManipulaPy_data/xarm/xarm6_robot.urdf
+include ManipulaPy/ManipulaPy_data/xarm/visual/*.dae

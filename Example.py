@@ -19,7 +19,7 @@ def main():
     os.environ['LIBGL_ALWAYS_SOFTWARE'] = '1'
 
     # Path to your URDF file
-    urdf_file_path = "xarm/xarm6_robot.urdf"
+    urdf_file_path = "ur5/ur5/ur5.urdf"
 
     # Initialize the URDFToSerialManipulator with the URDF file
     urdf_processor = URDFToSerialManipulator(urdf_file_path)
@@ -71,9 +71,8 @@ def main():
 
     # Create an instance of the Simulation class
     simulation = Simulation(urdf_file_path, Joint_limits, torque_limits)
-    simulation.manual_control()
     # Generate a joint trajectory (example)
-    thetastart = np.array([0, 0, 0, 0, 0, 0])
+    thetastart = np.array([0, 0, 0, 0, 0, 0]) 
     thetaend = np.array([pi/2, -pi/4, pi/6, -pi/3, pi/4, pi/2])
     Tf = 5  # Total time for the trajectory
     N = 100  # Number of trajectory points
@@ -85,7 +84,7 @@ def main():
     joint_accelerations = trajectory["accelerations"]
 
     # Plot the generated trajectory
-    trajectory_planner.plot_trajectory(trajectory, Tf, title="Generated Joint Trajectory")
+    #trajectory_planner.plot_trajectory(trajectory, Tf, title="Generated Joint Trajectory")
 
     # Simulate the robot motion with the generated joint trajectory
     simulation.run_trajectory(joint_positions)
