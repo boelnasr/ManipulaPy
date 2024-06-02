@@ -95,9 +95,7 @@ class URDFToSerialManipulator:
                 - "actuated_joints_num" (int): The number of actuated joints in the robot.
         """
         robot = URDF.load(urdf_name)
-        joint_num = len(
-            [joint for joint in robot.actuated_joints if joint.joint_type != "fixed"]
-        )
+        joint_num = len([joint for joint in robot.actuated_joints if joint.joint_type != "fixed"])
 
         p_ = []  # Positions of each joint
         w_ = []  # Rotation axes of each joint
@@ -105,9 +103,7 @@ class URDFToSerialManipulator:
         Glist = []  # Inertia matrices
 
         link_fk = robot.link_fk()
-        link_fk = {
-            link.name: fk for link, fk in link_fk.items()
-        }  # Use link names as keys
+        link_fk = {link.name: fk for link, fk in link_fk.items()}  # Use link names as keys
         link_fk_keys = list(link_fk.keys())  # Get the keys of link_fk for debugging
 
         for joint in robot.actuated_joints:
@@ -120,9 +116,7 @@ class URDFToSerialManipulator:
                 continue
 
             if joint.child not in link_fk:
-                raise KeyError(
-                    f"Link {joint.child} not found in link_fk dictionary. Available keys: {link_fk_keys}"
-                )
+                raise KeyError(f"Link {joint.child} not found in link_fk dictionary. Available keys: {link_fk_keys}")
 
             p_.append(self.transform_to_xyz(link_fk[joint.child]))
             G = np.eye(6)

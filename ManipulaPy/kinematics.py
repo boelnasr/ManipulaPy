@@ -4,7 +4,6 @@ import numpy as np
 from . import utils
 import matplotlib.pyplot as plt
 
-
 class SerialManipulator:
     def __init__(
         self,
@@ -36,14 +35,10 @@ class SerialManipulator:
         self.r_list = r_list if r_list is not None else utils.extract_r_list(S_list)
         self.b_list = b_list if b_list is not None else utils.extract_r_list(B_list)
         self.S_list = (
-            S_list
-            if S_list is not None
-            else utils.extract_screw_list(-omega_list, self.r_list)
+            S_list if S_list is not None else utils.extract_screw_list(-omega_list, self.r_list)
         )
         self.B_list = (
-            B_list
-            if B_list is not None
-            else utils.extract_screw_list(omega_list, self.b_list)
+            B_list if B_list is not None else utils.extract_screw_list(omega_list, self.b_list)
         )
         self.joint_limits = (
             joint_limits if joint_limits is not None else [(None, None)] * len(M_list)
@@ -109,21 +104,12 @@ class SerialManipulator:
         if frame == "space":
             for i in range(len(thetalist)):
                 J[:, i] = np.dot(utils.adjoint_transform(T), self.S_list[:, i])
-                T = np.dot(
-                    T, utils.transform_from_twist(self.S_list[:, i], thetalist[i])
-                )
+                T = np.dot(T, utils.transform_from_twist(self.S_list[:, i], thetalist[i]))
         elif frame == "body":
             T = self.forward_kinematics(thetalist, frame="body")
             for i in reversed(range(len(thetalist))):
-                J[:, i] = np.dot(
-                    utils.adjoint_transform(np.linalg.inv(T)), self.B_list[:, i]
-                )
-                T = np.dot(
-                    T,
-                    np.linalg.inv(
-                        utils.transform_from_twist(self.B_list[:, i], thetalist[i])
-                    ),
-                )
+                J[:, i] = np.dot(utils.adjoint_transform(np.linalg.inv(T)), self.B_list[:, i])
+                T = np.dot(T, np.linalg.inv(utils.transform_from_twist(self.B_list[:, i], thetalist[i])))
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return J
@@ -177,13 +163,7 @@ class SerialManipulator:
 
             # Update thetalist using the pseudoinverse of the Jacobian
             delta_theta = np.dot(np.linalg.pinv(J), V_error)
-<<<<<<< HEAD
-            thetalist += (
-                1 * delta_theta
-            )  # Ensure this step size is appropriate for convergence
-=======
             thetalist += 1* delta_theta  # Ensure this step size is appropriate for convergence
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 
             # Enforce joint limits
             for i, (theta_min, theta_max) in enumerate(self.joint_limits):

@@ -10,10 +10,6 @@ from ManipulaPy.control import ManipulatorController
 from math import pi
 from ManipulaPy.ManipulaPy_data.ur5 import urdf_file as xarm_urdf_file
 
-<<<<<<< HEAD
-
-=======
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 def main():
     # Path to your URDF file
     urdf_file_path = xarm_urdf_file
@@ -25,11 +21,7 @@ def main():
     ur5 = urdf_processor.serial_manipulator
 
     # Example joint angles (thetalist) for the manipulator
-<<<<<<< HEAD
-    thetalist = np.array([pi, -pi / 6, -pi / 4, -pi / 3, -pi / 2, -2 * pi / 3])
-=======
     thetalist = np.array([pi, -pi/6, -pi/4, -pi/3, -pi/2, -2*pi/3])
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 
     # Initialize ManipulatorDynamics with the URDF processor
     dynamics = urdf_processor.dynamics
@@ -38,19 +30,9 @@ def main():
     controller = ManipulatorController(dynamics)
 
     # Perform forward kinematics to get the desired end-effector position
-<<<<<<< HEAD
-    T_desired = ur5.forward_kinematics(thetalist, frame="space")
-    initial_guess = np.array(
-        [pi, pi / 6, pi / 4, -pi / 3, -pi / 2, (-2 * pi / 3)]
-    ) + np.random.normal(0, 0.2, 6)
-    desired_joint_angles, success, _ = ur5.iterative_inverse_kinematics(
-        T_desired, initial_guess
-    )
-=======
     T_desired = ur5.forward_kinematics(thetalist, frame='space')
     initial_guess = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)]) + np.random.normal(0, 0.2, 6)
     desired_joint_angles, success, _ = ur5.iterative_inverse_kinematics(T_desired, initial_guess)
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 
     if not success:
         print("Inverse kinematics did not converge.")
@@ -58,13 +40,7 @@ def main():
 
     # Find the ultimate gain and period
     dt = 0.01  # Time step for simulation
-<<<<<<< HEAD
-    ultimate_gain, ultimate_period, gain_history, error_history = (
-        controller.find_ultimate_gain_and_period(thetalist, desired_joint_angles, dt)
-    )
-=======
     ultimate_gain, ultimate_period, gain_history, error_history = controller.find_ultimate_gain_and_period(thetalist, desired_joint_angles, dt)
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 
     print(f"Ultimate Gain (K_u): {ultimate_gain}")
     print(f"Ultimate Period (T_u): {ultimate_period}")
@@ -79,11 +55,7 @@ def main():
     # Kalman Filter example
     Q = cp.eye(12) * 0.01  # Process noise covariance
     R = cp.eye(12) * 0.01  # Measurement noise covariance
-<<<<<<< HEAD
-    thetalist = cp.array([pi, -pi / 6, -pi / 4, -pi / 3, -pi / 2, -2 * pi / 3])
-=======
     thetalist = cp.array([pi, -pi/6, -pi/4, -pi/3, -pi/2, -2*pi/3])
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
     dthetalist = cp.zeros(6)
     tau = cp.zeros(6)  # Applied torque
     Ftip = cp.zeros(6)  # External forces at the end effector
@@ -94,49 +66,19 @@ def main():
     for _ in range(100):
         # Apply some control input (here just an example torque)
         tau = cp.random.normal(0, 1, 6)
-<<<<<<< HEAD
-
-        # True state evolution (for example purposes, in practice this would come from the system)
-        ddthetalist = cp.dot(
-            cp.linalg.inv(cp.asarray(dynamics.mass_matrix(thetalist.get()))),
-            (
-                tau
-                - cp.asarray(
-                    dynamics.velocity_quadratic_forces(
-                        thetalist.get(), dthetalist.get()
-                    )
-                )
-                - cp.asarray(
-                    dynamics.gravity_forces(thetalist.get(), np.array([0, 0, -9.81]))
-                )
-            ),
-        )
-=======
         
         # True state evolution (for example purposes, in practice this would come from the system)
         ddthetalist = cp.dot(cp.linalg.inv(cp.asarray(dynamics.mass_matrix(thetalist.get()))), 
                             (tau - cp.asarray(dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get())) - 
                             cp.asarray(dynamics.gravity_forces(thetalist.get(), np.array([0, 0, -9.81])))))
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
         dthetalist += ddthetalist * dt
         thetalist += dthetalist * dt
 
         # Kalman filter prediction
-<<<<<<< HEAD
-        controller.kalman_filter_predict(
-            thetalist, dthetalist, tau, cp.array([0, 0, -9.81]), Ftip, dt, Q
-        )
-
-        # Simulate measurement
-        measurement = cp.concatenate((thetalist, dthetalist)) + cp.random.normal(
-            0, 0.1, 12
-        )
-=======
         controller.kalman_filter_predict(thetalist, dthetalist, tau, cp.array([0, 0, -9.81]), Ftip, dt, Q)
 
         # Simulate measurement
         measurement = cp.concatenate((thetalist, dthetalist)) + cp.random.normal(0, 0.1, 12)
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 
         # Kalman filter update
         controller.kalman_filter_update(measurement, R)
@@ -152,22 +94,12 @@ def main():
     plt.figure(figsize=(10, 6))
     for i in range(6):
         plt.subplot(3, 2, i + 1)
-<<<<<<< HEAD
-        plt.plot(cp.asnumpy(estimated_states[:, i]), label="Estimated")
-        plt.plot(cp.asnumpy(true_states[:, i]), label="True")
-        plt.title(f"Joint {i + 1} Angle")
-=======
         plt.plot(cp.asnumpy(estimated_states[:, i]), label='Estimated')
         plt.plot(cp.asnumpy(true_states[:, i]), label='True')
         plt.title(f'Joint {i + 1} Angle')
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
         plt.legend()
     plt.tight_layout()
     plt.show()
 
-<<<<<<< HEAD
-
-=======
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 if __name__ == "__main__":
     main()

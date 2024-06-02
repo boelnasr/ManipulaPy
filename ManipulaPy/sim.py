@@ -11,16 +11,8 @@ import time
 import logging
 import matplotlib.pyplot as plt
 
-
 class Simulation:
-    def __init__(
-        self,
-        urdf_file_path,
-        joint_limits,
-        torque_limits=None,
-        time_step=0.01,
-        real_time_factor=1.0,
-    ):
+    def __init__(self, urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0):
         self.urdf_file_path = urdf_file_path
         self.joint_limits = joint_limits
         self.torque_limits = torque_limits
@@ -32,13 +24,11 @@ class Simulation:
         self.setup_simulation()
 
     def setup_logger(self):
-        logger = logging.getLogger("SimulationLogger")
+        logger = logging.getLogger('SimulationLogger')
         logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         ch.setFormatter(formatter)
         logger.addHandler(ch)
         return logger
@@ -60,7 +50,7 @@ class Simulation:
     def setup_simulation(self):
         self.connect_simulation()
         self.logger.info("Initializing simulation environment...")
-
+        
         # Load the plane and robot URDF
         self.plane_id = p.loadURDF("plane.urdf")
         self.robot_id = p.loadURDF(self.urdf_file_path, [0, 0, 0.1], useFixedBase=True)
@@ -69,19 +59,12 @@ class Simulation:
         urdf_processor = URDFToSerialManipulator(self.urdf_file_path)
         self.robot = urdf_processor.serial_manipulator
         self.dynamics = urdf_processor.dynamics
-        self.non_fixed_joints = [
-            i
-            for i in range(p.getNumJoints(self.robot_id))
-            if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
-        ]
+        self.non_fixed_joints = [i for i in range(p.getNumJoints(self.robot_id)) if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED]
 
         # Initialize the Trajectory Planner
         self.trajectory_planner = tp(
-            self.robot,
-            self.urdf_file_path,
-            self.dynamics,
-            self.joint_limits,
-            self.torque_limits,
+            self.robot, self.urdf_file_path, self.dynamics, 
+            self.joint_limits, self.torque_limits
         )
 
         # Initialize the Controller
@@ -95,12 +78,7 @@ class Simulation:
         """
         self.joint_params = []
         for i, joint_index in enumerate(self.non_fixed_joints):
-            param_id = p.addUserDebugParameter(
-                f"Joint {joint_index}",
-                self.joint_limits[i][0],
-                self.joint_limits[i][1],
-                0,
-            )
+            param_id = p.addUserDebugParameter(f'Joint {joint_index}', self.joint_limits[i][0], self.joint_limits[i][1], 0)
             self.joint_params.append(param_id)
 
     def set_joint_positions(self, joint_positions):
@@ -108,17 +86,11 @@ class Simulation:
             self.robot_id,
             self.non_fixed_joints,
             p.POSITION_CONTROL,
-<<<<<<< HEAD
-            targetPositions=joint_positions,
-=======
             targetPositions=joint_positions
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
         )
 
     def get_joint_positions(self):
-        joint_positions = [
-            p.getJointState(self.robot_id, i)[0] for i in self.non_fixed_joints
-        ]
+        joint_positions = [p.getJointState(self.robot_id, i)[0] for i in self.non_fixed_joints]
         return np.array(joint_positions)
 
     def run_trajectory(self, joint_trajectory):
@@ -131,19 +103,11 @@ class Simulation:
         for joint_positions in joint_trajectory:
             self.set_joint_positions(joint_positions)
             p.stepSimulation()
-<<<<<<< HEAD
-
-            # Get end-effector position
-            ee_pos = p.getLinkState(self.robot_id, p.getNumJoints(self.robot_id) - 1)[4]
-            ee_positions.append(ee_pos)
-
-=======
             
             # Get end-effector position
             ee_pos = p.getLinkState(self.robot_id, p.getNumJoints(self.robot_id) - 1)[4]
             ee_positions.append(ee_pos)
             
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
             time.sleep(self.time_step / self.real_time_factor)
 
         self.plot_trajectory(ee_positions)
@@ -156,34 +120,6 @@ class Simulation:
         for i in range(1, len(ee_positions)):
             for j in range(line_width):
                 p.addUserDebugLine(
-<<<<<<< HEAD
-                    lineFromXYZ=[
-                        ee_positions[i - 1][0] + j * 0.005,
-                        ee_positions[i - 1][1],
-                        ee_positions[i - 1][2],
-                    ],
-                    lineToXYZ=[
-                        ee_positions[i][0] + j * 0.005,
-                        ee_positions[i][1],
-                        ee_positions[i][2],
-                    ],
-                    lineColorRGB=color,
-                    lifeTime=0,  # Set to 0 for the line to remain indefinitely
-                )
-
-    def run_controller(
-        self,
-        controller,
-        desired_positions,
-        desired_velocities,
-        desired_accelerations,
-        g,
-        Ftip,
-        Kp,
-        Ki,
-        Kd,
-    ):
-=======
                     lineFromXYZ=[ee_positions[i-1][0] + j * 0.005, ee_positions[i-1][1], ee_positions[i-1][2]],
                     lineToXYZ=[ee_positions[i][0] + j * 0.005, ee_positions[i][1], ee_positions[i][2]],
                     lineColorRGB=color,
@@ -191,7 +127,6 @@ class Simulation:
                 )
 
     def run_controller(self, controller, desired_positions, desired_velocities, desired_accelerations, g, Ftip, Kp, Ki, Kd):
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
         """
         Runs the controller with the specified parameters.
         """
@@ -211,20 +146,10 @@ class Simulation:
                 dt=self.time_step,
                 Kp=cp.array(Kp),
                 Ki=cp.array(Ki),
-<<<<<<< HEAD
-                Kd=cp.array(Kd),
-            )
-
-            self.set_joint_positions(
-                cp.asnumpy(current_positions)
-                + cp.asnumpy(control_signal) * self.time_step
-            )
-=======
                 Kd=cp.array(Kd)
             )
 
             self.set_joint_positions(cp.asnumpy(current_positions) + cp.asnumpy(control_signal) * self.time_step)
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
             current_positions = self.get_joint_positions()
             current_velocities = cp.asnumpy(control_signal) / self.time_step
 
@@ -255,19 +180,11 @@ class Simulation:
         for joint_positions in desired_angles_trajectory:
             self.set_joint_positions(joint_positions)
             p.stepSimulation()
-<<<<<<< HEAD
-
-            # Get end-effector position
-            ee_pos = p.getLinkState(self.robot_id, p.getNumJoints(self.robot_id) - 1)[4]
-            ee_positions.append(ee_pos)
-
-=======
             
             # Get end-effector position
             ee_pos = p.getLinkState(self.robot_id, p.getNumJoints(self.robot_id) - 1)[4]
             ee_positions.append(ee_pos)
             
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
             time.sleep(self.time_step / self.real_time_factor)
 
         self.plot_trajectory(ee_positions)
@@ -287,14 +204,10 @@ class Simulation:
             self.non_fixed_joints,
             p.POSITION_CONTROL,
             targetPositions=desired_angles,
-<<<<<<< HEAD
-            forces=[1000] * len(desired_angles),
-=======
             forces=[1000]*len(desired_angles)
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
         )
 
-        time_step = 0.00001
+        time_step = 0.00001 
         p.setTimeStep(time_step)
         try:
             while True:
@@ -303,16 +216,12 @@ class Simulation:
         except KeyboardInterrupt:
             print("Simulation stopped by user.")
             self.logger.info("Robot simulation with desired angles completed.")
-
+        
     def close_simulation(self):
         self.logger.info("Closing simulation...")
         self.disconnect_simulation()
         self.logger.info("Simulation closed.")
-<<<<<<< HEAD
-
-=======
     
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
     def check_collisions(self):
         """
         Check for collisions in the simulation and log them.
@@ -329,13 +238,7 @@ class Simulation:
         Adds additional GUI parameters for controlling physics properties.
         """
         self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
-<<<<<<< HEAD
-        self.time_step_param = p.addUserDebugParameter(
-            "Time Step", 0.001, 0.1, self.time_step
-        )
-=======
         self.time_step_param = p.addUserDebugParameter("Time Step", 0.001, 0.1, self.time_step)
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
 
     def update_simulation_parameters(self):
         """
@@ -357,9 +260,7 @@ class Simulation:
             while True:
                 joint_positions = self.get_joint_parameters()
                 if len(joint_positions) != len(self.non_fixed_joints):
-                    raise ValueError(
-                        f"Number of joint positions ({len(joint_positions)}) does not match number of non-fixed joints ({len(self.non_fixed_joints)})."
-                    )
+                    raise ValueError(f"Number of joint positions ({len(joint_positions)}) does not match number of non-fixed joints ({len(self.non_fixed_joints)}).")
                 self.set_joint_positions(joint_positions)
                 self.check_collisions()  # Check for collisions in each step
                 self.update_simulation_parameters()  # Update simulation parameters
@@ -376,24 +277,12 @@ class Simulation:
         Args:
             filename (str): The filename for the CSV file.
         """
-<<<<<<< HEAD
-        joint_states = [
-            p.getJointState(self.robot_id, i) for i in self.non_fixed_joints
-        ]
-=======
         joint_states = [p.getJointState(self.robot_id, i) for i in self.non_fixed_joints]
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
         positions = [state[0] for state in joint_states]
         velocities = [state[1] for state in joint_states]
 
         data = np.column_stack((positions, velocities))
-<<<<<<< HEAD
-        np.savetxt(
-            filename, data, delimiter=",", header="Position,Velocity", comments=""
-        )
-=======
         np.savetxt(filename, data, delimiter=",", header="Position,Velocity", comments="")
->>>>>>> b175ebfc3e1929301748e949aaf8e848927935c5
         self.logger.info(f"Joint states saved to {filename}.")
 
     def plot_trajectory_in_scene(self, joint_trajectory, end_effector_trajectory):
@@ -401,18 +290,13 @@ class Simulation:
         ee_positions = np.array(end_effector_trajectory)
 
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection="3d")
-        ax.plot(
-            ee_positions[:, 0],
-            ee_positions[:, 1],
-            ee_positions[:, 2],
-            label="End-Effector Trajectory",
-        )
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z")
+        ax = fig.add_subplot(111, projection='3d')
+        ax.plot(ee_positions[:, 0], ee_positions[:, 1], ee_positions[:, 2], label='End-Effector Trajectory')
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
         plt.legend()
         plt.show()
-
+        
         self.run_trajectory(joint_trajectory)
         self.logger.info("Trajectory plotted and simulation completed.")

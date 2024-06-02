@@ -4,7 +4,6 @@ import numpy as np
 from .kinematics import SerialManipulator
 from .utils import adjoint_transform as ad
 
-
 class ManipulatorDynamics(SerialManipulator):
     def __init__(self, M_list, omega_list, r_list, b_list, S_list, B_list, Glist):
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
@@ -74,9 +73,7 @@ class ManipulatorDynamics(SerialManipulator):
         G = np.array(g)
         for i in range(n):
             AdT = ad(self.forward_kinematics(thetalist[: i + 1], "space"))
-            grav[i] = np.dot(AdT.T[:3, :3], G[:3]).dot(
-                self.Glist[i][:3, :3].sum(axis=0)
-            )
+            grav[i] = np.dot(AdT.T[:3, :3], G[:3]).dot(self.Glist[i][:3, :3].sum(axis=0))
         return grav
 
     def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
