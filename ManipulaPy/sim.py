@@ -21,19 +21,27 @@ class Simulation:
         self.logger = self.setup_logger()
         self.physics_client = None
         self.joint_params = []
+        self.reset_button = None
+        self.home_position = None
         self.setup_simulation()
 
     def setup_logger(self):
+        """
+        Sets up the logger for the simulation.
+        """
         logger = logging.getLogger('SimulationLogger')
         logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levellevel)s - %(message)s')
         ch.setFormatter(formatter)
         logger.addHandler(ch)
         return logger
 
     def connect_simulation(self):
+        """
+        Connects to the PyBullet simulation.
+        """
         self.logger.info("Connecting to PyBullet simulation...")
         self.physics_client = p.connect(p.GUI)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -41,6 +49,9 @@ class Simulation:
         p.setTimeStep(self.time_step)
 
     def disconnect_simulation(self):
+        """
+        Disconnects from the PyBullet simulation.
+        """
         self.logger.info("Disconnecting from PyBullet simulation...")
         if self.physics_client is not None:
             p.disconnect()
@@ -48,40 +59,63 @@ class Simulation:
             self.logger.info("Disconnected successfully.")
 
     def setup_simulation(self):
+        """
+        Sets up the simulation environment.
+        """
         self.connect_simulation()
         self.logger.info("Initializing simulation environment...")
-        
-        # Load the plane and robot URDF
+
+        self.load_urdf_files()
+        self.initialize_robot()
+        self.initialize_planner_and_controller()
+        self.add_joint_parameters()
+        self.add_reset_button()
+        self.logger.info("Simulation environment initialized.")
+
+    def load_urdf_files(self):
+        """
+        Loads the necessary URDF files into the simulation.
+        """
         self.plane_id = p.loadURDF("plane.urdf")
         self.robot_id = p.loadURDF(self.urdf_file_path, [0, 0, 0.1], useFixedBase=True)
 
-        # Initialize the URDF processor
+    def initialize_robot(self):
+        """
+        Initializes the robot using the URDF processor.
+        """
         urdf_processor = URDFToSerialManipulator(self.urdf_file_path)
         self.robot = urdf_processor.serial_manipulator
         self.dynamics = urdf_processor.dynamics
         self.non_fixed_joints = [i for i in range(p.getNumJoints(self.robot_id)) if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED]
+        self.home_position = np.zeros(len(self.non_fixed_joints))
 
-        # Initialize the Trajectory Planner
-        self.trajectory_planner = tp(
-            self.robot, self.urdf_file_path, self.dynamics, 
-            self.joint_limits, self.torque_limits
-        )
-
-        # Initialize the Controller
+    def initialize_planner_and_controller(self):
+        """
+        Initializes the trajectory planner and the manipulator controller.
+        """
+        self.trajectory_planner = tp(self.robot, self.urdf_file_path, self.dynamics, self.joint_limits, self.torque_limits)
         self.controller = ManipulatorController(self.dynamics)
-        self.logger.info("Simulation environment initialized.")
-        self.add_joint_parameters()
 
     def add_joint_parameters(self):
         """
         Adds GUI sliders for each joint.
         """
-        self.joint_params = []
-        for i, joint_index in enumerate(self.non_fixed_joints):
-            param_id = p.addUserDebugParameter(f'Joint {joint_index}', self.joint_limits[i][0], self.joint_limits[i][1], 0)
-            self.joint_params.append(param_id)
+        if not self.joint_params:
+            for i, joint_index in enumerate(self.non_fixed_joints):
+                param_id = p.addUserDebugParameter(f'Joint {joint_index}', self.joint_limits[i][0], self.joint_limits[i][1], 0)
+                self.joint_params.append(param_id)
+
+    def add_reset_button(self):
+        """
+        Adds a reset button to the simulation.
+        """
+        if self.reset_button is None:
+            self.reset_button = p.addUserDebugParameter("Reset", 0, 1, 0)
 
     def set_joint_positions(self, joint_positions):
+        """
+        Sets the joint positions of the robot.
+        """
         p.setJointMotorControlArray(
             self.robot_id,
             self.non_fixed_joints,
@@ -90,6 +124,9 @@ class Simulation:
         )
 
     def get_joint_positions(self):
+        """
+        Gets the current joint positions of the robot.
+        """
         joint_positions = [p.getJointState(self.robot_id, i)[0] for i in self.non_fixed_joints]
         return np.array(joint_positions)
 
@@ -103,15 +140,16 @@ class Simulation:
         for joint_positions in joint_trajectory:
             self.set_joint_positions(joint_positions)
             p.stepSimulation()
-            
+
             # Get end-effector position
             ee_pos = p.getLinkState(self.robot_id, p.getNumJoints(self.robot_id) - 1)[4]
             ee_positions.append(ee_pos)
-            
+
             time.sleep(self.time_step / self.real_time_factor)
 
         self.plot_trajectory(ee_positions)
         self.logger.info("Trajectory completed.")
+        return ee_positions[-1]  # Return the last end-effector position
 
     def plot_trajectory(self, ee_positions, line_width=3, color=[1, 0, 0]):
         """
@@ -163,6 +201,7 @@ class Simulation:
 
         self.plot_trajectory(ee_positions)
         self.logger.info("Controller run completed.")
+        return ee_positions[-1]  # Return the last end-effector position
 
     def get_joint_parameters(self):
         """
@@ -180,15 +219,16 @@ class Simulation:
         for joint_positions in desired_angles_trajectory:
             self.set_joint_positions(joint_positions)
             p.stepSimulation()
-            
+
             # Get end-effector position
             ee_pos = p.getLinkState(self.robot_id, p.getNumJoints(self.robot_id) - 1)[4]
             ee_positions.append(ee_pos)
-            
+
             time.sleep(self.time_step / self.real_time_factor)
 
         self.plot_trajectory(ee_positions)
         self.logger.info("Robot motion simulation completed.")
+        return ee_positions[-1]  # Return the last end-effector position
 
     def simulate_robot_with_desired_angles(self, desired_angles):
         """
@@ -216,16 +256,22 @@ class Simulation:
         except KeyboardInterrupt:
             print("Simulation stopped by user.")
             self.logger.info("Robot simulation with desired angles completed.")
-        
+
     def close_simulation(self):
+        """
+        Closes the simulation.
+        """
         self.logger.info("Closing simulation...")
         self.disconnect_simulation()
         self.logger.info("Simulation closed.")
-    
+
     def check_collisions(self):
         """
-        Check for collisions in the simulation and log them.
+        Checks for collisions in the simulation and logs them.
         """
+        if self.robot_id is None:
+            self.logger.warning("Cannot check for collisions before simulation is started.")
+            return
         for i in self.non_fixed_joints:
             contact_points = p.getContactPoints(self.robot_id, self.robot_id, i)
             if contact_points:
@@ -237,12 +283,13 @@ class Simulation:
         """
         Adds additional GUI parameters for controlling physics properties.
         """
-        self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
-        self.time_step_param = p.addUserDebugParameter("Time Step", 0.001, 0.1, self.time_step)
+        if not hasattr(self, 'gravity_param') and not hasattr(self, 'time_step_param'):
+            self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
+            self.time_step_param = p.addUserDebugParameter("Time Step", 0.001, 0.1, self.time_step)
 
     def update_simulation_parameters(self):
         """
-        Update simulation parameters from GUI controls.
+        Updates simulation parameters from GUI controls.
         """
         gravity = p.readUserDebugParameter(self.gravity_param)
         time_step = p.readUserDebugParameter(self.time_step_param)
@@ -264,15 +311,22 @@ class Simulation:
                 self.set_joint_positions(joint_positions)
                 self.check_collisions()  # Check for collisions in each step
                 self.update_simulation_parameters()  # Update simulation parameters
+
                 p.stepSimulation()
                 time.sleep(self.time_step / self.real_time_factor)
+
+                # Check for reset button press
+                if p.readUserDebugParameter(self.reset_button) == 1:
+                    self.logger.info("Resetting simulation state...")
+                    self.set_joint_positions(self.home_position)
+                    break  # Exit manual control to restart trajectory loop
         except KeyboardInterrupt:
             print("Manual control stopped by user.")
             self.logger.info("Manual control stopped.")
 
     def save_joint_states(self, filename="joint_states.csv"):
         """
-        Save the joint states to a CSV file.
+        Saves the joint states to a CSV file.
 
         Args:
             filename (str): The filename for the CSV file.
@@ -286,6 +340,9 @@ class Simulation:
         self.logger.info(f"Joint states saved to {filename}.")
 
     def plot_trajectory_in_scene(self, joint_trajectory, end_effector_trajectory):
+        """
+        Plots the trajectory in the simulation scene.
+        """
         self.logger.info("Plotting trajectory in simulation scene...")
         ee_positions = np.array(end_effector_trajectory)
 
@@ -297,6 +354,25 @@ class Simulation:
         ax.set_zlabel('Z')
         plt.legend()
         plt.show()
-        
+
         self.run_trajectory(joint_trajectory)
         self.logger.info("Trajectory plotted and simulation completed.")
+
+    def run(self, joint_trajectory):
+        """
+        Main loop for running the simulation.
+        """
+        try:
+            while True:
+                end_pos = self.run_trajectory(joint_trajectory)
+                self.logger.info("Trajectory completed. Waiting for reset...")
+
+                while p.readUserDebugParameter(self.reset_button) == 0:
+                    p.stepSimulation()
+                    time.sleep(0.01)
+
+                self.logger.info("Reset button pressed. Entering manual control...")
+                self.manual_control()  # Enter manual control mode when reset button is pressed
+        except KeyboardInterrupt:
+            self.logger.info("Simulation stopped by user.")
+            self.close_simulation()
