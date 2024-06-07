@@ -4,6 +4,10 @@ import cupy as cp
 import numpy as np
 import matplotlib.pyplot as plt
 from .dynamics import ManipulatorDynamics
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class ManipulatorController:
     def __init__(self, dynamics):
@@ -491,7 +495,7 @@ class ManipulatorController:
             x=settling_time,
             color="m",
             linestyle="--",
-            label=f"Settling Time: {settling_time:.2f}s",
+            label=f"Settling Time: {settling_time:.2f}s"
         )
         plt.axhline(
             y=set_point + steady_state_error,
@@ -688,10 +692,10 @@ class ManipulatorController:
             controller_type (str): Type of controller. Options are "P", "PI", "PID".
 
         Returns:
-            None
+            tuple: Tuned Kp, Ki, Kd.
         """
         Kp, Ki, Kd = self.ziegler_nichols_tuning(ultimate_gain, ultimate_period, controller_type)
-        print(f"Tuned Parameters: Kp = {Kp}, Ki = {Ki}, Kd = {Kd}")
+        logger.info(f"Tuned Parameters: Kp = {Kp}, Ki = {Ki}, Kd = {Kd}")
         return Kp, Ki, Kd
     
     def find_ultimate_gain_and_period(self, thetalist, desired_joint_angles, dt, max_steps=1000):

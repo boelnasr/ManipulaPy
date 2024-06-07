@@ -33,7 +33,7 @@ class Simulation:
         logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levellevel)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         ch.setFormatter(formatter)
         logger.addHandler(ch)
         return logger
@@ -110,7 +110,10 @@ class Simulation:
         Adds a reset button to the simulation.
         """
         if self.reset_button is None:
-            self.reset_button = p.addUserDebugParameter("Reset", 0, 1, 0)
+            try:
+                self.reset_button = p.addUserDebugParameter("Reset", 1, 0, 1)
+            except Exception as e:
+                self.logger.error(f"Failed to add reset button: {e}")
 
     def set_joint_positions(self, joint_positions):
         """
@@ -157,12 +160,15 @@ class Simulation:
         """
         for i in range(1, len(ee_positions)):
             for j in range(line_width):
-                p.addUserDebugLine(
-                    lineFromXYZ=[ee_positions[i-1][0] + j * 0.005, ee_positions[i-1][1], ee_positions[i-1][2]],
-                    lineToXYZ=[ee_positions[i][0] + j * 0.005, ee_positions[i][1], ee_positions[i][2]],
-                    lineColorRGB=color,
-                    lifeTime=0  # Set to 0 for the line to remain indefinitely
-                )
+                try:
+                    p.addUserDebugLine(
+                        lineFromXYZ=[ee_positions[i-1][0] + j * 0.005, ee_positions[i-1][1], ee_positions[i-1][2]],
+                        lineToXYZ=[ee_positions[i][0] + j * 0.005, ee_positions[i][1], ee_positions[i][2]],
+                        lineColorRGB=color,
+                        lifeTime=0  # Set to 0 for the line to remain indefinitely
+                    )
+                except Exception as e:
+                    self.logger.error(f"Failed to add user debug line: {e}")
 
     def run_controller(self, controller, desired_positions, desired_velocities, desired_accelerations, g, Ftip, Kp, Ki, Kd):
         """
@@ -324,6 +330,8 @@ class Simulation:
             print("Manual control stopped by user.")
             self.logger.info("Manual control stopped.")
 
+
+
     def save_joint_states(self, filename="joint_states.csv"):
         """
         Saves the joint states to a CSV file.
@@ -358,21 +366,40 @@ class Simulation:
         self.run_trajectory(joint_trajectory)
         self.logger.info("Trajectory plotted and simulation completed.")
 
-    def run(self, joint_trajectory):
-        """
-        Main loop for running the simulation.
-        """
-        try:
-            while True:
+def run(self, joint_trajectory):
+    """
+    Main loop for running the simulation.
+    """
+    try:
+        reset_pressed = False
+        mode = 'trajectory'  # Mode can be 'trajectory' or 'manual'
+
+        while True:
+            if mode == 'trajectory':
                 end_pos = self.run_trajectory(joint_trajectory)
                 self.logger.info("Trajectory completed. Waiting for reset...")
+                mode = 'wait_reset'
 
-                while p.readUserDebugParameter(self.reset_button) == 0:
-                    p.stepSimulation()
-                    time.sleep(0.01)
+            while mode == 'wait_reset' and not reset_pressed:
+                p.stepSimulation()
+                time.sleep(0.01)
 
-                self.logger.info("Reset button pressed. Entering manual control...")
-                self.manual_control()  # Enter manual control mode when reset button is pressed
-        except KeyboardInterrupt:
-            self.logger.info("Simulation stopped by user.")
-            self.close_simulation()
+                if p.readUserDebugParameter(self.reset_button) > 0:
+                    self.logger.info("Reset button pressed. Returning to home position and entering manual control...")
+                    self.set_joint_positions(self.home_position)
+                    mode = 'manual'
+                    break
+
+            if mode == 'manual':
+                self.manual_control()
+                reset_pressed = False  # Reset the flag to restart the trajectory
+                mode = 'trajectory'  # Go back to trajectory mode
+
+    except KeyboardInterrupt:
+        self.logger.info("Simulation stopped by user.")
+        self.close_simulation()
+
+
+
+
+

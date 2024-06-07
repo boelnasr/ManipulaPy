@@ -14,7 +14,15 @@ from .utils import (
 from urchin.urdf import URDF
 from .cuda_kernels import trajectory_kernel, inverse_dynamics_kernel, forward_dynamics_kernel, cartesian_trajectory_kernel
 from .potential_field import CollisionChecker, PotentialField
+import logging
 
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 class TrajectoryPlanning:
     def __init__(self, serial_manipulator, urdf_path, dynamics, joint_limits, torque_limits=None):
         """
@@ -41,18 +49,19 @@ class TrajectoryPlanning:
     def joint_trajectory(self, thetastart, thetaend, Tf, N, method):
         """
         Generates a joint trajectory for a robot based on the given start and end joint angles, final time, and number of steps.
-        
+
         Args:
             thetastart (numpy.ndarray): The starting joint angles.
             thetaend (numpy.ndarray): The ending joint angles.
             Tf (float): The final time for the trajectory.
             N (int): The number of steps in the trajectory.
             method (str): The method to use for generating the trajectory.
-        
+
         Returns:
             dict: A dictionary containing the positions, velocities, and accelerations of the joint trajectory.
         """
-        
+        logger.info("Generating joint trajectory.")
+
         thetastart = np.array(thetastart, dtype=np.float32)
         thetaend = np.array(thetaend, dtype=np.float32)
         num_joints = len(thetastart)
@@ -61,22 +70,31 @@ class TrajectoryPlanning:
         traj_vel = np.zeros((N, num_joints), dtype=np.float32)
         traj_acc = np.zeros((N, num_joints), dtype=np.float32)
 
-        threads_per_block = 1024
+        threads_per_block = 256  # Adjusted threads per block for better GPU utilization
         blocks_per_grid = (N + threads_per_block - 1) // threads_per_block
         blocks_per_grid = max(blocks_per_grid, 1)
+
         d_thetastart = cuda.to_device(thetastart)
         d_thetaend = cuda.to_device(thetaend)
         d_traj_pos = cuda.device_array_like(traj_pos)
         d_traj_vel = cuda.device_array_like(traj_vel)
         d_traj_acc = cuda.device_array_like(traj_acc)
 
-        trajectory_kernel[blocks_per_grid, threads_per_block](
-            d_thetastart, d_thetaend, d_traj_pos, d_traj_vel, d_traj_acc, Tf, N, method
-        )
+        try:
+            trajectory_kernel[blocks_per_grid, threads_per_block](
+                d_thetastart, d_thetaend, d_traj_pos, d_traj_vel, d_traj_acc, Tf, N, method
+            )
 
-        d_traj_pos.copy_to_host(traj_pos)
-        d_traj_vel.copy_to_host(traj_vel)
-        d_traj_acc.copy_to_host(traj_acc)
+            d_traj_pos.copy_to_host(traj_pos)
+            d_traj_vel.copy_to_host(traj_vel)
+            d_traj_acc.copy_to_host(traj_acc)
+        finally:
+            # Explicitly free GPU memory using del statement
+            del d_thetastart
+            del d_thetaend
+            del d_traj_pos
+            del d_traj_vel
+            del d_traj_acc
 
         for i in range(num_joints):
             traj_pos[:, i] = np.clip(
@@ -102,6 +120,7 @@ class TrajectoryPlanning:
             "velocities": traj_vel,
             "accelerations": traj_acc,
         }
+
 
     def inverse_dynamics_trajectory(
         self, thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector=None, Ftip=None):
