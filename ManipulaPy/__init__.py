@@ -16,6 +16,9 @@ from ManipulaPy.utils import *
 from ManipulaPy.urdf_processor import *
 from ManipulaPy.control import *
 from ManipulaPy.sim import *
+from ManipulaPy.potential_field import *
+from ManipulaPy.cuda_kernels import *
+
 
 # Define package-level variables
 __version__ = "0.2.0"
@@ -30,4 +33,6 @@ __all__ = [
     "urdf_processor",
     "control",
     "sim",
+    "potential_field",
+    "cuda_kernels"
 ]
