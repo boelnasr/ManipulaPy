@@ -1,3 +1,27 @@
+"""
+ManipulaPy Utils Module
+
+This module contains various utility functions for working with rigid body motions,
+transformations, and related operations in the context of robotic manipulation.
+
+The functions in this module cover a wide range of topics, including:
+
+- Extracting and manipulating screw vectors and twists
+- Computing transformation matrices from twists and joint angles
+- Computing matrix logarithms and exponentials
+- Converting between different representations (e.g., rotation matrices, Euler angles)
+- Handling skew-symmetric matrices and vectors
+- Working with the se(3) and so(3) Lie algebras
+- Implementing time scaling functions for trajectory generation
+
+This module is designed to be used in conjunction with other modules in the ManipulaPy
+library for tasks such as forward and inverse kinematics, trajectory planning, and control.
+
+Note: This module assumes familiarity with concepts from rigid body dynamics, Lie theory,
+and robotics. For more information, refer to the documentation or relevant literature.
+
+"""
+
 #!/usr/bin/env python3
 
 import numpy as np
@@ -403,3 +427,28 @@ def QuinticTimeScaling(Tf, t):
         float: The quintic time scaling factor.
     """
     return 10 * (t / Tf) ** 3 - 15 * (t / Tf) ** 4 + 6 * (t / Tf) ** 5
+
+def rotation_matrix_to_euler_angles(R):
+    """
+    Convert a rotation matrix to Euler angles (roll, pitch, yaw).
+
+    Parameters:
+        R (numpy.ndarray): A 3x3 rotation matrix.
+
+    Returns:
+        numpy.ndarray: A 3-element array representing the Euler angles (roll, pitch, yaw).
+    """
+    sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
+    
+    singular = sy < 1e-6
+
+    if not singular:
+        x = np.arctan2(R[2, 1], R[2, 2])
+        y = np.arctan2(-R[2, 0], sy)
+        z = np.arctan2(R[1, 0], R[0, 0])
+    else:
+        x = np.arctan2(-R[1, 2], R[1, 1])
+        y = np.arctan2(-R[2, 0], sy)
+        z = 0
+
+    return np.array([x, y, z])

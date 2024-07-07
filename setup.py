@@ -1,12 +1,15 @@
 from setuptools import setup, find_packages
 
+with open('README.md', 'r', encoding='utf-8') as fh:
+    long_description = fh.read()
+
 setup(
     name='ManipulaPy',
     version='1.0.1',
     author='Mohamed Aboelnar',
     author_email='aboelnasr1997@gmail.com',
     description='A package for robotic serial manipulator operations',
-    long_description=open('README.md').read(),
+    long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/boelnasr/ManipulaPy',
     packages=find_packages(),
@@ -16,7 +19,7 @@ setup(
         'urchin>=0.0.27',
         'pybullet>=3.0.6',
         'pycuda>=2021.1',
-        'trimesh>=3.9.14'  # Add trimesh if not already included
+        'trimesh>=3.9.14'
     ],
     classifiers=[
         'Programming Language :: Python :: 3',

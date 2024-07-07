@@ -55,7 +55,7 @@ print(joint_velocities)
 new_initial_thetalist = np.array([pi, pi/6, pi/4, -pi/3, -pi/2, (-2*pi/3)]) + np.random.normal(0, 0.2, 6)
 
 # Perform inverse kinematics with the new initial guess
-thetalistd = ur5.iterative_inverse_kinematics(T_space, new_initial_thetalist,plot_residuals=False)
+thetalistd = ur5.iterative_inverse_kinematics(T_space, new_initial_thetalist,plot_residuals=True)
 
 print("\nInverse Kinematics with Adjusted Initial Guess (Space Frame):")
 print(thetalistd)

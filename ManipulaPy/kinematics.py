@@ -1,3 +1,32 @@
+"""
+ManipulaPy Kinematics Module
+
+This module provides classes and functions for performing kinematic analysis and computations
+for serial manipulators, including forward and inverse kinematics, Jacobian calculations,
+and end-effector velocity calculations.
+
+The main class in this module is `SerialManipulator`, which represents a serial robotic
+manipulator with an arbitrary number of joints. This class provides methods for:
+
+- Forward kinematics: Compute the end-effector pose given joint angles
+- Inverse kinematics: Compute joint angles to achieve a desired end-effector pose
+- Jacobian calculation: Compute the Jacobian matrix in the space or body frame
+- End-effector velocity: Compute the end-effector velocity given joint angles and velocities
+- Joint velocity: Compute the joint velocities required to achieve a desired end-effector velocity
+
+The module also includes utility functions for working with transformation matrices, twists,
+and other kinematic quantities, which are imported from the `utils` module.
+
+To use this module, you need to provide the kinematic parameters of the manipulator, such as
+the  screw axes, or the M, G, and B matrices. The `SerialManipulator`
+class can then be instantiated with these parameters, and its methods can be used for various
+kinematic computations.
+
+Note: This module assumes familiarity with concepts from robotics, kinematics, and Lie theory.
+For more information, refer to the documentation or relevant literature.
+
+"""
+
 #!/usr/bin/env python3
 
 import numpy as np
@@ -222,3 +251,19 @@ class SerialManipulator:
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return np.linalg.pinv(J) @ V_ee
+
+
+    def end_effector_pose(self, thetalist):
+        """
+        Computes the end-effector's position and orientation given joint angles.
+
+        Parameters:
+            thetalist (numpy.ndarray): A 1D array of joint angles in radians.
+
+        Returns:
+            numpy.ndarray: A 6x1 vector representing the position and orientation (Euler angles) of the end-effector.
+        """
+        T = self.forward_kinematics(thetalist)
+        R, p = utils.TransToRp(T)
+        orientation = utils.rotation_matrix_to_euler_angles(R)
+        return np.concatenate((p, orientation))

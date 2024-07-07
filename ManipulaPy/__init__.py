@@ -18,7 +18,7 @@ from ManipulaPy.control import *
 from ManipulaPy.sim import *
 
 # Define package-level variables
-__version__ = "1.0.1"
+__version__ = "0.2.0"
 __author__ = "Mohamed Aboelnar"
 
 __all__ = [
