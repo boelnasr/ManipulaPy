@@ -12,14 +12,14 @@ import logging
 import matplotlib.pyplot as plt
 
 class Simulation:
-    def __init__(self, urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0):
+    def __init__(self, urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0,physics_client=None):
         self.urdf_file_path = urdf_file_path
         self.joint_limits = joint_limits
         self.torque_limits = torque_limits
         self.time_step = time_step
         self.real_time_factor = real_time_factor
         self.logger = self.setup_logger()
-        self.physics_client = None
+        self.physics_client = physics_client
         self.joint_params = []
         self.reset_button = None
         self.home_position = None
@@ -38,15 +38,19 @@ class Simulation:
         logger.addHandler(ch)
         return logger
 
+
     def connect_simulation(self):
         """
         Connects to the PyBullet simulation.
         """
         self.logger.info("Connecting to PyBullet simulation...")
-        self.physics_client = p.connect(p.GUI)
+        if self.physics_client is None:
+            self.physics_client = p.connect(p.GUI)
+        p.resetSimulation()  # Clear the simulation environment
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(self.time_step)
+
 
     def disconnect_simulation(self):
         """
@@ -62,32 +66,54 @@ class Simulation:
         """
         Sets up the simulation environment.
         """
-        self.connect_simulation()
-        self.logger.info("Initializing simulation environment...")
+        if self.physics_client is None:
+            self.physics_client = p.connect(p.GUI)
+            p.resetSimulation()
+            p.setAdditionalSearchPath(pybullet_data.getDataPath())
+            p.setGravity(0, 0, -9.81)
+            p.setTimeStep(self.time_step)
 
-        self.load_urdf_files()
-        self.initialize_robot()
-        self.initialize_planner_and_controller()
-        self.add_joint_parameters()
-        self.add_reset_button()
-        self.logger.info("Simulation environment initialized.")
+            # Load the ground plane
+            self.plane_id = p.loadURDF("plane.urdf")
 
-    def load_urdf_files(self):
-        """
-        Loads the necessary URDF files into the simulation.
-        """
-        self.plane_id = p.loadURDF("plane.urdf")
-        self.robot_id = p.loadURDF(self.urdf_file_path, [0, 0, 0.1], useFixedBase=True)
+            # Load the robot
+            self.robot_id = p.loadURDF(self.urdf_file_path, useFixedBase=True)
+
+            # Identify non-fixed joints
+            self.non_fixed_joints = [
+                i for i in range(p.getNumJoints(self.robot_id))
+                if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
+            ]
+            self.home_position = np.zeros(len(self.non_fixed_joints))
+        else:
+            print("Simulation already initialized.")
+
 
     def initialize_robot(self):
         """
         Initializes the robot using the URDF processor.
         """
-        urdf_processor = URDFToSerialManipulator(self.urdf_file_path)
-        self.robot = urdf_processor.serial_manipulator
-        self.dynamics = urdf_processor.dynamics
-        self.non_fixed_joints = [i for i in range(p.getNumJoints(self.robot_id)) if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED]
-        self.home_position = np.zeros(len(self.non_fixed_joints))
+        # Only skip URDF processing if self.robot is already set.
+        if hasattr(self, 'robot') and self.robot is not None:
+            self.logger.warning("Robot already initialized. Skipping URDF processing.")
+        else:
+            # Even if self.robot_id is already set from setup_simulation(),
+            # we need to process the URDF to set self.robot and self.dynamics.
+            if not (hasattr(self, 'robot_id') and self.robot_id is not None):
+                self.robot_id = p.loadURDF(self.urdf_file_path, [0, 0, 0.1], useFixedBase=True)
+            # Process the URDF to generate the robot model and dynamics.
+            from ManipulaPy.urdf_processor import URDFToSerialManipulator
+            urdf_processor = URDFToSerialManipulator(self.urdf_file_path)
+            self.robot = urdf_processor.serial_manipulator
+            self.dynamics = urdf_processor.dynamics
+            # Identify non-fixed joints
+            self.non_fixed_joints = [
+                i for i in range(p.getNumJoints(self.robot_id))
+                if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
+            ]
+            self.home_position = np.zeros(len(self.non_fixed_joints))
+
+
 
     def initialize_planner_and_controller(self):
         """
@@ -285,13 +311,23 @@ class Simulation:
                 for point in contact_points:
                     self.logger.warning(f"Contact point: {point}")
 
+    def step_simulation(self):
+        """
+        Steps the simulation forward by one time step.
+        """
+        self.logger.info("Setting up the simulation environment...")
+        self.connect_simulation()
+        self.add_additional_parameters()
+
     def add_additional_parameters(self):
         """
-        Adds additional GUI parameters for controlling physics properties.
+        Adds additional GUI parameters for controlling physics properties like gravity and time step.
         """
-        if not hasattr(self, 'gravity_param') and not hasattr(self, 'time_step_param'):
+        if not hasattr(self, 'gravity_param'):
             self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
+        if not hasattr(self, 'time_step_param'):
             self.time_step_param = p.addUserDebugParameter("Time Step", 0.001, 0.1, self.time_step)
+
 
     def update_simulation_parameters(self):
         """
@@ -308,7 +344,14 @@ class Simulation:
         Allows manual control of the robot through the PyBullet UI sliders.
         """
         self.logger.info("Starting manual control...")
-        self.add_additional_parameters()
+        if not self.joint_params:
+            self.add_joint_parameters()  # Ensure sliders are created
+        self.add_additional_parameters()  # Additional controls like gravity and time step
+        
+        # Add reset button if it doesn't exist
+        if self.reset_button is None:
+            self.add_reset_button()
+
         try:
             while True:
                 joint_positions = self.get_joint_parameters()
@@ -321,15 +364,14 @@ class Simulation:
                 p.stepSimulation()
                 time.sleep(self.time_step / self.real_time_factor)
 
-                # Check for reset button press
-                if p.readUserDebugParameter(self.reset_button) == 1:
+                # Check if reset button exists before reading it
+                if self.reset_button is not None and p.readUserDebugParameter(self.reset_button) == 1:
                     self.logger.info("Resetting simulation state...")
                     self.set_joint_positions(self.home_position)
                     break  # Exit manual control to restart trajectory loop
         except KeyboardInterrupt:
             print("Manual control stopped by user.")
             self.logger.info("Manual control stopped.")
-
 
 
     def save_joint_states(self, filename="joint_states.csv"):
@@ -366,39 +408,63 @@ class Simulation:
         self.run_trajectory(joint_trajectory)
         self.logger.info("Trajectory plotted and simulation completed.")
 
-def run(self, joint_trajectory):
-    """
-    Main loop for running the simulation.
-    """
-    try:
-        reset_pressed = False
-        mode = 'trajectory'  # Mode can be 'trajectory' or 'manual'
+    def add_additional_parameters(self):
+        """
+        Adds additional GUI parameters for controlling physics properties.
+        """
+        if not hasattr(self, 'gravity_param'):
+            self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
+        if not hasattr(self, 'time_step_param'):
+            self.time_step_param = p.addUserDebugParameter("Time Step", 0.001, 0.1, self.time_step)
 
-        while True:
-            if mode == 'trajectory':
-                end_pos = self.run_trajectory(joint_trajectory)
-                self.logger.info("Trajectory completed. Waiting for reset...")
-                mode = 'wait_reset'
+    def update_simulation_parameters(self):
+        """
+        Updates simulation parameters from GUI controls.
+        """
+        if not hasattr(self, 'gravity_param') or not hasattr(self, 'time_step_param'):
+            self.logger.warning("GUI parameters for gravity and time step are not initialized.")
+            return
 
-            while mode == 'wait_reset' and not reset_pressed:
-                p.stepSimulation()
-                time.sleep(0.01)
+        gravity = p.readUserDebugParameter(self.gravity_param)
+        time_step = p.readUserDebugParameter(self.time_step_param)
+        p.setGravity(0, 0, gravity)
+        p.setTimeStep(time_step)
+        self.time_step = time_step
 
-                if p.readUserDebugParameter(self.reset_button) > 0:
-                    self.logger.info("Reset button pressed. Returning to home position and entering manual control...")
-                    self.set_joint_positions(self.home_position)
-                    mode = 'manual'
-                    break
 
-            if mode == 'manual':
-                self.manual_control()
-                reset_pressed = False  # Reset the flag to restart the trajectory
-                mode = 'trajectory'  # Go back to trajectory mode
 
-    except KeyboardInterrupt:
-        self.logger.info("Simulation stopped by user.")
-        self.close_simulation()
+    def run(self, joint_trajectory):
+        """
+        Main loop for running the simulation.
+        """
+        try:
+            reset_pressed = False
+            mode = 'trajectory'  # Mode can be 'trajectory' or 'manual'
 
+            while True:
+                if mode == 'trajectory':
+                    end_pos = self.run_trajectory(joint_trajectory)
+                    self.logger.info("Trajectory completed. Waiting for reset...")
+                    mode = 'wait_reset'
+
+                while mode == 'wait_reset' and not reset_pressed:
+                    p.stepSimulation()
+                    time.sleep(0.01)
+
+                    if p.readUserDebugParameter(self.reset_button) > 0:
+                        self.logger.info("Reset button pressed. Returning to home position and entering manual control...")
+                        self.set_joint_positions(self.home_position)
+                        mode = 'manual'
+                        break
+
+                if mode == 'manual':
+                    self.manual_control()
+                    reset_pressed = False  # Reset the flag to restart the trajectory
+                    mode = 'trajectory'  # Go back to trajectory mode
+
+        except KeyboardInterrupt:
+            self.logger.info("Simulation stopped by user.")
+            self.close_simulation()
 
 
 

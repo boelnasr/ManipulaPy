@@ -438,6 +438,7 @@ def rotation_matrix_to_euler_angles(R):
     Returns:
         numpy.ndarray: A 3-element array representing the Euler angles (roll, pitch, yaw).
     """
+    assert R.shape == (3, 3), f"Expected 3x3 rotation matrix, got shape {R.shape}"
     sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
     
     singular = sy < 1e-6
@@ -452,3 +453,46 @@ def rotation_matrix_to_euler_angles(R):
         z = 0
 
     return np.array([x, y, z])
+
+def euler_to_rotation_matrix(euler_deg):
+    """
+    Convert Euler angles (roll_deg, pitch_deg, yaw_deg) in degrees
+    to a 3x3 rotation matrix.
+    ZYX convention is typical in robotics: yaw -> pitch -> roll,
+    but adapt as needed.
+
+    Parameters:
+        euler_deg (array-like): [roll_deg, pitch_deg, yaw_deg]
+
+    Returns:
+        np.ndarray: A 3x3 rotation matrix (float64 by default).
+    """
+    roll_deg, pitch_deg, yaw_deg = euler_deg
+    # Convert degrees to radians
+    roll = np.radians(roll_deg)
+    pitch = np.radians(pitch_deg)
+    yaw = np.radians(yaw_deg)
+
+    # Example Z-Y-X convention (yaw→pitch→roll). 
+    # If your code uses X→Y→Z or another sequence, adapt these multiplications.
+    Rz = np.array([
+        [ np.cos(yaw), -np.sin(yaw),  0],
+        [ np.sin(yaw),  np.cos(yaw),  0],
+        [          0,            0,   1]
+    ], dtype=np.float64)
+
+    Ry = np.array([
+        [ np.cos(pitch),  0, np.sin(pitch)],
+        [             0,  1,            0 ],
+        [-np.sin(pitch),  0, np.cos(pitch)]
+    ], dtype=np.float64)
+
+    Rx = np.array([
+        [1,           0,            0],
+        [0, np.cos(roll), -np.sin(roll)],
+        [0, np.sin(roll),  np.cos(roll)]
+    ], dtype=np.float64)
+
+    # Multiply in the correct order for your convention.
+    R = Rz @ Ry @ Rx
+    return R

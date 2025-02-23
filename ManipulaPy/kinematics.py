@@ -32,7 +32,7 @@ For more information, refer to the documentation or relevant literature.
 import numpy as np
 from . import utils
 import matplotlib.pyplot as plt
-
+import torch
 
 class SerialManipulator:
     def __init__(
@@ -45,6 +45,7 @@ class SerialManipulator:
         B_list=None,
         G_list=None,
         joint_limits=None,
+        
     ):
         """
         Initialize the class with the given parameters.
@@ -77,6 +78,21 @@ class SerialManipulator:
         self.joint_limits = (
             joint_limits if joint_limits is not None else [(None, None)] * len(M_list)
         )
+
+    def update_state(self, joint_positions, joint_velocities=None):
+            """
+            Updates the internal state of the manipulator.
+
+            Args:
+                joint_positions (np.ndarray): Current joint positions.
+                joint_velocities (np.ndarray, optional): Current joint velocities. Default is None.
+            """
+            self.joint_positions = np.array(joint_positions)
+            if joint_velocities is not None:
+                self.joint_velocities = np.array(joint_velocities)
+            else:
+                self.joint_velocities = np.zeros_like(self.joint_positions)
+
 
     def forward_kinematics(self, thetalist, frame="space"):
         """
@@ -120,6 +136,8 @@ class SerialManipulator:
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return np.dot(J, dthetalist)
+
+
 
     def jacobian(self, thetalist, frame="space"):
         """
@@ -207,7 +225,7 @@ class SerialManipulator:
             # Update thetalist using the pseudoinverse of the Jacobian
             delta_theta = np.dot(np.linalg.pinv(J), V_error)
             thetalist += (
-                1 * delta_theta
+                0.058 * delta_theta
             )  # Ensure this step size is appropriate for convergence
 
             # Enforce joint limits
@@ -267,3 +285,48 @@ class SerialManipulator:
         R, p = utils.TransToRp(T)
         orientation = utils.rotation_matrix_to_euler_angles(R)
         return np.concatenate((p, orientation))
+    
+
+    def hybrid_inverse_kinematics(
+        self,
+        T_desired,
+        neural_network,
+        scaler_X,
+        scaler_y,
+        device,
+        thetalist0=None,
+        eomg=1e-6,
+        ev=1e-6,
+        max_iterations=500
+    ):
+        """
+        Perform hybrid inverse kinematics using a neural network for initial guess and iterative refinement.
+
+        Parameters:
+            T_desired (np.ndarray): The desired end-effector pose as a 4x4 transformation matrix.
+            neural_network (nn.Module): The trained neural network model.
+            scaler_X (StandardScaler): Scaler for the input features.
+            scaler_y (StandardScaler): Scaler for the output features (joint angles).
+            device (torch.device): The device on which to run the neural network.
+            thetalist0 (np.ndarray, optional): Initial guess for joint angles. If None, the neural network is used to generate an initial guess.
+            eomg (float, optional): The tolerance for rotational error convergence. Defaults to 1e-6.
+            ev (float, optional): The tolerance for translational error convergence. Defaults to 1e-6.
+            max_iterations (int, optional): The maximum number of iterations to perform. Defaults to 500.
+
+        Returns:
+            np.ndarray: The resulting joint angles.
+            bool: Indicates whether the algorithm converged.
+            int: The number of iterations performed.
+        """
+        if thetalist0 is None:
+            # Use neural network to get initial guess
+            end_effector_pose = np.concatenate((T_desired[:3, 3], utils.rotation_matrix_to_euler_angles(T_desired[:3, :3])))
+            end_effector_pose = scaler_X.transform([end_effector_pose])
+            end_effector_pose = torch.tensor(end_effector_pose, dtype=torch.float32).to(device)
+            thetalist0 = neural_network(end_effector_pose).detach().cpu().numpy().flatten()
+            thetalist0 = scaler_y.inverse_transform([thetalist0])[0]
+
+        # Refine using iterative method
+        thetalist, success, num_iterations = self.iterative_inverse_kinematics(T_desired, thetalist0, eomg, ev, max_iterations)
+
+        return thetalist, success, num_iterations

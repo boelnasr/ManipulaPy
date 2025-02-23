@@ -5,7 +5,7 @@ with open('README.md', 'r', encoding='utf-8') as fh:
 
 setup(
     name='ManipulaPy',
-    version='1.0.1',
+    version='1.0.2',
     author='Mohamed Aboelnar',
     author_email='aboelnasr1997@gmail.com',
     description='A package for robotic serial manipulator operations',

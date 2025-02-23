@@ -14,10 +14,13 @@ from ManipulaPy.singularity import *
 from ManipulaPy.path_planning import *
 from ManipulaPy.utils import *
 from ManipulaPy.urdf_processor import *
+from ManipulaPy.vision import *
+from ManipulaPy.perception import *
 from ManipulaPy.control import *
 from ManipulaPy.sim import *
 from ManipulaPy.potential_field import *
 from ManipulaPy.cuda_kernels import *
+
 
 
 # Define package-level variables

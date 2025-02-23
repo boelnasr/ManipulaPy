@@ -519,3 +519,20 @@ class TrajectoryPlanning:
         ax.set_zlabel("Z Position")
         ax.legend()
         plt.show()
+
+    def plan_trajectory(self, start_position, target_position, obstacle_points):
+        """
+        Plans a collision-free trajectory from start to target position.
+
+        Args:
+            start_position (list): Initial joint configuration.
+            target_position (list): Desired joint configuration.
+            obstacle_points (list): List of obstacle points in the environment.
+
+        Returns:
+            list: Joint trajectory as a list of joint configurations.
+        """
+        # Perform trajectory planning (e.g., RRT or interpolation)
+        joint_trajectory = [start_position, target_position]  # Example
+        self.logger.info(f"Planned trajectory with {len(joint_trajectory)} waypoints.")
+        return joint_trajectory
