@@ -93,29 +93,40 @@ class SerialManipulator:
             else:
                 self.joint_velocities = np.zeros_like(self.joint_positions)
 
-
     def forward_kinematics(self, thetalist, frame="space"):
         """
-        Compute the forward kinematics of a robotic arm.
+        Compute the forward kinematics of a robotic arm using the product of exponentials method.
 
         Args:
             thetalist (numpy.ndarray): A 1D array of joint angles in radians.
             frame (str, optional): The frame in which to compute the forward kinematics.
-                                    Either 'space' (default) or 'body'.
+                Either 'space' or 'body'.
 
         Returns:
-            numpy.ndarray: The transformation matrix representing the end-effector's pose.
+            numpy.ndarray: The 4x4 transformation matrix representing the end-effector's pose.
         """
-        T = np.eye(4)
         if frame == "space":
+            # T(θ) = e^[S1θ1] e^[S2θ2] ... e^[Snθn] * M
+            T = np.eye(4)
             for i, theta in enumerate(thetalist):
-                T = np.dot(T, utils.transform_from_twist(self.S_list[:, i], theta))
+                T = T @ utils.transform_from_twist(self.S_list[:, i], theta)
+            # Multiply by home pose
+            T = T @ self.M_list
+
         elif frame == "body":
-            for i, theta in reversed(list(enumerate(thetalist))):
-                T = np.dot(utils.transform_from_twist(self.B_list[:, i], theta), T)
+            # T(θ) = M * e^[B1θ1] e^[B2θ2] ... e^[Bnθn]
+            T = np.eye(4)
+            # Build the product of exponentials from left to right
+            for i, theta in enumerate(thetalist):
+                T = T @ utils.transform_from_twist(self.B_list[:, i], theta)
+            # Then multiply from the left by M
+            T = self.M_list @ T
+
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
+
         return T
+
 
     def end_effector_velocity(self, thetalist, dthetalist, frame="space"):
         """

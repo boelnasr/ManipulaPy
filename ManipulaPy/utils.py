@@ -27,7 +27,6 @@ and robotics. For more information, refer to the documentation or relevant liter
 import numpy as np
 from scipy.linalg import expm
 
-
 def extract_r_list(Slist):
     """
     Extracts the r_list from the given Slist.
@@ -38,6 +37,11 @@ def extract_r_list(Slist):
     Returns:
         np.ndarray: An array of r vectors.
     """
+    # Handle None or improperly shaped input
+    if Slist is None or not hasattr(np.array(Slist), 'T'):
+        return np.array([])
+    
+    # Continue with the original function
     r_list = []
     for S in np.array(Slist).T:
         omega = S[:3]
@@ -48,8 +52,6 @@ def extract_r_list(Slist):
         else:
             r_list.append([0, 0, 0])  # For prismatic joints
     return np.array(r_list)
-
-
 def extract_omega_list(Slist):
     """
     Extracts the first three elements from each sublist in the given list and returns them as a numpy array.
@@ -62,7 +64,34 @@ def extract_omega_list(Slist):
     """
     return np.array(Slist)[:, :3]
 
+def extract_screw_list(omega_list, r_list):
+    """
+    Build a 6xn screw-axis matrix from (3xn) angular velocities 'omega_list'
+    and (3xn) positions 'r_list'.
+    For each column i:
+       S[:3, i] = w = omega_list[:, i]
+       S[3:, i] = v = - w x r
 
+    Returns a 6xn array of [wx, wy, wz, vx, vy, vz] in each column.
+    """
+    if omega_list is None or r_list is None:
+        return None
+
+    w_rows, w_cols = omega_list.shape
+    r_rows, r_cols = r_list.shape
+    if w_rows != 3 or r_rows != 3:
+        raise ValueError("omega_list and r_list must each have 3 rows.")
+    if w_cols != r_cols:
+        raise ValueError("omega_list and r_list must have the same number of columns.")
+
+    S = np.zeros((6, w_cols), dtype=float)
+    for i in range(w_cols):
+        w = omega_list[:, i]
+        r = r_list[:, i]
+        v = np.cross(-w, r)
+        S[:3, i] = w
+        S[3:, i] = v
+    return S
 def NearZero(z):
     """
     Determines if a given number is near zero.
