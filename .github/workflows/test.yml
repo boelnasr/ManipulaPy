@@ -149,7 +149,7 @@ jobs:
             try:
                 import ManipulaPy
                 assert hasattr(ManipulaPy, '__version__')
-                assert ManipulaPy.__version__ == "0.2.0"
+                assert ManipulaPy.__version__ == "1.1.0"
             except ImportError as e:
                 pytest.skip(f"Could not import ManipulaPy: {e}")
             
