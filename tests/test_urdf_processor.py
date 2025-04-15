@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import unittest
-import numpy as np
 import os
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file

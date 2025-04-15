@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from numba import cuda
 from urchin.urdf import URDF
 from scipy.spatial import ConvexHull
 
 
 # Import CUDA kernel functions (assuming these are defined in cuda_kernels.py)
-from .cuda_kernels import (
-    attractive_potential_kernel,
-    repulsive_potential_kernel,
-    gradient_kernel,
-)
 
 
 class PotentialField:

@@ -5,7 +5,6 @@ import numpy as np
 import cupy as cp
 import matplotlib.pyplot as plt
 from ManipulaPy.control import ManipulatorController
-from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file
 

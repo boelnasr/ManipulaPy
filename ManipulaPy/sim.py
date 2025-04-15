@@ -2,7 +2,6 @@
 
 import pybullet as p
 import pybullet_data
-from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.path_planning import TrajectoryPlanning as tp
 from ManipulaPy.control import ManipulatorController
 import numpy as np

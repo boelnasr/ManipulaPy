@@ -2,12 +2,9 @@
 
 import unittest
 import numpy as np
-import cupy as cp
 import matplotlib.pyplot as plt
 import os
 from ManipulaPy.path_planning import TrajectoryPlanning
-from ManipulaPy.dynamics import ManipulatorDynamics
-from ManipulaPy.kinematics import SerialManipulator
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file
 
@@ -99,7 +96,6 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
         # Patch the TrajectoryPlanning class to use our mock collision checker
         import types
-        from ManipulaPy.path_planning import CollisionChecker
 
         original_init = TrajectoryPlanning.__init__
 

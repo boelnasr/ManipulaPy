@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-from numba import cuda, float32
+from numba import cuda
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.spatial import ConvexHull
 from .utils import (
     TransToRp,
     MatrixLog3,
@@ -11,7 +10,6 @@ from .utils import (
     CubicTimeScaling,
     QuinticTimeScaling,
 )
-from urchin.urdf import URDF
 from .cuda_kernels import (
     trajectory_kernel,
     inverse_dynamics_kernel,

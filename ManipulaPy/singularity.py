@@ -2,11 +2,9 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial import ConvexHull
 from numba import cuda
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
-from numpy import linalg as la
 
 
 class Singularity:

@@ -3,7 +3,6 @@
 import cupy as cp
 import numpy as np
 import matplotlib.pyplot as plt
-from .dynamics import ManipulatorDynamics
 import logging
 
 logging.basicConfig(level=logging.INFO)

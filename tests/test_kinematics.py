@@ -2,7 +2,6 @@
 
 import unittest
 import numpy as np
-from math import pi
 from ManipulaPy.kinematics import SerialManipulator
 
 
