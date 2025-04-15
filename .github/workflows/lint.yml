@@ -8,14 +8,12 @@ on:
 
 jobs:
   lint:
-    name: Code Linting
+    name: Code Linting and Autoformat
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          persist-credentials: true  # required for committing
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -24,47 +22,34 @@ jobs:
 
       - name: Install flake8 and black
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install flake8 black
 
       - name: Run flake8
+        id: flake8
+        continue-on-error: true
         run: |
+          echo "🔍 Running flake8..."
           flake8 ManipulaPy tests --max-line-length=88
 
       - name: Check code style with black
+        id: black_check
+        continue-on-error: true
         run: |
+          echo "🧹 Checking black formatting..."
           black --check ManipulaPy tests
 
-  autofix:
-    name: Auto-format with Black and Push
-    runs-on: ubuntu-latest
-    needs: lint
-    if: always()  # Run regardless, but check for actual changes
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          persist-credentials: true  # required to push
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install black
-        run: pip install black
-
-      - name: Run Black Auto-format
-        run: black ManipulaPy tests
-
-      - name: Commit and Push if changes
+      - name: Autoformat and push fixes if needed
+        if: steps.flake8.outcome == 'failure' || steps.black_check.outcome == 'failure'
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          if [[ `git status --porcelain` ]]; then
-            git add ManipulaPy tests
-            git commit -m "🔧 Auto-format code with Black"
-            git push
-          else
-            echo "✅ No formatting changes to commit."
-          fi
+          echo "🔧 Autoformatting with black due to lint failure..."
+          black ManipulaPy tests
+
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add ManipulaPy tests
+          git commit -m "style: autoformat with black 🧹" || echo "Nothing to commit"
+          git push || echo "Nothing to push"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

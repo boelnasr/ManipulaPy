@@ -281,20 +281,20 @@ class ManipulatorController:
             self.x_hat = cp.concatenate((thetalist, dthetalist))
 
         thetalist_pred = (
-            self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist) :] * dt
+            self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist):] * dt
         )
         dthetalist_pred = (
             cp.asarray(
                 self.dynamics.forward_dynamics(
                     self.x_hat[: len(thetalist)].get(),
-                    self.x_hat[len(thetalist) :].get(),
+                    self.x_hat[len(thetalist):].get(),
                     taulist.get(),
                     g.get(),
                     Ftip.get(),
                 )
             )
             * dt
-            + self.x_hat[len(thetalist) :]
+            + self.x_hat[len(thetalist):]
         )
         x_hat_pred = cp.concatenate((thetalist_pred, dthetalist_pred))
 
@@ -359,7 +359,7 @@ class ManipulatorController:
 
         self.kalman_filter_predict(thetalist, dthetalist, taulist, g, Ftip, dt, Q)
         self.kalman_filter_update(cp.concatenate((thetalist, dthetalist)), R)
-        return self.x_hat[: len(thetalist)], self.x_hat[len(thetalist) :]
+        return self.x_hat[: len(thetalist)], self.x_hat[len(thetalist):]
 
     def feedforward_control(
         self, desired_position, desired_velocity, desired_acceleration, g, Ftip
