@@ -164,7 +164,7 @@ jobs:
         echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
         echo "SKIP_CUDA_TESTS=true" >> $GITHUB_ENV
     
-    - name: Run minimal tests
+    - name: Run all tests
       run: |
         pytest tests/test_basic.py -v --skip-cuda
         
