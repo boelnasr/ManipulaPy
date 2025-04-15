@@ -8,6 +8,7 @@ from numba import cuda
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
 from numpy import linalg as la
 
+
 class Singularity:
     def __init__(self, serial_manipulator):
         """
@@ -52,7 +53,7 @@ class Singularity:
         radii_w = 1.0 / np.sqrt(S_w)
 
         # Generate points on a unit sphere
-        u, v = np.mgrid[0:2 * np.pi:20j, 0:np.pi:10j]
+        u, v = np.mgrid[0 : 2 * np.pi : 20j, 0 : np.pi : 10j]
         x = np.cos(u) * np.sin(v)
         y = np.sin(u) * np.sin(v)
         z = np.cos(v)
@@ -101,7 +102,9 @@ class Singularity:
             num_samples (int, optional): Number of samples for Monte Carlo simulation. Defaults to 10000.
         """
         # Initialize device arrays
-        joint_samples = cuda.device_array((num_samples, len(joint_limits)), dtype=np.float32)
+        joint_samples = cuda.device_array(
+            (num_samples, len(joint_limits)), dtype=np.float32
+        )
 
         # Define the CUDA kernel for generating joint angles
         @cuda.jit
@@ -111,7 +114,8 @@ class Singularity:
                 for i in range(joint_samples.shape[1]):
                     low, high = joint_limits[i]
                     joint_samples[pos, i] = (
-                        xoroshiro128p_uniform_float32(rng_states, pos) * (high - low) + low
+                        xoroshiro128p_uniform_float32(rng_states, pos) * (high - low)
+                        + low
                     )
 
         # Setup random states
@@ -121,14 +125,18 @@ class Singularity:
         # Launch kernel
         threadsperblock = 256
         blockspergrid = (num_samples + threadsperblock - 1) // threadsperblock
-        generate_joint_samples[blockspergrid, threadsperblock](rng_states, device_joint_limits, joint_samples)
+        generate_joint_samples[blockspergrid, threadsperblock](
+            rng_states, device_joint_limits, joint_samples
+        )
 
         # Copy joint samples to host and calculate workspace points
         host_joint_samples = joint_samples.copy_to_host()
-        workspace_points = np.array([
-            self.serial_manipulator.forward_kinematics(thetas)[:3, 3]
-            for thetas in host_joint_samples
-        ])
+        workspace_points = np.array(
+            [
+                self.serial_manipulator.forward_kinematics(thetas)[:3, 3]
+                for thetas in host_joint_samples
+            ]
+        )
 
         # Compute convex hull
         hull = ConvexHull(workspace_points)
@@ -137,8 +145,13 @@ class Singularity:
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
         ax.plot_trisurf(
-            workspace_points[:, 0], workspace_points[:, 1], workspace_points[:, 2],
-            triangles=hull.simplices, cmap="viridis", edgecolor="none", alpha=0.5
+            workspace_points[:, 0],
+            workspace_points[:, 1],
+            workspace_points[:, 2],
+            triangles=hull.simplices,
+            cmap="viridis",
+            edgecolor="none",
+            alpha=0.5,
         )
         ax.set_xlabel("X")
         ax.set_ylabel("Y")

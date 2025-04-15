@@ -3,9 +3,10 @@ import logging
 import numpy as np
 from sklearn.cluster import DBSCAN
 
+
 class Perception:
     """
-    A higher-level perception module that uses a Vision instance to handle 
+    A higher-level perception module that uses a Vision instance to handle
     tasks like obstacle detection, 3D point cloud generation, and clustering.
 
     Attributes
@@ -43,7 +44,9 @@ class Perception:
             logger.setLevel(logging.DEBUG)
             ch = logging.StreamHandler()
             ch.setLevel(logging.DEBUG)
-            fmt = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            fmt = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
             ch.setFormatter(fmt)
             logger.addHandler(ch)
         return logger
@@ -51,7 +54,9 @@ class Perception:
     # --------------------------------------------------------------------------
     # Primary Methods
     # --------------------------------------------------------------------------
-    def detect_and_cluster_obstacles(self, camera_index=0, depth_threshold=5.0, step=2, eps=0.1, min_samples=3):
+    def detect_and_cluster_obstacles(
+        self, camera_index=0, depth_threshold=5.0, step=2, eps=0.1, min_samples=3
+    ):
         """
         Capture an image from the Vision instance, detect 3D obstacle points,
         and then cluster those points using DBSCAN.
@@ -78,7 +83,9 @@ class Perception:
         """
         rgb, depth = self.vision.capture_image(camera_index=camera_index)
         if depth is None or depth.ndim < 2:
-            self.logger.warning(f"❌ Depth image not available from camera {camera_index}; returning empty arrays.")
+            self.logger.warning(
+                f"❌ Depth image not available from camera {camera_index}; returning empty arrays."
+            )
             return np.empty((0, 3)), np.array([])
 
         self.logger.debug("Calling vision.detect_obstacles()...")
@@ -87,20 +94,28 @@ class Perception:
             rgb_image=rgb,
             depth_threshold=depth_threshold,
             camera_index=camera_index,
-            step=step
+            step=step,
         )
 
         if obstacle_points is None or labels is None:
-            self.logger.error("🚨 detect_obstacles() returned None! Returning empty arrays to prevent crash.")
+            self.logger.error(
+                "🚨 detect_obstacles() returned None! Returning empty arrays to prevent crash."
+            )
             return np.empty((0, 3)), np.array([])
 
         if obstacle_points.shape[0] == 0:
             self.logger.info("⚠️ No obstacle points detected to cluster.")
             return obstacle_points, np.array([])
 
-        self.logger.debug(f"Detected {obstacle_points.shape[0]} obstacle points before clustering.")
-        labels, num_clusters = self.cluster_obstacles(obstacle_points, eps=eps, min_samples=min_samples)
-        self.logger.info(f"✅ Clustering complete. Found {num_clusters} clusters (excluding noise).")
+        self.logger.debug(
+            f"Detected {obstacle_points.shape[0]} obstacle points before clustering."
+        )
+        labels, num_clusters = self.cluster_obstacles(
+            obstacle_points, eps=eps, min_samples=min_samples
+        )
+        self.logger.info(
+            f"✅ Clustering complete. Found {num_clusters} clusters (excluding noise)."
+        )
         return obstacle_points, labels
 
     # --------------------------------------------------------------------------
@@ -149,7 +164,9 @@ class Perception:
             self.logger.error("Stereo is not enabled in the Vision instance.")
             return np.empty((0, 3))
         point_cloud = self.vision.get_stereo_point_cloud(left_img, right_img)
-        self.logger.debug(f"Stereo point cloud generated with {point_cloud.shape[0]} points.")
+        self.logger.debug(
+            f"Stereo point cloud generated with {point_cloud.shape[0]} points."
+        )
         return point_cloud
 
     # --------------------------------------------------------------------------
@@ -176,7 +193,9 @@ class Perception:
             The number of clusters found (excluding noise).
         """
         if points.shape[0] == 0:
-            self.logger.info("⚠️ No points provided to cluster_obstacles; returning empty results.")
+            self.logger.info(
+                "⚠️ No points provided to cluster_obstacles; returning empty results."
+            )
             return np.array([]), 0
 
         dbscan_model = DBSCAN(eps=eps, min_samples=min_samples)
@@ -185,7 +204,9 @@ class Perception:
         unique_labels = set(labels)
         num_clusters = len(unique_labels) - (1 if -1 in unique_labels else 0)
         noise_count = np.sum(labels == -1)
-        self.logger.info(f"DBSCAN clustering: {num_clusters} clusters found with {noise_count} noise points.")
+        self.logger.info(
+            f"DBSCAN clustering: {num_clusters} clusters found with {noise_count} noise points."
+        )
         return labels, num_clusters
 
     # --------------------------------------------------------------------------
@@ -207,7 +228,7 @@ class Perception:
         Destructor to ensure Vision resources are released.
         """
         try:
-            if hasattr(self, 'vision') and self.vision is not None:
+            if hasattr(self, "vision") and self.vision is not None:
                 self.vision.release()
         except Exception:
             pass

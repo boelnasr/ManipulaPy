@@ -1,7 +1,7 @@
 # ManipulaPy
 
 
-[![PyPI version](https://badge.fury.io/py/ManipulaPy.svg)](https://pypi.org/project/ManipulaPy/)
+[![PyPI](https://img.shields.io/pypi/v/ManipulaPy)](https://pypi.org/project/ManipulaPy/)
 ![Tested](https://img.shields.io/badge/tested-yes-brightgreen.svg)
 ![CI](https://github.com/boelnasr/ManipulaPy/actions/workflows/test.yml/badge.svg?branch=main)
 
@@ -134,7 +134,6 @@ controller.plot_steady_state_response(time, response, set_point=1)
 ## 📁 Examples
 Browse the `examples/` folder for full scripts demonstrating:
 - Inverse kinematics
-- RL-based control
 - Stereo perception & 3D clustering
 - Simulation-based validation
 

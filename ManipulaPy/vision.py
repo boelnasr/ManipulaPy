@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from .utils import euler_to_rotation_matrix
 from ultralytics import YOLO
 
+
 def read_debug_parameters(dbg_params):
     """
     Utility to read current slider values from PyBullet debug interface.
@@ -16,10 +17,11 @@ def read_debug_parameters(dbg_params):
         values[name] = pb.readUserDebugParameter(param_id)
     return values
 
+
 class Vision:
     """
     A unified vision class for monocular/stereo inputs and PyBullet debugging.
-    
+
     Features:
     ---------
       - Monocular camera(s) with user-specified intrinsics/extrinsics or OpenCV capture devices.
@@ -43,7 +45,7 @@ class Vision:
             - "device_index" (int) => for OpenCV
     stereo_configs : tuple(dict, dict), optional
         (left_cam_cfg, right_cam_cfg) for stereo. Must have 'intrinsic_matrix',
-        'distortion_coeffs', 'translation', 'rotation', etc. 
+        'distortion_coeffs', 'translation', 'rotation', etc.
     use_pybullet_debug : bool
         If True, create debug sliders in PyBullet for a single "virtual" camera.
     show_plot : bool
@@ -61,7 +63,7 @@ class Vision:
         use_pybullet_debug=False,
         show_plot=True,
         logger_name="VisionSystemLogger",
-        physics_client=None
+        physics_client=None,
     ):
         """
         Initializes the Vision system with optional monocular/stereo cameras, PyBullet debug tools, and YOLO object detection.
@@ -104,14 +106,12 @@ class Vision:
                     "fov": 60,
                     "near": 0.1,
                     "far": 5.0,
-                    "intrinsic_matrix": np.array([
-                        [500, 0, 320],
-                        [0, 500, 240],
-                        [0, 0, 1]
-                    ], dtype=np.float32),
+                    "intrinsic_matrix": np.array(
+                        [[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=np.float32
+                    ),
                     "distortion_coeffs": np.zeros(5, dtype=np.float32),
                     "use_opencv": False,
-                    "device_index": 0
+                    "device_index": 0,
                 }
             ]
 
@@ -138,7 +138,7 @@ class Vision:
                 numDisparities=64,
                 blockSize=7,
                 P1=8 * 3 * 7**2,
-                P2=32 * 3 * 7**2
+                P2=32 * 3 * 7**2,
             )
             self.logger.info("✅ Stereo processing enabled.")
 
@@ -159,7 +159,6 @@ class Vision:
             for i, cfg in enumerate(camera_configs):
                 self._configure_camera(i, cfg)
 
-
     # --------------------------------------------------------------------------
     # Logger
     # --------------------------------------------------------------------------
@@ -169,7 +168,9 @@ class Vision:
             logger.setLevel(logging.DEBUG)
             ch = logging.StreamHandler()
             ch.setLevel(logging.DEBUG)
-            fmt = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+            fmt = logging.Formatter(
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            )
             ch.setFormatter(fmt)
             logger.addHandler(ch)
         return logger
@@ -256,23 +257,28 @@ class Vision:
         """
         roll, pitch, yaw = np.radians(euler_deg)
 
-        Rx = np.array([
-            [1, 0,          0         ],
-            [0, np.cos(roll),-np.sin(roll)],
-            [0, np.sin(roll), np.cos(roll)]
-        ], dtype=np.float32)
+        Rx = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(roll), -np.sin(roll)],
+                [0, np.sin(roll), np.cos(roll)],
+            ],
+            dtype=np.float32,
+        )
 
-        Ry = np.array([
-            [ np.cos(pitch), 0, np.sin(pitch)],
-            [            0   , 1,     0       ],
-            [-np.sin(pitch), 0, np.cos(pitch)]
-        ], dtype=np.float32)
+        Ry = np.array(
+            [
+                [np.cos(pitch), 0, np.sin(pitch)],
+                [0, 1, 0],
+                [-np.sin(pitch), 0, np.cos(pitch)],
+            ],
+            dtype=np.float32,
+        )
 
-        Rz = np.array([
-            [np.cos(yaw), -np.sin(yaw), 0],
-            [np.sin(yaw),  np.cos(yaw), 0],
-            [     0      ,       0     , 1]
-        ], dtype=np.float32)
+        Rz = np.array(
+            [[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]],
+            dtype=np.float32,
+        )
 
         # Final rotation: Rz * Ry * Rx
         return Rz @ Ry @ Rx
@@ -286,24 +292,28 @@ class Vision:
         """
         self.dbg_params = {}
         # View matrix sliders
-        self.dbg_params['target_x'] = pb.addUserDebugParameter('target_x', -1, 1, 0)
-        self.dbg_params['target_y'] = pb.addUserDebugParameter('target_y', -1, 1, 0)
-        self.dbg_params['target_z'] = pb.addUserDebugParameter('target_z', -1, 1, 0)
-        self.dbg_params['distance'] = pb.addUserDebugParameter('distance', 0, 10, 2)
-        self.dbg_params['yaw']      = pb.addUserDebugParameter('yaw', -180, 180, 0)
-        self.dbg_params['pitch']    = pb.addUserDebugParameter('pitch', -180, 180, -40)
-        self.dbg_params['roll']     = pb.addUserDebugParameter('roll', -180, 180, 0)
-        self.dbg_params['upAxisIndex'] = pb.addUserDebugParameter('upAxisIndex', 0, 1, 1)
+        self.dbg_params["target_x"] = pb.addUserDebugParameter("target_x", -1, 1, 0)
+        self.dbg_params["target_y"] = pb.addUserDebugParameter("target_y", -1, 1, 0)
+        self.dbg_params["target_z"] = pb.addUserDebugParameter("target_z", -1, 1, 0)
+        self.dbg_params["distance"] = pb.addUserDebugParameter("distance", 0, 10, 2)
+        self.dbg_params["yaw"] = pb.addUserDebugParameter("yaw", -180, 180, 0)
+        self.dbg_params["pitch"] = pb.addUserDebugParameter("pitch", -180, 180, -40)
+        self.dbg_params["roll"] = pb.addUserDebugParameter("roll", -180, 180, 0)
+        self.dbg_params["upAxisIndex"] = pb.addUserDebugParameter(
+            "upAxisIndex", 0, 1, 1
+        )
 
         # Projection matrix sliders
-        self.dbg_params['width']   = pb.addUserDebugParameter('width',  100, 1000, 320)
-        self.dbg_params['height']  = pb.addUserDebugParameter('height', 100, 1000, 240)
-        self.dbg_params['fov']     = pb.addUserDebugParameter('fov', 1, 180, 60)
-        self.dbg_params['near_val']= pb.addUserDebugParameter('near_val', 1e-3, 1.0, 0.1)
-        self.dbg_params['far_val'] = pb.addUserDebugParameter('far_val', 1.0, 50.0, 5.0)
+        self.dbg_params["width"] = pb.addUserDebugParameter("width", 100, 1000, 320)
+        self.dbg_params["height"] = pb.addUserDebugParameter("height", 100, 1000, 240)
+        self.dbg_params["fov"] = pb.addUserDebugParameter("fov", 1, 180, 60)
+        self.dbg_params["near_val"] = pb.addUserDebugParameter(
+            "near_val", 1e-3, 1.0, 0.1
+        )
+        self.dbg_params["far_val"] = pb.addUserDebugParameter("far_val", 1.0, 50.0, 5.0)
 
         # Print button
-        self.dbg_params['print']   = pb.addUserDebugParameter('print_params', 1, 0, 1)
+        self.dbg_params["print"] = pb.addUserDebugParameter("print_params", 1, 0, 1)
         self.old_print_val = 1
 
     def _get_pybullet_view_proj(self):
@@ -313,33 +323,33 @@ class Vision:
         vals = read_debug_parameters(self.dbg_params)
 
         # Build view matrix
-        target_pos = [vals['target_x'], vals['target_y'], vals['target_z']]
-        up_axis_idx = int(vals['upAxisIndex'])
+        target_pos = [vals["target_x"], vals["target_y"], vals["target_z"]]
+        up_axis_idx = int(vals["upAxisIndex"])
         view_mtx = pb.computeViewMatrixFromYawPitchRoll(
             cameraTargetPosition=target_pos,
-            distance=vals['distance'],
-            yaw=vals['yaw'],
-            pitch=vals['pitch'],
-            roll=vals['roll'],
-            upAxisIndex=up_axis_idx
+            distance=vals["distance"],
+            yaw=vals["yaw"],
+            pitch=vals["pitch"],
+            roll=vals["roll"],
+            upAxisIndex=up_axis_idx,
         )
 
         # Build projection matrix
-        width = int(vals['width'])
-        height = int(vals['height'])
+        width = int(vals["width"])
+        height = int(vals["height"])
         aspect = width / float(height)
         proj_mtx = pb.computeProjectionMatrixFOV(
-            fov=vals['fov'],
+            fov=vals["fov"],
             aspect=aspect,
-            nearVal=vals['near_val'],
-            farVal=vals['far_val']
+            nearVal=vals["near_val"],
+            farVal=vals["far_val"],
         )
 
         # Debug print if button clicked
-        if self.old_print_val != vals['print']:
-            self.old_print_val = vals['print']
-            vm_np = np.array(view_mtx).reshape((4,4), order='F')
-            pm_np = np.array(proj_mtx).reshape((4,4), order='F')
+        if self.old_print_val != vals["print"]:
+            self.old_print_val = vals["print"]
+            vm_np = np.array(view_mtx).reshape((4, 4), order="F")
+            pm_np = np.array(proj_mtx).reshape((4, 4), order="F")
             self.logger.info("===== PYBULLET DEBUG CAMERA PARAMS =====")
             self.logger.info(f"View Matrix:\n{vm_np}")
             self.logger.info(f"Projection Matrix:\n{pm_np}")
@@ -367,13 +377,13 @@ class Vision:
         view_matrix = pb.computeViewMatrix(
             cameraEyePosition=cfg["translation"],
             cameraTargetPosition=target,
-            cameraUpVector=up_vector
+            cameraUpVector=up_vector,
         )
         proj_matrix = pb.computeProjectionMatrixFOV(
             fov=cfg["fov"],
             aspect=width / float(height),
             nearVal=cfg["near"],
-            farVal=cfg["far"]
+            farVal=cfg["far"],
         )
 
         _, _, rgba, depth_buf, _ = pb.getCameraImage(
@@ -389,13 +399,13 @@ class Vision:
 
         return rgb, depth
 
-
-
     # --------------------------------------------------------------------------
     # Basic Obstacle Detection
     # --------------------------------------------------------------------------
 
-    def detect_obstacles(self, depth_image, rgb_image, depth_threshold=0.0, camera_index=0, step=5):
+    def detect_obstacles(
+        self, depth_image, rgb_image, depth_threshold=0.0, camera_index=0, step=5
+    ):
         """
         Detects obstacles using YOLO for object detection + median depth for 3D positioning.
         Returns positions and orientations (in the XY plane).
@@ -435,8 +445,14 @@ class Vision:
             # 3. Approximate 3D position using the bounding box center
             cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
 
-            fx, fy = self.cameras[camera_index]["intrinsic_matrix"][0, 0], self.cameras[camera_index]["intrinsic_matrix"][1, 1]
-            cx_intrinsic, cy_intrinsic = self.cameras[camera_index]["intrinsic_matrix"][0, 2], self.cameras[camera_index]["intrinsic_matrix"][1, 2]
+            fx, fy = (
+                self.cameras[camera_index]["intrinsic_matrix"][0, 0],
+                self.cameras[camera_index]["intrinsic_matrix"][1, 1],
+            )
+            cx_intrinsic, cy_intrinsic = (
+                self.cameras[camera_index]["intrinsic_matrix"][0, 2],
+                self.cameras[camera_index]["intrinsic_matrix"][1, 2],
+            )
 
             x_cam = (cx - cx_intrinsic) * mean_depth / fx
             y_cam = (cy - cy_intrinsic) * mean_depth / fy
@@ -452,8 +468,6 @@ class Vision:
             return np.empty((0, 3)), np.array([])
 
         return np.array(positions), np.array(orientations)
-
-
 
     # --------------------------------------------------------------------------
     # Stereo Methods
@@ -471,7 +485,9 @@ class Vision:
         D2 = self.right_cam_cfg["distortion_coeffs"]
 
         # Build rotation/translation between left & right
-        R_l = euler_to_rotation_matrix(self.left_cam_cfg["rotation"])  # might be float32
+        R_l = euler_to_rotation_matrix(
+            self.left_cam_cfg["rotation"]
+        )  # might be float32
         t_l = np.array(self.left_cam_cfg["translation"], dtype=np.float32)
         R_r = euler_to_rotation_matrix(self.right_cam_cfg["rotation"])
         t_r = np.array(self.right_cam_cfg["translation"], dtype=np.float32)
@@ -488,11 +504,15 @@ class Vision:
 
         # Now call stereoRectify with consistent 64-bit floats
         R1, R2, P1, P2, Q, _, _ = cv2.stereoRectify(
-            cameraMatrix1=K1, distCoeffs1=D1,
-            cameraMatrix2=K2, distCoeffs2=D2,
+            cameraMatrix1=K1,
+            distCoeffs1=D1,
+            cameraMatrix2=K2,
+            distCoeffs2=D2,
             imageSize=image_size,
-            R=R_lr, T=t_lr,
-            flags=cv2.CALIB_ZERO_DISPARITY, alpha=0
+            R=R_lr,
+            T=t_lr,
+            flags=cv2.CALIB_ZERO_DISPARITY,
+            alpha=0,
         )
 
         # Generate undistort rectification maps (still fine to use float32 maps)
@@ -505,10 +525,6 @@ class Vision:
         self.Q = Q
         self.logger.info("Stereo rectification maps computed successfully.")
 
-
-
-
-
     def rectify_stereo_images(self, left_img, right_img):
         """
         Remap left and right images to their rectified forms.
@@ -516,10 +532,16 @@ class Vision:
         if not self.stereo_enabled:
             raise RuntimeError("Stereo is disabled; cannot rectify images.")
         if self.left_map_x is None or self.right_map_x is None:
-            raise RuntimeError("Rectification maps not computed. Call compute_stereo_rectification_maps first.")
+            raise RuntimeError(
+                "Rectification maps not computed. Call compute_stereo_rectification_maps first."
+            )
 
-        left_rect = cv2.remap(left_img, self.left_map_x, self.left_map_y, cv2.INTER_LINEAR)
-        right_rect = cv2.remap(right_img, self.right_map_x, self.right_map_y, cv2.INTER_LINEAR)
+        left_rect = cv2.remap(
+            left_img, self.left_map_x, self.left_map_y, cv2.INTER_LINEAR
+        )
+        right_rect = cv2.remap(
+            right_img, self.right_map_x, self.right_map_y, cv2.INTER_LINEAR
+        )
         return left_rect, right_rect
 
     def compute_disparity(self, left_rect, right_rect):
@@ -527,7 +549,9 @@ class Vision:
         Compute a disparity map from rectified stereo images using StereoSGBM (or BM).
         """
         if self.stereo_matcher is None:
-            raise RuntimeError("Stereo matcher not initialized (stereo configs missing).")
+            raise RuntimeError(
+                "Stereo matcher not initialized (stereo configs missing)."
+            )
 
         # Convert to grayscale if needed
         if len(left_rect.shape) == 3:
@@ -535,8 +559,10 @@ class Vision:
         if len(right_rect.shape) == 3:
             right_rect = cv2.cvtColor(right_rect, cv2.COLOR_BGR2GRAY)
 
-        disparity = self.stereo_matcher.compute(left_rect, right_rect).astype(np.float32)
-        # Most OpenCV stereo matchers produce fixed-point disparities in Q16. 
+        disparity = self.stereo_matcher.compute(left_rect, right_rect).astype(
+            np.float32
+        )
+        # Most OpenCV stereo matchers produce fixed-point disparities in Q16.
         # Typically we divide by 16.0 to get real disparity values:
         disparity /= 16.0
 
@@ -547,7 +573,9 @@ class Vision:
         Reproject a disparity map to 3D points using the Q matrix from stereoRectify.
         """
         if self.Q is None:
-            raise RuntimeError("No Q matrix found. Did you call compute_stereo_rectification_maps?")
+            raise RuntimeError(
+                "No Q matrix found. Did you call compute_stereo_rectification_maps?"
+            )
 
         points_3D = cv2.reprojectImageTo3D(disparity, self.Q)
         h, w, _ = points_3D.shape
@@ -565,7 +593,9 @@ class Vision:
         High-level pipeline: rectify, compute disparity, reproject to 3D.
         """
         if not self.stereo_enabled:
-            raise RuntimeError("Stereo is not enabled. Provide stereo_configs in constructor.")
+            raise RuntimeError(
+                "Stereo is not enabled. Provide stereo_configs in constructor."
+            )
 
         left_rect, right_rect = self.rectify_stereo_images(left_img, right_img)
         disparity = self.compute_disparity(left_rect, right_rect)
@@ -589,7 +619,7 @@ class Vision:
         Destructor: ensure we release resources gracefully.
         """
         try:
-            if hasattr(self, 'logger') and self.logger:
+            if hasattr(self, "logger") and self.logger:
                 self.logger.debug("Vision destructor called; releasing resources.")
             self.release()
         except Exception:

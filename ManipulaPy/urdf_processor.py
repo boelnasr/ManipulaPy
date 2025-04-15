@@ -9,6 +9,7 @@ from .kinematics import SerialManipulator
 from .dynamics import ManipulatorDynamics
 from . import utils
 
+
 class URDFToSerialManipulator:
     """
     A class to convert URDF files to SerialManipulator objects and simulate them using PyBullet.
@@ -20,7 +21,7 @@ class URDFToSerialManipulator:
 
         Parameters:
             urdf_name (str): The name of the URDF file.
-            use_pybullet_limits (bool): Whether to override URDF or default joint limits 
+            use_pybullet_limits (bool): Whether to override URDF or default joint limits
                                         with those from PyBullet.
         """
         self.urdf_name = urdf_name
@@ -38,8 +39,7 @@ class URDFToSerialManipulator:
             # If not using PyBullet, fallback to a default
             # (Here, we just fill with (-π, π); adapt as needed)
             self.robot_data["joint_limits"] = [
-                (-np.pi, np.pi)
-                for _ in range(self.robot_data["actuated_joints_num"])
+                (-np.pi, np.pi) for _ in range(self.robot_data["actuated_joints_num"])
             ]
 
         # 3. Create SerialManipulator and dynamics
@@ -89,10 +89,12 @@ class URDFToSerialManipulator:
           - DOF count
         """
         robot = URDF.load(urdf_name)
-        joint_num = len([joint for joint in robot.actuated_joints if joint.joint_type != "fixed"])
+        joint_num = len(
+            [joint for joint in robot.actuated_joints if joint.joint_type != "fixed"]
+        )
 
-        p_ = []       # Joint positions
-        w_ = []       # Joint rotation axes
+        p_ = []  # Joint positions
+        w_ = []  # Joint rotation axes
         M_list = np.eye(4)
         Glist = []
 
@@ -186,8 +188,6 @@ class URDFToSerialManipulator:
         # We'll simply return what we found:
         return joint_limits
 
-
-
     def initialize_serial_manipulator(self) -> SerialManipulator:
         """
         Initializes a SerialManipulator object using the extracted URDF data.
@@ -208,9 +208,8 @@ class URDFToSerialManipulator:
             S_list=data["Slist"],
             B_list=data["Blist"],
             G_list=data["Glist"],
-            joint_limits=jlimits
+            joint_limits=jlimits,
         )
-
 
     def initialize_manipulator_dynamics(self):
         """
@@ -279,7 +278,4 @@ class URDFToSerialManipulator:
         """
         joint_names = [joint.name for joint in self.robot.joints]
         # Return them in a list or dictionary, no printing
-        return {
-            "num_joints": len(joint_names),
-            "joint_names": joint_names
-        }
+        return {"num_joints": len(joint_names), "joint_names": joint_names}

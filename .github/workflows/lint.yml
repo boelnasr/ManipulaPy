@@ -1,0 +1,37 @@
+name: Lint with flake8 and black
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  lint:
+    name: Code Linting
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black
+    - name: Run flake8
+      run: |
+        echo "🔍 Running flake8..."
+        flake8 ManipulaPy tests --max-line-length=88 --ignore=F405,E741,F841,E265,F811
+      continue-on-error: false
+    - name: Run black check
+      run: |
+        echo "🎨 Checking black formatting..."
+        black --check ManipulaPy tests
+      continue-on-error: false
+    - name: Formatting Reminder (if previous steps failed)
+      if: failure()
+      run: |
+        echo "::warning::Linting failed. Run the following commands locally to fix:"
+        echo "  black ManipulaPy tests"
+        echo "  flake8 ManipulaPy tests --max-line-length=88 --ignore=F405,E741,F841,E265,F811"

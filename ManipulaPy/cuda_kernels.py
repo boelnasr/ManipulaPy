@@ -1,8 +1,11 @@
 from numba import cuda, float32
 import numpy as np
 
+
 @cuda.jit
-def trajectory_kernel(thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method):
+def trajectory_kernel(
+    thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
+):
     """
     CUDA kernel to compute positions, velocities, and accelerations using cubic or quintic time scaling.
     """
@@ -25,10 +28,20 @@ def trajectory_kernel(thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N,
             traj_vel[idx, j] = s_dot * (thetaend[j] - thetastart[j])
             traj_acc[idx, j] = s_ddot * (thetaend[j] - thetastart[j])
 
+
 @cuda.jit
 def inverse_dynamics_kernel(
-    thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector, Ftip,
-    Glist, Slist, M, torques_trajectory, torque_limits):
+    thetalist_trajectory,
+    dthetalist_trajectory,
+    ddthetalist_trajectory,
+    gravity_vector,
+    Ftip,
+    Glist,
+    Slist,
+    M,
+    torques_trajectory,
+    torque_limits,
+):
     """
     Computes the inverse dynamics of a robot manipulator given the joint angle, velocity, and acceleration trajectories,
     as well as the external forces acting on the end-effector.
@@ -44,7 +57,9 @@ def inverse_dynamics_kernel(
         for i in range(len(thetalist)):
             for row in range(6):
                 for col in range(6):
-                    M_temp[row, col] += Glist[i, row, col]  # Simplified for demonstration
+                    M_temp[row, col] += Glist[
+                        i, row, col
+                    ]  # Simplified for demonstration
 
         # Velocity quadratic forces computation
         c_temp = cuda.local.array(6, dtype=float32)
@@ -70,13 +85,29 @@ def inverse_dynamics_kernel(
             tau_temp[row] += c_temp[row] + g_temp[row] + F_ext[row]
         for j in range(len(tau_temp)):
             # Enforce torque limits
-            tau_temp[j] = max(torque_limits[j, 0], min(tau_temp[j], torque_limits[j, 1]))
+            tau_temp[j] = max(
+                torque_limits[j, 0], min(tau_temp[j], torque_limits[j, 1])
+            )
             torques_trajectory[idx, j] = tau_temp[j]
+
 
 @cuda.jit
 def forward_dynamics_kernel(
-    thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes,
-    Glist, Slist, M, thetamat, dthetamat, ddthetamat, joint_limits):
+    thetalist,
+    dthetalist,
+    taumat,
+    g,
+    Ftipmat,
+    dt,
+    intRes,
+    Glist,
+    Slist,
+    M,
+    thetamat,
+    dthetamat,
+    ddthetamat,
+    joint_limits,
+):
     """
     CUDA kernel to compute forward dynamics for a robotic system.
     """
@@ -105,7 +136,11 @@ def forward_dynamics_kernel(
 
             # Compute joint accelerations
             for i in range(len(thetalist)):
-                ddthetalist_local[i] = (current_tau[i] - c_temp[i] - g_temp[i]) / M_temp[i, i]  # Simplified
+                ddthetalist_local[i] = (
+                    current_tau[i] - c_temp[i] - g_temp[i]
+                ) / M_temp[
+                    i, i
+                ]  # Simplified
 
             # Integrate to get velocities and positions
             for i in range(len(thetalist)):
@@ -114,7 +149,9 @@ def forward_dynamics_kernel(
 
             # Enforce joint limits
             for i in range(len(thetalist)):
-                current_thetalist[i] = max(joint_limits[i, 0], min(current_thetalist[i], joint_limits[i, 1]))
+                current_thetalist[i] = max(
+                    joint_limits[i, 0], min(current_thetalist[i], joint_limits[i, 1])
+                )
 
         # Store results
         for i in range(len(thetalist)):
@@ -122,8 +159,11 @@ def forward_dynamics_kernel(
             dthetamat[idx, i] = current_dthetalist[i]
             ddthetamat[idx, i] = ddthetalist_local[i]
 
+
 @cuda.jit
-def cartesian_trajectory_kernel(pstart, pend, traj_pos, traj_vel, traj_acc, Tf, N, method):
+def cartesian_trajectory_kernel(
+    pstart, pend, traj_pos, traj_vel, traj_acc, Tf, N, method
+):
     """
     CUDA kernel to compute Cartesian trajectory positions, velocities, and accelerations.
     """
@@ -146,6 +186,7 @@ def cartesian_trajectory_kernel(pstart, pend, traj_pos, traj_vel, traj_acc, Tf, 
             traj_vel[idx, j] = s_dot * (pend[j] - pstart[j])
             traj_acc[idx, j] = s_ddot * (pend[j] - pstart[j])
 
+
 @cuda.jit
 def attractive_potential_kernel(positions, goal, potential):
     """
@@ -154,7 +195,8 @@ def attractive_potential_kernel(positions, goal, potential):
     idx = cuda.grid(1)
     if idx < positions.shape[0]:
         for i in range(3):
-            potential[idx] += 0.5 * (positions[idx, i] - goal[i])**2
+            potential[idx] += 0.5 * (positions[idx, i] - goal[i]) ** 2
+
 
 @cuda.jit
 def repulsive_potential_kernel(positions, obstacles, potential, influence_distance):
@@ -166,11 +208,12 @@ def repulsive_potential_kernel(positions, obstacles, potential, influence_distan
         for obs in range(obstacles.shape[0]):
             dist = 0
             for i in range(3):
-                dist += (positions[idx, i] - obstacles[obs, i])**2
+                dist += (positions[idx, i] - obstacles[obs, i]) ** 2
             dist = np.sqrt(dist)
             if dist < influence_distance:
                 for i in range(3):
-                    potential[idx] += 0.5 * (1/dist - 1/influence_distance)**2
+                    potential[idx] += 0.5 * (1 / dist - 1 / influence_distance) ** 2
+
 
 @cuda.jit
 def gradient_kernel(potential, gradient):

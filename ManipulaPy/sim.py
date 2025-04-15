@@ -11,8 +11,17 @@ import time
 import logging
 import matplotlib.pyplot as plt
 
+
 class Simulation:
-    def __init__(self, urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0,physics_client=None):
+    def __init__(
+        self,
+        urdf_file_path,
+        joint_limits,
+        torque_limits=None,
+        time_step=0.01,
+        real_time_factor=1.0,
+        physics_client=None,
+    ):
         self.urdf_file_path = urdf_file_path
         self.joint_limits = joint_limits
         self.torque_limits = torque_limits
@@ -29,15 +38,16 @@ class Simulation:
         """
         Sets up the logger for the simulation.
         """
-        logger = logging.getLogger('SimulationLogger')
+        logger = logging.getLogger("SimulationLogger")
         logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
         ch.setFormatter(formatter)
         logger.addHandler(ch)
         return logger
-
 
     def connect_simulation(self):
         """
@@ -50,7 +60,6 @@ class Simulation:
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(self.time_step)
-
 
     def disconnect_simulation(self):
         """
@@ -81,45 +90,53 @@ class Simulation:
 
             # Identify non-fixed joints
             self.non_fixed_joints = [
-                i for i in range(p.getNumJoints(self.robot_id))
+                i
+                for i in range(p.getNumJoints(self.robot_id))
                 if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
             ]
             self.home_position = np.zeros(len(self.non_fixed_joints))
         else:
             print("Simulation already initialized.")
 
-
     def initialize_robot(self):
         """
         Initializes the robot using the URDF processor.
         """
         # Only skip URDF processing if self.robot is already set.
-        if hasattr(self, 'robot') and self.robot is not None:
+        if hasattr(self, "robot") and self.robot is not None:
             self.logger.warning("Robot already initialized. Skipping URDF processing.")
         else:
             # Even if self.robot_id is already set from setup_simulation(),
             # we need to process the URDF to set self.robot and self.dynamics.
-            if not (hasattr(self, 'robot_id') and self.robot_id is not None):
-                self.robot_id = p.loadURDF(self.urdf_file_path, [0, 0, 0.1], useFixedBase=True)
+            if not (hasattr(self, "robot_id") and self.robot_id is not None):
+                self.robot_id = p.loadURDF(
+                    self.urdf_file_path, [0, 0, 0.1], useFixedBase=True
+                )
             # Process the URDF to generate the robot model and dynamics.
             from ManipulaPy.urdf_processor import URDFToSerialManipulator
+
             urdf_processor = URDFToSerialManipulator(self.urdf_file_path)
             self.robot = urdf_processor.serial_manipulator
             self.dynamics = urdf_processor.dynamics
             # Identify non-fixed joints
             self.non_fixed_joints = [
-                i for i in range(p.getNumJoints(self.robot_id))
+                i
+                for i in range(p.getNumJoints(self.robot_id))
                 if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
             ]
             self.home_position = np.zeros(len(self.non_fixed_joints))
-
-
 
     def initialize_planner_and_controller(self):
         """
         Initializes the trajectory planner and the manipulator controller.
         """
-        self.trajectory_planner = tp(self.robot, self.urdf_file_path, self.dynamics, self.joint_limits, self.torque_limits)
+        self.trajectory_planner = tp(
+            self.robot,
+            self.urdf_file_path,
+            self.dynamics,
+            self.joint_limits,
+            self.torque_limits,
+        )
         self.controller = ManipulatorController(self.dynamics)
 
     def add_joint_parameters(self):
@@ -128,7 +145,12 @@ class Simulation:
         """
         if not self.joint_params:
             for i, joint_index in enumerate(self.non_fixed_joints):
-                param_id = p.addUserDebugParameter(f'Joint {joint_index}', self.joint_limits[i][0], self.joint_limits[i][1], 0)
+                param_id = p.addUserDebugParameter(
+                    f"Joint {joint_index}",
+                    self.joint_limits[i][0],
+                    self.joint_limits[i][1],
+                    0,
+                )
                 self.joint_params.append(param_id)
 
     def add_reset_button(self):
@@ -149,14 +171,16 @@ class Simulation:
             self.robot_id,
             self.non_fixed_joints,
             p.POSITION_CONTROL,
-            targetPositions=joint_positions
+            targetPositions=joint_positions,
         )
 
     def get_joint_positions(self):
         """
         Gets the current joint positions of the robot.
         """
-        joint_positions = [p.getJointState(self.robot_id, i)[0] for i in self.non_fixed_joints]
+        joint_positions = [
+            p.getJointState(self.robot_id, i)[0] for i in self.non_fixed_joints
+        ]
         return np.array(joint_positions)
 
     def run_trajectory(self, joint_trajectory):
@@ -188,15 +212,34 @@ class Simulation:
             for j in range(line_width):
                 try:
                     p.addUserDebugLine(
-                        lineFromXYZ=[ee_positions[i-1][0] + j * 0.005, ee_positions[i-1][1], ee_positions[i-1][2]],
-                        lineToXYZ=[ee_positions[i][0] + j * 0.005, ee_positions[i][1], ee_positions[i][2]],
+                        lineFromXYZ=[
+                            ee_positions[i - 1][0] + j * 0.005,
+                            ee_positions[i - 1][1],
+                            ee_positions[i - 1][2],
+                        ],
+                        lineToXYZ=[
+                            ee_positions[i][0] + j * 0.005,
+                            ee_positions[i][1],
+                            ee_positions[i][2],
+                        ],
                         lineColorRGB=color,
-                        lifeTime=0  # Set to 0 for the line to remain indefinitely
+                        lifeTime=0,  # Set to 0 for the line to remain indefinitely
                     )
                 except Exception as e:
                     self.logger.error(f"Failed to add user debug line: {e}")
 
-    def run_controller(self, controller, desired_positions, desired_velocities, desired_accelerations, g, Ftip, Kp, Ki, Kd):
+    def run_controller(
+        self,
+        controller,
+        desired_positions,
+        desired_velocities,
+        desired_accelerations,
+        g,
+        Ftip,
+        Kp,
+        Ki,
+        Kd,
+    ):
         """
         Runs the controller with the specified parameters.
         """
@@ -216,10 +259,13 @@ class Simulation:
                 dt=self.time_step,
                 Kp=cp.array(Kp),
                 Ki=cp.array(Ki),
-                Kd=cp.array(Kd)
+                Kd=cp.array(Kd),
             )
 
-            self.set_joint_positions(cp.asnumpy(current_positions) + cp.asnumpy(control_signal) * self.time_step)
+            self.set_joint_positions(
+                cp.asnumpy(current_positions)
+                + cp.asnumpy(control_signal) * self.time_step
+            )
             current_positions = self.get_joint_positions()
             current_velocities = cp.asnumpy(control_signal) / self.time_step
 
@@ -276,10 +322,10 @@ class Simulation:
             self.non_fixed_joints,
             p.POSITION_CONTROL,
             targetPositions=desired_angles,
-            forces=[1000]*len(desired_angles)
+            forces=[1000] * len(desired_angles),
         )
 
-        time_step = 0.00001 
+        time_step = 0.00001
         p.setTimeStep(time_step)
         try:
             while True:
@@ -302,7 +348,9 @@ class Simulation:
         Checks for collisions in the simulation and logs them.
         """
         if self.robot_id is None:
-            self.logger.warning("Cannot check for collisions before simulation is started.")
+            self.logger.warning(
+                "Cannot check for collisions before simulation is started."
+            )
             return
         for i in self.non_fixed_joints:
             contact_points = p.getContactPoints(self.robot_id, self.robot_id, i)
@@ -323,11 +371,12 @@ class Simulation:
         """
         Adds additional GUI parameters for controlling physics properties like gravity and time step.
         """
-        if not hasattr(self, 'gravity_param'):
+        if not hasattr(self, "gravity_param"):
             self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
-        if not hasattr(self, 'time_step_param'):
-            self.time_step_param = p.addUserDebugParameter("Time Step", 0.001, 0.1, self.time_step)
-
+        if not hasattr(self, "time_step_param"):
+            self.time_step_param = p.addUserDebugParameter(
+                "Time Step", 0.001, 0.1, self.time_step
+            )
 
     def update_simulation_parameters(self):
         """
@@ -347,7 +396,7 @@ class Simulation:
         if not self.joint_params:
             self.add_joint_parameters()  # Ensure sliders are created
         self.add_additional_parameters()  # Additional controls like gravity and time step
-        
+
         # Add reset button if it doesn't exist
         if self.reset_button is None:
             self.add_reset_button()
@@ -356,7 +405,9 @@ class Simulation:
             while True:
                 joint_positions = self.get_joint_parameters()
                 if len(joint_positions) != len(self.non_fixed_joints):
-                    raise ValueError(f"Number of joint positions ({len(joint_positions)}) does not match number of non-fixed joints ({len(self.non_fixed_joints)}).")
+                    raise ValueError(
+                        f"Number of joint positions ({len(joint_positions)}) does not match number of non-fixed joints ({len(self.non_fixed_joints)})."
+                    )
                 self.set_joint_positions(joint_positions)
                 self.check_collisions()  # Check for collisions in each step
                 self.update_simulation_parameters()  # Update simulation parameters
@@ -365,14 +416,16 @@ class Simulation:
                 time.sleep(self.time_step / self.real_time_factor)
 
                 # Check if reset button exists before reading it
-                if self.reset_button is not None and p.readUserDebugParameter(self.reset_button) == 1:
+                if (
+                    self.reset_button is not None
+                    and p.readUserDebugParameter(self.reset_button) == 1
+                ):
                     self.logger.info("Resetting simulation state...")
                     self.set_joint_positions(self.home_position)
                     break  # Exit manual control to restart trajectory loop
         except KeyboardInterrupt:
             print("Manual control stopped by user.")
             self.logger.info("Manual control stopped.")
-
 
     def save_joint_states(self, filename="joint_states.csv"):
         """
@@ -381,12 +434,16 @@ class Simulation:
         Args:
             filename (str): The filename for the CSV file.
         """
-        joint_states = [p.getJointState(self.robot_id, i) for i in self.non_fixed_joints]
+        joint_states = [
+            p.getJointState(self.robot_id, i) for i in self.non_fixed_joints
+        ]
         positions = [state[0] for state in joint_states]
         velocities = [state[1] for state in joint_states]
 
         data = np.column_stack((positions, velocities))
-        np.savetxt(filename, data, delimiter=",", header="Position,Velocity", comments="")
+        np.savetxt(
+            filename, data, delimiter=",", header="Position,Velocity", comments=""
+        )
         self.logger.info(f"Joint states saved to {filename}.")
 
     def plot_trajectory_in_scene(self, joint_trajectory, end_effector_trajectory):
@@ -397,11 +454,16 @@ class Simulation:
         ee_positions = np.array(end_effector_trajectory)
 
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.plot(ee_positions[:, 0], ee_positions[:, 1], ee_positions[:, 2], label='End-Effector Trajectory')
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
+        ax = fig.add_subplot(111, projection="3d")
+        ax.plot(
+            ee_positions[:, 0],
+            ee_positions[:, 1],
+            ee_positions[:, 2],
+            label="End-Effector Trajectory",
+        )
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z")
         plt.legend()
         plt.show()
 
@@ -412,17 +474,21 @@ class Simulation:
         """
         Adds additional GUI parameters for controlling physics properties.
         """
-        if not hasattr(self, 'gravity_param'):
+        if not hasattr(self, "gravity_param"):
             self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
-        if not hasattr(self, 'time_step_param'):
-            self.time_step_param = p.addUserDebugParameter("Time Step", 0.001, 0.1, self.time_step)
+        if not hasattr(self, "time_step_param"):
+            self.time_step_param = p.addUserDebugParameter(
+                "Time Step", 0.001, 0.1, self.time_step
+            )
 
     def update_simulation_parameters(self):
         """
         Updates simulation parameters from GUI controls.
         """
-        if not hasattr(self, 'gravity_param') or not hasattr(self, 'time_step_param'):
-            self.logger.warning("GUI parameters for gravity and time step are not initialized.")
+        if not hasattr(self, "gravity_param") or not hasattr(self, "time_step_param"):
+            self.logger.warning(
+                "GUI parameters for gravity and time step are not initialized."
+            )
             return
 
         gravity = p.readUserDebugParameter(self.gravity_param)
@@ -431,41 +497,37 @@ class Simulation:
         p.setTimeStep(time_step)
         self.time_step = time_step
 
-
-
     def run(self, joint_trajectory):
         """
         Main loop for running the simulation.
         """
         try:
             reset_pressed = False
-            mode = 'trajectory'  # Mode can be 'trajectory' or 'manual'
+            mode = "trajectory"  # Mode can be 'trajectory' or 'manual'
 
             while True:
-                if mode == 'trajectory':
+                if mode == "trajectory":
                     end_pos = self.run_trajectory(joint_trajectory)
                     self.logger.info("Trajectory completed. Waiting for reset...")
-                    mode = 'wait_reset'
+                    mode = "wait_reset"
 
-                while mode == 'wait_reset' and not reset_pressed:
+                while mode == "wait_reset" and not reset_pressed:
                     p.stepSimulation()
                     time.sleep(0.01)
 
                     if p.readUserDebugParameter(self.reset_button) > 0:
-                        self.logger.info("Reset button pressed. Returning to home position and entering manual control...")
+                        self.logger.info(
+                            "Reset button pressed. Returning to home position and entering manual control..."
+                        )
                         self.set_joint_positions(self.home_position)
-                        mode = 'manual'
+                        mode = "manual"
                         break
 
-                if mode == 'manual':
+                if mode == "manual":
                     self.manual_control()
                     reset_pressed = False  # Reset the flag to restart the trajectory
-                    mode = 'trajectory'  # Go back to trajectory mode
+                    mode = "trajectory"  # Go back to trajectory mode
 
         except KeyboardInterrupt:
             self.logger.info("Simulation stopped by user.")
             self.close_simulation()
-
-
-
-

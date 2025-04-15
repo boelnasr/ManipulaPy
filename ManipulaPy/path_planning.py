@@ -12,19 +12,28 @@ from .utils import (
     QuinticTimeScaling,
 )
 from urchin.urdf import URDF
-from .cuda_kernels import trajectory_kernel, inverse_dynamics_kernel, forward_dynamics_kernel, cartesian_trajectory_kernel
+from .cuda_kernels import (
+    trajectory_kernel,
+    inverse_dynamics_kernel,
+    forward_dynamics_kernel,
+    cartesian_trajectory_kernel,
+)
 from .potential_field import CollisionChecker, PotentialField
 import logging
 
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+
 class TrajectoryPlanning:
-    def __init__(self, serial_manipulator, urdf_path, dynamics, joint_limits, torque_limits=None):
+    def __init__(
+        self, serial_manipulator, urdf_path, dynamics, joint_limits, torque_limits=None
+    ):
         """
         Initializes a TrajectoryPlanning object.
 
@@ -82,7 +91,14 @@ class TrajectoryPlanning:
 
         try:
             trajectory_kernel[blocks_per_grid, threads_per_block](
-                d_thetastart, d_thetaend, d_traj_pos, d_traj_vel, d_traj_acc, Tf, N, method
+                d_thetastart,
+                d_thetaend,
+                d_traj_pos,
+                d_traj_vel,
+                d_traj_acc,
+                Tf,
+                N,
+                method,
             )
 
             d_traj_pos.copy_to_host(traj_pos)
@@ -109,7 +125,9 @@ class TrajectoryPlanning:
         for idx, step in enumerate(traj_pos):
             if self.collision_checker.check_collision(step):
                 for _ in range(100):  # Max iterations to adjust trajectory
-                    gradient = self.potential_field.compute_gradient(step, q_goal, obstacles)
+                    gradient = self.potential_field.compute_gradient(
+                        step, q_goal, obstacles
+                    )
                     step -= 0.01 * gradient  # Adjust step size as needed
                     if not self.collision_checker.check_collision(step):
                         break
@@ -121,9 +139,14 @@ class TrajectoryPlanning:
             "accelerations": traj_acc,
         }
 
-
     def inverse_dynamics_trajectory(
-        self, thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector=None, Ftip=None):
+        self,
+        thetalist_trajectory,
+        dthetalist_trajectory,
+        ddthetalist_trajectory,
+        gravity_vector=None,
+        Ftip=None,
+    ):
         """
         Compute joint torques with enforced torque limits based on a trajectory using CUDA acceleration.
 
@@ -162,19 +185,30 @@ class TrajectoryPlanning:
         d_torque_limits = cuda.to_device(self.torque_limits)
 
         inverse_dynamics_kernel[blocks_per_grid, threads_per_block](
-            d_thetalist_trajectory, d_dthetalist_trajectory, d_ddthetalist_trajectory,
-            d_gravity_vector, d_Ftip, d_Glist, d_Slist, d_M, d_torques_trajectory, d_torque_limits)
+            d_thetalist_trajectory,
+            d_dthetalist_trajectory,
+            d_ddthetalist_trajectory,
+            d_gravity_vector,
+            d_Ftip,
+            d_Glist,
+            d_Slist,
+            d_M,
+            d_torques_trajectory,
+            d_torque_limits,
+        )
 
         d_torques_trajectory.copy_to_host(torques_trajectory)
 
         if self.torque_limits is not None:
             torques_trajectory = np.clip(
-                torques_trajectory, self.torque_limits[:, 0], self.torque_limits[:, 1])
+                torques_trajectory, self.torque_limits[:, 0], self.torque_limits[:, 1]
+            )
 
         return torques_trajectory
 
     def forward_dynamics_trajectory(
-        self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes):
+        self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
+    ):
         """
         Calculates the forward dynamics trajectory of a robotic system given the joint angles, joint velocities, joint torques, gravity vector, and external forces.
 
@@ -216,8 +250,21 @@ class TrajectoryPlanning:
         d_ddthetamat = cuda.device_array_like(ddthetamat)
         d_joint_limits = cuda.to_device(self.joint_limits)
         forward_dynamics_kernel[blocks_per_grid, threads_per_block](
-            d_thetalist, d_dthetalist, d_taumat, d_g, d_Ftipmat, dt, intRes,
-            d_Glist, d_Slist, d_M, d_thetamat, d_dthetamat, d_ddthetamat, d_joint_limits)
+            d_thetalist,
+            d_dthetalist,
+            d_taumat,
+            d_g,
+            d_Ftipmat,
+            dt,
+            intRes,
+            d_Glist,
+            d_Slist,
+            d_M,
+            d_thetamat,
+            d_dthetamat,
+            d_ddthetamat,
+            d_joint_limits,
+        )
         d_thetamat.copy_to_host(thetamat)
         d_dthetamat.copy_to_host(dthetamat)
         d_ddthetamat.copy_to_host(ddthetamat)
@@ -347,7 +394,9 @@ class TrajectoryPlanning:
             axs[1, i].set_ylabel("Velocity")
             axs[1, i].legend()
 
-            axs[2, i].plot(time_steps, accelerations[:, i], label=f"{label} Acceleration")
+            axs[2, i].plot(
+                time_steps, accelerations[:, i], label=f"{label} Acceleration"
+            )
             axs[2, i].set_ylabel("Acceleration")
             axs[2, i].legend()
 
@@ -360,11 +409,11 @@ class TrajectoryPlanning:
     def plot_tcp_trajectory(self, trajectory, dt):
         """
         Plots the trajectory of the TCP (Tool Center Point) of a serial manipulator.
-        
+
         Args:
             trajectory (list): A list of joint angle configurations representing the trajectory.
             dt (float): The time step between consecutive points in the trajectory.
-        
+
         Returns:
             None
         """
@@ -403,15 +452,17 @@ class TrajectoryPlanning:
         plt.tight_layout()
         plt.show()
 
-    def plot_cartesian_trajectory(self, trajectory_data, Tf, title="Cartesian Trajectory"):
+    def plot_cartesian_trajectory(
+        self, trajectory_data, Tf, title="Cartesian Trajectory"
+    ):
         """
         Plots the Cartesian trajectory of a robot's motion, including position, velocity, and acceleration.
-        
+
         Args:
             trajectory_data (dict): A dictionary containing the position, velocity, and acceleration data for the Cartesian trajectory.
             Tf (float): The final time of the trajectory.
             title (str, optional): The title of the plot. Defaults to "Cartesian Trajectory".
-        
+
         Returns:
             None
         """
@@ -470,12 +521,12 @@ class TrajectoryPlanning:
     def plot_ee_trajectory(self, trajectory_data, Tf, title="End-Effector Trajectory"):
         """
         Plots the end-effector trajectory of a serial manipulator.
-        
+
         Args:
             trajectory_data (dict): A dictionary containing the position and orientation data of the end-effector trajectory.
             Tf (float): The final time of the trajectory.
             title (str, optional): The title of the plot. Defaults to "End-Effector Trajectory".
-        
+
         Returns:
             None
         """
@@ -498,20 +549,45 @@ class TrajectoryPlanning:
         fig.suptitle(title)
 
         ax.plot(
-            positions[:, 0], positions[:, 1], positions[:, 2], label="EE Position", color="b"
+            positions[:, 0],
+            positions[:, 1],
+            positions[:, 2],
+            label="EE Position",
+            color="b",
         )
 
         for i in range(0, num_steps, max(1, num_steps // 20)):
             R = orientations[i]
             pos = positions[i]
             ax.quiver(
-                pos[0], pos[1], pos[2], R[0, 0], R[1, 0], R[2, 0], length=0.01, color="r"
+                pos[0],
+                pos[1],
+                pos[2],
+                R[0, 0],
+                R[1, 0],
+                R[2, 0],
+                length=0.01,
+                color="r",
             )
             ax.quiver(
-                pos[0], pos[1], pos[2], R[0, 1], R[1, 1], R[2, 1], length=0.01, color="g"
+                pos[0],
+                pos[1],
+                pos[2],
+                R[0, 1],
+                R[1, 1],
+                R[2, 1],
+                length=0.01,
+                color="g",
             )
             ax.quiver(
-                pos[0], pos[1], pos[2], R[0, 2], R[1, 2], R[2, 2], length=0.01, color="b"
+                pos[0],
+                pos[1],
+                pos[2],
+                R[0, 2],
+                R[1, 2],
+                R[2, 2],
+                length=0.01,
+                color="b",
             )
 
         ax.set_xlabel("X Position")

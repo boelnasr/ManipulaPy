@@ -27,6 +27,7 @@ and robotics. For more information, refer to the documentation or relevant liter
 import numpy as np
 from scipy.linalg import expm
 
+
 def extract_r_list(Slist):
     """
     Extracts the r_list from the given Slist.
@@ -38,9 +39,9 @@ def extract_r_list(Slist):
         np.ndarray: An array of r vectors.
     """
     # Handle None or improperly shaped input
-    if Slist is None or not hasattr(np.array(Slist), 'T'):
+    if Slist is None or not hasattr(np.array(Slist), "T"):
         return np.array([])
-    
+
     # Continue with the original function
     r_list = []
     for S in np.array(Slist).T:
@@ -52,6 +53,8 @@ def extract_r_list(Slist):
         else:
             r_list.append([0, 0, 0])  # For prismatic joints
     return np.array(r_list)
+
+
 def extract_omega_list(Slist):
     """
     Extracts the first three elements from each sublist in the given list and returns them as a numpy array.
@@ -63,6 +66,7 @@ def extract_omega_list(Slist):
         np.array: A numpy array containing the first three elements from each sublist.
     """
     return np.array(Slist)[:, :3]
+
 
 def extract_screw_list(omega_list, r_list):
     """
@@ -92,6 +96,8 @@ def extract_screw_list(omega_list, r_list):
         S[:3, i] = w
         S[3:, i] = v
     return S
+
+
 def NearZero(z):
     """
     Determines if a given number is near zero.
@@ -457,6 +463,7 @@ def QuinticTimeScaling(Tf, t):
     """
     return 10 * (t / Tf) ** 3 - 15 * (t / Tf) ** 4 + 6 * (t / Tf) ** 5
 
+
 def rotation_matrix_to_euler_angles(R):
     """
     Convert a rotation matrix to Euler angles (roll, pitch, yaw).
@@ -469,7 +476,7 @@ def rotation_matrix_to_euler_angles(R):
     """
     assert R.shape == (3, 3), f"Expected 3x3 rotation matrix, got shape {R.shape}"
     sy = np.sqrt(R[0, 0] ** 2 + R[1, 0] ** 2)
-    
+
     singular = sy < 1e-6
 
     if not singular:
@@ -482,6 +489,7 @@ def rotation_matrix_to_euler_angles(R):
         z = 0
 
     return np.array([x, y, z])
+
 
 def euler_to_rotation_matrix(euler_deg):
     """
@@ -502,25 +510,26 @@ def euler_to_rotation_matrix(euler_deg):
     pitch = np.radians(pitch_deg)
     yaw = np.radians(yaw_deg)
 
-    # Example Z-Y-X convention (yaw→pitch→roll). 
+    # Example Z-Y-X convention (yaw→pitch→roll).
     # If your code uses X→Y→Z or another sequence, adapt these multiplications.
-    Rz = np.array([
-        [ np.cos(yaw), -np.sin(yaw),  0],
-        [ np.sin(yaw),  np.cos(yaw),  0],
-        [          0,            0,   1]
-    ], dtype=np.float64)
+    Rz = np.array(
+        [[np.cos(yaw), -np.sin(yaw), 0], [np.sin(yaw), np.cos(yaw), 0], [0, 0, 1]],
+        dtype=np.float64,
+    )
 
-    Ry = np.array([
-        [ np.cos(pitch),  0, np.sin(pitch)],
-        [             0,  1,            0 ],
-        [-np.sin(pitch),  0, np.cos(pitch)]
-    ], dtype=np.float64)
+    Ry = np.array(
+        [
+            [np.cos(pitch), 0, np.sin(pitch)],
+            [0, 1, 0],
+            [-np.sin(pitch), 0, np.cos(pitch)],
+        ],
+        dtype=np.float64,
+    )
 
-    Rx = np.array([
-        [1,           0,            0],
-        [0, np.cos(roll), -np.sin(roll)],
-        [0, np.sin(roll),  np.cos(roll)]
-    ], dtype=np.float64)
+    Rx = np.array(
+        [[1, 0, 0], [0, np.cos(roll), -np.sin(roll)], [0, np.sin(roll), np.cos(roll)]],
+        dtype=np.float64,
+    )
 
     # Multiply in the correct order for your convention.
     R = Rz @ Ry @ Rx

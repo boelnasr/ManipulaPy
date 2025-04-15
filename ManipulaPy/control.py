@@ -9,6 +9,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class ManipulatorController:
     def __init__(self, dynamics):
         """
@@ -72,9 +73,15 @@ class ManipulatorController:
 
         M = cp.asarray(self.dynamics.mass_matrix(thetalist.get()))
         tau = M @ (Kp * e + Ki * self.eint + Kd * (dthetalistd - dthetalist))
-        tau += cp.asarray(self.dynamics.inverse_dynamics(
-            thetalist.get(), dthetalist.get(), ddthetalistd.get(), g.get(), [0, 0, 0, 0, 0, 0]
-        ))
+        tau += cp.asarray(
+            self.dynamics.inverse_dynamics(
+                thetalist.get(),
+                dthetalist.get(),
+                ddthetalistd.get(),
+                g.get(),
+                [0, 0, 0, 0, 0, 0],
+            )
+        )
 
         return tau
 
@@ -183,7 +190,9 @@ class ManipulatorController:
         disturbance_estimate = cp.asarray(disturbance_estimate)
 
         M = cp.asarray(self.dynamics.mass_matrix(thetalist.get()))
-        c = cp.asarray(self.dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get()))
+        c = cp.asarray(
+            self.dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get())
+        )
         g_forces = cp.asarray(self.dynamics.gravity_forces(thetalist.get(), g.get()))
         J_transpose = cp.asarray(self.dynamics.jacobian(thetalist.get()).T)
         tau = (
@@ -232,7 +241,9 @@ class ManipulatorController:
 
         self.parameter_estimate += adaptation_gain * measurement_error
         M = cp.asarray(self.dynamics.mass_matrix(thetalist.get()))
-        c = cp.asarray(self.dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get()))
+        c = cp.asarray(
+            self.dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get())
+        )
         g_forces = cp.asarray(self.dynamics.gravity_forces(thetalist.get(), g.get()))
         J_transpose = cp.asarray(self.dynamics.jacobian(thetalist.get()).T)
         tau = (
@@ -274,13 +285,16 @@ class ManipulatorController:
             self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist) :] * dt
         )
         dthetalist_pred = (
-            cp.asarray(self.dynamics.forward_dynamics(
-                self.x_hat[: len(thetalist)].get(),
-                self.x_hat[len(thetalist) :].get(),
-                taulist.get(),
-                g.get(),
-                Ftip.get(),
-            )) * dt
+            cp.asarray(
+                self.dynamics.forward_dynamics(
+                    self.x_hat[: len(thetalist)].get(),
+                    self.x_hat[len(thetalist) :].get(),
+                    taulist.get(),
+                    g.get(),
+                    Ftip.get(),
+                )
+            )
+            * dt
             + self.x_hat[len(thetalist) :]
         )
         x_hat_pred = cp.concatenate((thetalist_pred, dthetalist_pred))
@@ -370,9 +384,15 @@ class ManipulatorController:
         g = cp.asarray(g)
         Ftip = cp.asarray(Ftip)
 
-        tau = cp.asarray(self.dynamics.inverse_dynamics(
-            desired_position.get(), desired_velocity.get(), desired_acceleration.get(), g.get(), Ftip.get()
-        ))
+        tau = cp.asarray(
+            self.dynamics.inverse_dynamics(
+                desired_position.get(),
+                desired_velocity.get(),
+                desired_acceleration.get(),
+                g.get(),
+                Ftip.get(),
+            )
+        )
         return tau
 
     def pd_feedforward_control(
@@ -470,7 +490,7 @@ class ManipulatorController:
         """
         time = cp.asnumpy(time)
         response = cp.asnumpy(response)
-        
+
         plt.figure(figsize=(10, 5))
         plt.plot(time, response, label="Response")
         plt.axhline(y=set_point, color="r", linestyle="--", label="Set Point")
@@ -495,7 +515,7 @@ class ManipulatorController:
             x=settling_time,
             color="m",
             linestyle="--",
-            label=f"Settling Time: {settling_time:.2f}s"
+            label=f"Settling Time: {settling_time:.2f}s",
         )
         plt.axhline(
             y=set_point + steady_state_error,
@@ -646,14 +666,18 @@ class ManipulatorController:
         Kp = cp.asarray(Kp)
         Kd = cp.asarray(Kd)
 
-        current_position = cp.asarray(self.dynamics.forward_kinematics(current_joint_angles.get())[:3, 3])
+        current_position = cp.asarray(
+            self.dynamics.forward_kinematics(current_joint_angles.get())[:3, 3]
+        )
         e = desired_position - current_position
         dthetalist = current_joint_velocities
         J = cp.asarray(self.dynamics.jacobian(current_joint_angles.get()))
         tau = J.T @ (Kp * e - Kd @ J @ dthetalist)
         return tau
 
-    def ziegler_nichols_tuning(self, ultimate_gain, ultimate_period, controller_type="PID"):
+    def ziegler_nichols_tuning(
+        self, ultimate_gain, ultimate_period, controller_type="PID"
+    ):
         """
         Perform Ziegler-Nichols tuning.
 
@@ -679,7 +703,7 @@ class ManipulatorController:
             Kd = Kp * ultimate_period / 8
         else:
             raise ValueError("Invalid controller type. Choose 'P', 'PI', or 'PID'.")
-        
+
         return Kp, Ki, Kd
 
     def tune_controller(self, ultimate_gain, ultimate_period, controller_type="PID"):
@@ -694,11 +718,15 @@ class ManipulatorController:
         Returns:
             tuple: Tuned Kp, Ki, Kd.
         """
-        Kp, Ki, Kd = self.ziegler_nichols_tuning(ultimate_gain, ultimate_period, controller_type)
+        Kp, Ki, Kd = self.ziegler_nichols_tuning(
+            ultimate_gain, ultimate_period, controller_type
+        )
         logger.info(f"Tuned Parameters: Kp = {Kp}, Ki = {Ki}, Kd = {Kd}")
         return Kp, Ki, Kd
-    
-    def find_ultimate_gain_and_period(self, thetalist, desired_joint_angles, dt, max_steps=1000):
+
+    def find_ultimate_gain_and_period(
+        self, thetalist, desired_joint_angles, dt, max_steps=1000
+    ):
         """
         Find the ultimate gain and period using the Ziegler-Nichols method.
 
@@ -719,36 +747,66 @@ class ManipulatorController:
         oscillation_detected = False
         error_history = []
         gain_history = []
-        
-        while not oscillation_detected and Kp < 1000:  # Upper limit to prevent infinite loop
+
+        while (
+            not oscillation_detected and Kp < 1000
+        ):  # Upper limit to prevent infinite loop
             thetalist_current = thetalist.copy()
             dthetalist = cp.zeros_like(thetalist)
             self.eint = cp.zeros_like(thetalist)  # Reset integral term
-            
+
             error = []
             for step in range(max_steps):
-                tau = self.pd_control(desired_joint_angles, cp.zeros_like(thetalist), thetalist_current, dthetalist, Kp, 0)
-                ddthetalist = cp.dot(cp.linalg.inv(cp.asarray(self.dynamics.mass_matrix(thetalist_current.get()))), 
-                                     (tau - cp.asarray(self.dynamics.velocity_quadratic_forces(thetalist_current.get(), dthetalist.get())) - 
-                                      cp.asarray(self.dynamics.gravity_forces(thetalist_current.get(), np.array([0, 0, -9.81])))))
+                tau = self.pd_control(
+                    desired_joint_angles,
+                    cp.zeros_like(thetalist),
+                    thetalist_current,
+                    dthetalist,
+                    Kp,
+                    0,
+                )
+                ddthetalist = cp.dot(
+                    cp.linalg.inv(
+                        cp.asarray(self.dynamics.mass_matrix(thetalist_current.get()))
+                    ),
+                    (
+                        tau
+                        - cp.asarray(
+                            self.dynamics.velocity_quadratic_forces(
+                                thetalist_current.get(), dthetalist.get()
+                            )
+                        )
+                        - cp.asarray(
+                            self.dynamics.gravity_forces(
+                                thetalist_current.get(), np.array([0, 0, -9.81])
+                            )
+                        )
+                    ),
+                )
                 dthetalist += ddthetalist * dt
                 thetalist_current += dthetalist * dt
-                
+
                 error.append(cp.linalg.norm(thetalist_current - desired_joint_angles))
-                
+
                 if step > 10 and error[-1] > 1e10:  # If error explodes, stop
                     break
 
             error_history.append(cp.array(error))
             gain_history.append(Kp)
-            
-            if len(error) >= 2 and error[-2] < error[-1] and error[-1] < error[-2] * 1.2:
+
+            if (
+                len(error) >= 2
+                and error[-2] < error[-1]
+                and error[-1] < error[-2] * 1.2
+            ):
                 oscillation_detected = True
             else:
                 Kp *= increase_factor
 
         # Determine the ultimate gain and period
         ultimate_gain = Kp
-        oscillation_period = (max_steps * dt) / (cp.count_nonzero(cp.diff(cp.sign(cp.array(error_history[-1])))) // 2)
-        
+        oscillation_period = (max_steps * dt) / (
+            cp.count_nonzero(cp.diff(cp.sign(cp.array(error_history[-1])))) // 2
+        )
+
         return ultimate_gain, oscillation_period, gain_history, error_history

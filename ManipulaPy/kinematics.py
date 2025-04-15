@@ -34,6 +34,7 @@ from . import utils
 import matplotlib.pyplot as plt
 import torch
 
+
 class SerialManipulator:
     def __init__(
         self,
@@ -45,7 +46,6 @@ class SerialManipulator:
         B_list=None,
         G_list=None,
         joint_limits=None,
-        
     ):
         """
         Initialize the class with the given parameters.
@@ -80,18 +80,18 @@ class SerialManipulator:
         )
 
     def update_state(self, joint_positions, joint_velocities=None):
-            """
-            Updates the internal state of the manipulator.
+        """
+        Updates the internal state of the manipulator.
 
-            Args:
-                joint_positions (np.ndarray): Current joint positions.
-                joint_velocities (np.ndarray, optional): Current joint velocities. Default is None.
-            """
-            self.joint_positions = np.array(joint_positions)
-            if joint_velocities is not None:
-                self.joint_velocities = np.array(joint_velocities)
-            else:
-                self.joint_velocities = np.zeros_like(self.joint_positions)
+        Args:
+            joint_positions (np.ndarray): Current joint positions.
+            joint_velocities (np.ndarray, optional): Current joint velocities. Default is None.
+        """
+        self.joint_positions = np.array(joint_positions)
+        if joint_velocities is not None:
+            self.joint_velocities = np.array(joint_velocities)
+        else:
+            self.joint_velocities = np.zeros_like(self.joint_positions)
 
     def forward_kinematics(self, thetalist, frame="space"):
         """
@@ -127,7 +127,6 @@ class SerialManipulator:
 
         return T
 
-
     def end_effector_velocity(self, thetalist, dthetalist, frame="space"):
         """
         Calculate the end effector velocity given the joint angles and joint velocities.
@@ -147,8 +146,6 @@ class SerialManipulator:
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return np.dot(J, dthetalist)
-
-
 
     def jacobian(self, thetalist, frame="space"):
         """
@@ -281,7 +278,6 @@ class SerialManipulator:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return np.linalg.pinv(J) @ V_ee
 
-
     def end_effector_pose(self, thetalist):
         """
         Computes the end-effector's position and orientation given joint angles.
@@ -296,7 +292,6 @@ class SerialManipulator:
         R, p = utils.TransToRp(T)
         orientation = utils.rotation_matrix_to_euler_angles(R)
         return np.concatenate((p, orientation))
-    
 
     def hybrid_inverse_kinematics(
         self,
@@ -308,7 +303,7 @@ class SerialManipulator:
         thetalist0=None,
         eomg=1e-6,
         ev=1e-6,
-        max_iterations=500
+        max_iterations=500,
     ):
         """
         Perform hybrid inverse kinematics using a neural network for initial guess and iterative refinement.
@@ -331,13 +326,24 @@ class SerialManipulator:
         """
         if thetalist0 is None:
             # Use neural network to get initial guess
-            end_effector_pose = np.concatenate((T_desired[:3, 3], utils.rotation_matrix_to_euler_angles(T_desired[:3, :3])))
+            end_effector_pose = np.concatenate(
+                (
+                    T_desired[:3, 3],
+                    utils.rotation_matrix_to_euler_angles(T_desired[:3, :3]),
+                )
+            )
             end_effector_pose = scaler_X.transform([end_effector_pose])
-            end_effector_pose = torch.tensor(end_effector_pose, dtype=torch.float32).to(device)
-            thetalist0 = neural_network(end_effector_pose).detach().cpu().numpy().flatten()
+            end_effector_pose = torch.tensor(end_effector_pose, dtype=torch.float32).to(
+                device
+            )
+            thetalist0 = (
+                neural_network(end_effector_pose).detach().cpu().numpy().flatten()
+            )
             thetalist0 = scaler_y.inverse_transform([thetalist0])[0]
 
         # Refine using iterative method
-        thetalist, success, num_iterations = self.iterative_inverse_kinematics(T_desired, thetalist0, eomg, ev, max_iterations)
+        thetalist, success, num_iterations = self.iterative_inverse_kinematics(
+            T_desired, thetalist0, eomg, ev, max_iterations
+        )
 
         return thetalist, success, num_iterations

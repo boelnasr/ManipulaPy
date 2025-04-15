@@ -37,5 +37,5 @@ __all__ = [
     "control",
     "sim",
     "potential_field",
-    "cuda_kernels"
+    "cuda_kernels",
 ]

@@ -14,6 +14,7 @@ import numpy as np
 from math import pi
 from ManipulaPy.dynamics import ManipulatorDynamics
 
+
 class TestDynamics(unittest.TestCase):
     def setUp(self):
         """
@@ -22,26 +23,25 @@ class TestDynamics(unittest.TestCase):
         so the constructor doesn't auto-build from (omega, r).
         """
         # 1) S_list shape => (6,6)
-        self.S_list = np.array([
-            [0, 0, 1,   0,     0,     0],
-            [0, -1, 0,  -0.089, 0,     0],
-            [0, -1, 0,  -0.089, 0,     0.425],
-            [0, -1, 0,  -0.089, 0,     0.817],
-            [1,  0,  0,   0,    0.109, 0],
-            [0, -1,  0,  -0.089,0,     0.817]
-        ]).T  # shape => (6,6)
+        self.S_list = np.array(
+            [
+                [0, 0, 1, 0, 0, 0],
+                [0, -1, 0, -0.089, 0, 0],
+                [0, -1, 0, -0.089, 0, 0.425],
+                [0, -1, 0, -0.089, 0, 0.817],
+                [1, 0, 0, 0, 0.109, 0],
+                [0, -1, 0, -0.089, 0, 0.817],
+            ]
+        ).T  # shape => (6,6)
 
-        # 2) B_list also shape => (6,6). 
+        # 2) B_list also shape => (6,6).
         # For simplicity, let’s just copy S_list here, or you can do another approach
         self.B_list = np.copy(self.S_list)
 
         # 3) M_list => the manipulator's home pose (4x4)
-        self.M_list = np.array([
-            [1, 0, 0, 0.817],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0.191],
-            [0, 0, 0, 1]
-        ])
+        self.M_list = np.array(
+            [[1, 0, 0, 0.817], [0, 1, 0, 0], [0, 0, 1, 0.191], [0, 0, 0, 1]]
+        )
 
         # 4) Glist => inertia for each of 6 joints, shape => (6, 6, 6)
         self.Glist = []
@@ -59,7 +59,7 @@ class TestDynamics(unittest.TestCase):
             b_list=None,
             S_list=self.S_list,
             B_list=self.B_list,
-            Glist=self.Glist
+            Glist=self.Glist,
         )
 
         self.n_joints = 6
@@ -70,10 +70,12 @@ class TestDynamics(unittest.TestCase):
         """
         thetalist = np.zeros(self.n_joints)
         M = self.dynamics.mass_matrix(thetalist)
-        self.assertEqual(M.shape, (self.n_joints, self.n_joints),
-                         "Mass matrix should be NxN.")
-        np.testing.assert_array_almost_equal(M, M.T, decimal=5,
-            err_msg="Mass matrix is not symmetric.")
+        self.assertEqual(
+            M.shape, (self.n_joints, self.n_joints), "Mass matrix should be NxN."
+        )
+        np.testing.assert_array_almost_equal(
+            M, M.T, decimal=5, err_msg="Mass matrix is not symmetric."
+        )
 
     def test_velocity_quadratic_forces(self):
         """
@@ -82,10 +84,17 @@ class TestDynamics(unittest.TestCase):
         thetalist = np.zeros(self.n_joints)
         dthetalist = np.zeros(self.n_joints)
         c = self.dynamics.velocity_quadratic_forces(thetalist, dthetalist)
-        self.assertEqual(c.shape, (self.n_joints,),
-                         "Returned shape for velocity_quad_forces must be (N,).")
-        np.testing.assert_allclose(c, 0.0, atol=1e-8,
-            err_msg="With zero velocity, velocity_quadratic_forces(...) should be 0.")
+        self.assertEqual(
+            c.shape,
+            (self.n_joints,),
+            "Returned shape for velocity_quad_forces must be (N,).",
+        )
+        np.testing.assert_allclose(
+            c,
+            0.0,
+            atol=1e-8,
+            err_msg="With zero velocity, velocity_quadratic_forces(...) should be 0.",
+        )
 
     def test_gravity_forces(self):
         """
@@ -94,10 +103,13 @@ class TestDynamics(unittest.TestCase):
         thetalist = np.zeros(self.n_joints)
         g = [0, 0, -9.81]
         gf = self.dynamics.gravity_forces(thetalist, g)
-        self.assertEqual(gf.shape, (self.n_joints,),
-                         "Gravity forces must be shape (N,).")
-        self.assertTrue(np.linalg.norm(gf) > 1e-7,
-            "Gravity forces should not be zero if mass is nontrivial.")
+        self.assertEqual(
+            gf.shape, (self.n_joints,), "Gravity forces must be shape (N,)."
+        )
+        self.assertTrue(
+            np.linalg.norm(gf) > 1e-7,
+            "Gravity forces should not be zero if mass is nontrivial.",
+        )
 
     def test_inverse_forward_dynamics_consistency(self):
         """
@@ -111,13 +123,22 @@ class TestDynamics(unittest.TestCase):
         Ftip = np.zeros(6)
 
         # 1) get torques from inverse_dynamics
-        tau = self.dynamics.inverse_dynamics(thetalist, dthetalist, ddthetalist_des, g_vec, Ftip)
+        tau = self.dynamics.inverse_dynamics(
+            thetalist, dthetalist, ddthetalist_des, g_vec, Ftip
+        )
 
         # 2) feed them to forward_dynamics
-        ddthetalist = self.dynamics.forward_dynamics(thetalist, dthetalist, tau, g_vec, Ftip)
+        ddthetalist = self.dynamics.forward_dynamics(
+            thetalist, dthetalist, tau, g_vec, Ftip
+        )
 
-        np.testing.assert_allclose(ddthetalist, ddthetalist_des, atol=1e-3,
-            err_msg="Forward dynamics does not match the desired accelerations from inverse_dynamics.")
+        np.testing.assert_allclose(
+            ddthetalist,
+            ddthetalist_des,
+            atol=1e-3,
+            err_msg="Forward dynamics does not match the desired accelerations from inverse_dynamics.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
