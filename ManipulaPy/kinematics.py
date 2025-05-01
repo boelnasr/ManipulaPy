@@ -140,9 +140,9 @@ class SerialManipulator:
             numpy.ndarray: The end effector velocity.
         """
         if frame == "space":
-            J = self.jacobian_space(thetalist)
+            J = self.jacobian(thetalist,frame="space")
         elif frame == "body":
-            J = self.jacobian_body(thetalist)
+            J = self.jacobian(thetalist,frame="body")
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return np.dot(J, dthetalist)
@@ -182,81 +182,76 @@ class SerialManipulator:
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return J
-
     def iterative_inverse_kinematics(
         self,
         T_desired,
         thetalist0,
-        eomg=1e-9,
-        ev=1e-9,
+        eomg=1e-6,
+        ev=1e-6,
         max_iterations=5000,
         plot_residuals=False,
+        damping=5e-2,            # λ for damped least-squares
+        step_cap=0.5,            # max ‖Δθ‖ per iteration (rad)
+        png_name="ik_residuals.png",
     ):
         """
-        Performs iterative inverse kinematics to calculate joint angles that achieve a desired end-effector pose.
-
-        Parameters:
-            T_desired (np.ndarray): The desired end-effector pose as a 4x4 transformation matrix.
-            thetalist0 (List[float]): The initial guess for the joint angles.
-            eomg (float, optional): The tolerance for rotational error convergence. Defaults to 1e-6.
-            ev (float, optional): The tolerance for translational error convergence. Defaults to 1e-6.
-            max_iterations (int, optional): The maximum number of iterations to perform. Defaults to 5000.
-            plot_residuals (bool, optional): Whether to plot the residual norm over iterations. Defaults to False.
-
-        Returns:
-            Tuple[List[float], bool, int]: A tuple containing the resulting joint angles, a boolean value indicating the success of convergence, and the number of iterations.
+        Damped-least-squares iterative IK with joint-limit projection and
+        residual plot saved to file (no interactive window).
         """
-        thetalist = np.array(thetalist0)
-        residuals = []  # List to store the error at each iteration
-        num_iterations = 0  # Initialize iteration counter
+        θ = np.array(thetalist0, dtype=float)
+        V_desired = utils.se3ToVec(utils.MatrixLog6(T_desired))
+        residuals = []
 
-        for _ in range(max_iterations):
-            T_current = self.forward_kinematics(thetalist, frame="space")
-            num_iterations += 1
-            # Calculate the current twist
-            J = self.jacobian(thetalist, frame="space")
-            V_current = utils.se3ToVec(utils.MatrixLog6(T_current))
-            V_desired = utils.se3ToVec(utils.MatrixLog6(T_desired))
+        for k in range(max_iterations):
+            # Current pose & twist error
+            T_curr = self.forward_kinematics(θ, frame="space")
+            V_curr = utils.se3ToVec(utils.MatrixLog6(T_curr))
+            V_err  = V_desired - V_curr
+            rot_err, trans_err = np.linalg.norm(V_err[:3]), np.linalg.norm(V_err[3:])
+            residuals.append((trans_err, rot_err))
 
-            # Calculate the error twist
-            V_error = V_desired - V_current
-            trans_error = V_error[3:6]
-            rot_error = V_error[0:3]
-            trans_error_norm = np.linalg.norm(trans_error)
-            rot_error_norm = np.linalg.norm(rot_error)
-            residuals.append((trans_error_norm, rot_error_norm))
-
-            # Check for convergence independently
-            if trans_error_norm < ev and rot_error_norm < eomg:
+            if rot_err < eomg and trans_err < ev:
+                success = True
                 break
 
-            # Update thetalist using the pseudoinverse of the Jacobian
-            delta_theta = np.dot(np.linalg.pinv(J), V_error)
-            thetalist += (
-                0.058 * delta_theta
-            )  # Ensure this step size is appropriate for convergence
+            # Damped least-squares Δθ
+            J = self.jacobian(θ, frame="space")
+            JJt = J @ J.T
+            Δθ  = J.T @ np.linalg.inv(JJt + (damping ** 2) * np.eye(6)) @ V_err
 
-            # Enforce joint limits
-            for i, (theta_min, theta_max) in enumerate(self.joint_limits):
-                if theta_min is not None and thetalist[i] < theta_min:
-                    thetalist[i] = theta_min
-                elif theta_max is not None and thetalist[i] > theta_max:
-                    thetalist[i] = theta_max
+            # Cap step size
+            normΔ = np.linalg.norm(Δθ)
+            if normΔ > step_cap:
+                Δθ *= step_cap / normΔ
 
-        success = trans_error_norm < ev and rot_error_norm < eomg
+            θ += Δθ
 
-        # Plotting the residual if requested
+            # Project into joint limits
+            for i, (mn, mx) in enumerate(self.joint_limits):
+                if mn is not None: θ[i] = max(θ[i], mn)
+                if mx is not None: θ[i] = min(θ[i], mx)
+        else:
+            success = False
+            k += 1   # max_iterations reached
+
+        # Optional residual plot (non-interactive)
         if plot_residuals:
-            plt.plot([r[0] for r in residuals], label="Translational Error")
-            plt.plot([r[1] for r in residuals], label="Rotational Error")
-            plt.xlabel("Iteration")
-            plt.ylabel("Error Norm")
-            plt.title("Inverse Kinematics Convergence")
-            plt.legend()
-            plt.grid(True)
-            plt.show()
+            import matplotlib
+            matplotlib.use("Agg")
+            import matplotlib.pyplot as plt
 
-        return np.array(thetalist), success, num_iterations
+            it = np.arange(len(residuals))
+            tr, rt = zip(*residuals)
+            plt.plot(it, tr, label="Translation error")
+            plt.plot(it, rt, label="Rotation error")
+            plt.xlabel("Iteration"); plt.ylabel("Norm")
+            plt.title("IK convergence")
+            plt.legend(); plt.grid(True); plt.tight_layout()
+            plt.savefig(png_name, dpi=400)
+            plt.close()
+            print(f"Residual plot saved to {png_name}")
+
+        return θ, success, k + 1
 
     def joint_velocity(self, thetalist, V_ee, frame="space"):
         """
