@@ -31,11 +31,11 @@ class PotentialField:
             d = np.linalg.norm(q - obstacle)
             if d <= self.influence_distance:
                 repulsive_potential += (
-                    0.5
+                    2
                     * self.repulsive_gain
                     * (1.0 / d - 1.0 / self.influence_distance) ** 2
                 )
-        return repulsive_potential
+        return 10*repulsive_potential
 
     def compute_gradient(self, q, q_goal, obstacles):
         """
@@ -50,7 +50,7 @@ class PotentialField:
             d = np.linalg.norm(q - obstacle)
             if d <= self.influence_distance:
                 repulsive_gradient += (
-                    self.repulsive_gain
+                    5*self.repulsive_gain
                     * (1.0 / d - 1.0 / self.influence_distance)
                     * (1.0 / (d**3))
                     * (q - obstacle)

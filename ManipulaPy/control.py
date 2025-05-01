@@ -673,139 +673,107 @@ class ManipulatorController:
         J = cp.asarray(self.dynamics.jacobian(current_joint_angles.get()))
         tau = J.T @ (Kp * e - Kd @ J @ dthetalist)
         return tau
-
-    def ziegler_nichols_tuning(
-        self, ultimate_gain, ultimate_period, controller_type="PID"
-    ):
+# ------------------------------------------------------------------------
+    def ziegler_nichols_tuning(self, Ku, Tu, kind="PID"):
         """
-        Perform Ziegler-Nichols tuning.
+        Classical Z-N table (vectorised: Ku & Tu may be scalars or 1-D arrays).
 
-        Parameters:
-            ultimate_gain (float): Ultimate gain (K_u).
-            ultimate_period (float): Ultimate period (T_u).
-            controller_type (str): Type of controller. Options are "P", "PI", "PID".
-
-        Returns:
-            tuple: Tuned Kp, Ki, Kd.
+        Returns Kp, Ki, Kd as *NumPy* arrays so the caller can convert to CuPy
+        later if desired.
         """
-        if controller_type == "P":
-            Kp = 0.5 * ultimate_gain
-            Ki = 0.0
-            Kd = 0.0
-        elif controller_type == "PI":
-            Kp = 0.45 * ultimate_gain
-            Ki = 1.2 * Kp / ultimate_period
-            Kd = 0.0
-        elif controller_type == "PID":
-            Kp = 0.6 * ultimate_gain
-            Ki = 2 * Kp / ultimate_period
-            Kd = Kp * ultimate_period / 8
+        Ku = np.asarray(Ku, dtype=np.float32)
+        Tu = np.asarray(Tu, dtype=np.float32)
+
+        if kind == "P":
+            Kp, Ki, Kd = 0.50*Ku,        0.0,               0.0
+        elif kind == "PI":
+            Kp, Ki, Kd = 0.45*Ku, 1.2*Ku/Tu,               0.0
+        elif kind == "PID":
+            Kp = 0.60*Ku
+            Ki = 2.0*Kp/Tu
+            Kd = 0.125*Kp*Tu           # Tu/8
         else:
-            raise ValueError("Invalid controller type. Choose 'P', 'PI', or 'PID'.")
+            raise ValueError("kind must be 'P', 'PI' or 'PID'")
 
         return Kp, Ki, Kd
-
-    def tune_controller(self, ultimate_gain, ultimate_period, controller_type="PID"):
+    # ------------------------------------------------------------------------
+    def tune_controller(self, Ku, Tu, kind="PID"):
         """
-        Tune the controller using Ziegler-Nichols method.
-
-        Parameters:
-            ultimate_gain (float): Ultimate gain (K_u).
-            ultimate_period (float): Ultimate period (T_u).
-            controller_type (str): Type of controller. Options are "P", "PI", "PID".
-
-        Returns:
-            tuple: Tuned Kp, Ki, Kd.
+        Convenience wrapper that logs and returns NumPy arrays (length = DOF).
         """
-        Kp, Ki, Kd = self.ziegler_nichols_tuning(
-            ultimate_gain, ultimate_period, controller_type
-        )
-        logger.info(f"Tuned Parameters: Kp = {Kp}, Ki = {Ki}, Kd = {Kd}")
+        Kp, Ki, Kd = self.ziegler_nichols_tuning(Ku, Tu, kind)
+        logger.info(f"Tuned Z-N ({kind}) gains\n  Kp={Kp}\n  Ki={Ki}\n  Kd={Kd}")
         return Kp, Ki, Kd
-
-    def find_ultimate_gain_and_period(
-        self, thetalist, desired_joint_angles, dt, max_steps=1000
-    ):
+    # ------------------------------------------------------------------------
+    def find_ultimate_gain_and_period(self, thetalist, desired_joint_angles, dt, max_steps=1000):
         """
-        Find the ultimate gain and period using the Ziegler-Nichols method.
+        Find the ultimate gain and period using the Ziegler–Nichols method.
 
         Parameters:
-            thetalist (cp.ndarray): Initial joint angles.
-            desired_joint_angles (cp.ndarray): Desired joint angles.
-            dt (float): Time step for simulation.
-            max_steps (int, optional): Maximum number of steps for the simulation.
+            thetalist (cp.ndarray): Initial joint angles (shape [6]).
+            desired_joint_angles (cp.ndarray): Step target angles (shape [6]).
+            dt (float): Simulation time step.
+            max_steps (int): Number of integration steps to try.
 
         Returns:
-            tuple: Ultimate gain, ultimate period, gain history, error history.
+            tuple:
+              - ultimate_gain (float)
+              - ultimate_period (float)
+              - gain_history (list of float)
+              - error_history (list of cp.ndarray)
         """
         thetalist = cp.asarray(thetalist)
         desired_joint_angles = cp.asarray(desired_joint_angles)
 
-        Kp = 0.01  # Start with a small proportional gain
-        increase_factor = 1.1  # Factor to increase Kp each iteration
-        oscillation_detected = False
-        error_history = []
+        Kp = 0.01
+        increase = 1.1
+        oscillation = False
         gain_history = []
+        error_history = []
 
-        while (
-            not oscillation_detected and Kp < 1000
-        ):  # Upper limit to prevent infinite loop
-            thetalist_current = thetalist.copy()
-            dthetalist = cp.zeros_like(thetalist)
-            self.eint = cp.zeros_like(thetalist)  # Reset integral term
+        while not oscillation and Kp < 1000:
+            θ = thetalist.copy()
+            ω = cp.zeros_like(θ)
+            self.eint = cp.zeros_like(θ)
+            errors = []
 
-            error = []
             for step in range(max_steps):
-                tau = self.pd_control(
+                # pure-PD poke
+                τ = self.pd_control(
                     desired_joint_angles,
-                    cp.zeros_like(thetalist),
-                    thetalist_current,
-                    dthetalist,
+                    cp.zeros_like(θ),
+                    θ,
+                    ω,
                     Kp,
-                    0,
+                    0.0
                 )
-                ddthetalist = cp.dot(
-                    cp.linalg.inv(
-                        cp.asarray(self.dynamics.mass_matrix(thetalist_current.get()))
-                    ),
-                    (
-                        tau
-                        - cp.asarray(
-                            self.dynamics.velocity_quadratic_forces(
-                                thetalist_current.get(), dthetalist.get()
-                            )
-                        )
-                        - cp.asarray(
-                            self.dynamics.gravity_forces(
-                                thetalist_current.get(), np.array([0, 0, -9.81])
-                            )
-                        )
-                    ),
-                )
-                dthetalist += ddthetalist * dt
-                thetalist_current += dthetalist * dt
+                # α = M⁻¹ (τ – C – G)
+                M  = cp.asarray(self.dynamics.mass_matrix(θ.get()))
+                C  = cp.asarray(self.dynamics.velocity_quadratic_forces(θ.get(), ω.get()))
+                Gf = cp.asarray(self.dynamics.gravity_forces(θ.get(), np.array([0,0,-9.81])))
+                α  = cp.linalg.solve(M, τ - C - Gf)
 
-                error.append(cp.linalg.norm(thetalist_current - desired_joint_angles))
+                ω += α * dt
+                θ += ω * dt
 
-                if step > 10 and error[-1] > 1e10:  # If error explodes, stop
+                err = cp.linalg.norm(θ - desired_joint_angles)
+                errors.append(err)
+                # blow-up guard
+                if step > 10 and err > 1e10:
                     break
 
-            error_history.append(cp.array(error))
             gain_history.append(Kp)
+            error_history.append(cp.stack(errors))
 
-            if (
-                len(error) >= 2
-                and error[-2] < error[-1]
-                and error[-1] < error[-2] * 1.2
-            ):
-                oscillation_detected = True
+            # look for the first upward slope after initial increase
+            if len(errors) >= 2 and errors[-2] < errors[-1] < errors[-2] * 1.2:
+                oscillation = True
             else:
-                Kp *= increase_factor
+                Kp *= increase
 
-        # Determine the ultimate gain and period
-        ultimate_gain = Kp
-        oscillation_period = (max_steps * dt) / (
-            cp.count_nonzero(cp.diff(cp.sign(cp.array(error_history[-1])))) // 2
+        ultimate_gain   = float(Kp)
+        ultimate_period = (max_steps * dt) / max(1,
+            cp.count_nonzero(cp.diff(cp.sign(error_history[-1])) ) // 2
         )
 
-        return ultimate_gain, oscillation_period, gain_history, error_history
+        return ultimate_gain, ultimate_period, gain_history, error_history
