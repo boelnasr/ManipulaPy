@@ -44,62 +44,60 @@ Modern robotic research demands *tight integration* of geometry, physics, vision
 - ships a Simulation wrapper that synchronises PyBullet, cameras, planners and controllers  
 
 This “batteries‑included” design removes weeks of boilerplate for graduate‑level projects and provides a reproducible platform for publications that rely on high‑frequency dynamics or perception‑loop experiments.
-
 # Library Architecture
-
 | Module | Purpose (selected highlights) |
 |--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `urdf_processor.py` | Parse URDF → screw axes \(S_i\), home pose \(M\), link inertias \(G_i\); query PyBullet for joint/torque limits → `SerialManipulator`, `ManipulatorDynamics`. |
-| `kinematics.py`     | PoE forward & inverse kinematics, Jacobians, hybrid (NN + iterative) IK. |
-| `dynamics.py`       | Mass matrix \(M(θ)\), Coriolis/gravity, inverse & forward dynamics (RNEA) with on‑GPU cache. |
+| `urdf_processor.py` | Parse URDF → screw axes $(S_i)$, home pose $(M)$, link inertias $(G_i)$; query PyBullet for joint/torque limits → `SerialManipulator`, `ManipulatorDynamics`. |
+| `kinematics.py`     | PoE forward & inverse kinematics, Jacobians, hybrid (NN + iterative) IK. |
+| `dynamics.py`       | Mass matrix $(M(\theta))$, Coriolis/gravity, inverse & forward dynamics (RNEA) with on‑GPU cache. |
 | `path_planning.py`  | CUDA‑accelerated cubic/quintic joint and Cartesian trajectories; potential‑field collision shaping. |
 | `potential_field.py`| Attractive/repulsive potentials + gradient computation for online obstacle avoidance. |
 | `control.py`        | PD/PID, computed‑torque, robust, adaptive and Kalman‑filter controllers plus Ziegler–Nichols auto‑tune. |
-| `vision.py`         | Camera abstraction, stereo rectification, disparity → depth, PyBullet debug sliders [@febrianto2022]. |
+| `vision.py`         | Camera abstraction, stereo rectification, disparity → depth, PyBullet debug sliders [@Febrianto2022]. |
 | `perception.py`     | Depth→point‑cloud, DBSCAN clustering → obstacle list for the planner/RL. |
 | `singularity.py`    | Jacobian determinant/condition‑number tests, manipulability ellipsoid and Monte‑Carlo workspace hull (CUDA). |
 | `sim.py`            | One‑liner PyBullet world (ground, robot, sliders, logging, collision hooks). |
 | `cuda_kernels.py`   | Raw GPU kernels (trajectory, dynamics, potential‑field) tuned for 256‑thread blocks. |
-| `utils.py`          | Lie‑group helpers, cubic/quintic time scaling, matrix log/exp, SE(3) ↔ se(3). |
+| `utils.py`          | Lie‑group helpers, cubic/quintic time scaling, matrix log/exp, SE(3) ↔ se(3). |
 
 # Theory Highlights
 
 ## PoE Kinematics
 
 A pose is obtained with[@lynch2017modern] 
-\[ T(\theta)=e^{S_1\theta_1}\ldots e^{S_n\theta_n}M, \]
+$$ T(\theta)=e^{S_1\theta_1}\ldots e^{S_n\theta_n}M, $$
 while the space Jacobian stacks each transformed screw axis
-\[ J(\theta)=\left[\operatorname{Ad}_{T_1}S_1,\ldots,S_n\right]. \]
+$$ J(\theta)=\left[\operatorname{Ad}_{T_1}S_1,\ldots,S_n\right]. $$
 
 ## Dynamics
 
 Mass matrix via spatial inertia:
-\[ M(\theta)=\sum_{i=1}^{n}\operatorname{Ad}_{T_i}^T G_i\,\operatorname{Ad}_{T_i}, \qquad \tau=M\ddot{\theta}+C(\theta,\dot\theta)+g(\theta). \]
+$$ M(\theta)=\sum_{i=1}^{n}\operatorname{Ad}_{T_i}^T G_i\,\operatorname{Ad}_{T_i}, \qquad \tau=M\ddot{\theta}+C(\theta,\dot\theta)+g(\theta). $$
 
 GPU kernels solve batches of these equations in parallel.
 
 ## Stereo Depth
 
-With focal length \(f\) and baseline \(B\):
-\[ Z=\dfrac{fB}{d}. \]
+With focal length $f$ and baseline $B$:
+$$ Z=\dfrac{fB}{d}. $$
 
 ## CUDA Kernels for Acceleration
 
 ManipulaPy includes a custom CUDA backend to speed up the most time-critical operations:
 
-- **Trajectory Kernel** (`trajectory_kernel`)[shahid2024]
+- **Trajectory Kernel** (`trajectory_kernel`)[@shahid2024]
   This kernel computes joint trajectories using cubic or quintic time scaling. It parallelizes over each timestep using 256 threads per block:
-  \[
+  $$
   \theta_i(t) = s(t) \cdot (\theta_{\text{end}} - \theta_{\text{start}}) + \theta_{\text{start}}.
-  \]
+  $$
 
-- **Forward Dynamics Kernel** (`forward_dynamics_kernel`)[liang2018gpu]
-  Solves \(\ddot{\theta} = M^{-1}(\tau - C - g)\) for multiple time steps in parallel. Each thread processes one trajectory point, leveraging shared memory for intermediate matrix storage.
+- **Forward Dynamics Kernel** (`forward_dynamics_kernel`)[@liang2018gpu]
+  Solves $\ddot{\theta} = M^{-1}(\tau - C - g)$ for multiple time steps in parallel. Each thread processes one trajectory point, leveraging shared memory for intermediate matrix storage.
 
-- **Inverse Dynamics Kernel** (`inverse_dynamics_kernel`)[shahid2024]
-  Computes the required torque \(\tau\) from desired accelerations. This is used inside computed-torque controllers or for logging in training.
+- **Inverse Dynamics Kernel** (`inverse_dynamics_kernel`)[@shahid2024]
+  Computes the required torque $\tau$ from desired accelerations. This is used inside computed-torque controllers or for logging in training.
 
-- **Cartesian Trajectory Kernel** (`cartesian_trajectory_kernel`)[shahid2024]  
+- **Cartesian Trajectory Kernel** (`cartesian_trajectory_kernel`)[@shahid2024]  
   Generates position/velocity/acceleration trajectories in SE(3) by interpolating position and rotating frames via exponential maps.
 
 All kernels are compiled with Numba's @cuda.jit decorator and optimized for 256-thread blocks. This balances occupancy and avoids register spilling. CuPy arrays wrap all inputs/outputs so that dynamics and control modules operate natively on the GPU.
