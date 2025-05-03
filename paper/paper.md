@@ -1,5 +1,5 @@
 ---
-title: "ManipulaPy: Theoretical Foundations and System Integration"
+title: "ManipulaPy: A GPU-Accelerated Python Framework for Robotic Manipulation, Perception, and Control"
 tags:
   - robotics
   - manipulator
@@ -11,13 +11,13 @@ tags:
   - trajectory-planning
   - computer-vision
 authors:
-  - name: Mohamed Ibrahim
+  - name: M.I.M. Abo El Nasr
     orcid: 0000-0002-1768-2031
     affiliation: 1
 affiliations:
   - name: Universität Duisburg-Essen
     index: 1
-date: 2024-06-01
+date: 2025-05-03
 bibliography: paper.bib
 ---
 
@@ -45,41 +45,92 @@ Modern robotic research demands *tight integration* of geometry, physics, vision
 
 This “batteries‑included” design removes weeks of boilerplate for graduate‑level projects and provides a reproducible platform for publications that rely on high‑frequency dynamics or perception‑loop experiments.
 # Library Architecture
-| Module | Purpose (selected highlights) |
-|--------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `urdf_processor.py` | Parse URDF → screw axes $(S_i)$, home pose $(M)$, link inertias $(G_i)$; query PyBullet for joint/torque limits → `SerialManipulator`, `ManipulatorDynamics`. |
-| `kinematics.py`     | PoE forward & inverse kinematics, Jacobians, hybrid (NN + iterative) IK. |
-| `dynamics.py`       | Mass matrix $(M(\theta))$, Coriolis/gravity, inverse & forward dynamics (RNEA) with on‑GPU cache. |
-| `path_planning.py`  | CUDA‑accelerated cubic/quintic joint and Cartesian trajectories; potential‑field collision shaping. |
-| `potential_field.py`| Attractive/repulsive potentials + gradient computation for online obstacle avoidance. |
-| `control.py`        | PD/PID, computed‑torque, robust, adaptive and Kalman‑filter controllers plus Ziegler–Nichols auto‑tune. |
-| `vision.py`         | Camera abstraction, stereo rectification, disparity → depth, PyBullet debug sliders [@Febrianto2022]. |
-| `perception.py`     | Depth→point‑cloud, DBSCAN clustering → obstacle list for the planner/RL. |
-| `singularity.py`    | Jacobian determinant/condition‑number tests, manipulability ellipsoid and Monte‑Carlo workspace hull (CUDA). |
-| `sim.py`            | One‑liner PyBullet world (ground, robot, sliders, logging, collision hooks). |
-| `cuda_kernels.py`   | Raw GPU kernels (trajectory, dynamics, potential‑field) tuned for 256‑thread blocks. |
-| `utils.py`          | Lie‑group helpers, cubic/quintic time scaling, matrix log/exp, SE(3) ↔ se(3). |
 
+| Module              | Purpose (selected highlights)                                                                                                                                             |
+|-----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `urdf_processor.py`     | Parses URDF files into screw axes $(S_i)$, home pose $(M)$, and link inertias $(G_i)$; queries PyBullet for joint/torque limits → `SerialManipulator`, `ManipulatorDynamics`. |
+| `kinematics.py`         | Implements PoE-based forward and inverse kinematics, Jacobians, and hybrid (neural + iterative) inverse kinematics solvers.                                              |
+| `dynamics.py`           | Computes mass matrix $M(\theta)$, Coriolis and gravity terms; supports forward and inverse dynamics (RNEA), with optional GPU caching.                                  |
+| `path_planning.py`      | CUDA-accelerated cubic/quintic joint and Cartesian trajectory generation; includes potential-field shaping for collision-aware paths.                                    |
+| `potential_field.py`    | Computes attractive and repulsive potentials and their gradients for real-time obstacle avoidance.                                                                      |
+| `control.py`            | Offers PD/PID, computed-torque, robust, adaptive, and Kalman-filter-based controllers; supports Ziegler–Nichols tuning.                                                  |
+| `vision.py`             | Handles camera modeling, stereo rectification, disparity-to-depth conversion; includes PyBullet-based GUI tuning interface .                             |
+| `perception.py`         | Converts depth maps to point clouds; clusters points using DBSCAN to detect obstacles for planning and reinforcement learning.                                            |
+| `singularity.py`        | Analyzes Jacobian singularities via condition numbers and manipulability ellipsoids; estimates workspace volume via Monte Carlo (GPU).                                   |
+| `sim.py`                | Sets up a PyBullet environment in one line; loads robots, applies joint sliders, runs control loops, and performs collision monitoring.                                  |
+| `cuda_kernels.py`       | Hosts low-level GPU kernels (trajectory rollout, dynamics, potential fields), tuned for 256-thread CUDA blocks.                                                          |
+| `utils.py`              | Provides utility functions for Lie group operations, time scaling, matrix logarithms/exponentials, and SE(3) ↔ se(3) conversions.                                         |
 # Theory Highlights
 
-## PoE Kinematics
+## URDF Processing and Robot Model Generation
 
-A pose is obtained with[@lynch2017modern] 
-$$ T(\theta)=e^{S_1\theta_1}\ldots e^{S_n\theta_n}M, $$
+A core capability of **ManipulaPy** is converting a robot's URDF (Unified Robot Description Format) file into an internal computational model suitable for kinematics, dynamics, and control. This transformation is handled by the `URDFToSerialManipulator` class.
+
+When a user loads a robot model:
+
+```python
+from ManipulaPy.urdf_processor import URDFToSerialManipulator
+
+urdf_proc = URDFToSerialManipulator("xarm.urdf")
+```
+
+the following steps are executed:
+
+### 1. URDF Parsing
+
+- The URDF is parsed using PyBullet’s internal loader to access link names, joint types, limits, masses, and inertia tensors.
+- The joint hierarchy is extracted as a tree of revolute/prismatic joints with parent-child link relations.
+
+### 2. Screw Axis Extraction
+
+- Each joint is converted into a **screw axis** $S_i \in \mathbb{R}^6$, using the joint’s origin, axis, and type.
+- The screw axis encodes both rotation and translation components:
+  
+  $$
+  S = \begin{bmatrix} \omega \\ v \end{bmatrix}, \quad \text{with } \omega = \text{axis},\quad v = -\omega \times q
+  $$
+
+  where $q$ is the joint position in the base frame.
+
+### 3. Home Configuration Matrix $M$
+
+- The default pose of the end-effector with all joint angles at zero is computed as a homogeneous transformation matrix $M \in SE(3)$.
+- This serves as the base pose in PoE kinematics:
+
+  $$
+  T(\theta) = e^{S_1 \theta_1} \cdots e^{S_n \theta_n} M
+  $$
 while the space Jacobian stacks each transformed screw axis
 $$ J(\theta)=\left[\operatorname{Ad}_{T_1}S_1,\ldots,S_n\right]. $$
 
-## Dynamics
 
-Mass matrix via spatial inertia:
+### 4. Inertial Property Extraction
+
+- Each link’s mass and spatial inertia tensor are wrapped into a $6 \times 6$ **spatial inertia matrix** $G_i$ for use in dynamic calculations.
+- These matrices are used to construct the mass matrix $M(\theta)$ and Coriolis/gravity terms.
 $$ M(\theta)=\sum_{i=1}^{n}\operatorname{Ad}_{T_i}^T G_i\,\operatorname{Ad}_{T_i}, \qquad \tau=M\ddot{\theta}+C(\theta,\dot\theta)+g(\theta). $$
 
-GPU kernels solve batches of these equations in parallel.
 
-## Stereo Depth
+### 5. Limit and Metadata Mapping
 
-With focal length $f$ and baseline $B$:
-$$ Z=\dfrac{fB}{d}. $$
+- PyBullet is queried to extract joint limits, damping/friction, and torque constraints.
+- This metadata is stored in `robot_data` and injected into the planner and controller to enforce safety and realism.
+
+### 6. Model Object Output
+
+- Finally, two primary Python objects are constructed:
+  - `SerialManipulator`: A pure kinematic model with screw axes and link transforms.
+  - `ManipulatorDynamics`: A dynamic model with mass, inertia, and external force computations.
+
+These are returned via:
+
+```python
+robot = urdf_proc.serial_manipulator
+dynamics = urdf_proc.dynamics
+```
+
+This one-call setup bridges URDF semantics with analytical modeling, enabling immediate simulation, control, and planning.
+
 
 ## CUDA Kernels for Acceleration
 
@@ -100,7 +151,7 @@ ManipulaPy includes a custom CUDA backend to speed up the most time-critical ope
 - **Cartesian Trajectory Kernel** (`cartesian_trajectory_kernel`)[@shahid2024]  
   Generates position/velocity/acceleration trajectories in SE(3) by interpolating position and rotating frames via exponential maps.
 
-All kernels are compiled with Numba's @cuda.jit decorator and optimized for 256-thread blocks. This balances occupancy and avoids register spilling. CuPy arrays wrap all inputs/outputs so that dynamics and control modules operate natively on the GPU.
+All kernels are compiled with Numba's **\@cuda.jit** decorator and optimized for 256-thread blocks. This balances occupancy and avoids register spilling. CuPy arrays wrap all inputs/outputs so that dynamics and control modules operate natively on the GPU.
 
 In trajectory benchmarks with 1000 steps, GPU rollout reduced latency from ~80ms to <4ms on an RTX 3060.
 
