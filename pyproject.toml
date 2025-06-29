@@ -1,7 +1,152 @@
+# ──────────────────────────────────────────────────────────────
+# Project build configuration for ManipulaPy
+# ──────────────────────────────────────────────────────────────
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# ------------------------------------------------------------------
+[project]
+name = "ManipulaPy"                    # exact PyPI casing
+version = "1.1.0"                      
+authors = [
+    { name = "Mohamed Aboelnar", email = "aboelnasr1997@gmail.com" },
+]
+description = "A comprehensive Python package for robotic manipulator analysis and control"
+readme = "README.md"
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.8"
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords = [
+    "robotics",
+    "kinematics",
+    "dynamics",
+    "trajectory-planning",
+    "simulation",
+    "cuda",
+]
+
+# ------------------------------------------------------------------
+# Core runtime dependencies - FIXED: Removed problematic GPU dependencies from core
+dependencies = [
+    "numpy>=1.19.2",
+    "scipy>=1.5.2",
+    "pybullet>=3.0.6",
+    "trimesh>=3.9.14",
+    "urchin>=0.0.27",
+    "numba>=0.55",
+    "matplotlib>=3.3",
+    "scikit-learn>=1.0",
+    "opencv-python>=4.5",
+    "ultralytics>=8.0",
+    "torch>=1.8.0",
+]
+
+[project.optional-dependencies]
+# GPU support - Multiple options to handle different CUDA versions
+gpu-cuda11 = ["cupy-cuda11x>=10.0.0"]
+gpu-cuda12 = ["cupy-cuda12x>=12.0.0"]
+gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
+# Legacy PyCUDA (alternative to CuPy)
+gpu-pycuda = ["pycuda>=2021.1"]
+# All GPU options combined
+gpu = ["cupy-cuda11x>=10.0.0"]  # Default to CUDA 11
+
+# Development dependencies
+dev = [
+    "pytest>=6.0.0",
+    "pytest-cov>=2.0.0",
+    "black>=21.0.0",
+    "flake8>=3.8.0",
+    "isort>=5.0.0",
+    "mypy>=0.910",
+    "pre-commit>=2.15.0",
+]
+
+# Documentation dependencies
+docs = [
+    "sphinx>=4.0.0",
+    "sphinx-rtd-theme>=1.0.0",
+    "myst-parser>=0.15.0",
+]
+
+# Testing with GPU support
+test-gpu = [
+    "ManipulaPy[dev,gpu-cuda11]"
+]
+
+# All optional dependencies (excluding GPU to avoid installation issues)
+all = ["ManipulaPy[dev,docs]"]
+
+[project.urls]
+Homepage = "https://github.com/boelnasr/ManipulaPy"
+Documentation = "https://manipulapy.readthedocs.io/"
+Repository = "https://github.com/boelnasr/ManipulaPy.git"
+"Bug Tracker" = "https://github.com/boelnasr/ManipulaPy/issues"
+
+# ------------------------------------------------------------------
+[tool.setuptools]
+packages = ["ManipulaPy"]
+include-package-data = true
+
+# FIXED: Proper package data inclusion for subdirectories
+[tool.setuptools.package-data]
+"ManipulaPy" = [
+    "*.yml",
+    "*.yaml",
+    "*.json",
+    "*.urdf",
+    "*.stl",
+    "*.dae",
+    "*.obj",
+]
+"ManipulaPy.ManipulaPy_data" = ["*"]
+"ManipulaPy.ManipulaPy_data.xarm" = [
+    "*.urdf",
+    "*.stl",
+    "*.dae", 
+    "*.obj",
+    "*.yml",
+    "*.yaml",
+    "xarm_description/**/*",
+    "xarm_gripper/**/*",
+]
+"ManipulaPy.ManipulaPy_data.ur5" = [
+    "*.urdf",
+    "*.stl",
+    "*.dae",
+    "*.obj", 
+    "*.yml",
+    "*.yaml",
+    "collision/**/*",
+    "visual/**/*",
+]
+
+# Alternative approach using MANIFEST.in file
+[tool.setuptools.package-dir]
+"" = "."
+
+# ------------------------------------------------------------------
+# Code-style & static-analysis tooling
+# ------------------------------------------------------------------
 [tool.black]
 line-length = 88
-target-version = ['py38']
-include = '\.pyi?$'
+target-version = ["py38", "py39", "py310", "py311"]
+include = "\\.pyi?$"
 exclude = '''
 /(
     \.eggs
@@ -14,5 +159,108 @@ exclude = '''
   | buck-out
   | build
   | dist
+  | __pycache__
 )/
 '''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["ManipulaPy"]
+known_third_party = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "cv2",
+    "pybullet",
+    "torch",
+    "numba",
+    "cupy",
+    "ultralytics",
+    "sklearn",
+    "urchin",
+    "trimesh",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["ManipulaPy"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pybullet.*",
+    "urchin.*",
+    "ultralytics.*",
+    "cupy.*",
+    "numba.*",
+    "cv2.*",
+    "matplotlib.*",
+    "scipy.*",
+    "trimesh.*",
+    "pycuda.*",
+]
+ignore_missing_imports = true
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = [
+    "E203",  # whitespace before ':'
+    "E501",  # line too long (handled by black)
+    "W503",  # line break before binary operator
+]
+exclude = [
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    ".eggs",
+    "*.egg-info",
+    ".venv",
+    ".tox",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101", "B601"]
