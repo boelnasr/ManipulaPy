@@ -1,5 +1,29 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""
+Path Planning Module - ManipulaPy
 
+This module provides trajectory planning capabilities including joint space and Cartesian
+space trajectory generation with CUDA acceleration and collision avoidance.
+
+Copyright (c) 2025 Mohamed Aboelnar
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
+
+This file is part of ManipulaPy.
+
+ManipulaPy is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+ManipulaPy is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
+"""
 from numba import cuda
 import numpy as np
 import matplotlib.pyplot as plt

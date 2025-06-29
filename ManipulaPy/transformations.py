@@ -1,3 +1,38 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""
+Transformations Module - ManipulaPy
+
+This module provides essential geometric transformation utilities for robotics applications
+including rotation matrices for X, Y, and Z axes, Euler angle conversions, and homogeneous
+transformation matrix construction for pose representation and manipulation.
+
+The module supports:
+- Elementary rotation matrices around coordinate axes
+- Euler angle to rotation matrix conversion (ZYX convention)
+- Pose vector to homogeneous transformation matrix conversion
+- Type-annotated functions for better code clarity and IDE support
+
+Copyright (c) 2025 Mohamed Aboelnar
+
+This file is part of ManipulaPy.
+
+ManipulaPy is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+ManipulaPy is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
+"""
+
+
+
 import numpy as np
 
 
