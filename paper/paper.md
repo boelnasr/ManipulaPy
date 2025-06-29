@@ -16,7 +16,7 @@ bibliography: paper.bib
 
 **ManipulaPy** is an open‑source Python toolbox that stitches together the entire manipulation pipeline—from URDF parsing to GPU‑accelerated dynamics, vision‑based perception, planning and control—within a single API.  Built on the Product‑of‑Exponentials model [@lynch2017modern], PyBullet [@coumans2019], CuPy [@cupy2021] and custom CUDA kernels [@liang2018gpu], the library lets researchers move from robot description to real‑time control with up to **40 ×** faster inverse‑dynamics on a 6‑DOF UR5 than a NumPy baseline.
 
-## Statement of need
+# Statement of Need
 
 Robotics research needs tight couplings of geometry, physics, vision and control. Existing stacks—MoveIt [@chitta2012moveit], Orocos KDL [@smits2009kdl] and the Python Robotics Toolbox [@corke2021]—cover parts of this but require glue code or lack GPU paths. **ManipulaPy** instead:
 
