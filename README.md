@@ -434,8 +434,6 @@ This project is licensed under the **GNU Affero General Public License v3.0 or l
 - **`pybullet`** → Zlib License
 - **`scikit-learn`** → BSD License
 - **`ultralytics`** → AGPL-3.0 License (YOLO object detection)
-
-**Optional GPU Dependencies**:
 - **`cupy`** → MIT License (GPU acceleration)
 - **`numba`** → BSD License (JIT compilation)
 
@@ -501,27 +499,6 @@ Feel free to reach out with questions, bug reports, feature requests, or collabo
 
 ---
 
-## 🔄 Version History
-
-### v1.2.0 (Current - January 2025)
-- ✅ **AGPL-3.0 Licensing**: Full license compliance and transparency
-- 🚀 **Enhanced GPU Support**: Improved CUDA kernels with graceful CPU fallbacks
-- 🔧 **Better Error Handling**: Robust handling of missing dependencies
-- 📦 **Improved Installation**: Cleaner dependency management with optional extras
-- 📚 **Comprehensive Documentation**: Enhanced docstrings, examples, and JOSS compliance
-- 🧪 **Extended Testing**: Broader test coverage and validation scenarios
-
-### v1.1.0 (2024)
-- 👁️ **Computer Vision**: Stereo vision and YOLO-based perception capabilities
-- 🌐 **PyBullet Integration**: Real-time physics simulation and visualization
-- ⚡ **GPU Acceleration**: CUDA kernels for trajectory planning and dynamics
-- 🎮 **Advanced Control**: Additional control algorithms and strategies
-
-### v1.0.0 (2024)
-- 🔧 **Core Kinematics**: Forward/inverse kinematics and Jacobian calculations
-- ⚙️ **Basic Dynamics**: Mass matrix and gravity force computation
-- 🛤️ **Trajectory Planning**: Basic joint space trajectory generation
-- 🎮 **Control Systems**: PID and basic control implementations
 
 ---
 
