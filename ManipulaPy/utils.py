@@ -1,28 +1,38 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """
-ManipulaPy Utils Module
+Utilities Module - ManipulaPy
 
-This module contains various utility functions for working with rigid body motions,
-transformations, and related operations in the context of robotic manipulation.
+This module contains essential utility functions for working with rigid body motions,
+transformations, and related operations in robotic manipulation. Functions cover
+screw theory, matrix operations, Lie algebra computations, time scaling, and
+coordinate transformations for kinematics and dynamics calculations.
 
-The functions in this module cover a wide range of topics, including:
-
+The functions in this module support:
 - Extracting and manipulating screw vectors and twists
 - Computing transformation matrices from twists and joint angles
-- Computing matrix logarithms and exponentials
-- Converting between different representations (e.g., rotation matrices, Euler angles)
-- Handling skew-symmetric matrices and vectors
-- Working with the se(3) and so(3) Lie algebras
-- Implementing time scaling functions for trajectory generation
+- Matrix logarithms and exponentials for SE(3) and SO(3)
+- Converting between rotation matrices and Euler angles
+- Skew-symmetric matrix operations
+- Time scaling functions for trajectory generation
 
-This module is designed to be used in conjunction with other modules in the ManipulaPy
-library for tasks such as forward and inverse kinematics, trajectory planning, and control.
+Copyright (c) 2025 Mohamed Aboelnar
 
-Note: This module assumes familiarity with concepts from rigid body dynamics, Lie theory,
-and robotics. For more information, refer to the documentation or relevant literature.
+This file is part of ManipulaPy.
 
+ManipulaPy is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+ManipulaPy is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
-
-#!/usr/bin/env python3
 
 import numpy as np
 from scipy.linalg import expm

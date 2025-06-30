@@ -1,33 +1,31 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """
-ManipulaPy Kinematics Module
+Kinematics Module - ManipulaPy
 
 This module provides classes and functions for performing kinematic analysis and computations
 for serial manipulators, including forward and inverse kinematics, Jacobian calculations,
 and end-effector velocity calculations.
 
-The main class in this module is `SerialManipulator`, which represents a serial robotic
-manipulator with an arbitrary number of joints. This class provides methods for:
+Copyright (c) 2025 Mohamed Aboelnar
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 
-- Forward kinematics: Compute the end-effector pose given joint angles
-- Inverse kinematics: Compute joint angles to achieve a desired end-effector pose
-- Jacobian calculation: Compute the Jacobian matrix in the space or body frame
-- End-effector velocity: Compute the end-effector velocity given joint angles and velocities
-- Joint velocity: Compute the joint velocities required to achieve a desired end-effector velocity
+This file is part of ManipulaPy.
 
-The module also includes utility functions for working with transformation matrices, twists,
-and other kinematic quantities, which are imported from the `utils` module.
+ManipulaPy is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-To use this module, you need to provide the kinematic parameters of the manipulator, such as
-the  screw axes, or the M, G, and B matrices. The `SerialManipulator`
-class can then be instantiated with these parameters, and its methods can be used for various
-kinematic computations.
+ManipulaPy is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
 
-Note: This module assumes familiarity with concepts from robotics, kinematics, and Lie theory.
-For more information, refer to the documentation or relevant literature.
-
+You should have received a copy of the GNU Affero General Public License
+along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
-
-#!/usr/bin/env python3
 
 import numpy as np
 from . import utils
