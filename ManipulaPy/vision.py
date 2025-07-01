@@ -111,7 +111,7 @@ class Vision:
 
         # Load YOLO Model for Object Detection
         try:
-            self.yolo_model = YOLO("yolov8m.pt")  # Ensure this model file is available
+            self.yolo_model = YOLO("yolov10m.pt")  # Ensure this model file is available
             self.logger.info("✅ YOLO model loaded successfully.")
         except Exception as e:
             self.logger.error(f"❌ Failed to load YOLO model: {e}")
