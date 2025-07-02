@@ -639,13 +639,38 @@ class Vision:
             self.logger.info(f"Released OpenCV camera {idx}.")
         self.capture_devices.clear()
 
+# Patch for vision.py to fix the logging issue in destructor
+# This should be applied at the end of the vision.py file
+
     def __del__(self):
         """
         Destructor: ensure we release resources gracefully.
         """
         try:
-            if hasattr(self, "logger") and self.logger:
-                self.logger.debug("Vision destructor called; releasing resources.")
+            # Check if logger exists and is still valid
+            if hasattr(self, 'logger') and self.logger:
+                # Check if logger handlers are still valid
+                if hasattr(self.logger, 'handlers') and self.logger.handlers:
+                    # Check if any handler is still open
+                    valid_handlers = []
+                    for handler in self.logger.handlers:
+                        try:
+                            if hasattr(handler, 'stream') and hasattr(handler.stream, 'closed'):
+                                if not handler.stream.closed:
+                                    valid_handlers.append(handler)
+                            else:
+                                valid_handlers.append(handler)
+                        except:
+                            pass
+                    
+                    # Only log if we have valid handlers
+                    if valid_handlers:
+                        self.logger.debug("Vision destructor called; releasing resources.")
+            
+            # Always try to release resources regardless of logging
             self.release()
+            
         except Exception:
-            pass  # Avoid raising exceptions during object destruction
+            # Silently ignore all exceptions during destruction
+            # This prevents the logging error from causing issues
+            pass
