@@ -639,13 +639,54 @@ class Vision:
             self.logger.info(f"Released OpenCV camera {idx}.")
         self.capture_devices.clear()
 
+# Replace the __del__ method in ManipulaPy/vision.py (around line 648)
+
     def __del__(self):
         """
         Destructor: ensure we release resources gracefully.
         """
         try:
-            if hasattr(self, "logger") and self.logger:
-                self.logger.debug("Vision destructor called; releasing resources.")
-            self.release()
+            # Only attempt logging if we have a valid logger with open handlers
+            if (hasattr(self, 'logger') and 
+                self.logger and 
+                hasattr(self.logger, 'handlers')):
+                
+                # Check if any handlers are still valid (not closed)
+                has_valid_handler = False
+                for handler in self.logger.handlers:
+                    try:
+                        # Check if handler has a stream and if it's open
+                        if hasattr(handler, 'stream'):
+                            if hasattr(handler.stream, 'closed'):
+                                if not handler.stream.closed:
+                                    has_valid_handler = True
+                                    break
+                            else:
+                                # Stream exists but no 'closed' attribute, assume it's valid
+                                has_valid_handler = True
+                                break
+                        else:
+                            # Handler without stream (e.g., NullHandler), assume valid
+                            has_valid_handler = True
+                            break
+                    except (AttributeError, ValueError):
+                        # Skip this handler if we can't determine its state
+                        continue
+                
+                # Only log if we found at least one valid handler
+                if has_valid_handler:
+                    try:
+                        self.logger.debug("Vision destructor called; releasing resources.")
+                    except (ValueError, OSError):
+                        # Even if we thought the handler was valid, it might have closed
+                        # between our check and the log call. Just ignore it.
+                        pass
+            
+            # Always attempt to release resources, regardless of logging success
+            if hasattr(self, 'release'):
+                self.release()
+                
         except Exception:
-            pass  # Avoid raising exceptions during object destruction
+            # Silently ignore ALL exceptions during destruction
+            # The destructor should never raise exceptions
+            pass
