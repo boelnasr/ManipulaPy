@@ -1,0 +1,14 @@
+numpy>=1.19.2
+scipy>=1.5.2
+pybullet>=3.0.6
+pycuda>=2021.1
+trimesh>=3.9.14
+urchin>=0.0.27
+numba>=0.55
+matplotlib>=3.3
+scikit-learn>=1.0
+opencv-python>=4.5
+ultralytics>=8.0  # For YOLO-based perception
+cupy>=9.0         # CUDA-accelerated arrays/kernels
+torch>=1.8.0      # Required for YOLO (PyTorch-based)
+
