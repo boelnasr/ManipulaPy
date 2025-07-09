@@ -4,56 +4,20 @@
 CUDA Kernels API Reference
 ==========================
 
-This page documents **ManipulaPy.cuda_kernels**, the module providing CUDA-accelerated functions for trajectory planning and dynamics computation.
-
-.. tip::
-   All CUDA functionality is optional and gracefully degrades to CPU implementations when GPU support is unavailable.
-
------------------
-Quick Navigation
------------------
-
-.. contents::
-   :local:
-   :depth: 2
-
-----------------
-Module Overview
-----------------
-
 .. currentmodule:: ManipulaPy.cuda_kernels
 
-The CUDA kernels module provides high-performance GPU-accelerated functions for:
+This module provides CUDA-accelerated functions for trajectory planning and dynamics computation with automatic CPU fallback.
 
-- **Trajectory Generation**: Cubic and quintic time scaling with parallel computation
-- **Dynamics Computation**: Inverse and forward dynamics for trajectory batches
-- **Potential Fields**: Attractive and repulsive potential field calculations
-- **Automatic Fallback**: CPU implementations when CUDA is unavailable
-
-.. note::
-   **GPU Requirements**: CUDA kernels require:
-   
-   - NVIDIA GPU with compute capability 3.5+
-   - CUDA toolkit 11.0+ or 12.0+
-   - Installation: ``pip install ManipulaPy[gpu-cuda11]`` or ``pip install ManipulaPy[gpu-cuda12]``
-
------------------
+--------------------
 Availability Check
------------------
+--------------------
 
 .. autofunction:: check_cuda_availability
 
-   Check if CUDA is available and provide helpful error messages.
+   Check if CUDA is available and provide helpful diagnostic information.
 
    **Returns:**
      - **bool** -- True if CUDA is available, False otherwise
-
-   **Example:**
-     >>> from ManipulaPy.cuda_kernels import check_cuda_availability
-     >>> if check_cuda_availability():
-     ...     print("CUDA acceleration available")
-     ... else:
-     ...     print("Falling back to CPU implementation")
 
 .. autofunction:: check_cupy_availability
 
@@ -62,127 +26,135 @@ Availability Check
    **Returns:**
      - **bool** -- True if CuPy is available, False otherwise
 
------------------
-CUDA Kernels
------------------
+.. autofunction:: get_gpu_properties
+
+   Retrieve current CUDA device properties for kernel optimization and resource allocation.
+
+   **Returns:**
+     - **dict or None** -- GPU device properties including multiprocessor count, memory limits, etc.
+
+-------------------
+Core CUDA Kernels
+-------------------
 
 Trajectory Kernels
-------------------
+--------------------
 
 .. autofunction:: trajectory_kernel
 
-   CUDA kernel to compute joint trajectories with cubic or quintic time scaling.
+   CUDA kernel for generating joint trajectory points with time-scaling.
 
    **Parameters:**
-     - **thetastart** (*cuda.device_array*) -- Starting joint angles (n,)
-     - **thetaend** (*cuda.device_array*) -- Ending joint angles (n,)
-     - **traj_pos** (*cuda.device_array*) -- Output positions (N, n)
-     - **traj_vel** (*cuda.device_array*) -- Output velocities (N, n)
-     - **traj_acc** (*cuda.device_array*) -- Output accelerations (N, n)
+     - **thetastart** (*cuda.device_array*) -- Starting joint angles
+     - **thetaend** (*cuda.device_array*) -- Target joint angles  
+     - **traj_pos** (*cuda.device_array*) -- Output trajectory positions
+     - **traj_vel** (*cuda.device_array*) -- Output trajectory velocities
+     - **traj_acc** (*cuda.device_array*) -- Output trajectory accelerations
      - **Tf** (*float*) -- Total trajectory time
      - **N** (*int*) -- Number of trajectory points
      - **method** (*int*) -- Time scaling method (3=cubic, 5=quintic)
-
-   **Grid Configuration:**
-     - **Threads per block**: 256
-     - **Blocks per grid**: ``(N + 255) // 256``
-
-   **Mathematical Formulation:**
-
-   For cubic time scaling (method=3):
-
-   .. math::
-
-      s(t) &= 3\left(\frac{t}{T_f}\right)^2 - 2\left(\frac{t}{T_f}\right)^3 \\
-      \dot{s}(t) &= \frac{6t(T_f - t)}{T_f^3} \\
-      \ddot{s}(t) &= \frac{6(T_f - 2t)}{T_f^2}
-
-   For quintic time scaling (method=5):
-
-   .. math::
-
-      s(t) &= 10\left(\frac{t}{T_f}\right)^3 - 15\left(\frac{t}{T_f}\right)^4 + 6\left(\frac{t}{T_f}\right)^5
+     - **stream** (*int*) -- CUDA stream for kernel execution
 
 .. autofunction:: cartesian_trajectory_kernel
 
-   CUDA kernel for Cartesian space trajectory generation.
+   CUDA kernel for generating Cartesian trajectory with time-scaling.
 
    **Parameters:**
-     - **pstart** (*cuda.device_array*) -- Starting position [x, y, z]
-     - **pend** (*cuda.device_array*) -- Ending position [x, y, z]
-     - **traj_pos** (*cuda.device_array*) -- Output positions (N, 3)
-     - **traj_vel** (*cuda.device_array*) -- Output velocities (N, 3)
-     - **traj_acc** (*cuda.device_array*) -- Output accelerations (N, 3)
-     - **Tf** (*float*) -- Total trajectory time
+     - **pstart** (*cuda.device_array*) -- Starting point coordinates [x, y, z]
+     - **pend** (*cuda.device_array*) -- Ending point coordinates [x, y, z]
+     - **traj_pos** (*cuda.device_array*) -- Output trajectory positions
+     - **traj_vel** (*cuda.device_array*) -- Output trajectory velocities
+     - **traj_acc** (*cuda.device_array*) -- Output trajectory accelerations
+     - **Tf** (*float*) -- Total trajectory duration
      - **N** (*int*) -- Number of trajectory points
-     - **method** (*int*) -- Time scaling method (3=cubic, 5=quintic)
+     - **method** (*int*) -- Time-scaling method (3=cubic, 5=quintic)
+     - **stream** (*int*) -- CUDA stream for kernel execution
+
+.. autofunction:: batch_trajectory_kernel
+
+   Optimized CUDA kernel for batch trajectory generation with time-scaling.
+
+   **Parameters:**
+     - **thetastart_batch** (*cuda.device_array*) -- Starting joint positions for each batch
+     - **thetaend_batch** (*cuda.device_array*) -- Ending joint positions for each batch
+     - **traj_pos_batch** (*cuda.device_array*) -- Output trajectory positions
+     - **traj_vel_batch** (*cuda.device_array*) -- Output trajectory velocities
+     - **traj_acc_batch** (*cuda.device_array*) -- Output trajectory accelerations
+     - **Tf** (*float*) -- Total trajectory duration
+     - **N** (*int*) -- Number of trajectory timesteps
+     - **method** (*int*) -- Time-scaling method (3=cubic, 5=quintic)
+     - **batch_size** (*int*) -- Number of trajectory batches
+     - **stream** (*int*) -- CUDA stream for kernel execution
 
 Dynamics Kernels
------------------
+-------------------
 
 .. autofunction:: inverse_dynamics_kernel
 
-   CUDA kernel for parallel inverse dynamics computation.
+   Optimized CUDA kernel for computing inverse dynamics using 2D parallelization.
 
    **Parameters:**
-     - **thetalist_trajectory** (*cuda.device_array*) -- Joint angles (N, n)
-     - **dthetalist_trajectory** (*cuda.device_array*) -- Joint velocities (N, n)
-     - **ddthetalist_trajectory** (*cuda.device_array*) -- Joint accelerations (N, n)
-     - **gravity_vector** (*cuda.device_array*) -- Gravity vector [0, 0, -9.81]
-     - **Ftip** (*cuda.device_array*) -- External forces at end-effector
-     - **Glist** (*cuda.device_array*) -- Spatial inertia matrices (n, 6, 6)
-     - **Slist** (*cuda.device_array*) -- Screw axes (6, n)
-     - **M** (*cuda.device_array*) -- Home configuration matrix (4, 4)
-     - **torques_trajectory** (*cuda.device_array*) -- Output torques (N, n)
-     - **torque_limits** (*cuda.device_array*) -- Torque limits (n, 2)
-
-   **Mathematical Formulation:**
-
-   .. math::
-
-      \boldsymbol{\tau} = M(\mathbf{q})\ddot{\mathbf{q}} + C(\mathbf{q},\dot{\mathbf{q}})\dot{\mathbf{q}} + G(\mathbf{q}) + J^T(\mathbf{q})\mathbf{F}_{tip}
+     - **thetalist_trajectory** (*cuda.device_array*) -- Joint position trajectory
+     - **dthetalist_trajectory** (*cuda.device_array*) -- Joint velocity trajectory
+     - **ddthetalist_trajectory** (*cuda.device_array*) -- Joint acceleration trajectory
+     - **gravity_vector** (*cuda.device_array*) -- Gravity vector
+     - **Ftip** (*cuda.device_array*) -- End-effector wrench
+     - **Glist** (*cuda.device_array*) -- Mass matrix diagonal elements
+     - **Slist** (*cuda.device_array*) -- Velocity quadratic force coefficients
+     - **M** (*cuda.device_array*) -- Full mass matrix
+     - **torques_trajectory** (*cuda.device_array*) -- Output joint torque trajectory
+     - **torque_limits** (*cuda.device_array*) -- Joint torque limits
+     - **stream** (*int*) -- CUDA stream for kernel execution
 
 .. autofunction:: forward_dynamics_kernel
 
-   CUDA kernel for parallel forward dynamics computation.
+   Compute forward dynamics for a robotic system using a CUDA kernel.
 
    **Parameters:**
-     - **thetalist** (*cuda.device_array*) -- Initial joint angles
+     - **thetalist** (*cuda.device_array*) -- Initial joint positions
      - **dthetalist** (*cuda.device_array*) -- Initial joint velocities
-     - **taumat** (*cuda.device_array*) -- Applied torques (N, n)
+     - **taumat** (*cuda.device_array*) -- Applied joint torques trajectory
      - **g** (*cuda.device_array*) -- Gravity vector
-     - **Ftipmat** (*cuda.device_array*) -- External forces (N, 6)
-     - **dt** (*float*) -- Integration time step
-     - **intRes** (*int*) -- Integration resolution
-     - **Glist** (*cuda.device_array*) -- Spatial inertia matrices
-     - **Slist** (*cuda.device_array*) -- Screw axes
-     - **M** (*cuda.device_array*) -- Home configuration
-     - **thetamat** (*cuda.device_array*) -- Output positions (N, n)
-     - **dthetamat** (*cuda.device_array*) -- Output velocities (N, n)
-     - **ddthetamat** (*cuda.device_array*) -- Output accelerations (N, n)
-     - **joint_limits** (*cuda.device_array*) -- Joint limits (n, 2)
+     - **Ftipmat** (*cuda.device_array*) -- End-effector wrenches
+     - **dt** (*float*) -- Total time step
+     - **intRes** (*int*) -- Integration resolution/substeps
+     - **Glist** (*cuda.device_array*) -- Mass matrix diagonal elements
+     - **Slist** (*cuda.device_array*) -- Velocity quadratic force coefficients
+     - **M** (*cuda.device_array*) -- Full mass matrix
+     - **thetamat** (*cuda.device_array*) -- Output joint position trajectory
+     - **dthetamat** (*cuda.device_array*) -- Output joint velocity trajectory
+     - **ddthetamat** (*cuda.device_array*) -- Output joint acceleration trajectory
+     - **joint_limits** (*cuda.device_array*) -- Joint position limits
+     - **stream** (*int*) -- CUDA stream for kernel execution
 
 Potential Field Kernels
-------------------------
+--------------------------
+
+.. autofunction:: fused_potential_gradient_kernel
+
+   CUDA kernel for computing potential and gradient for path planning.
+
+   **Parameters:**
+     - **positions** (*cuda.device_array*) -- Input positions to evaluate
+     - **goal** (*cuda.device_array*) -- Target goal point coordinates
+     - **obstacles** (*cuda.device_array*) -- Array of obstacle point coordinates
+     - **potential** (*cuda.device_array*) -- Output array for computed potential values
+     - **gradient** (*cuda.device_array*) -- Output array for computed gradient vectors
+     - **influence_distance** (*float*) -- Distance threshold for obstacle influence
+     - **stream** (*int*) -- CUDA stream for kernel execution
 
 .. autofunction:: attractive_potential_kernel
 
-   CUDA kernel for attractive potential field computation.
+   Legacy CUDA kernel for attractive potential field computation.
 
    **Parameters:**
      - **positions** (*cuda.device_array*) -- Query positions (N, 3)
      - **goal** (*cuda.device_array*) -- Goal position [x, y, z]
      - **potential** (*cuda.device_array*) -- Output potential values (N,)
 
-   **Mathematical Formulation:**
-
-   .. math::
-
-      U_{att}(\mathbf{q}) = \frac{1}{2}\|\mathbf{q} - \mathbf{q}_{goal}\|^2
-
 .. autofunction:: repulsive_potential_kernel
 
-   CUDA kernel for repulsive potential field computation.
+   Legacy CUDA kernel for repulsive potential field computation.
 
    **Parameters:**
      - **positions** (*cuda.device_array*) -- Query positions (N, 3)
@@ -190,286 +162,256 @@ Potential Field Kernels
      - **potential** (*cuda.device_array*) -- Output potential values (N,)
      - **influence_distance** (*float*) -- Maximum influence distance
 
-   **Mathematical Formulation:**
-
-   .. math::
-
-      U_{rep}(\mathbf{q}) = \begin{cases}
-      \frac{1}{2}\left(\frac{1}{\rho(\mathbf{q})} - \frac{1}{\rho_0}\right)^2 & \text{if } \rho(\mathbf{q}) \leq \rho_0 \\
-      0 & \text{if } \rho(\mathbf{q}) > \rho_0
-      \end{cases}
-
-   where :math:`\rho(\mathbf{q})` is the distance to nearest obstacle and :math:`\rho_0` is the influence distance.
-
 .. autofunction:: gradient_kernel
 
-   CUDA kernel for numerical gradient computation.
+   Legacy CUDA kernel for numerical gradient computation.
 
    **Parameters:**
      - **potential** (*cuda.device_array*) -- Potential field values (N,)
      - **gradient** (*cuda.device_array*) -- Output gradient (N-1,)
 
+
+
 -------------------
+High-Level Wrappers
+-------------------
+
+.. autofunction:: optimized_trajectory_generation
+
+   Generates an optimized trajectory using CUDA acceleration with automatic memory management.
+
+   **Parameters:**
+     - **thetastart** (*np.ndarray*) -- Initial joint configuration
+     - **thetaend** (*np.ndarray*) -- Final joint configuration
+     - **Tf** (*float*) -- Total trajectory duration
+     - **N** (*int*) -- Number of trajectory timesteps
+     - **method** (*int*) -- Trajectory generation method
+     - **use_pinned** (*bool*) -- Use pinned memory for faster GPU transfers
+
+   **Returns:**
+     - **tuple** -- (trajectory positions, trajectory velocities, trajectory accelerations)
+
+.. autofunction:: optimized_potential_field
+
+   Compute potential field and gradient for a set of positions using a CUDA-accelerated kernel.
+
+   **Parameters:**
+     - **positions** (*np.ndarray*) -- Input positions to compute potential field for
+     - **goal** (*np.ndarray*) -- Target goal position
+     - **obstacles** (*np.ndarray*) -- Array of obstacle positions
+     - **influence_distance** (*float*) -- Distance within which obstacles influence the potential field
+     - **use_pinned** (*bool*) -- Use pinned memory for faster GPU transfers
+
+   **Returns:**
+     - **tuple** -- (potential values, gradient vectors) for each input position
+
+.. autofunction:: optimized_batch_trajectory_generation
+
+   Efficiently generate batch trajectories using CUDA acceleration.
+
+   **Parameters:**
+     - **thetastart_batch** (*np.ndarray*) -- Batch of initial joint configurations
+     - **thetaend_batch** (*np.ndarray*) -- Batch of final joint configurations
+     - **Tf** (*float*) -- Total trajectory duration
+     - **N** (*int*) -- Number of trajectory timesteps
+     - **method** (*int*) -- Trajectory generation method identifier
+     - **use_pinned** (*bool*) -- Use pinned memory for faster GPU transfers
+
+   **Returns:**
+     - **tuple** -- Batch of trajectory positions, velocities, and accelerations
+
+----------------------
 CPU Fallback Functions
--------------------
+----------------------
 
 .. autofunction:: trajectory_cpu_fallback
 
-   CPU implementation for trajectory generation when CUDA is unavailable.
+   Compute trajectory positions, velocities, and accelerations on the CPU when CUDA is unavailable.
 
    **Parameters:**
-     - **thetastart** (*np.ndarray*) -- Starting joint angles
-     - **thetaend** (*np.ndarray*) -- Ending joint angles
-     - **Tf** (*float*) -- Final time
-     - **N** (*int*) -- Number of trajectory points
+     - **thetastart** (*np.ndarray*) -- Initial joint configurations
+     - **thetaend** (*np.ndarray*) -- Target joint configurations
+     - **Tf** (*float*) -- Total trajectory duration
+     - **N** (*int*) -- Number of trajectory points to generate
      - **method** (*int*) -- Time scaling method (3=cubic, 5=quintic)
 
    **Returns:**
      - **tuple** -- (positions, velocities, accelerations) arrays
 
-   **Example:**
-     >>> import numpy as np
-     >>> from ManipulaPy.cuda_kernels import trajectory_cpu_fallback
-     >>> start = np.array([0.0, 0.0, 0.0])
-     >>> end = np.array([1.0, 0.5, -0.3])
-     >>> pos, vel, acc = trajectory_cpu_fallback(start, end, Tf=2.0, N=100, method=3)
-
---------------
-Usage Examples
---------------
-
-Basic CUDA Trajectory Generation
----------------------------------
-
-::
-
-   import numpy as np
-   from numba import cuda
-   from ManipulaPy.cuda_kernels import trajectory_kernel, check_cuda_availability
-
-   if check_cuda_availability():
-       # Setup trajectory parameters
-       thetastart = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-       thetaend = np.array([1.0, 0.5, -0.3], dtype=np.float32)
-       N = 1000
-       Tf = 2.0
-       method = 3  # Cubic scaling
-
-       # Allocate GPU memory
-       d_start = cuda.to_device(thetastart)
-       d_end = cuda.to_device(thetaend)
-       d_pos = cuda.device_array((N, 3), dtype=np.float32)
-       d_vel = cuda.device_array((N, 3), dtype=np.float32)
-       d_acc = cuda.device_array((N, 3), dtype=np.float32)
-
-       # Configure kernel launch
-       threads_per_block = 256
-       blocks_per_grid = (N + threads_per_block - 1) // threads_per_block
-
-       # Launch kernel
-       trajectory_kernel[blocks_per_grid, threads_per_block](
-           d_start, d_end, d_pos, d_vel, d_acc, Tf, N, method
-       )
-
-       # Copy results back to host
-       positions = d_pos.copy_to_host()
-       velocities = d_vel.copy_to_host()
-       accelerations = d_acc.copy_to_host()
-
-Batch Dynamics Computation
----------------------------
-
-::
-
-   from ManipulaPy.cuda_kernels import inverse_dynamics_kernel
-
-   # Batch inverse dynamics for 1000 trajectory points
-   N_points = 1000
-   n_joints = 6
-
-   # Setup trajectory data (on GPU)
-   d_theta_traj = cuda.device_array((N_points, n_joints), dtype=np.float32)
-   d_dtheta_traj = cuda.device_array((N_points, n_joints), dtype=np.float32)
-   d_ddtheta_traj = cuda.device_array((N_points, n_joints), dtype=np.float32)
-   d_torques = cuda.device_array((N_points, n_joints), dtype=np.float32)
-
-   # Robot parameters (simplified)
-   gravity = np.array([0, 0, -9.81], dtype=np.float32)
-   d_gravity = cuda.to_device(gravity)
-   
-   # Configure and launch kernel
-   threads_per_block = 256
-   blocks_per_grid = (N_points + threads_per_block - 1) // threads_per_block
-
-   inverse_dynamics_kernel[blocks_per_grid, threads_per_block](
-       d_theta_traj, d_dtheta_traj, d_ddtheta_traj,
-       d_gravity, d_Ftip, d_Glist, d_Slist, d_M,
-       d_torques, d_torque_limits
-   )
-
-   # Results available in d_torques
-
-Potential Field Path Planning
------------------------------
-
-::
-
-   from ManipulaPy.cuda_kernels import attractive_potential_kernel, repulsive_potential_kernel
-
-   # Setup workspace grid
-   N_points = 10000
-   positions = np.random.uniform(-5, 5, (N_points, 3)).astype(np.float32)
-   goal = np.array([4.0, 4.0, 1.0], dtype=np.float32)
-   obstacles = np.array([
-       [1.0, 1.0, 0.5],
-       [2.0, 3.0, 1.0],
-       [-1.0, 2.0, 0.8]
-   ], dtype=np.float32)
-
-   # GPU memory allocation
-   d_positions = cuda.to_device(positions)
-   d_goal = cuda.to_device(goal)
-   d_obstacles = cuda.to_device(obstacles)
-   d_potential = cuda.device_array(N_points, dtype=np.float32)
-
-   threads_per_block = 256
-   blocks_per_grid = (N_points + threads_per_block - 1) // threads_per_block
-
-   # Compute attractive potential
-   attractive_potential_kernel[blocks_per_grid, threads_per_block](
-       d_positions, d_goal, d_potential
-   )
-
-   # Add repulsive potential
-   influence_distance = 1.0
-   repulsive_potential_kernel[blocks_per_grid, threads_per_block](
-       d_positions, d_obstacles, d_potential, influence_distance
-   )
-
-   # Copy results
-   total_potential = d_potential.copy_to_host()
-
-Error Handling and Fallbacks
------------------------------
-
-::
-
-   from ManipulaPy.cuda_kernels import check_cuda_availability, trajectory_cpu_fallback
-
-   def generate_trajectory(start, end, Tf, N, method=3):
-       """Generate trajectory with automatic GPU/CPU fallback"""
-       
-       if check_cuda_availability():
-           try:
-               # GPU implementation
-               from numba import cuda
-               from ManipulaPy.cuda_kernels import trajectory_kernel
-               
-               # Convert to appropriate types
-               start = np.asarray(start, dtype=np.float32)
-               end = np.asarray(end, dtype=np.float32)
-               
-               # GPU computation
-               d_start = cuda.to_device(start)
-               d_end = cuda.to_device(end)
-               d_pos = cuda.device_array((N, len(start)), dtype=np.float32)
-               d_vel = cuda.device_array((N, len(start)), dtype=np.float32)
-               d_acc = cuda.device_array((N, len(start)), dtype=np.float32)
-               
-               threads_per_block = 256
-               blocks_per_grid = (N + threads_per_block - 1) // threads_per_block
-               
-               trajectory_kernel[blocks_per_grid, threads_per_block](
-                   d_start, d_end, d_pos, d_vel, d_acc, Tf, N, method
-               )
-               
-               return d_pos.copy_to_host(), d_vel.copy_to_host(), d_acc.copy_to_host()
-               
-           except Exception as e:
-               print(f"GPU computation failed: {e}")
-               print("Falling back to CPU implementation")
-       
-       # CPU fallback
-       return trajectory_cpu_fallback(start, end, Tf, N, method)
-
+-------------------
 Memory Management
------------------
+-------------------
 
-::
+.. autofunction:: get_cuda_array
 
-   import gc
-   from numba import cuda
+   Get a CUDA array from the memory pool.
 
-   def cleanup_gpu_memory():
-       """Clean up GPU memory after kernel execution"""
-       # Force garbage collection
-       gc.collect()
-       
-       # Synchronize CUDA context
-       cuda.synchronize()
-       
-       # Optional: Reset CUDA context (use with caution)
-       # cuda.close()
+   **Parameters:**
+     - **shape** (*tuple*) -- Array dimensions
+     - **dtype** (*np.dtype*) -- Data type
 
-   # Example usage in a loop
-   for i in range(num_iterations):
-       # GPU computation
-       result = compute_on_gpu(data)
-       
-       # Process results
-       process_results(result)
-       
-       # Clean up every few iterations
-       if i % 10 == 0:
-           cleanup_gpu_memory()
+   **Returns:**
+     - **cuda.device_array** -- GPU array from memory pool
 
--------------
-Performance Tips
--------------
+.. autofunction:: return_cuda_array
 
-**Memory Optimization:**
-  - Reuse device arrays when possible
-  - Use appropriate data types (float32 for most kernels)
-  - Minimize host-device transfers
+   Return a CUDA array to the memory pool.
 
-**Kernel Configuration:**
-  - Use 256 or 512 threads per block for optimal occupancy
-  - Ensure sufficient work per thread to hide latency
-  - Profile with ``nvprof`` or ``nsight`` for optimization
+   **Parameters:**
+     - **array** (*cuda.device_array*) -- GPU array to return
 
-**Batch Processing:**
-  - Process multiple trajectory points simultaneously
-  - Use shared memory for frequently accessed data
-  - Consider memory coalescing patterns
+.. autofunction:: _h2d_pinned
 
-**Error Handling:**
-  - Always check CUDA availability before kernel calls
-  - Implement CPU fallbacks for robustness
-  - Monitor GPU memory usage to avoid out-of-memory errors
+   Helper function for pinned memory H2D transfers.
 
--------------
-Known Limitations
--------------
+   **Parameters:**
+     - **arr** (*np.ndarray*) -- Array to transfer to device
 
-.. warning::
-   **Current Limitations:**
-   
-   - Dynamics kernels use simplified models for demonstration
-   - No support for parallel manipulators
-   - Limited error checking within kernels
-   - Memory management is manual
+   **Returns:**
+     - **cuda.device_array** -- Device array with data transferred
 
-**Planned Improvements:**
-  - Complete dynamics model implementation
-  - Automatic memory management
-  - Support for variable DOF robots
-  - Enhanced error reporting
+Memory Pool Class
+-------------------
 
----------
-See Also
----------
+.. autoclass:: _GlobalCudaMemoryPool
 
-- :doc:`path_planning` -- High-level trajectory planning using CUDA kernels
-- :doc:`dynamics` -- Robot dynamics models for kernel computations
-- :doc:`potential_field` -- Potential field methods using CUDA acceleration
-- :doc:`control` -- GPU-accelerated control algorithms
+   A memory pool for managing CUDA device arrays to improve memory allocation efficiency.
+
+   .. automethod:: get_array
+
+      Get a GPU array from the pool or allocate new one.
+
+      **Parameters:**
+        - **shape** (*tuple*) -- Array shape
+        - **dtype** (*np.dtype*) -- Data type
+
+      **Returns:**
+        - **cuda.device_array** -- GPU array
+
+   .. automethod:: return_array
+
+      Return a GPU array to the memory pool for potential future reuse.
+
+      **Parameters:**
+        - **array** (*cuda.device_array*) -- The CUDA device array to return
+
+   .. automethod:: clear
+
+      Clear the memory pool.
+
+-------------------
+Grid Configuration
+-------------------
+
+.. autofunction:: make_1d_grid
+
+   Create a 1D grid configuration for CUDA kernel launch with optimal thread and block sizing.
+
+   **Parameters:**
+     - **size** (*int*) -- Total number of elements or work items to process
+     - **threads** (*int*) -- Desired number of threads per block
+
+   **Returns:**
+     - **tuple** -- ((blocks,), (threads,)) for kernel launch configuration
+
+.. autofunction:: make_2d_grid
+
+   Compute optimal 2D grid configuration for CUDA kernel launch.
+
+   **Parameters:**
+     - **N** (*int*) -- First dimension of problem space
+     - **num_joints** (*int*) -- Second dimension of problem space
+     - **block_size** (*tuple*) -- Initial suggested block dimensions
+
+   **Returns:**
+     - **tuple** -- ((blocks_x, blocks_y), (threads_x, threads_y))
+
+-------------------
+Performance Tools
+-------------------
+
+.. autofunction:: benchmark_kernel_performance
+
+   Benchmark the performance of a specific CUDA kernel by executing it multiple times.
+
+   **Parameters:**
+     - **kernel_name** (*str*) -- Name of the kernel to benchmark
+     - ***args** -- Arguments to pass to the kernel function
+     - **num_runs** (*int*) -- Number of times to run the kernel
+
+   **Returns:**
+     - **dict or None** -- Performance metrics including average, std, min/max times
+
+.. autofunction:: profile_start
+
+   Start CUDA profiling.
+
+.. autofunction:: profile_stop
+
+   Stop CUDA profiling.
+
+.. autofunction:: _best_2d_config
+
+   Auto-tune 2D CUDA kernel launch configuration for optimal performance.
+
+   **Parameters:**
+     - **N** (*int*) -- Number of time steps or trajectory points
+     - **J** (*int*) -- Number of joints or degrees of freedom
+
+   **Returns:**
+     - **tuple** -- ((grid_x, grid_y), (block_x, block_y))
+
+-------------------
+Constant Memory
+-------------------
+
+.. autofunction:: setup_constant_array
+
+   Set up a constant memory array for frequently accessed data.
+
+   **Parameters:**
+     - **name** (*str*) -- Unique identifier for the constant memory array
+     - **data** (*array-like*) -- Data to be stored in the constant memory array
+
+   **Returns:**
+     - **cuda.const.array** -- A CUDA constant memory array
+
+.. autofunction:: get_constant_array
+
+   Retrieve a constant memory array by its name.
+
+   **Parameters:**
+     - **name** (*str*) -- The unique identifier of the constant memory array
+
+   **Returns:**
+     - **cuda.const.array or None** -- The constant memory array if it exists
+
+-------------------
+Module Constants
+-------------------
+
+.. autodata:: CUDA_AVAILABLE
+
+   **bool** -- True if CUDA is available, False otherwise
+
+.. autodata:: CUPY_AVAILABLE
+
+   **bool** -- True if CuPy is available, False otherwise
+
+.. autodata:: FAST_MATH
+
+   **bool** -- Whether fast math optimizations are enabled
+
+.. autodata:: float_t
+
+   **type** -- Float precision type (float32 or float16)
+
+----------------------
+Environment Variables
+----------------------
+
+**MANIPULAPY_FASTMATH**
+   Set to "1" to enable fast math optimizations (~2x speedup with relaxed IEEE 754 compliance)
+
+**MANIPULAPY_USE_FP16**
+   Set to "1" to use 16-bit floating point precision for memory-bound kernels

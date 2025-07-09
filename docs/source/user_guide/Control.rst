@@ -708,9 +708,6 @@ API Reference
 
 Additional Resources
 ====================
-
-- :doc:`../tutorials/kinematics_guide` - Learn about robot kinematics
-- :doc:`../tutorials/dynamics_guide` - Understand robot dynamics
 - :doc:`Trajectory_Planning` - Motion planning and trajectory generation
 - :doc:`../api/control` - Complete API reference
 
