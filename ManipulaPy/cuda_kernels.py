@@ -112,7 +112,17 @@ except ImportError:
 float_t = float16 if os.getenv("MANIPULAPY_USE_FP16", "0") == "1" else float32
 
 def check_cuda_availability():
-    """Check if CUDA is available and provide helpful error messages."""
+    """
+        Check if CUDA is available and provide helpful diagnostic information.
+        
+        Checks the availability of CUDA and emits a user-friendly warning with
+        installation instructions if GPU acceleration is not possible. Useful for
+        gracefully handling scenarios where GPU support cannot be initialized.
+        
+        Returns:
+            bool: True if CUDA is available, False otherwise. Triggers a UserWarning
+            with detailed setup guidance when CUDA is not detected.
+        """
     if not CUDA_AVAILABLE:
         warnings.warn(
             "CUDA not available. GPU-accelerated trajectory planning will not work.\n"
@@ -127,7 +137,13 @@ def check_cuda_availability():
     return CUDA_AVAILABLE
 
 def check_cupy_availability():
-    """Check if CuPy is available for GPU array operations."""
+    """
+        Check if CuPy is available for GPU array operations.
+        
+        Returns:
+            bool: True if CuPy is available, False otherwise. Raises a UserWarning
+            if CuPy is not available, providing installation instructions.
+        """
     if not CUPY_AVAILABLE:
         warnings.warn(
             "CuPy not available. Some GPU array operations will not work.\n"
@@ -156,7 +172,20 @@ def _h2d_pinned(arr):
 
 # Optimized launch configuration helpers
 def make_1d_grid(size, threads=256):
-    """Create 1D grid configuration with optimal occupancy."""
+    """
+        Create a 1D grid configuration for CUDA kernel launch with optimal thread and block sizing.
+        
+        Calculates the appropriate number of blocks and threads for a CUDA kernel based on the problem size.
+        Ensures minimum occupancy by adjusting thread count for small datasets and rounding to power of 2.
+        
+        Args:
+            size (int): Total number of elements or work items to process
+            threads (int, optional): Desired number of threads per block. Defaults to 256.
+        
+        Returns:
+            Tuple[Tuple[int], Tuple[int]]: A tuple containing (blocks,), (threads,) for kernel launch configuration
+        """
+
     if size <= 0:
         return (1,), (1,)
     
@@ -169,8 +198,22 @@ def make_1d_grid(size, threads=256):
 
 def make_2d_grid(N: int,
                  num_joints: int,
-                 block_size: Tuple[int, int] = (64, 8)):
+                 block_size: Tuple[int, int] = (128, 8)):
     """
+        Compute optimal 2D grid configuration for CUDA kernel launch.
+        
+        Calculates grid and block dimensions that ensure:
+            • Thread-block dimensions are powers of two (≥ 4)
+            • Block thread count respects device limits
+            • Provides good GPU occupancy by targeting at least 2x streaming multiprocessors
+        
+        Args:
+            N (int): First dimension of problem space
+            num_joints (int): Second dimension of problem space
+            block_size (Tuple[int, int], optional): Initial suggested block dimensions. Defaults to (128, 8).
+        
+        Returns:
+            Tuple[Tuple[int, int], Tuple[int, int]]: ((blocks_x, blocks_y), (threads_x, threads_y))
     Choose (grid, block) for a 2-D kernel so that
       • thread-block dimensions are powers of two (≥ 4)
       • block.x * block.y  ≤  device.MAX_THREADS_PER_BLOCK
@@ -225,7 +268,18 @@ def make_2d_grid(N: int,
     return (blocks_x, blocks_y), (threads_x, threads_y)
 
 def get_gpu_properties():
-    """Get GPU properties for optimization decisions."""
+    """
+        Retrieve current CUDA device properties for kernel optimization and resource allocation.
+        
+        Returns:
+            dict or None: A dictionary containing key GPU device properties if CUDA is available,
+            or None if CUDA is not available or device properties cannot be retrieved. Properties include:
+            - 'multiprocessor_count': Number of multiprocessors on the device
+            - 'max_threads_per_block': Maximum number of threads per block
+            - 'max_shared_memory_per_block': Maximum shared memory size per block
+            - 'max_block_dim_x': Maximum x-dimension of a block
+            - 'max_block_dim_y': Maximum y-dimension of a block
+        """
     if not CUDA_AVAILABLE:
         return None
     
@@ -243,7 +297,26 @@ def get_gpu_properties():
 
 # CPU fallback functions for when CUDA is not available
 def trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method):
-    """CPU fallback for trajectory generation when CUDA is not available."""
+    """
+        Compute trajectory positions, velocities, and accelerations on the CPU when CUDA is unavailable.
+        
+        Generates joint trajectories using specified time scaling method (cubic or quintic) 
+        for a given set of start and end joint configurations.
+        
+        Args:
+            thetastart (np.ndarray): Initial joint configurations
+            thetaend (np.ndarray): Target joint configurations
+            Tf (float): Total trajectory duration
+            N (int): Number of trajectory points to generate
+            method (int): Time scaling method (3 for cubic, 5 for quintic)
+        
+        Returns:
+            tuple: Trajectory data containing:
+                - traj_pos (np.ndarray): Joint position trajectory
+                - traj_vel (np.ndarray): Joint velocity trajectory
+                - traj_acc (np.ndarray): Joint acceleration trajectory
+        """
+
     num_joints = len(thetastart)
     traj_pos = np.zeros((N, num_joints), dtype=np.float32)
     traj_vel = np.zeros((N, num_joints), dtype=np.float32)
@@ -281,7 +354,18 @@ if CUDA_AVAILABLE:
     
     @cuda.jit(device=True, inline=True, **jit_kwargs)
     def matrix_vector_multiply_6x6(M, v, result):
-        """Optimized 6x6 matrix-vector multiplication using registers."""
+        """
+            Perform an optimized 6x6 matrix-vector multiplication using register-based computation.
+        
+            Args:
+                M (np.ndarray): 6x6 input matrix
+                v (np.ndarray): 6-element input vector
+                result (np.ndarray): Pre-allocated 6-element output vector to store multiplication result
+        
+            Notes:
+                - Unrolled matrix-vector multiplication for improved performance
+                - Directly computes each result element without loops
+        """
         # Unrolled matrix-vector multiplication for better performance
         result[0] = M[0,0]*v[0] + M[0,1]*v[1] + M[0,2]*v[2] + M[0,3]*v[3] + M[0,4]*v[4] + M[0,5]*v[5]
         result[1] = M[1,0]*v[0] + M[1,1]*v[1] + M[1,2]*v[2] + M[1,3]*v[3] + M[1,4]*v[4] + M[1,5]*v[5]
@@ -293,9 +377,28 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def trajectory_kernel(thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method, stream=0):
         """
-        Optimized trajectory kernel with 2D parallelization and shared memory time-scaling.
-        Each thread computes exactly one (time, joint) tuple.
+        CUDA kernel for generating joint trajectory points with time-scaling.
+        
+        Computes trajectory positions, velocities, and accelerations for multiple joints
+        using 2D parallelization and shared memory optimization.
+        
+        Args:
+            thetastart (ndarray): Starting joint angles
+            thetaend (ndarray): Target joint angles
+            traj_pos (ndarray): Output array for trajectory positions
+            traj_vel (ndarray): Output array for trajectory velocities
+            traj_acc (ndarray): Output array for trajectory accelerations
+            Tf (float): Total trajectory time
+            N (int): Number of trajectory points
+            method (int): Time scaling method (3 for cubic, 5 for quintic)
+            stream (int, optional): CUDA stream for kernel execution. Defaults to 0.
+        
+        Notes:
+            - Uses shared memory to compute time-scaling parameters efficiently
+            - Supports cubic (method=3) and quintic (method=5) time scaling
+            - Each thread computes trajectory for one (time, joint) point
         """
+        
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x  # 0 ... N-1
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y  # 0 ... num_joints-1
         num_j = thetastart.shape[0]
@@ -354,9 +457,28 @@ if CUDA_AVAILABLE:
         stream=0
     ):
         """
-        Optimized inverse dynamics kernel using 2D parallelization.
-        Each thread computes one (time, joint) element.
+        Optimized CUDA kernel for computing inverse dynamics using 2D parallelization.
+        
+        Computes joint torques for a trajectory by calculating dynamics contributions 
+        for each (time, joint) point in parallel. Uses simplified dynamics computations 
+        with mass matrix, velocity, and gravity contributions.
+        
+        Args:
+            thetalist_trajectory (ndarray): Joint position trajectory
+            dthetalist_trajectory (ndarray): Joint velocity trajectory
+            ddthetalist_trajectory (ndarray): Joint acceleration trajectory
+            gravity_vector (ndarray): Gravity vector
+            Ftip (ndarray): End-effector wrench
+            Glist (ndarray): Mass matrix diagonal elements
+            Slist (ndarray): Velocity quadratic force coefficients
+            M (ndarray): Full mass matrix
+            torques_trajectory (ndarray): Output joint torque trajectory
+            torque_limits (ndarray): Joint torque limits
+        
+        Each CUDA thread handles a single (time, joint) point, enabling efficient 
+        parallel computation of inverse dynamics across the entire trajectory.
         """
+
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x   # time index
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y   # joint index
 
@@ -404,9 +526,31 @@ if CUDA_AVAILABLE:
         stream=0
     ):
         """
-        Optimized forward dynamics kernel with 2D parallelization.
-        Each thread handles one (time, joint) element.
+        Compute forward dynamics for a robotic system using a CUDA kernel.
+        
+        Performs parallel forward dynamics integration for each joint across a trajectory.
+        Handles joint state integration, acceleration computation, and joint limit enforcement.
+        
+        Args:
+            thetalist (ndarray): Initial joint positions
+            dthetalist (ndarray): Initial joint velocities
+            taumat (ndarray): Applied joint torques trajectory
+            g (ndarray): Gravity vector
+            Ftipmat (ndarray): End-effector wrenches
+            dt (float): Total time step
+            intRes (int): Integration resolution/substeps
+            Glist (ndarray): Mass matrix diagonal elements
+            Slist (ndarray): Velocity quadratic force coefficients
+            M (ndarray): Full mass matrix
+            thetamat (ndarray): Output joint position trajectory
+            dthetamat (ndarray): Output joint velocity trajectory
+            ddthetamat (ndarray): Output joint acceleration trajectory
+            joint_limits (ndarray): Joint position limits
+        
+        Each CUDA thread handles dynamics integration for a single (time, joint) point,
+        enabling efficient parallel computation across the entire trajectory.
         """
+
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x   # time index
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y   # joint index
 
@@ -447,8 +591,23 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def cartesian_trajectory_kernel(pstart, pend, traj_pos, traj_vel, traj_acc, Tf, N, method, stream=0):
         """
-        Optimized Cartesian trajectory kernel with 2D parallelization and shared memory time-scaling.
+            CUDA kernel for generating Cartesian trajectory with time-scaling.
+
+            Computes smooth position, velocity, and acceleration trajectories between start and end points
+            using polynomial time-scaling methods (cubic or quintic).
+
+            Args:
+                pstart (ndarray): Starting point coordinates [x, y, z]
+                pend (ndarray): Ending point coordinates [x, y, z]
+                traj_pos (ndarray): Output trajectory positions
+                traj_vel (ndarray): Output trajectory velocities
+                traj_acc (ndarray): Output trajectory accelerations
+                Tf (float): Total trajectory duration
+                N (int): Number of trajectory points
+                method (int): Time-scaling method (3 for cubic, 5 for quintic)
+                stream (int, optional): CUDA stream for kernel execution. Defaults to 0.
         """
+
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x  # 0 ... N-1
         coord_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y  # 0 ... 2 (x,y,z)
 
@@ -494,9 +653,21 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def fused_potential_gradient_kernel(positions, goal, obstacles, potential, gradient, influence_distance, stream=0):
         """
-        Fused kernel computing both attractive potential and gradient in one pass.
-        Optimized with rsqrt for improved performance and register usage.
+            CUDA kernel for computing potential and gradient for path planning.
+
+            Calculates attractive and repulsive potentials for a set of positions relative to a goal and obstacles.
+            Uses efficient CUDA parallel computation with register-based distance calculations.
+
+            Args:
+                positions (ndarray): Input positions to evaluate potential and gradient
+                goal (ndarray): Target goal point coordinates
+                obstacles (ndarray): Array of obstacle point coordinates
+                potential (ndarray): Output array for computed potential values
+                gradient (ndarray): Output array for computed gradient vectors
+                influence_distance (float): Distance threshold for obstacle influence
+                stream (int, optional): CUDA stream for kernel execution. Defaults to 0.
         """
+
         idx = cuda.grid(1)
         if idx >= positions.shape[0]:
             return
@@ -561,9 +732,24 @@ if CUDA_AVAILABLE:
         Tf, N, method, batch_size, stream=0
     ):
         """
-        Optimized batch trajectory kernel for processing multiple trajectories simultaneously.
-        3D parallelization: (batch, time, joint) with shared memory time-scaling.
-        """
+                Optimized CUDA kernel for batch trajectory generation with time-scaling.
+                
+                Generates trajectories for multiple batches, times, and joints simultaneously using 3D parallelization.
+                Supports different time-scaling methods (cubic and quintic) for smooth trajectory interpolation.
+                
+                Args:
+                    thetastart_batch (ndarray): Starting joint positions for each batch
+                    thetaend_batch (ndarray): Ending joint positions for each batch
+                    traj_pos_batch (ndarray): Output trajectory positions
+                    traj_vel_batch (ndarray): Output trajectory velocities
+                    traj_acc_batch (ndarray): Output trajectory accelerations
+                    Tf (float): Total trajectory duration
+                    N (int): Number of trajectory timesteps
+                    method (int): Time-scaling method (3 for cubic, 5 for quintic)
+                    batch_size (int): Number of trajectory batches
+                    stream (int, optional): CUDA stream for kernel execution. Defaults to 0.
+                """
+               
         batch_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         t_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
         j_idx = cuda.blockIdx.z * cuda.blockDim.z + cuda.threadIdx.z
@@ -609,8 +795,18 @@ if CUDA_AVAILABLE:
 
     # Memory pool for CUDA arrays
     class _GlobalCudaMemoryPool:
-        """Simple memory pool for reusing GPU memory allocations."""
-        
+        """
+            A memory pool for managing CUDA device arrays to improve memory allocation efficiency.
+            
+            This class provides a caching mechanism for GPU memory arrays, allowing reuse of previously 
+            allocated arrays to reduce overhead from repeated memory allocations. It maintains a pool 
+            of arrays with specific shapes and data types, with a configurable maximum pool size.
+            
+            Attributes:
+                pool (dict): A dictionary storing cached arrays keyed by (shape, dtype)
+                max_pool_size (int): Maximum number of arrays to cache for each unique shape/type
+        """
+                
         def __init__(self):
             self.pool = {}
             self.max_pool_size = 100  # Maximum number of cached arrays
@@ -624,7 +820,16 @@ if CUDA_AVAILABLE:
                 return cuda.device_array(shape, dtype=dtype)
         
         def return_array(self, array):
-            """Return a GPU array to the pool for reuse."""
+            """
+                Return a GPU array to the memory pool for potential future reuse.
+        
+                This method adds the given CUDA array back to the pool if the pool for its 
+                specific shape and data type has not reached the maximum size. If the pool 
+                is full, the array will be allowed to be garbage collected.
+        
+                Args:
+                    array (cuda.devicearray): The CUDA device array to return to the pool.
+                """
             key = (array.shape, array.dtype)
             if key not in self.pool:
                 self.pool[key] = []
@@ -669,7 +874,36 @@ if CUDA_AVAILABLE:
 
     @lru_cache(maxsize=None)
     def _best_2d_config(N, J):
-        """Auto-tune block sizes for optimal performance."""
+        """
+            Auto-tune 2D CUDA kernel launch configuration for optimal performance.
+
+            This function evaluates multiple thread block size configurations for a 2D CUDA kernel 
+            (e.g., trajectory planning across time steps and joints) and selects the one that 
+            minimizes execution time. It caches the result using `lru_cache`.
+
+            It runs a small benchmarking test using `trajectory_kernel` on dummy data 
+            to empirically find the fastest `(grid, block)` pair.
+
+            Parameters
+            ----------
+            N : int
+                Number of time steps or trajectory points.
+            J : int
+                Number of joints or degrees of freedom.
+
+            Returns
+            -------
+            tuple
+                A tuple of (grid_dim, block_dim), where each is a tuple of two integers
+                representing the 2D grid and block size respectively.
+
+            Notes
+            -----
+            - This method is only run if CUDA is available.
+            - If CUDA is not available or benchmarking fails, it falls back to `make_2d_grid`.
+            - The result is cached for efficiency.
+            - Uses a set of pre-defined test block configurations to explore performance.
+            """
         if not CUDA_AVAILABLE:
             return ((1, 1), (1, 1))
         
@@ -720,13 +954,35 @@ if CUDA_AVAILABLE:
         _constant_arrays = {}
         
         def setup_constant_array(name, data):
-            """Set up a constant memory array for frequently accessed data."""
+            """
+            Set up a constant memory array for frequently accessed data.
+            
+            This function creates and caches a CUDA constant memory array for a given name and data.
+            If the array already exists, it returns the existing array. Otherwise, it creates a new
+            constant memory array using cuda.const.array_like().
+            
+            Args:
+                name (str): Unique identifier for the constant memory array.
+                data (array-like): Data to be stored in the constant memory array.
+            
+            Returns:
+                cuda.const.array: A CUDA constant memory array containing the provided data.
+            """
+
             if name not in _constant_arrays:
                 _constant_arrays[name] = cuda.const.array_like(data)
             return _constant_arrays[name]
         
         def get_constant_array(name):
-            """Get a constant memory array by name."""
+            """
+                Retrieve a constant memory array by its name from the internal constant arrays dictionary.
+            
+                Args:
+                    name (str): The unique identifier of the constant memory array to retrieve.
+            
+                Returns:
+                    cuda.const.array or None: The constant memory array if it exists, otherwise None.
+                """
             return _constant_arrays.get(name)
             
     except AttributeError:
@@ -740,6 +996,17 @@ if CUDA_AVAILABLE:
 else:
     # If CUDA is not available, create placeholder functions that raise informative errors
     def trajectory_kernel(*args, **kwargs):
+        """
+            Placeholder CUDA trajectory kernel that raises an error when GPU support is not installed.
+            
+            Raises:
+                RuntimeError: Indicates that the CUDA trajectory kernel is not available.
+                Provides instructions for installing GPU support via pip.
+            
+            Note:
+                To enable this kernel, install GPU support using:
+                pip install ManipulaPy[gpu-cuda11]
+            """
         raise RuntimeError(
             "CUDA trajectory kernel not available. Install GPU support:\n"
             "pip install ManipulaPy[gpu-cuda11]"
@@ -821,9 +1088,23 @@ else:
 # High-level wrapper functions for optimized CUDA operations
 def optimized_trajectory_generation(thetastart, thetaend, Tf, N, method, use_pinned=True):
     """
-    High-level wrapper for optimized trajectory generation with automatic
-    memory management and performance optimizations.
-    """
+        Generates an optimized trajectory using CUDA acceleration with automatic memory management.
+        
+        Computes joint positions, velocities, and accelerations for a trajectory between start and end configurations.
+        Falls back to CPU computation if CUDA is unavailable.
+        
+        Args:
+            thetastart (np.ndarray): Initial joint configuration
+            thetaend (np.ndarray): Final joint configuration
+            Tf (float): Total trajectory duration
+            N (int): Number of trajectory timesteps
+            method (int): Trajectory generation method
+            use_pinned (bool, optional): Use pinned memory for faster GPU transfers. Defaults to True.
+        
+        Returns:
+            tuple: (trajectory positions, trajectory velocities, trajectory accelerations)
+        """
+
     if not CUDA_AVAILABLE:
         return trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
     
@@ -867,9 +1148,25 @@ def optimized_trajectory_generation(thetastart, thetaend, Tf, N, method, use_pin
 
 def optimized_potential_field(positions, goal, obstacles, influence_distance, use_pinned=True):
     """
-    High-level wrapper for optimized potential field computation with
-    fused kernel and automatic memory management.
-    """
+        Compute potential field and gradient for a set of positions using a CUDA-accelerated kernel.
+        
+        Calculates the potential field and gradient for given positions, goal, and obstacles
+        using a high-performance GPU kernel with optional pinned memory for faster transfers.
+        
+        Args:
+            positions (numpy.ndarray): Input positions to compute potential field for
+            goal (numpy.ndarray): Target goal position
+            obstacles (numpy.ndarray): Array of obstacle positions
+            influence_distance (float): Distance within which obstacles influence the potential field
+            use_pinned (bool, optional): Use pinned memory for faster GPU transfers. Defaults to True.
+        
+        Returns:
+            tuple: (potential values, gradient vectors) for each input position
+        
+        Raises:
+            RuntimeError: If CUDA is not available
+        """
+
     if not CUDA_AVAILABLE:
         raise RuntimeError("CUDA not available for potential field computation")
     
@@ -911,8 +1208,26 @@ def optimized_potential_field(positions, goal, obstacles, influence_distance, us
 # Batch processing utilities
 def optimized_batch_trajectory_generation(thetastart_batch, thetaend_batch, Tf, N, method, use_pinned=True):
     """
-    High-level wrapper for optimized batch trajectory generation.
+    Efficiently generate batch trajectories using CUDA acceleration.
+
+    Computes position, velocity, and acceleration trajectories for multiple joint configurations
+    in parallel using GPU computation.
+
+    Args:
+        thetastart_batch (numpy.ndarray): Batch of initial joint configurations
+        thetaend_batch (numpy.ndarray): Batch of final joint configurations
+        Tf (float): Total trajectory duration
+        N (int): Number of trajectory timesteps
+        method (int): Trajectory generation method identifier
+        use_pinned (bool, optional): Use pinned memory for faster GPU transfers. Defaults to True.
+
+    Returns:
+        tuple: Batch of trajectory positions, velocities, and accelerations
+
+    Raises:
+        RuntimeError: If CUDA is not available
     """
+
     if not CUDA_AVAILABLE:
         raise RuntimeError("CUDA not available for batch trajectory generation")
     
@@ -958,8 +1273,20 @@ def optimized_batch_trajectory_generation(thetastart_batch, thetaend_batch, Tf, 
 # Utility functions for performance monitoring
 def benchmark_kernel_performance(kernel_name, *args, num_runs=10):
     """
-    Benchmark a specific kernel's performance over multiple runs.
-    """
+        Benchmark the performance of a specific CUDA kernel by executing it multiple times.
+        
+        Args:
+            kernel_name (str): Name of the kernel to benchmark ('trajectory', 'potential_field', or 'batch_trajectory')
+            *args: Arguments to pass to the kernel function
+            num_runs (int, optional): Number of times to run the kernel for performance measurement. Defaults to 10.
+        
+        Returns:
+            dict or None: Performance metrics including average, standard deviation, min, max times, and all run times.
+                        Returns None if CUDA is not available.
+        
+        Prints performance statistics to console.
+        """
+
     if not CUDA_AVAILABLE:
         print(f"Cannot benchmark {kernel_name} - CUDA not available")
         return None

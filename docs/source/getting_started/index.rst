@@ -391,7 +391,7 @@ Common Issues & Solutions
       <div class="tip">
          <span class="tip-icon">⚡</span>
          <strong>Use GPU Acceleration</strong><br>
-         Install CUDA for 50x faster computations
+         Install CUDA for 7x faster computations
       </div>
       <div class="tip">
          <span class="tip-icon">🔧</span>
@@ -452,11 +452,26 @@ Common Issues & Solutions
       margin: 1.5rem 0;
    }
    .tip {
-      background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
       color: white;
       padding: 1rem;
       border-radius: 8px;
       text-align: center;
+   }
+
+   .tip:nth-child(1) {
+      background: #2563eb; /* Strong blue */
+   }
+
+   .tip:nth-child(2) {
+      background: #dc2626; /* Strong red */
+   }
+
+   .tip:nth-child(3) {
+      background: #059669; /* Strong green */
+   }
+
+   .tip:nth-child(4) {
+      background: #7c3aed; /* Strong purple */
    }
    .tip-icon {
       font-size: 1.5rem;

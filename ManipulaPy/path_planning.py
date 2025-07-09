@@ -158,7 +158,7 @@ class OptimizedTrajectoryPlanning:
         *,                       # ――― everything after * is keyword-only ―――
 
         use_cuda: Optional[bool] = None,
-        cuda_threshold: int = 100,
+        cuda_threshold: int = 50,
         memory_pool_size_mb: Optional[int] = None,
         enable_profiling: bool = False,
     ):

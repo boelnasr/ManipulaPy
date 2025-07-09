@@ -54,11 +54,7 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
                <strong>Real-time Control</strong><br>
                PyBullet simulation and advanced controllers
             </div>
-            <div class="feature">
-               <span class="feature-icon">🧠</span>
-               <strong>Neural Networks</strong><br>
-               Hybrid IK with deep learning acceleration
-            </div>
+
          </div>
       </div>
    </div>
@@ -295,7 +291,7 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
          <div class="tip">
             <span class="tip-icon">⚡</span>
             <strong>GPU Acceleration</strong><br>
-            Install CUDA for 50x faster trajectory computations
+            Install CUDA for 7x faster trajectory computations
          </div>
       </div>
    </div>
@@ -343,8 +339,12 @@ Documentation map
    :caption: 🚀 Get Started
 
    getting_started/index
-   .. api/Installation Guide
-   
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 🛠️ API Reference
+
+   api/index   
 .. toctree::
    :maxdepth: 2
    :caption: 📚 User Guides
@@ -365,17 +365,7 @@ Documentation map
    user_guide/Collision_Checker
    user_guide/CUDA_Kernels
 
-.. toctree::
-   :maxdepth: 2
-   :caption: 🛠️ API Reference
 
-   api/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 🎓 Tutorials & Examples
-
-   tutorials/index
 
 Popular Learning Paths
 ----------------------
@@ -468,7 +458,7 @@ Performance Showcase
    <div class="performance-showcase">
       <div class="benchmark">
          <h5>⚡ CUDA Acceleration</h5>
-         <p><strong>50x faster</strong> trajectory planning<br>
+         <p><strong>7x faster</strong> trajectory planning<br>
          GPU vs CPU for 1000-point trajectories</p>
       </div>
       <div class="benchmark">
@@ -623,7 +613,7 @@ Indices and tables
       margin-top: 1.5rem;
    }
    .feature {
-      background: rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.5);
       padding: 1rem;
       border-radius: 8px;
       text-align: center;
@@ -650,10 +640,25 @@ Indices and tables
       margin-top: 1rem;
    }
    .tip {
-      background: rgba(255,255,255,0.1);
       padding: 1rem;
       border-radius: 8px;
       text-align: center;
+   }
+
+   .tip:nth-child(1) {
+      background: #059669; /* Strong blue */
+   }
+
+   .tip:nth-child(2) {
+      background: #059669; /* Strong red */
+   }
+
+   .tip:nth-child(3) {
+      background: #059669; /* Strong green */
+   }
+
+   .tip:nth-child(4) {
+      background: #059669; /* Strong purple */
    }
    .tip-icon {
       font-size: 1.5rem;

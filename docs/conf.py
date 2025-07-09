@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'ManipulaPy'
 copyright = f'{datetime.datetime.now().year}, Mohamed Aboelnar'
 author = 'Mohamed Aboelnar'
-release = '0.2.0'
-version = '0.2.0'
+release = '1.1.0'
+version = '1.1.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
