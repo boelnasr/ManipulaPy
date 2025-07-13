@@ -1,0 +1,22 @@
+# .readthedocs.yaml
+version: 2
+
+# what to build
+sphinx:
+  configuration: docs/source/conf.py
+
+# the Python environment
+python:
+  version: 3.8
+  install:
+    - requirements: docs/requirements.txt
+
+# optional: build artifacts you want RtD to keep around
+artifacts:
+  - path: docs/build/html
+    destination: html
+
+# optional: set some build options
+build:
+  image: latest
+  use-virtualenv: true

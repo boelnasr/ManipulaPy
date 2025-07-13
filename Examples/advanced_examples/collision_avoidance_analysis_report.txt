@@ -1,0 +1,70 @@
+
+========================================================================
+                ADVANCED COLLISION AVOIDANCE ANALYSIS REPORT
+========================================================================
+
+1. SYSTEM CONFIGURATION
+-----------------------
+Robot DOF: 6
+GPU Available: True
+Total Obstacles: 7
+Obstacle Configurations: 14
+Workspace Bounds: {'x': (-1.0, 1.5), 'y': (-1.0, 1.0), 'z': (0.0, 1.5)}
+
+
+2. PLANNING ALGORITHM COMPARISON
+--------------------------------
+Scenarios Tested: 8
+
+POTENTIAL FIELD METHOD:
+  Success Rate: 37.5%
+  Average Time: 0.0183s
+  Average Path Length: 3.180
+  Average Iterations: 431.8
+
+RRT* METHOD:
+  Success Rate: 75.0%
+  Average Time: 0.1912s
+  Average Path Length: 6.064
+  Average Iterations: 271.1
+
+Speed Ratio (RRT*/PF): 10.43x
+Success Ratio (PF/RRT*): 0.50x
+
+
+3. GPU PERFORMANCE ANALYSIS
+----------------------------
+Maximum Speedup: 1.00x
+Average Speedup: 0.99x
+Problem Sizes Tested: [10, 50, 100, 500, 1000, 2000]
+Peak Performance at Size: 500
+
+GPU Efficiency: IMPROVING with problem size
+
+4. REAL-TIME SIMULATION RESULTS
+-------------------------------
+Simulation Duration: 0.00s
+Average Step Time: 0.12ms
+Collision Rate: 0.0%
+Final Distance to Goal: 0.004
+Real-time Violations: 0/15
+Real-time Performance: ACCEPTABLE
+
+
+5. RECOMMENDATIONS
+------------------
+- RECOMMENDED ALGORITHM: Potential Field Method
+  Reasons: Better overall performance balance
+- GPU ACCELERATION: Limited benefit, CPU sufficient
+
+
+6. TECHNICAL DETAILS
+--------------------
+Analysis Timestamp: 2025-07-13 15:44:59
+ManipulaPy Version: Advanced Demo
+CUDA Available: True
+Number of CPU Cores Used: 16
+
+========================================================================
+                            END OF REPORT
+========================================================================

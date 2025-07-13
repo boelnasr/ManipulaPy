@@ -1,0 +1,107 @@
+
+========================================================================
+                    BATCH PROCESSING ANALYSIS REPORT
+========================================================================
+
+1. SYSTEM CONFIGURATION
+-----------------------
+CPU Cores: 16
+System Memory: 31.1 GB
+GPU Available: True
+Robot DOF: 6
+
+
+2. PERFORMANCE SCALING ANALYSIS
+-------------------------------
+Maximum Batch Size Tested: 1000
+CPU Sequential Time Range: 0.012s - 1.178s
+CPU Parallel Time Range: 0.067s - 0.563s
+GPU Time Range: 0.046s - 0.944s
+Maximum GPU Speedup vs Sequential: 19.24x
+Maximum GPU Speedup vs Parallel: 9.19x
+Maximum Parallel Speedup: 12.92x
+Parallel Efficiency: 80.74%
+
+
+3. MEMORY EFFICIENCY ANALYSIS
+-----------------------------
+Pre-allocated Arrays:
+  Peak Memory: 0.0 MB
+  Processing Time: 0.012s
+  Memory Efficiency: 0.00 MB/s
+
+Chunked Processing:
+  Peak Memory: 0.2 MB
+  Processing Time: 0.108s
+  Memory Efficiency: 2.17 MB/s
+
+
+4. STATISTICAL ANALYSIS
+-----------------------
+TRAJECTORY METRICS:
+  Path Lengths:
+    Mean: 4.847
+    Std Dev: 1.238
+    Range: 2.168 - 7.880
+
+  Max Velocities:
+    Mean: 3.743
+    Std Dev: 0.956
+    Range: 1.674 - 6.085
+
+  Max Accelerations:
+    Mean: 7.715
+    Std Dev: 1.971
+    Range: 3.451 - 12.543
+
+JOINT-WISE ANALYSIS:
+  Joint 1:
+    Max Velocity: 4.424 rad/s
+    Max Acceleration: 9.119 rad/s²
+    Position Range: 6.071 rad
+
+  Joint 2:
+    Max Velocity: 2.351 rad/s
+    Max Acceleration: 4.845 rad/s²
+    Position Range: 3.140 rad
+
+  Joint 3:
+    Max Velocity: 3.496 rad/s
+    Max Acceleration: 7.205 rad/s²
+    Position Range: 6.161 rad
+
+  Joint 4:
+    Max Velocity: 3.762 rad/s
+    Max Acceleration: 7.753 rad/s²
+    Position Range: 6.117 rad
+
+  Joint 5:
+    Max Velocity: 2.060 rad/s
+    Max Acceleration: 4.247 rad/s²
+    Position Range: 3.118 rad
+
+  Joint 6:
+    Max Velocity: 4.460 rad/s
+    Max Acceleration: 9.192 rad/s²
+    Position Range: 6.246 rad
+
+
+5. RECOMMENDATIONS
+------------------
+- GPU ACCELERATION: Highly recommended for batch processing
+  GPU provides up to 19.2x speedup over sequential CPU
+- PARALLEL PROCESSING: Recommended (12.9x speedup)
+  Optimal for batch sizes > 50 with 16 cores
+- OPTIMAL BATCH SIZE: 1000 (for GPU processing)
+
+
+6. TECHNICAL DETAILS
+--------------------
+Analysis Timestamp: 2025-07-13 15:44:48
+ManipulaPy Version: Batch Processing Demo
+CUDA Available: True
+GPU Acceleration: ENABLED
+
+========================================================================
+                            END OF REPORT
+========================================================================
