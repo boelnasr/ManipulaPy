@@ -41,26 +41,34 @@ class ManipulatorDynamics(SerialManipulator):
             return self._mass_matrix_cache[thetalist_key]
 
         n = len(thetalist)
-        M = np.zeros((n, n))
+        M = np.zeros((n, n), dtype=np.float64)
+
+        # Precompute the "space" transforms for each link
         AdT = np.zeros((6, 6, n + 1))
         AdT[:, :, 0] = np.eye(6)
+        for j in range(n):
+            T = self.forward_kinematics(thetalist[:j + 1], frame="space")
+            AdT[:, :, j + 1] = ad(T)
 
+        # Full space Jacobian at the end-effector
+        J_full = self.jacobian(thetalist, frame="space")  # shape (6, n)
+
+        # Implement the correct formula: M(θ) = Σᵢ JᵢᵀI_i Jᵢ
+        # where Jᵢ is the spatial Jacobian up to link i, and I_i is link i's spatial inertia in base frame
         for i in range(n):
-            T = self.forward_kinematics(thetalist[: i + 1], "space")
-            AdT[:, :, i + 1] = ad(T)
+            for j in range(n):
+                # Transform the i-th link's inertia into the base frame
+                Ii_base = AdT[:, :, i + 1].T @ self.Glist[i] @ AdT[:, :, i + 1]
+                
+                # Get the spatial Jacobian columns for joints i and j
+                Ji = J_full[:, i]  # i-th column of Jacobian
+                Jj = J_full[:, j]  # j-th column of Jacobian
+                
+                # Accumulate M[i,j] = Jᵢᵀ I_i Jⱼ for each link
+                M[i, j] += Ji.T @ Ii_base @ Jj
 
-        for i in range(n):
-            F = np.zeros(6)
-            for j in range(i, n):
-                AdTi = AdT[:, :, j + 1].T
-                I = self.Glist[j]
-                Ia = np.dot(AdTi, np.dot(I, AdT[:, :, j + 1]))
-                dV = np.zeros(6)
-                dV[5] = 1 if i == j else 0
-                F += np.dot(Ia, dV)
-            M[i, i:] = np.dot(self.jacobian(thetalist).T, F)[i:]
-
-        M = M + M.T - np.diag(np.diag(M))
+        # Ensure exact symmetry (guard against tiny floating-point drift)
+        M = 0.5 * (M + M.T)
         self._mass_matrix_cache[thetalist_key] = M
         return M
 
