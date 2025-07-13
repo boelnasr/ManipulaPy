@@ -5,6 +5,35 @@
 import os
 import sys
 import datetime
+from unittest.mock import MagicMock
+
+# ── CRITICAL: Mock heavy dependencies FIRST ─────────────
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+        return MagicMock()
+
+# Mock all heavy dependencies before any other imports
+MOCK_MODULES = [
+    # Deep Learning / GPU
+    "torch", "cupy", "numba", "numba.cuda", "numba.cuda.random", "numba.config",
+    "pycuda", "pycuda.driver", "pycuda.autoinit", "tensorflow",
+    
+    # Robotics / Simulation
+    "pybullet", "pybullet_data", "urchin", "urchin.urdf",
+    
+    # Computer Vision
+    "cv2", "ultralytics", "opencv-python",
+    
+    # Scientific Computing (keep matplotlib for docs)
+    "sklearn", "sklearn.cluster", "scipy", "scipy.spatial", "scipy.linalg",
+    
+    # Optional dependencies
+    "plotly", "seaborn", "PIL", "Pillow",
+]
+
+for mod_name in MOCK_MODULES:
+    sys.modules[mod_name] = Mock()
 
 # ── Path handling ────────────────────────────────────────
 DOCS_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -26,20 +55,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
-    
-    # Enhanced documentation features
-    "sphinx.ext.autosectionlabel",   # every heading gets an explicit label
     "sphinx.ext.githubpages",        # .nojekyll file for GitHub Pages
-    "sphinx.ext.extlinks",           # external link shortcuts
-    "sphinx.ext.todo",               # TODO directives
-    "sphinx.ext.ifconfig",           # conditional content
-    
-    # Graphviz for block diagrams
-    "sphinx.ext.graphviz",           # dot/graphviz diagram support
-    
-    # Third-party extensions (check availability)
-    "myst_parser",                   # markdown support
-    "sphinx_design",                 # nice HTML components (<sd-*)
 ]
 
 # ── Safely add optional extensions ──────────────────────
@@ -54,24 +70,45 @@ def try_add_extension(ext_name):
         print(f"⚠️  Optional extension not available: {ext_name}")
         return False
 
-# Try to add optional extensions
+# Try to add optional extensions - be conservative for RTD
 _optional_extensions = {
+    "myst_parser": try_add_extension("myst_parser"),
     "sphinx_copybutton": try_add_extension("sphinx_copybutton"),
-    "sphinx_tabs": try_add_extension("sphinx_tabs"), 
-    "sphinx_togglebutton": try_add_extension("sphinx_togglebutton"),
-    "sphinxext.opengraph": try_add_extension("sphinxext.opengraph"),
-    "sphinx_sitemap": try_add_extension("sphinx_sitemap"),
+    "sphinx_design": try_add_extension("sphinx_design"),
 }
 
-# ── Theme selection (furo -> pydata -> RTD -> default) ──
+# Only add these if we're not on RTD (they may not be available)
+if not os.environ.get('READTHEDOCS'):
+    _optional_extensions.update({
+        "sphinx.ext.autosectionlabel": try_add_extension("sphinx.ext.autosectionlabel"),
+        "sphinx.ext.extlinks": try_add_extension("sphinx.ext.extlinks"), 
+        "sphinx.ext.todo": try_add_extension("sphinx.ext.todo"),
+        "sphinx.ext.ifconfig": try_add_extension("sphinx.ext.ifconfig"),
+        "sphinx_tabs": try_add_extension("sphinx_tabs"), 
+        "sphinx_togglebutton": try_add_extension("sphinx_togglebutton"),
+        "sphinxext.opengraph": try_add_extension("sphinxext.opengraph"),
+        "sphinx_sitemap": try_add_extension("sphinx_sitemap"),
+    })
+
+# ── Theme selection (RTD-compatible priority) ───────────
 def _try_theme(name, mod_name, **kw):
     try:
-        mod = __import__(mod_name)
+        __import__(mod_name)
         return name, kw.get("extra", {})
     except ImportError:
         return None, {}
 
-html_theme, html_theme_options = "default", {}
+# Start with RTD theme for maximum compatibility
+html_theme = "sphinx_rtd_theme" 
+html_theme_options = {
+    "style_nav_header_background": "#2980B9",
+    "collapse_navigation": True,
+    "navigation_depth": 4,
+    "includehidden": True,
+    "titles_only": False,
+}
+
+# Try better themes if available (but fallback gracefully)
 for _name, _mod, _opts in [
     ("furo", "furo", {"extra": {      # first choice - modern and clean
         "navigation_with_keys": True,
@@ -113,15 +150,6 @@ for _name, _mod, _opts in [
             ],
         }
     }),
-    ("sphinx_rtd_theme", "sphinx_rtd_theme", {
-        "extra": {
-            "style_nav_header_background": "#2980B9",
-            "collapse_navigation": True,
-            "navigation_depth": 4,
-            "includehidden": True,
-            "titles_only": False,
-        }
-    }),
 ]:
     _selected, _opts_dict = _try_theme(_name, _mod, extra=_opts["extra"])
     if _selected:
@@ -133,239 +161,143 @@ for _name, _mod, _opts in [
 # ── HTML output ──────────────────────────────────────────
 html_title = f"{project} {release} Documentation"
 html_short_title = f"{project} Docs"
-html_logo  = "_static/file.png"  # Consider adding a proper logo
-html_favicon = "_static/file.png"  # Add a favicon for better branding
 html_static_path = ["_static"]
-html_css_files  = ["custom.css"]
+html_css_files = ["custom.css"]
 
 # Better HTML output options
 html_show_sourcelink = True
 html_show_sphinx = True
 html_show_copyright = True
 html_copy_source = True
-html_use_opensearch = f"{project} Documentation"
 
-# ── LaTeX Configuration (FIXED) ──────────────────────────
-# Use XeLaTeX for better Unicode support
-latex_engine = 'xelatex'
+# Only set these if files exist (prevent RTD errors)
+logo_path = os.path.join(DOCS_DIR, "_static", "file.png")
+if os.path.exists(logo_path):
+    html_logo = "_static/file.png"
+    html_favicon = "_static/file.png"
 
-# LaTeX document configuration - PROPERLY FIXED
+# ── LaTeX Configuration (RTD-compatible) ────────────────
+# Use pdflatex for RTD compatibility (xelatex may not be available)
+latex_engine = 'pdflatex'
+
+# LaTeX document configuration - FIXED for RTD
 latex_documents = [
     (
         'index',                    # master document (source file)
         'manipulapy.tex',          # output .tex filename  
-        'ManipulaPy User Guide',   # CLEAN title (no underscores or special chars)
+        'ManipulaPy Documentation', # CLEAN title (no special chars)
         'Mohamed Aboelnar',        # author
         'manual',                  # document class
     ),
 ]
 
-# LaTeX configuration for Unicode and better formatting
+# Simplified LaTeX configuration for RTD compatibility
 latex_elements = {
     'papersize': 'letterpaper',
     'pointsize': '10pt',
     'preamble': r'''
-        % Basic Unicode support with fontspec
-        \usepackage{fontspec}
-        \setmainfont{DejaVu Serif}
-        \setsansfont{DejaVu Sans}
-        \setmonofont{DejaVu Sans Mono}
-        
-        % Handle specific Unicode characters that commonly cause issues
+        \usepackage[utf8]{inputenc}
         \usepackage{newunicodechar}
-        \newunicodechar{🚀}{\textbf{[ROCKET]}}
-        \newunicodechar{✅}{\textbf{[CHECK]}}
-        \newunicodechar{❌}{\textbf{[X]}}
-        \newunicodechar{⚠}{\textbf{[WARNING]}}
-        \newunicodechar{📋}{\textbf{[CLIPBOARD]}}
-        \newunicodechar{🎨}{\textbf{[ART]}}
-        \newunicodechar{📦}{\textbf{[PACKAGE]}}
-        \newunicodechar{🔌}{\textbf{[PLUG]}}
-        \newunicodechar{📌}{\textbf{[PIN]}}
-        \newunicodechar{🚨}{\textbf{[ALERT]}}
-        \newunicodechar{🔍}{\textbf{[SEARCH]}}
-        \newunicodechar{💡}{\textbf{[IDEA]}}
-        \newunicodechar{🔧}{\textbf{[WRENCH]}}
-        \newunicodechar{⭐}{\textbf{[STAR]}}
-        \newunicodechar{🎯}{\textbf{[TARGET]}}
+        \DeclareUnicodeCharacter{1F680}{\textbf{[ROCKET]}}
+        \DeclareUnicodeCharacter{2705}{\textbf{[CHECK]}}
+        \DeclareUnicodeCharacter{274C}{\textbf{[X]}}
+        \DeclareUnicodeCharacter{26A0}{\textbf{[WARNING]}}
+        \DeclareUnicodeCharacter{1F4CB}{\textbf{[CLIPBOARD]}}
+        \DeclareUnicodeCharacter{1F3A8}{\textbf{[ART]}}
+        \DeclareUnicodeCharacter{1F4E6}{\textbf{[PACKAGE]}}
+        \DeclareUnicodeCharacter{1F50C}{\textbf{[PLUG]}}
+        \DeclareUnicodeCharacter{1F4CC}{\textbf{[PIN]}}
+        \DeclareUnicodeCharacter{1F6A8}{\textbf{[ALERT]}}
+        \DeclareUnicodeCharacter{1F50D}{\textbf{[SEARCH]}}
+        \DeclareUnicodeCharacter{1F4A1}{\textbf{[IDEA]}}
+        \DeclareUnicodeCharacter{1F527}{\textbf{[WRENCH]}}
+        \DeclareUnicodeCharacter{2B50}{\textbf{[STAR]}}
+        \DeclareUnicodeCharacter{1F3AF}{\textbf{[TARGET]}}
     ''',
     'fncychap': r'\usepackage[Bjornstrup]{fncychap}',
     'printindex': r'\footnotesize\raggedright\printindex',
-    'sphinxsetup': '''
-        hmargin={1in,1in},
-        vmargin={1in,1in},
-        verbatimwithframe=true,
-        TitleColor={rgb}{0,0,0},
-        HeaderFamily=\\rmfamily\\bfseries,
-        InnerLinkColor={rgb}{0.2,0.4,0.8},
-        OuterLinkColor={rgb}{0.8,0.2,0.2}
-    ''',
-}
-
-# LaTeX additional settings
-latex_use_xindy = False
-latex_domain_indices = True
-latex_show_pagerefs = True
-latex_show_urls = 'footnote'
-
-# ── Graphviz Configuration ───────────────────────────────
-# Graphviz (dot) configuration for block diagrams
-graphviz_dot = 'dot'  # Path to dot executable (usually in PATH)
-graphviz_dot_args = ['-Grankdir=TB', '-Gsize="8,10"', '-Gdpi=150']
-graphviz_output_format = 'svg'  # Use SVG for better quality
-
-# Default attributes for all graphviz diagrams
-graphviz_default_attrs = {
-    'graph': {
-        'rankdir': 'TB',
-        'bgcolor': 'transparent',
-        'fontname': 'Arial',
-        'fontsize': '10',
-        'nodesep': '0.5',
-        'ranksep': '0.8',
-    },
-    'node': {
-        'shape': 'box',
-        'style': 'rounded,filled',
-        'fillcolor': 'lightblue',
-        'fontname': 'Arial',
-        'fontsize': '9',
-        'color': 'black',
-        'penwidth': '1',
-    },
-    'edge': {
-        'fontname': 'Arial',
-        'fontsize': '8',
-        'color': 'black',
-        'penwidth': '1',
-        'arrowsize': '0.8',
-    },
 }
 
 # ── Napoleon (NumPy / Google docstrings) ────────────────
-napoleon_google_docstring      = True
-napoleon_numpy_docstring       = True
+napoleon_google_docstring = True
+napoleon_numpy_docstring = True
 napoleon_include_private_with_doc = False
 napoleon_include_special_with_doc = True
 napoleon_use_param = True
 napoleon_use_rtype = True
-napoleon_preprocess_types = True
+napoleon_preprocess_types = False  # Simplified for RTD
 napoleon_type_aliases = {
     "array_like": ":term:`array_like`",
     "ndarray": "numpy.ndarray",
-    "DataFrame": "pandas.DataFrame",
 }
 
 # ── Autodoc / Autosummary ───────────────────────────────
-autodoc_default_options = dict(
-    members=True,
-    undoc_members=True,
-    special_members="__init__",
-    show_inheritance=True,
-    member_order="bysource",
-    exclude_members="__weakref__",
-    inherited_members=True,
-)
+autodoc_default_options = {
+    "members": True,
+    "undoc_members": True,
+    "special_members": "__init__",
+    "show_inheritance": True,
+    "member-order": "bysource",
+    "exclude_members": "__weakref__",
+}
 
 # Better autodoc behavior
 autodoc_typehints = "description"
-autodoc_typehints_description_target = "documented"
 autodoc_class_signature = "mixed"
 autodoc_member_order = "bysource"
 
 autosummary_generate = True
-autosummary_generate_overwrite = True
-autosummary_imported_members = True
+autosummary_generate_overwrite = False  # Prevent RTD conflicts
+autosummary_imported_members = False     # Simplify for RTD
 
-# Mock heavy / optional deps
-autodoc_mock_imports = [
-    # Deep Learning / GPU
-    "torch", "cupy", "numba", "numba.cuda", "pycuda", "pycuda.driver",
-    "pycuda.autoinit", "tensorflow",
-    
-    # Robotics / Simulation
-    "pybullet", "pybullet_data", "urchin", "urchin.urdf",
-    
-    # Computer Vision
-    "cv2", "ultralytics", "opencv-python",
-    
-    # Scientific Computing
-    "sklearn", "sklearn.cluster", "scipy", "scipy.spatial",
-    "matplotlib", "matplotlib.pyplot",
-    
-    # Optional dependencies
-    "plotly", "seaborn", "PIL", "Pillow",
-]
+# Mock imports - CRITICAL for RTD
+autodoc_mock_imports = MOCK_MODULES
 
 # ── Math support ─────────────────────────────────────────
-mathjax3_config = {
-    "tex": {
-        "inlineMath": [["$", "$"], ["\\(", "\\)"]],
-        "displayMath": [["$$", "$$"], ["\\[", "\\]"]],
-    },
-}
+# Use simpler mathjax config for RTD
+mathjax_path = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'
 
 # ── Extension configuration ──────────────────────────────
 intersphinx_mapping = {
-    "python":      ("https://docs.python.org/3/", None),
-    "numpy":       ("https://numpy.org/doc/stable/", None),
-    "scipy":       ("https://docs.scipy.org/doc/scipy/", None),
-    "matplotlib":  ("https://matplotlib.org/stable/", None),
-    "sklearn":     ("https://scikit-learn.org/stable/", None),
-    "torch":       ("https://pytorch.org/docs/stable/", None),
-    "cv2":         ("https://docs.opencv.org/4.x/", None),
+    "python": ("https://docs.python.org/3/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "matplotlib": ("https://matplotlib.org/stable/", None),
 }
-
-# External links shortcuts
-extlinks = {
-    "issue": ("https://github.com/boelnasr/ManipulaPy/issues/%s", "issue #%s"),
-    "pull": ("https://github.com/boelnasr/ManipulaPy/pull/%s", "PR #%s"),
-    "pypi": ("https://pypi.org/project/%s/", "%s"),
-    "wiki": ("https://en.wikipedia.org/wiki/%s", "%s"),
-}
-
-# TODO extension
-todo_include_todos = True
-todo_emit_warnings = True
 
 # ── Optional Extension Configurations ───────────────────
+# External links shortcuts (only if extension is available)
+if "sphinx.ext.extlinks" in extensions:
+    extlinks = {
+        "issue": ("https://github.com/boelnasr/ManipulaPy/issues/%s", "issue #%s"),
+        "pull": ("https://github.com/boelnasr/ManipulaPy/pull/%s", "PR #%s"),
+        "pypi": ("https://pypi.org/project/%s/", "%s"),
+        "wiki": ("https://en.wikipedia.org/wiki/%s", "%s"),
+    }
+
+# TODO extension (only if available)
+if "sphinx.ext.todo" in extensions:
+    todo_include_todos = not os.environ.get('READTHEDOCS', False)  # Hide on RTD
+    todo_emit_warnings = False  # Don't break builds
+
 # Copy button configuration (only if extension is available)
 if _optional_extensions.get("sphinx_copybutton", False):
-    copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
+    copybutton_prompt_text = r">>> |\.\.\. |\$ "
     copybutton_prompt_is_regexp = True
-    copybutton_line_continuation_character = "\\"
-    copybutton_here_doc_delimiter = "EOT"
 
 # OpenGraph / Social Media (only if extension is available)
 if _optional_extensions.get("sphinxext.opengraph", False):
-    ogp_site_url = "https://boelnasr.github.io/ManipulaPy/"
+    ogp_site_url = "https://manipulapy.readthedocs.io/"
     ogp_site_name = "ManipulaPy Documentation"
     ogp_description_length = 200
     ogp_type = "website"
-    ogp_image = "_static/file.png"
 
-# Sitemap generation (only if extension is available)
-if _optional_extensions.get("sphinx_sitemap", False):
-    html_baseurl = "https://boelnasr.github.io/ManipulaPy/"
-    sitemap_url_scheme = "{link}"
-
-# ── Source code links ───────────────────────────────────
-viewcode_enable_epub = True
+# Better section label generation (only if extension is available)
+if "sphinx.ext.autosectionlabel" in extensions:
+    autosectionlabel_prefix_document = True
+    autosectionlabel_maxdepth = 3
 
 # ── Quality of life improvements ────────────────────────
-# Better section label generation
-autosectionlabel_prefix_document = True
-autosectionlabel_maxdepth = 3
-
-# Show todos in development builds
-import os
-if os.environ.get("SPHINX_BUILD_TYPE") == "dev":
-    todo_include_todos = True
-else:
-    todo_include_todos = False
-
-# ── Misc / setup hook ───────────────────────────────────
-templates_path   = ["_templates"]
+templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
 # Language and locale
@@ -373,10 +305,27 @@ language = "en"
 today_fmt = "%B %d, %Y"
 
 # Source file encoding
-source_suffix = {
-    ".rst": None,
-    ".md": "myst_parser",
-}
+source_suffix = {".rst": None}
+
+# Add markdown support if myst_parser is available
+if _optional_extensions.get("myst_parser", False):
+    source_suffix[".md"] = "myst_parser"
+
+# Master document
+master_doc = "index"
+
+# ── Critical: Suppress warnings that break RTD builds ───
+suppress_warnings = [
+    'ref.citation',
+    'ref.footnote', 
+    'autosectionlabel.*',
+    'toc.excluded',
+    'epub.unknown_project_files',
+    'app.add_directive',
+]
+
+# Don't fail on warnings
+keep_warnings = True
 
 def setup(app):
     """Sphinx setup hook for custom configuration."""
@@ -389,59 +338,43 @@ def setup(app):
     if os.path.exists(js_file):
         app.add_js_file("custom.js")
     
-    # Add version info to environment
-    app.add_config_value("project_version", version, "env")
+    # Print configuration summary
+    print("\n" + "="*50)
+    print("📋 SPHINX BUILD CONFIGURATION")
+    print("="*50)
+    print(f"🎨 Theme: {html_theme}")
+    print(f"📦 Core extensions: {len(extensions)}")
+    print(f"🔌 Optional extensions: {sum(_optional_extensions.values())}")
+    available = [k for k, v in _optional_extensions.items() if v]
+    if available:
+        print(f"   Available: {', '.join(available)}")
+    print(f"📄 LaTeX engine: {latex_engine}")
+    print(f"🏗️  RTD Build: {bool(os.environ.get('READTHEDOCS'))}")
+    print("="*50)
     
-    # Check if Graphviz is available
-    import subprocess
-    try:
-        subprocess.run(['dot', '-V'], capture_output=True, check=True)
-        print("✅ Graphviz (dot) is available for block diagrams")
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("⚠️  Graphviz (dot) not found. Install with: sudo apt-get install graphviz")
-        print("    Block diagrams will not render properly without Graphviz")
-    
-    # Friendly import check with more detailed diagnostics
+    # Attempt to import ManipulaPy with comprehensive error handling
     try:
         import ManipulaPy
-        print("✅ ManipulaPy imported successfully during docs build")
+        print("✅ ManipulaPy imported successfully")
         print(f"   Version: {getattr(ManipulaPy, '__version__', 'unknown')}")
         print(f"   Location: {ManipulaPy.__file__}")
         
-        # Check for key modules
+        # Check key modules
         key_modules = ["kinematics", "dynamics", "control", "path_planning"]
         for module_name in key_modules:
             try:
                 module = getattr(ManipulaPy, module_name, None)
                 if module:
-                    print(f"   ✅ {module_name} module available")
+                    print(f"   ✅ {module_name} available")
                 else:
-                    print(f"   ⚠️  {module_name} module not found")
+                    print(f"   ⚠️  {module_name} not found")
             except Exception as e:
                 print(f"   ❌ Error checking {module_name}: {e}")
                 
     except ImportError as exc:
-        print(f"⚠️  ManipulaPy not importable during docs build: {exc}")
-        print("    This is normal if you're building docs without installing the package")
-        print("    Run `pip install -e .` from the repo root if needed")
+        print(f"⚠️  ManipulaPy import failed: {exc}")
+        print("    This is expected during RTD builds with heavy dependencies")
     except Exception as e:
-        print(f"❌ Unexpected error importing ManipulaPy: {e}")
-
-# ── Development helpers ──────────────────────────────────
-def print_build_summary():
-    """Print a summary of the build configuration."""
-    print("\n" + "="*50)
-    print("📋 SPHINX BUILD CONFIGURATION SUMMARY")
-    print("="*50)
-    print(f"🎨 Theme: {html_theme}")
-    print(f"📦 Core extensions: {len([e for e in extensions if not e.startswith('sphinx_copybutton')])}")
-    print(f"🔌 Optional extensions: {sum(_optional_extensions.values())}/{len(_optional_extensions)}")
-    available = [k for k, v in _optional_extensions.items() if v]
-    if available:
-        print(f"   Available: {', '.join(available)}")
-    print(f"📊 Graphviz enabled: {'sphinx.ext.graphviz' in extensions}")
-    print(f"📄 LaTeX engine: {latex_engine}")
+        print(f"❌ Unexpected error: {e}")
+    
     print("="*50 + "\n")
-
-# Call summary (uncomment for debugging)
-print_build_summary()
