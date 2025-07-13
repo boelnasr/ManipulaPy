@@ -1,22 +1,49 @@
 # .readthedocs.yaml
+# Read the Docs configuration file for ManipulaPy
 version: 2
 
-# what to build
-sphinx:
-  configuration: docs/source/conf.py
+# Set the OS, Python version and tools
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+  jobs:
+    pre_create_environment:
+      # Install system dependencies required for compilation
+      - apt-get update
+      - apt-get install -y build-essential
+      - apt-get install -y libopencv-dev python3-opencv
+      - apt-get install -y ffmpeg libsm6 libxext6
+      - apt-get install -y graphviz graphviz-dev
+    post_install:
+      # Install package in development mode
+      - pip install -e .
 
-# the Python environment
+# Build documentation - CORRECT PATH for your structure
+sphinx:
+  builder: html
+  configuration: docs/source/conf.py
+  fail_on_warning: false
+
+# Python configuration
 python:
-  version: 3.8
   install:
     - requirements: docs/requirements.txt
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+  system_packages: true
 
-# optional: build artifacts you want RtD to keep around
-artifacts:
-  - path: docs/build/html
-    destination: html
+# Output formats
+formats:
+  - pdf
+  - epub
+  - htmlzip
 
-# optional: set some build options
-build:
-  image: latest
-  use-virtualenv: true
+# Search configuration
+search:
+  ranking:
+    api/**: -1
+    tutorials/**: 1
+    user_guide/**: 2
