@@ -1,0 +1,59 @@
+/* Custom CSS for ManipulaPy documentation */
+
+/* Improve code block appearance */
+.highlight {
+    background: #f8f8f8;
+    border: 1px solid #e1e4e5;
+    border-radius: 3px;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+/* Better table styling */
+.wy-table-responsive table td, .wy-table-responsive table th {
+    white-space: normal;
+}
+
+/* Improve navigation */
+.wy-nav-side {
+    width: 300px;
+}
+
+.wy-nav-content-wrap {
+    margin-left: 300px;
+}
+
+/* Better admonitions */
+.admonition {
+    margin: 20px 0;
+    padding: 15px;
+    border-left: 5px solid #ccc;
+}
+
+.admonition.note {
+    border-color: #6ab0de;
+}
+
+.admonition.warning {
+    border-color: #f0b37e;
+}
+
+.admonition.tip {
+    border-color: #1abc9c;
+}
+
+/* Code copy button improvements */
+.highlight {
+    position: relative;
+}
+
+/* Responsive improvements */
+@media screen and (max-width: 768px) {
+    .wy-nav-side {
+        width: 100%;
+    }
+    
+    .wy-nav-content-wrap {
+        margin-left: 0;
+    }
+}

@@ -1,5 +1,7 @@
 # ManipulaPy
 
+<div align="center">
+
 [![PyPI](https://img.shields.io/pypi/v/ManipulaPy)](https://pypi.org/project/ManipulaPy/)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -7,237 +9,236 @@
 ![Test Status](https://img.shields.io/badge/tests-passing-brightgreen)
 [![status](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg)](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa)
 
-**ManipulaPy** is a comprehensive, GPU-accelerated Python package for robotic manipulator analysis, simulation, planning, control, and perception. It provides a unified framework combining advanced kinematics, dynamics modeling, trajectory planning, control strategies, PyBullet simulation, and computer vision capabilities with optional CUDA acceleration.
+**A comprehensive, GPU-accelerated Python package for robotic manipulator analysis, simulation, planning, control, and perception.**
+
+[Quick Start](#-quick-start) • [Documentation](#-documentation) • [Examples](#-examples) • [Installation](#-installation) • [Contributing](#-contributing)
+
+</div>
 
 ---
 
-## 🎯 Statement of Need
+## 🎯 Overview
 
-Modern robotics research and development requires sophisticated tools for manipulator analysis and control. Existing solutions often lack integration between kinematic analysis, dynamic modeling, trajectory planning, and perception systems. ManipulaPy addresses these critical gaps by providing:
+ManipulaPy is a modern, comprehensive framework that bridges the gap between basic robotics libraries and sophisticated research tools. It provides seamless integration of kinematics, dynamics, control, and perception systems with optional CUDA acceleration for real-time applications.
 
-- **🔧 Unified Framework**: Seamless integration of kinematics, dynamics, control, and perception
-- **⚡ GPU Acceleration**: High-performance CUDA kernels for real-time applications
-- **🔬 Research-Ready**: Comprehensive algorithms suitable for academic and industrial research
-- **🧩 Modular Design**: Use individual components or the complete integrated system
-- **📖 Well-Documented**: Extensive documentation with theoretical background and practical examples
-- **🆓 Open Source**: AGPL-3.0 licensed for transparency, collaboration, and academic use
+### Why ManipulaPy?
 
-ManipulaPy fills the gap between basic robotics libraries and comprehensive research frameworks, providing researchers and developers with professional-grade tools for advanced robotic manipulation projects.
-
----
-
-## 🚀 Key Features
-
-- **🔧 Kinematic Analysis**: Forward and inverse kinematics for serial manipulators with Jacobian calculations
-- **⚙️ Dynamic Modeling**: Complete dynamics analysis including mass matrix, Coriolis forces, and gravity compensation
-- **🛤️ Path Planning**: CUDA-accelerated joint and Cartesian trajectory generation with collision avoidance
-- **📊 Singularity Analysis**: Detect singularities, visualize manipulability ellipsoids, and compute workspace boundaries
-- **📄 URDF Processing**: Convert URDF files into manipulatable Python models with PyBullet integration
-- **🎮 Advanced Control**: PID, computed torque, adaptive, robust, and optimal control algorithms
-- **🌐 Real-time Simulation**: PyBullet-based physics simulation with interactive visualization and GUI controls
-- **👁️ Vision & Perception**: Stereo vision, depth processing, YOLO object detection, and 3D point cloud analysis
-- **🚀 GPU Acceleration**: Optional CUDA kernels for high-performance trajectory planning and dynamics computation
-- **📈 Visualization Tools**: Comprehensive plotting for trajectories, workspace analysis, and control performance
+**🔧 Unified Framework**: Complete integration from low-level kinematics to high-level perception  
+**⚡ GPU Accelerated**: CUDA kernels for trajectory planning and dynamics computation  
+**🔬 Research Ready**: Mathematical rigor with practical implementation  
+**🧩 Modular Design**: Use individual components or the complete system  
+**📖 Well Documented**: Comprehensive guides with theoretical foundations  
+**🆓 Open Source**: AGPL-3.0 licensed for transparency and collaboration
 
 ---
 
-## 📦 Installation
+## ✨ Key Features
 
-### Basic Installation
+<table>
+<tr>
+<td width="50%">
+
+### 🔧 **Core Robotics**
+- **Kinematics**: Forward/inverse kinematics with Jacobian analysis
+- **Dynamics**: Mass matrix, Coriolis forces, gravity compensation
+- **Control**: PID, computed torque, adaptive, robust algorithms
+- **Singularity Analysis**: Detect singularities and workspace boundaries
+
+</td>
+<td width="50%">
+
+### 🚀 **Advanced Capabilities**
+- **Path Planning**: CUDA-accelerated trajectory generation
+- **Simulation**: Real-time PyBullet physics simulation
+- **Vision**: Stereo vision, YOLO detection, point clouds
+- **URDF Processing**: Convert robot models to Python objects
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🚀 Quick Start
+
+### Installation
+
 ```bash
+# Basic installation
 pip install ManipulaPy
-```
 
+# With GPU support (CUDA 11.x)
+pip install ManipulaPy[gpu-cuda11]
 
-### Development Installation
-```bash
+# With GPU support (CUDA 12.x)
+pip install ManipulaPy[gpu-cuda12]
+
+# Development installation
 git clone https://github.com/boelnasr/ManipulaPy.git
 cd ManipulaPy
-pip install -e .
+pip install -e .[dev]
 ```
 
-### Verify Installation
-```bash
-python -c "import ManipulaPy; print('✅ ManipulaPy installed successfully')"
-python -c "import ManipulaPy; ManipulaPy.check_dependencies()"
-```
+### 30-Second Demo
 
----
-
-## 🛠️ Quick Start
-
-### Basic Robot Setup
 ```python
 import numpy as np
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
+from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
+from ManipulaPy.control import ManipulatorController
 
-# Option 1: Use included robot models
+# Load robot model
 try:
     from ManipulaPy.ManipulaPy_data.xarm import urdf_file
-    print(f"Using xArm URDF: {urdf_file}")
 except ImportError:
-    # Option 2: Use your own URDF file
     urdf_file = "path/to/your/robot.urdf"
 
-# Process URDF and create robot model
+# Initialize robot
 urdf_processor = URDFToSerialManipulator(urdf_file)
 robot = urdf_processor.serial_manipulator
 dynamics = urdf_processor.dynamics
 
-print(f"✅ Robot loaded with {len(robot.joint_limits)} joints")
-```
-
-### Forward and Inverse Kinematics
-```python
-from math import pi
-
-# Forward Kinematics
-joint_angles = np.array([pi/6, pi/4, -pi/3, -pi/2, pi/4, pi/6])
+# Forward kinematics
+joint_angles = np.array([0.1, 0.2, -0.3, -0.5, 0.2, 0.1])
 end_effector_pose = robot.forward_kinematics(joint_angles)
-print("End-effector pose:")
-print(end_effector_pose)
+print(f"End-effector position: {end_effector_pose[:3, 3]}")
 
-# Inverse Kinematics
-target_pose = np.eye(4)
-target_pose[:3, 3] = [0.5, 0.3, 0.4]  # Target position
+# Trajectory planning
+joint_limits = [(-np.pi, np.pi)] * 6
+planner = OptimizedTrajectoryPlanning(robot, urdf_file, dynamics, joint_limits)
 
-solution, success, iterations = robot.iterative_inverse_kinematics(
-    T_desired=target_pose,
-    thetalist0=joint_angles,
-    eomg=1e-6,  # Orientation tolerance
-    ev=1e-6     # Position tolerance
+trajectory = planner.joint_trajectory(
+    thetastart=np.zeros(6),
+    thetaend=joint_angles,
+    Tf=5.0, N=100, method=5
 )
 
-if success:
-    print(f"✅ IK converged in {iterations} iterations")
-    print(f"Solution: {solution}")
-else:
-    print("❌ IK failed to converge")
+print(f"✅ Generated {trajectory['positions'].shape[0]} trajectory points")
 ```
 
 ---
 
-## 🤖 Core Functionalities
+## 📚 Core Modules
 
-### Advanced Trajectory Planning
+### 🔧 Kinematics & Dynamics
+
+<details>
+<summary><b>Forward & Inverse Kinematics</b></summary>
+
 ```python
-from ManipulaPy.path_planning import TrajectoryPlanning
+# Forward kinematics
+pose = robot.forward_kinematics(joint_angles, frame="space")
 
-# Initialize trajectory planner with collision checking
-joint_limits = [(-pi, pi)] * 6
-planner = TrajectoryPlanning(
-    robot, urdf_file, dynamics, 
-    joint_limits=joint_limits
+# Inverse kinematics with advanced solver
+target_pose = np.eye(4)
+target_pose[:3, 3] = [0.5, 0.3, 0.4]
+
+solution, success, iterations = robot.iterative_inverse_kinematics(
+    T_desired=target_pose,
+    thetalist0=joint_angles,
+    eomg=1e-6, ev=1e-6,
+    max_iterations=5000,
+    plot_residuals=True
 )
-
-# Generate smooth joint space trajectory
-start_config = np.zeros(6)
-end_config = np.array([pi/2, pi/4, pi/6, -pi/3, -pi/2, -pi/3])
-
-trajectory = planner.joint_trajectory(
-    thetastart=start_config,
-    thetaend=end_config,
-    Tf=5.0,  # 5 seconds
-    N=100,   # 100 points
-    method=5  # Quintic time scaling
-)
-
-print(f"Generated trajectory with {trajectory['positions'].shape[0]} points")
-
-# Plot trajectory
-planner.plot_trajectory(trajectory, Tf=5.0, title="Joint Space Trajectory")
 ```
 
-### Comprehensive Dynamics Analysis
+</details>
+
+<details>
+<summary><b>Dynamic Analysis</b></summary>
+
 ```python
 from ManipulaPy.dynamics import ManipulatorDynamics
 
 # Compute dynamics quantities
-joint_velocities = np.array([0.1, 0.05, 0.02, 0.01, 0.005, 0.002])
-joint_accelerations = np.array([0.1, 0.2, 0.1, 0.05, 0.05, 0.02])
-
-# Mass matrix (configuration-dependent)
 M = dynamics.mass_matrix(joint_angles)
-print(f"Mass matrix condition number: {np.linalg.cond(M):.2f}")
-
-# Coriolis and centrifugal forces
 C = dynamics.velocity_quadratic_forces(joint_angles, joint_velocities)
-
-# Gravity forces
 G = dynamics.gravity_forces(joint_angles, g=[0, 0, -9.81])
 
 # Inverse dynamics: τ = M(q)q̈ + C(q,q̇) + G(q)
-required_torques = dynamics.inverse_dynamics(
+torques = dynamics.inverse_dynamics(
     joint_angles, joint_velocities, joint_accelerations,
-    [0, 0, -9.81], np.zeros(6)  # gravity, external forces
+    [0, 0, -9.81], np.zeros(6)
 )
-print(f"Required torques: {required_torques}")
 ```
 
-### Advanced Control Systems
+</details>
+
+### 🛤️ Path Planning & Control
+
+<details>
+<summary><b>Advanced Trajectory Planning</b></summary>
+
+```python
+# GPU-accelerated trajectory planning
+planner = OptimizedTrajectoryPlanning(
+    robot, urdf_file, dynamics, joint_limits,
+    use_cuda=True,  # Enable GPU acceleration
+    cuda_threshold=200,  # Auto-switch threshold
+    enable_profiling=True
+)
+
+# Joint space trajectory
+trajectory = planner.joint_trajectory(
+    thetastart=start_config,
+    thetaend=end_config,
+    Tf=5.0, N=1000, method=5  # Quintic time scaling
+)
+
+# Cartesian space trajectory
+cartesian_traj = planner.cartesian_trajectory(
+    Xstart=start_pose, Xend=end_pose,
+    Tf=3.0, N=500, method=3  # Cubic time scaling
+)
+
+# Performance monitoring
+stats = planner.get_performance_stats()
+print(f"GPU usage: {stats['gpu_usage_percent']:.1f}%")
+```
+
+</details>
+
+<details>
+<summary><b>Advanced Control Systems</b></summary>
+
 ```python
 from ManipulaPy.control import ManipulatorController
 
 controller = ManipulatorController(dynamics)
 
-# PID Control with tuned gains
-Kp = np.diag([100, 100, 50, 50, 30, 30])
-Ki = np.diag([10, 10, 5, 5, 3, 3])
-Kd = np.diag([20, 20, 10, 10, 6, 6])
+# Auto-tuned PID control using Ziegler-Nichols
+Ku, Tu = 50.0, 0.5  # Ultimate gain and period
+Kp, Ki, Kd = controller.ziegler_nichols_tuning(Ku, Tu, kind="PID")
 
-desired_pos = np.array([1.0, 0.5, 0.3, 0.2, 0.1, 0.0])
-current_pos = np.array([0.9, 0.4, 0.35, 0.25, 0.05, 0.05])
-current_vel = np.zeros(6)
-
-# PID control
-control_torque = controller.pid_control(
-    thetalistd=desired_pos,
-    dthetalistd=np.zeros(6),
-    thetalist=current_pos,
-    dthetalist=current_vel,
-    dt=0.01,
+# Computed torque control
+control_torque = controller.computed_torque_control(
+    thetalistd=desired_positions,
+    dthetalistd=desired_velocities,
+    ddthetalistd=desired_accelerations,
+    thetalist=current_positions,
+    dthetalist=current_velocities,
+    g=[0, 0, -9.81], dt=0.01,
     Kp=Kp, Ki=Ki, Kd=Kd
 )
 
-# Computed torque control (model-based)
-desired_acc = np.array([0.1, 0.1, 0.05, 0.05, 0.02, 0.02])
-model_torque = controller.computed_torque_control(
-    thetalistd=desired_pos,
-    dthetalistd=np.zeros(6),
-    ddthetalistd=desired_acc,
-    thetalist=current_pos,
-    dthetalist=current_vel,
-    g=[0, 0, -9.81],
-    dt=0.01,
-    Kp=Kp, Ki=Ki, Kd=Kd
+# Adaptive control
+adaptive_torque = controller.adaptive_control(
+    thetalist=current_positions,
+    dthetalist=current_velocities,
+    ddthetalist=desired_accelerations,
+    g=[0, 0, -9.81], Ftip=np.zeros(6),
+    measurement_error=position_error,
+    adaptation_gain=0.1
 )
 ```
 
-### Singularity Analysis and Workspace Computation
-```python
-from ManipulaPy.singularity import Singularity
+</details>
 
-singularity_analyzer = Singularity(robot)
+### 🌐 Simulation & Visualization
 
-# Check for singularities
-is_singular = singularity_analyzer.singularity_analysis(joint_angles)
-condition_num = singularity_analyzer.condition_number(joint_angles)
+<details>
+<summary><b>Real-time PyBullet Simulation</b></summary>
 
-print(f"Configuration singular: {is_singular}")
-print(f"Condition number: {condition_num:.2f}")
-
-# Visualize manipulability ellipsoid
-singularity_analyzer.manipulability_ellipsoid(joint_angles)
-
-# Compute and visualize workspace
-print("Computing robot workspace...")
-singularity_analyzer.plot_workspace_monte_carlo(
-    joint_limits=joint_limits,
-    num_samples=5000
-)
-```
-
-### Real-time Simulation with PyBullet
 ```python
 from ManipulaPy.sim import Simulation
 
@@ -249,220 +250,286 @@ sim = Simulation(
     real_time_factor=1.0
 )
 
-try:
-    # Initialize simulation
-    sim.initialize_robot()
-    sim.initialize_planner_and_controller()
-    sim.add_joint_parameters()  # Add GUI sliders
+# Initialize and run
+sim.initialize_robot()
+sim.initialize_planner_and_controller()
+sim.add_joint_parameters()  # GUI sliders
 
-    print("🎮 Simulation started! Use GUI to control the robot.")
-    
-    # Execute trajectory
-    if 'trajectory' in locals():
-        final_pose = sim.run_trajectory(trajectory["positions"])
-        print(f"Trajectory completed. Final pose: {final_pose}")
-    
-    # Manual control mode
-    # sim.manual_control()  # Uncomment for interactive control
-    
-except KeyboardInterrupt:
-    print("\nSimulation stopped by user")
-finally:
-    sim.close_simulation()
+# Execute trajectory
+final_pose = sim.run_trajectory(trajectory["positions"])
+
+# Manual control with collision detection
+sim.manual_control()
 ```
 
-### Vision and Perception
+</details>
+
+<details>
+<summary><b>Singularity & Workspace Analysis</b></summary>
+
+```python
+from ManipulaPy.singularity import Singularity
+
+analyzer = Singularity(robot)
+
+# Singularity detection
+is_singular = analyzer.singularity_analysis(joint_angles)
+condition_number = analyzer.condition_number(joint_angles)
+
+# Manipulability ellipsoid
+analyzer.manipulability_ellipsoid(joint_angles)
+
+# Workspace visualization with GPU acceleration
+analyzer.plot_workspace_monte_carlo(
+    joint_limits=joint_limits,
+    num_samples=10000
+)
+```
+
+</details>
+
+### 👁️ Vision & Perception
+
+<details>
+<summary><b>Computer Vision Pipeline</b></summary>
+
 ```python
 from ManipulaPy.vision import Vision
 from ManipulaPy.perception import Perception
 
-# Setup camera configuration
+# Camera configuration
 camera_config = {
     "name": "main_camera",
-    "intrinsic_matrix": np.array([
-        [500, 0, 320],
-        [0, 500, 240],
-        [0, 0, 1]
-    ], dtype=np.float32),
+    "intrinsic_matrix": np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]]),
     "translation": [0, 0, 1.5],
     "rotation": [0, -30, 0],  # degrees
-    "fov": 60
+    "fov": 60,
+    "use_opencv": True,  # Real camera
+    "device_index": 0
 }
 
-# Initialize vision and perception systems
-vision = Vision([camera_config])
-perception = Perception(vision)
+# Stereo vision setup
+left_cam = {**camera_config, "translation": [-0.1, 0, 1.5]}
+right_cam = {**camera_config, "translation": [0.1, 0, 1.5]}
 
-# Detect and cluster obstacles
-try:
-    obstacles, labels = perception.detect_and_cluster_obstacles(
-        depth_threshold=3.0,
-        eps=0.1,
-        min_samples=5
-    )
-    
-    if len(obstacles) > 0:
-        num_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-        print(f"Found {len(obstacles)} obstacle points in {num_clusters} clusters")
-    else:
-        print("No obstacles detected")
-        
-except Exception as e:
-    print(f"Vision system: {e} (normal if no camera available)")
+vision = Vision(
+    camera_configs=[camera_config],
+    stereo_configs=(left_cam, right_cam)
+)
+
+# Object detection and clustering
+perception = Perception(vision)
+obstacles, labels = perception.detect_and_cluster_obstacles(
+    depth_threshold=3.0,
+    eps=0.1, min_samples=5
+)
+
+# 3D point cloud from stereo
+if vision.stereo_enabled:
+    left_img, _ = vision.capture_image(0)
+    right_img, _ = vision.capture_image(1)
+    point_cloud = vision.get_stereo_point_cloud(left_img, right_img)
 ```
 
-### Performance Monitoring and GPU Acceleration
+</details>
+
+---
+
+## 📊 Performance Features
+
+### GPU Acceleration
+
+ManipulaPy includes highly optimized CUDA kernels for performance-critical operations:
+
 ```python
 from ManipulaPy.cuda_kernels import check_cuda_availability
-import time
 
-# Check GPU availability
 if check_cuda_availability():
     print("🚀 CUDA acceleration available!")
     
-    # Performance comparison
-    start_time = time.time()
-    large_trajectory = planner.joint_trajectory(
-        start_config, end_config, 
-        Tf=10.0, N=10000, method=5
+    # Automatic GPU/CPU switching based on problem size
+    planner = OptimizedTrajectoryPlanning(
+        robot, urdf_file, dynamics, joint_limits,
+        use_cuda=None,  # Auto-detect
+        cuda_threshold=200,  # Switch threshold
+        memory_pool_size_mb=512  # GPU memory pool
     )
-    gpu_time = time.time() - start_time
     
-    print(f"GPU trajectory generation: {gpu_time:.3f} seconds")
-    print(f"Performance: {10000/gpu_time:.0f} points/second")
-    
+    # Batch processing for multiple trajectories
+    batch_trajectories = planner.batch_joint_trajectory(
+        thetastart_batch=start_configs,  # (batch_size, n_joints)
+        thetaend_batch=end_configs,
+        Tf=5.0, N=1000, method=5
+    )
 else:
-    print("⚠️ CUDA not available - using CPU fallback")
-    print("Install GPU support: pip install ManipulaPy[gpu-cuda11]")
+    print("CPU mode - install GPU support for acceleration")
+```
+
+### Performance Monitoring
+
+```python
+# Benchmark different implementations
+results = planner.benchmark_performance([
+    {"N": 1000, "joints": 6, "name": "Medium"},
+    {"N": 5000, "joints": 6, "name": "Large"},
+    {"N": 1000, "joints": 12, "name": "Many joints"}
+])
+
+for name, result in results.items():
+    print(f"{name}: {result['total_time']:.3f}s, GPU: {result['used_gpu']}")
 ```
 
 ---
 
-## 📁 Examples and Tutorials
+## 📁 Examples & Tutorials
 
 The `Examples/` directory contains comprehensive demonstrations:
 
-### Available Examples
-- **`basic_kinematics.py`**: Forward/inverse kinematics with visualization
-- **`trajectory_planning_demo.py`**: Advanced path planning with obstacles
-- **`dynamics_analysis.py`**: Complete dynamics modeling and control
-- **`simulation_demo.py`**: Real-time PyBullet simulation
-- **`perception_demo.py`**: Stereo vision and object detection
-- **`control_comparison.py`**: Various control strategies
-- **`workspace_analysis.py`**: Singularity analysis and workspace computation
+| Example | Description | Complexity |
+|---------|-------------|------------|
+| `basic_kinematics.py` | Forward/inverse kinematics with visualization | ⭐ |
+| `trajectory_planning_demo.py` | GPU-accelerated path planning | ⭐⭐ |
+| `dynamics_and_control.py` | Complete dynamics and control analysis | ⭐⭐ |
+| `simulation_complete.py` | Full PyBullet simulation pipeline | ⭐⭐⭐ |
+| `perception_stereo.py` | Stereo vision and object detection | ⭐⭐⭐ |
+| `performance_comparison.py` | GPU vs CPU performance analysis | ⭐⭐ |
+| `advanced_control.py` | Multiple control strategies comparison | ⭐⭐⭐ |
 
 ### Running Examples
+
 ```bash
 cd Examples/
+
+# Basic kinematics
 python basic_kinematics.py
-python trajectory_planning_demo.py
-python simulation_demo.py
+
+# Advanced trajectory planning
+python trajectory_planning_demo.py --gpu --visualize
+
+# Complete simulation
+python simulation_complete.py --urdf path/to/robot.urdf
 ```
 
 ---
 
-## 🧪 Testing and Validation
+## 🧪 Testing & Validation
 
-ManipulaPy includes comprehensive tests covering all modules:
+### Test Suite
 
-### Run Tests
 ```bash
 # Install test dependencies
 pip install ManipulaPy[dev]
 
 # Run all tests
-python -m pytest tests/ -v
+python -m pytest tests/ -v --cov=ManipulaPy
 
 # Test specific modules
 python -m pytest tests/test_kinematics.py -v
 python -m pytest tests/test_dynamics.py -v
 python -m pytest tests/test_control.py -v
+python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
 
-# Check installation and dependencies
-python -c "import ManipulaPy; ManipulaPy.check_dependencies(verbose=True)"
+# Performance benchmarks
+python -m pytest tests/test_performance.py -v --benchmark-only
 ```
 
-### Performance Testing
-```bash
-# GPU performance test (if CUDA available)
-python -c "from ManipulaPy.cuda_kernels import check_cuda_availability; print(f'CUDA: {check_cuda_availability()}')"
+### Coverage Statistics
 
-# Run performance benchmarks
-python Examples/performance_test.py
+- **Kinematics**: >95% test coverage
+- **Dynamics**: >90% test coverage  
+- **Control**: >88% test coverage
+- **Perception**: >85% test coverage
+- **GPU Kernels**: >80% test coverage
+
+---
+
+## 📖 Documentation
+
+### Online Documentation
+- **[Complete API Reference](https://manipulapy.readthedocs.io/)**
+- **[User Guide](https://manipulapy.readthedocs.io/en/latest/user_guide.html)**
+- **[Theory Background](https://manipulapy.readthedocs.io/en/latest/theory.html)**
+- **[GPU Programming Guide](https://manipulapy.readthedocs.io/en/latest/gpu.html)**
+
+### Quick Reference
+
+```python
+# Check installation and dependencies
+import ManipulaPy
+ManipulaPy.check_dependencies(verbose=True)
+
+# Module overview
+print(ManipulaPy.__version__)  # Current version
+print(ManipulaPy.__all__)     # Available modules
+
+# GPU capabilities
+from ManipulaPy.cuda_kernels import get_gpu_properties
+props = get_gpu_properties()
+if props:
+    print(f"GPU: {props['multiprocessor_count']} SMs")
 ```
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! ManipulaPy is a community-driven project that benefits from diverse input.
+We welcome contributions from the robotics community!
 
 ### Quick Start for Contributors
+
 ```bash
-# Fork the repository on GitHub
+# Fork and clone
 git clone https://github.com/your-username/ManipulaPy.git
 cd ManipulaPy
 
-# Install in development mode
+# Development setup
 pip install -e .[dev]
+pre-commit install  # Code formatting
 
-# Run tests to verify setup
-python -m pytest tests/ -x
+# Run tests
+python -m pytest tests/ -v
 
-# Make your changes and submit a pull request
+# Check code quality
+black ManipulaPy/
+flake8 ManipulaPy/
+mypy ManipulaPy/
 ```
 
-### Contribution Guidelines
-- **Follow PEP8** style guidelines
-- **Add comprehensive tests** for new features
-- **Update documentation** for API changes
-- **Include examples** for new functionality
-- **Maintain backward compatibility** when possible
+### Contribution Areas
+
+- 🐛 **Bug Reports**: Issues and edge cases
+- ✨ **New Features**: Algorithms and capabilities
+- 📚 **Documentation**: Guides and examples
+- 🚀 **Performance**: CUDA kernels and optimizations
+- 🧪 **Testing**: Test coverage and validation
+- 🎨 **Visualization**: Plotting and animation tools
+
+### Guidelines
+
+- Follow **PEP 8** style guidelines
+- Add **comprehensive tests** for new features
+- Update **documentation** for API changes
+- Include **working examples** for new functionality
+- Maintain **backward compatibility** when possible
 
 ---
 
-## 📄 License
+## 📄 License & Citation
 
-This project is licensed under the **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**.
+### License
 
-### Key Dependencies and Their Licenses
+ManipulaPy is licensed under the **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**.
 
-**Core Dependencies** (All compatible with AGPL-3.0):
-- **`numpy`**, **`scipy`**, **`matplotlib`** → BSD License
-- **`opencv-python`** → Apache 2.0 License  
-- **`torch`** → BSD License
-- **`pybullet`** → Zlib License
-- **`scikit-learn`** → BSD License
-- **`ultralytics`** → AGPL-3.0 License (YOLO object detection)
-- **`cupy`** → MIT License (GPU acceleration)
-- **`numba`** → BSD License (JIT compilation)
+**Key Points:**
+- ✅ **Free to use** for research and education
+- ✅ **Modify and distribute** under same license
+- ✅ **Commercial use** allowed under AGPL terms
+- ⚠️ **Network services** must provide source code
+- 📜 **See [LICENSE](LICENSE)** for complete terms
 
-All dependencies are compatible with AGPL-3.0 licensing. See [LICENSE](LICENSE) for complete terms.
+### Citation
 
-### License Summary
-
-ManipulaPy is free and open-source software. You can use, modify, and distribute it under AGPL-3.0 terms. If you distribute modified versions or use ManipulaPy in network services, you must make your source code available under the same license.
-
-```
-ManipulaPy - Comprehensive robotic manipulator analysis and control
-Copyright (c) 2025 Mohamed Aboelnar
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU Affero General Public License for more details.
-```
-
----
-
-## 🏆 Citation
-
-If you use ManipulaPy in your research, please cite our work:
+If you use ManipulaPy in your research, please cite:
 
 ```bibtex
 @software{manipulapy2025,
@@ -470,79 +537,97 @@ If you use ManipulaPy in your research, please cite our work:
   author={Mohamed Aboelnar},
   year={2025},
   url={https://github.com/boelnasr/ManipulaPy},
-  version={1.2.0},
-  license={AGPL-3.0-or-later}
+  version={1.1.0},
+  license={AGPL-3.0-or-later},
+  doi={10.5281/zenodo.XXXXXXX}
 }
 ```
 
-For academic papers, please also consider citing the underlying mathematical frameworks and algorithms used in your specific application.
+### Dependencies
+
+All dependencies are AGPL-3.0 compatible:
+- **Core**: `numpy`, `scipy`, `matplotlib` (BSD)
+- **Vision**: `opencv-python` (Apache 2.0), `ultralytics` (AGPL-3.0)
+- **GPU**: `cupy` (MIT), `numba` (BSD)
+- **Simulation**: `pybullet` (Zlib), `urchin` (MIT)
 
 ---
 
-## 📬 Contact & Support
+## 📞 Support & Community
+
+### Getting Help
+
+1. **📚 Documentation**: [manipulapy.readthedocs.io](https://manipulapy.readthedocs.io/)
+2. **💡 Examples**: Check the `Examples/` directory
+3. **🐛 Issues**: [GitHub Issues](https://github.com/boelnasr/ManipulaPy/issues)
+4. **💬 Discussions**: [GitHub Discussions](https://github.com/boelnasr/ManipulaPy/discussions)
+5. **📧 Contact**: [aboelnasr1997@gmail.com](mailto:aboelnasr1997@gmail.com)
+
+### Community
+
+- **🌟 Star** the project if you find it useful
+- **🍴 Fork** to contribute improvements
+- **📢 Share** with the robotics community
+- **📝 Cite** in your academic work
+
+### Contact Information
 
 **Created and maintained by Mohamed Aboelnar**
 
-### Contact Information
 - 📧 **Email**: [aboelnasr1997@gmail.com](mailto:aboelnasr1997@gmail.com)
 - 🐙 **GitHub**: [@boelnasr](https://github.com/boelnasr)
-- 📖 **Documentation**: [manipulapy.readthedocs.io](https://manipulapy.readthedocs.io/)
-
-### Getting Help
-1. **📚 Check Documentation**: Comprehensive guides and API reference
-2. **🔍 Browse Examples**: Complete working examples in `Examples/` directory
-3. **🐛 Report Issues**: [GitHub Issues](https://github.com/boelnasr/ManipulaPy/issues)
-4. **💬 Discussions**: [GitHub Discussions](https://github.com/boelnasr/ManipulaPy/discussions)
-5. **📧 Direct Contact**: For complex questions or collaboration opportunities
-
-Feel free to reach out with questions, bug reports, feature requests, or collaboration ideas!
+- 🔗 **LinkedIn**: Connect for collaboration opportunities
 
 ---
 
+## 🏆 Why Choose ManipulaPy?
+
+<table>
+<tr>
+<td width="33%">
+
+### 🔬 **For Researchers**
+- Comprehensive algorithms with solid mathematical foundations
+- Extensible modular design for new methods
+- Well-documented with theoretical background
+- Proper citation format for publications
+- AGPL-3.0 license for open science
+
+</td>
+<td width="33%">
+
+### 👩‍💻 **For Developers**
+- High-performance GPU acceleration
+- Clean, readable Python code
+- Modular architecture
+- Comprehensive test suite
+- Active development and support
+
+</td>
+<td width="33%">
+
+### 🏭 **For Industry**
+- Production-ready with robust error handling
+- Scalable for real-time applications
+- Clear licensing for commercial use
+- Professional documentation
+- Regular updates and maintenance
+
+</td>
+</tr>
+</table>
 
 ---
 
-## ✅ Tested
+<div align="center">
 
-ManipulaPy includes a comprehensive suite of unit tests covering:
-- **Kinematics**: Forward/inverse kinematics accuracy and convergence
-- **Dynamics**: Mass matrix properties and dynamics equations
-- **Control**: Controller stability and performance
-- **Perception**: Vision system functionality and robustness
-- **Integration**: End-to-end system testing
-
-We run tests with Python's built-in `unittest` and `pytest`. See the [`tests/`](./tests) folder for details.
-
-**Test Coverage**: > 85% across all core modules  
-**Continuous Integration**: Automated testing on multiple Python versions  
-**Performance Validation**: Benchmarks for GPU acceleration and algorithm efficiency
-
----
-
-## 🌟 Why Choose ManipulaPy?
-
-### For Researchers
-- **🔬 Academic Ready**: Comprehensive algorithms with solid mathematical foundations
-- **📊 Extensible**: Modular design allows easy integration of new methods
-- **📚 Well Documented**: Extensive documentation with theoretical background
-- **🏆 Citable**: Proper citation format for academic publications
-
-### For Developers  
-- **⚡ High Performance**: GPU acceleration for computationally intensive tasks
-- **🐍 Pythonic**: Clean, readable code following Python best practices
-- **🔧 Modular**: Use only the components you need
-- **🧪 Thoroughly Tested**: Comprehensive test suite ensuring reliability
-
-### For Industry
-- **🏭 Production Ready**: Robust error handling and graceful degradation
-- **📈 Scalable**: Efficient algorithms suitable for real-time applications
-- **🔒 Licensed**: Clear AGPL-3.0 licensing for commercial understanding
-- **🤝 Actively Supported**: Regular updates and community support
-
----
-
-*🤖 **ManipulaPy**: Empowering robotics research and development with comprehensive, high-performance tools for manipulator analysis and control.*
-
-> 📌 **Latest Version**: `v1.2.0` - JOSS-compliant, GPU-accelerated, and ready for serious robotics work!
+**🤖 ManipulaPy v1.1.0: Professional robotics tools for the Python ecosystem**
 
 [![GitHub stars](https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=social)](https://github.com/boelnasr/ManipulaPy)
+[![Downloads](https://img.shields.io/pypi/dm/ManipulaPy)](https://pypi.org/project/ManipulaPy/)
+
+*Empowering robotics research and development with comprehensive, GPU-accelerated tools*
+
+[⭐ Star on GitHub](https://github.com/boelnasr/ManipulaPy) • [📦 Install from PyPI](https://pypi.org/project/ManipulaPy/) • [📖 Read the Docs](https://manipulapy.readthedocs.io/)
+
+</div>

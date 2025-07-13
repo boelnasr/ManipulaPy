@@ -1,0 +1,69 @@
+ManipulaPy: Basic Dynamics Demo - Analysis Summary
+============================================================
+
+MASS MATRIX ANALYSIS
+------------------------------
+
+Configuration: Home (Zero)
+  Joint angles: [          0           0           0           0           0           0]
+  Condition number: 9830.21
+  Determinant: -1.00e-06
+  Trace: 6.293
+  Eigenvalue range: [-0.469, 4.395]
+  Positive definite: False
+  Computation time: 0.92 ms
+
+Configuration: Mid-range
+  Joint angles: [          0      0.0177     -1.8675           0     0.72431           0]
+  Condition number: 187.00
+  Determinant: -3.78e-02
+  Trace: 9.081
+  Eigenvalue range: [-0.591, 6.965]
+  Positive definite: False
+  Computation time: 0.88 ms
+
+Configuration: Random
+  Joint angles: [    -2.1932     -1.7251     -1.1131      3.8624     0.47842      4.2707]
+  Condition number: 241.91
+  Determinant: -5.25e-03
+  Trace: 4.908
+  Eigenvalue range: [-0.861, 3.437]
+  Positive definite: False
+  Computation time: 0.85 ms
+
+Configuration: Extended
+  Joint angles: [     4.3982      1.4661     0.13439      4.3982      2.1991      4.3982]
+  Condition number: 102.23
+  Determinant: 1.00e-03
+  Trace: 4.571
+  Eigenvalue range: [-0.291, 3.330]
+  Positive definite: False
+  Computation time: 0.84 ms
+
+Configuration: Folded
+  Joint angles: [    -4.3982     -1.4413     -2.7489     -4.3982     -1.1851     -4.3982]
+  Condition number: 162.10
+  Determinant: -5.13e-04
+  Trace: 3.950
+  Eigenvalue range: [-0.263, 2.789]
+  Positive definite: False
+  Computation time: 0.84 ms
+
+PERFORMANCE SUMMARY
+------------------------------
+Average computation times:
+  Mass Matrix: 0.87 ms (1156 Hz)
+  Inverse Dynamics: 1.50 ms (666 Hz)
+  Forward Dynamics: 1.47 ms (680 Hz)
+
+CONFIGURATION SPACE STATISTICS
+------------------------------
+Samples analyzed: 100
+Condition number range: [21.12, 5934.87]
+Condition number mean: 406.10 ± 984.39
+High condition configurations: 62/100 (62.0%)
+
+VERIFICATION RESULTS
+------------------------------
+Forward/Inverse dynamics consistency: 2.72e-13
+Verification status: PASSED

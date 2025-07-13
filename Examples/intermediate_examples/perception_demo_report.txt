@@ -1,0 +1,67 @@
+ManipulaPy Perception Demo - Detailed Report
+==================================================
+
+Generated: 2025-07-13 15:46:15
+
+System Information:
+  PyBullet Available: True
+  Vision System Available: True
+  Perception System Available: True
+  Total Outputs Generated: 27
+
+Generated Output Files:
+  - 20250713_154611_vision_vision_features_analysis.png
+  - 20250713_154612_vision_vision_geometric_shapes_edges.png
+  - 20250713_154612_vision_vision_geometric_shapes_blurred.png
+  - 20250713_154612_vision_vision_geometric_shapes_equalized.png
+  - 20250713_154612_vision_vision_geometric_shapes_opening.png
+  - 20250713_154612_vision_vision_geometric_shapes_closing.png
+  - 20250713_154612_vision_vision_noise_edges.png
+  - 20250713_154612_vision_vision_noise_blurred.png
+  - 20250713_154612_vision_vision_noise_equalized.png
+  - 20250713_154612_vision_vision_noise_opening.png
+  - 20250713_154612_vision_vision_noise_closing.png
+  - 20250713_154612_vision_vision_gradient_edges.png
+  - 20250713_154612_vision_vision_gradient_blurred.png
+  - 20250713_154612_vision_vision_gradient_equalized.png
+  - 20250713_154612_vision_vision_gradient_opening.png
+  - 20250713_154612_vision_vision_gradient_closing.png
+  - 20250713_154612_vision_vision_textured_edges.png
+  - 20250713_154612_vision_vision_textured_blurred.png
+  - 20250713_154612_vision_vision_textured_equalized.png
+  - 20250713_154612_vision_vision_textured_opening.png
+  - 20250713_154612_vision_vision_textured_closing.png
+  - 20250713_154612_advanced_advanced_perception_analysis.png
+  - 20250713_154613_clustering_clustering_analysis.png
+  - 20250713_154614_clustering_clustering_performance.png
+  - 20250713_154614_stereo_stereo_left.png
+  - 20250713_154614_stereo_stereo_right.png
+  - 20250713_154615_stereo_stereo_vision_analysis.png
+  - 20250713_154615_summary_perception_summary_report.png
+
+Demonstration Results:
+  image_capture:
+    images_captured: 0
+    positions: []
+
+  vision_features:
+    images_processed: 4
+    processing_techniques: ['edges', 'blur', 'equalization', 'morphology', 'histogram']
+
+  clustering_analysis:
+    total_points: 138
+    true_clusters: 4
+    parameter_combinations_tested: 12
+    best_result: {'eps': 0.2, 'min_samples': 3, 'clusters_found': 3, 'noise_points': 14}
+
+  advanced_perception:
+    objects_tracked: 3
+    total_detections: 60
+    avg_objects_per_frame: 3.0
+    motion_analysis: {1: {'avg_speed': 1.494381324735992, 'max_speed': 1.4943813247359956}, 2: {'avg_speed': 0.20000000000000007, 'max_speed': 0.20000000000000046}, 3: {'avg_speed': 0.0, 'max_speed': 0.0}}
+
+  stereo_vision:
+    point_cloud_size: 190943
+    disparity_range: [-1.0, 5.375]
+    depth_range: [-70.0, -19.534883499145508]
+

@@ -1,0 +1,26 @@
+ManipulaPy Simulation Demo - Detailed Report
+==================================================
+
+Generated: 2025-07-13 15:46:21
+
+Robot Configuration:
+  URDF Path: /home/abo/Desktop/ManipulaPy/Examples/intermediate_examples/simple_arm.urdf
+  Number of Joints: 2
+  Joint Limits: [(-3.141592653589793, 3.141592653589793), (-3.141592653589793, 3.141592653589793)]
+
+System Information:
+  CUDA Available: True
+  Plots Generated: 5
+  Plots Saved To: /home/abo/Desktop/ManipulaPy/Examples/intermediate_examples
+
+Generated Plots:
+  - 20250713_154618_ik_inverse_kinematics_analysis.png
+  - 20250713_154620_traj_trajectory_planning_comparison.png
+  - 20250713_154620_traj_perf_trajectory_planning_performance.png
+  - 20250713_154621_perf_performance_benchmarking.png
+  - 20250713_154621_control_tune_controller_tuning.png
+  - 20250713_154621_summary_summary_report.png
+
+Performance Results:
+  benchmarking: {'Small': {'total_time': 0.0027761459350585938, 'N': 50, 'joints': 2, 'stats': {'gpu_calls': 0, 'cpu...
+  planner_stats: {'gpu_calls': 0, 'cpu_calls': 1, 'total_gpu_time': 0.0, 'total_cpu_time': 0.013815641403198242, 'mem...
