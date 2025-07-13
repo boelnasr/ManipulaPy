@@ -158,7 +158,7 @@ class OptimizedTrajectoryPlanning:
         *,                       # ――― everything after * is keyword-only ―――
 
         use_cuda: Optional[bool] = None,
-        cuda_threshold: int = 50,
+        cuda_threshold: int = 10,
         memory_pool_size_mb: Optional[int] = None,
         enable_profiling: bool = False,
     ):
@@ -1443,7 +1443,7 @@ def create_optimized_planner(
         dynamics=dynamics,
         joint_limits=joint_limits,
         torque_limits=torque_limits,
-        use_cuda=None,  # Auto-detect
+        use_cuda=True,  # Auto-detect
         cuda_threshold=threshold,
         memory_pool_size_mb=gpu_memory_mb,
         enable_profiling=enable_profiling,

@@ -184,72 +184,79 @@ class SerialManipulator:
         self,
         T_desired,
         thetalist0,
-        eomg=1e-6,
-        ev=1e-6,
-        max_iterations=5000,
-        plot_residuals=False,
-        damping=5e-2,            # λ for damped least-squares
-        step_cap=0.5,            # max ‖Δθ‖ per iteration (rad)
-        png_name="ik_residuals.png",
+        eomg: float = 1e-6,
+        ev: float = 1e-6,
+        max_iterations: int = 5000,
+        plot_residuals: bool = False,
+        damping: float = 5e-2,    # base λ for damped least-squares
+        step_cap: float = 0.5,    # max ‖Δθ‖ per iteration (rad)
+        png_name: str = "ik_residuals.png",
     ):
         """
-        Damped-least-squares iterative IK with joint-limit projection and
-        residual plot saved to file (no interactive window).
+        Accelerated damped-least-squares IK with dynamic damping, joint-limit
+        projection, and optional residual plotting.
         """
         θ = np.array(thetalist0, dtype=float)
         V_desired = utils.se3ToVec(utils.MatrixLog6(T_desired))
-        residuals = []
 
+        # Pre-allocate small constant arrays
+        I6 = np.eye(6)
+        A  = np.empty((6, 6))
+        mn = np.array([lim[0] if lim[0] is not None else -np.inf for lim in self.joint_limits])
+        mx = np.array([lim[1] if lim[1] is not None else  np.inf for lim in self.joint_limits])
+
+        residuals = []
         for k in range(max_iterations):
-            # Current pose & twist error
+            # --- pose & error ---
             T_curr = self.forward_kinematics(θ, frame="space")
             V_curr = utils.se3ToVec(utils.MatrixLog6(T_curr))
             V_err  = V_desired - V_curr
             rot_err, trans_err = np.linalg.norm(V_err[:3]), np.linalg.norm(V_err[3:])
             residuals.append((trans_err, rot_err))
-
             if rot_err < eomg and trans_err < ev:
-                success = True
-                break
+                return θ, True, k + 1
 
-            # Damped least-squares Δθ
-            J = self.jacobian(θ, frame="space")
+            # --- build Jacobian and damped solve ---
+            J   = self.jacobian(θ, frame="space")
             JJt = J @ J.T
-            Δθ  = J.T @ np.linalg.inv(JJt + (damping ** 2) * np.eye(6)) @ V_err
 
-            # Cap step size
+            # dynamic damping based on conditioning
+            cond = np.linalg.cond(JJt)
+            λ = damping * max(1.0, cond / 100.0)
+
+            # assemble A = JJt + λ² I, in-place
+            A[:] = JJt
+            A.flat[0::7] += λ**2
+
+            # solve A Δ = V_err, then Δθ = Jᵀ Δ
+            Δθ = J.T @ np.linalg.solve(A, V_err)
+
+            # --- step-size cap ---
             normΔ = np.linalg.norm(Δθ)
             if normΔ > step_cap:
-                Δθ *= step_cap / normΔ
+                Δθ *= (step_cap / normΔ)
 
             θ += Δθ
+            # joint-limits projection (vectorized)
+            θ = np.minimum(np.maximum(θ, mn), mx)
 
-            # Project into joint limits
-            for i, (mn, mx) in enumerate(self.joint_limits):
-                if mn is not None: θ[i] = max(θ[i], mn)
-                if mx is not None: θ[i] = min(θ[i], mx)
-        else:
-            success = False
-            k += 1   # max_iterations reached
-
-        # Optional residual plot (non-interactive)
+        # didn't converge within max_iterations
         if plot_residuals:
             import matplotlib
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
-
             it = np.arange(len(residuals))
             tr, rt = zip(*residuals)
-            plt.plot(it, tr, label="Translation error")
-            plt.plot(it, rt, label="Rotation error")
+            plt.plot(it, tr, label="translation error")
+            plt.plot(it, rt, label="rotation error")
             plt.xlabel("Iteration"); plt.ylabel("Norm")
-            plt.title("IK convergence")
+            plt.title("IK Convergence Residuals")
             plt.legend(); plt.grid(True); plt.tight_layout()
-            plt.savefig(png_name, dpi=400)
-            plt.close()
+            plt.savefig(png_name, dpi=400); plt.close()
             print(f"Residual plot saved to {png_name}")
 
-        return θ, success, k + 1
+        return θ, False, max_iterations
+
 
     def joint_velocity(self, thetalist, V_ee, frame="space"):
         """
