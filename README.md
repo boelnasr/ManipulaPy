@@ -447,9 +447,9 @@ python -m pytest tests/test_performance.py -v --benchmark-only
 
 ### Online Documentation
 - **[Complete API Reference](https://manipulapy.readthedocs.io/)**
-- **[User Guide](https://manipulapy.readthedocs.io/en/latest/user_guide.html)**
-- **[Theory Background](https://manipulapy.readthedocs.io/en/latest/theory.html)**
-- **[GPU Programming Guide](https://manipulapy.readthedocs.io/en/latest/gpu.html)**
+- **[User Guide](https://manipulapy.readthedocs.io/en/latest/api/index.html)**
+- **[API Reference](https://manipulapy.readthedocs.io/en/latest/theory.html)**
+- **[GPU Programming Guide](https://manipulapy.readthedocs.io/en/latest/user_guide/CUDA_Kernels.html)**
 
 ### Quick Reference
 
@@ -473,27 +473,53 @@ if props:
 
 ## 🤝 Contributing
 
-We welcome contributions from the robotics community!
+We love your input! Whether you’re reporting a bug, proposing a new feature, or improving our docs, here’s how to get started:
 
-### Quick Start for Contributors
+### 1. Report an Issue
+Please open a GitHub Issue with:
+- A descriptive title  
+- Steps to reproduce  
+- Expected vs. actual behavior  
+- Any relevant logs or screenshots  
 
-```bash
-# Fork and clone
-git clone https://github.com/your-username/ManipulaPy.git
-cd ManipulaPy
+### 2. Submit a Pull Request
+1. Fork this repository and create your branch:
+   ```bash
+   git clone https://github.com/<your-username>/ManipulaPy.git
+   cd ManipulaPy
+   git checkout -b feature/my-feature
+   ```
+2. Install and set up the development environment:
+   ```bash
+   pip install -e .[dev]
+   pre-commit install     # to run formatters and linters
+   ```
+3. Make your changes, then run tests and quality checks:
+   ```bash
+   # Run the full test suite
+   python -m pytest tests/ -v
 
-# Development setup
-pip install -e .[dev]
-pre-commit install  # Code formatting
+   # Lint and format
+   black ManipulaPy/
+   flake8 ManipulaPy/
+   mypy ManipulaPy/
+   ```
+4. Commit with clear, focused messages and push your branch:
+   ```bash
+   git add .
+   git commit -m "Add awesome new feature"
+   git push origin feature/my-feature
+   ```
+5. Open a Pull Request against `main` describing your changes.
 
-# Run tests
-python -m pytest tests/ -v
+### 3. Seek Support
+- **Design questions:** [GitHub Discussions](https://github.com/boelnasr/ManipulaPy/discussions)  
+- **Bug reports:** [GitHub Issues](https://github.com/boelnasr/ManipulaPy/issues)  
+- **Email:** aboelnasr1997@gmail.com  
 
-# Check code quality
-black ManipulaPy/
-flake8 ManipulaPy/
-mypy ManipulaPy/
-```
+### 4. Code of Conduct
+Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) to keep this community welcoming.  
+
 
 ### Contribution Areas
 
@@ -539,7 +565,7 @@ If you use ManipulaPy in your research, please cite:
   url={https://github.com/boelnasr/ManipulaPy},
   version={1.1.0},
   license={AGPL-3.0-or-later},
-  doi={10.5281/zenodo.XXXXXXX}
+
 }
 ```
 
