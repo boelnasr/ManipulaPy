@@ -611,7 +611,7 @@ class OptimizedTrajectoryPlanning:
             )
 
     def _inverse_dynamics_gpu(self, thetalist_trajectory, dthetalist_trajectory, 
-                             ddthetalist_trajectory, gravity_vector, Ftip):
+                            ddthetalist_trajectory, gravity_vector, Ftip):
         """GPU-accelerated inverse dynamics computation with optimized memory management."""
         start_time = time.time()
         
@@ -627,8 +627,19 @@ class OptimizedTrajectoryPlanning:
             d_dthetalist_trajectory = _h2d_pinned(dthetalist_trajectory.astype(np.float32))
             d_ddthetalist_trajectory = _h2d_pinned(ddthetalist_trajectory.astype(np.float32))
             
-            d_gravity_vector = cuda.to_device(gravity_vector.astype(np.float32))
-            d_Ftip = cuda.to_device(np.array(Ftip, dtype=np.float32))
+            # Convert gravity_vector and Ftip to numpy arrays if they're lists
+            if isinstance(gravity_vector, list):
+                gravity_vector = np.array(gravity_vector, dtype=np.float32)
+            else:
+                gravity_vector = np.asarray(gravity_vector, dtype=np.float32)
+                
+            if isinstance(Ftip, list):
+                Ftip = np.array(Ftip, dtype=np.float32)
+            else:
+                Ftip = np.asarray(Ftip, dtype=np.float32)
+            
+            d_gravity_vector = cuda.to_device(gravity_vector)
+            d_Ftip = cuda.to_device(Ftip)
             d_Glist = cuda.to_device(np.array(self.dynamics.Glist, dtype=np.float32))
             d_Slist = cuda.to_device(np.array(self.dynamics.S_list, dtype=np.float32))
             d_M = cuda.to_device(np.array(self.dynamics.M_list, dtype=np.float32))
@@ -678,7 +689,6 @@ class OptimizedTrajectoryPlanning:
             # Return large array to pool
             if 'torques_trajectory' in locals():
                 return_cuda_array(torques_trajectory)
-
     def _inverse_dynamics_cpu(self, thetalist_trajectory, dthetalist_trajectory,
                              ddthetalist_trajectory, gravity_vector, Ftip):
         """CPU-based inverse dynamics computation."""
