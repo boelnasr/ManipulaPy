@@ -27,9 +27,11 @@ Robotics research needs tight couplings of geometry, physics, vision and control
 
 Implementation mirrors the clustering in [@chu2021boundary].
 
+
+![ManipulaPy simulation showing GPU-accelerated trajectory execution with real-time dynamics and collision avoidance in a 6-DOF robotic manipulator. The orange trajectory line demonstrates smooth path planning with waypoint navigation, while colored objects represent workspace constraints.](figure_1_ultra_visible_trajectory.png)
 ## Library Architecture
 
-* **urdf_processor.py** – URDF → $(S_i,M,G_i)$ & limits → `SerialManipulator`, `ManipulatorDynamics`  
+* **urdf_processor.py** – URDF → $(S_i,M,G_i)$ & limits → `SerialManipulator`, `ManipulatorDynamics`  
 * **kinematics.py** – PoE FK/IK + Jacobians  
 * **dynamics.py** – Mass matrix, Coriolis, gravity (GPU‑optional)  
 * **path_planning.py** – CUDA cubic/quintic & SE(3) trajectories  
@@ -39,6 +41,24 @@ Implementation mirrors the clustering in [@chu2021boundary].
 * **sim.py** – One‑line PyBullet setup & loop  
 * **cuda_kernels.py** – Trajectory & dynamics kernels tuned for 256‑thread blocks  
 * **utils.py** – Lie‑group and SE(3) helpers
+
+### Vision Pipeline
+
+ManipulaPy integrates perception through a five-stage pipeline:
+
+```mermaid
+flowchart LR
+    A[RGB + Depth<br/>(640×480 px)] --> B[YOLO Detection<br/>(30-50 FPS, 80 classes)]
+    B --> C[3D Projection<br/>X = K⁻¹ · (u, v, d)]
+    C --> D[DBSCAN Clustering<br/>ε-neighborhood]
+    D --> E[Robot Integration<br/>T_base^cam · X]
+```
+
+**Figure Caption (example):**  
+**Figure X.** Five‐stage vision pipeline in ManipulaPy: (1) RGB+Depth capture (640×480 px); (2) YOLO 2D detection (30–50 FPS, 80 classes); (3) back‐projection to 3D via camera intrinsics \(X = K^{-1}[u,v,1]^\top d\); (4) spatial clustering with DBSCAN (\(\epsilon\) neighborhood); (5) transform into the robot base frame using \(T_{\text{base}}^{\text{cam}}\).
+::contentReference[oaicite:0]{index=0}
+
+(1) **Sensor Input** captures RGB+depth from stereo cameras, (2) **YOLO Detection** [@jocher2022yolo] extracts 2D bounding boxes at 30-50 FPS, (3) **3D Integration** projects detections to 3D using camera intrinsics $K$, (4) **DBSCAN Clustering** groups points spatially with $\epsilon$-neighborhoods, and (5) **Robot Integration** transforms clusters via $T_{base}^{cam}$ for collision-aware planning. This hybrid approach combines PyBullet geometric primitives with vision-detected obstacles, enabling 5-15 Hz end-to-end processing for dynamic environments.
 
 ## Theory Highlights
 

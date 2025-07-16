@@ -1,5 +1,5 @@
 Perception User Guide
-====================
+=======================
 
 .. _user_guide_perception:
 
@@ -10,7 +10,7 @@ This comprehensive guide covers the Perception module in ManipulaPy, which provi
    :depth: 2
 
 Overview
---------
+----------
 
 The Perception module serves as a higher-level interface that builds upon the Vision module to provide sophisticated environmental understanding capabilities for robotic systems. It transforms raw visual data into actionable information for robot control and navigation.
 
@@ -47,7 +47,7 @@ The Perception module serves as a higher-level interface that builds upon the Vi
    </div>
 
 Key Features
-------------
+--------------
 
 **Environmental Understanding**
   - Real-time obstacle detection and classification
@@ -65,10 +65,10 @@ Key Features
   - Coordinate frame transformations for robot control
 
 Getting Started
----------------
+-----------------
 
 Basic Perception Setup
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Perception module requires a Vision instance to function:
 
@@ -87,7 +87,7 @@ The Perception module requires a Vision instance to function:
    print("🧠 Perception system initialized successfully!")
 
 Simple Obstacle Detection
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Detect and cluster obstacles in the robot's environment:
 
@@ -123,10 +123,10 @@ Detect and cluster obstacles in the robot's environment:
        print(f"  📏 Size: [{cluster_size[0]:.2f}, {cluster_size[1]:.2f}, {cluster_size[2]:.2f}] m")
 
 Core Functionality
-------------------
+----------------------
 
 Obstacle Detection and Clustering
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The primary function of the Perception module is to detect and cluster obstacles:
 
@@ -174,7 +174,7 @@ The detection pipeline follows these steps:
 6. **Filtering**: Remove noise and invalid clusters
 
 Stereo Vision Processing
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For systems with stereo cameras, generate detailed 3D point clouds:
 
@@ -208,7 +208,7 @@ For systems with stereo cameras, generate detailed 3D point clouds:
        print("⚠️ Stereo vision not enabled - using monocular detection")
 
 Advanced Clustering Control
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Fine-tune clustering parameters for different environments:
 
@@ -243,10 +243,10 @@ Fine-tune clustering parameters for different environments:
        return labels, num_clusters
 
 Data Flow Architecture
---------------------
+------------------------
 
 Understanding the Data Pipeline
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Perception module processes data through a sophisticated pipeline that transforms raw sensor input into actionable robotic intelligence. Understanding this flow is crucial for effective system integration and troubleshooting.
 
@@ -285,7 +285,7 @@ The Perception module processes data through a sophisticated pipeline that trans
    </div>
 
 Detailed Data Flow Stages
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Stage 1: Sensor Data Acquisition**
 
@@ -490,7 +490,7 @@ Detailed Data Flow Stages
            return []
 
 Complete Data Flow Demonstration
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -533,7 +533,7 @@ Complete Data Flow Demonstration
        }
 
 Data Flow Performance Analysis
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -657,7 +657,7 @@ Data Flow Performance Analysis
            return sorted(bottlenecks, key=lambda x: x['percentage'], reverse=True)
 
 Data Flow Optimization Strategies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -745,10 +745,10 @@ Data Flow Optimization Strategies
 
 
 Advanced Applications
---------------------
+-------------------------
 
 Real-time Monitoring
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Set up continuous environmental monitoring:
 
@@ -837,7 +837,7 @@ Set up continuous environmental monitoring:
    monitor.stop_monitoring()
 
 Integration with Path Planning
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use perception data for safe robot navigation:
 
@@ -888,7 +888,7 @@ Use perception data for safe robot navigation:
        return trajectory, obstacles
 
 Object Tracking and Persistence
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Track objects over time for consistent identification:
 
@@ -968,10 +968,10 @@ Track objects over time for consistent identification:
        print(f"Frame {frame}: {len(tracked_objects)} tracked objects")
 
 Performance Optimization
-------------------------
+------------------------------
 
 Efficient Processing Strategies
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1009,7 +1009,7 @@ Efficient Processing Strategies
        return obstacles, labels
 
 Memory Management
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1045,10 +1045,10 @@ Memory Management
        return results
 
 Error Handling and Robustness
------------------------------
+--------------------------------
 
 Robust Perception Pipeline
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1097,7 +1097,7 @@ Robust Perception Pipeline
        return np.empty((0, 3)), np.array([])
 
 System Health Monitoring
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1149,7 +1149,7 @@ System Health Monitoring
            return report
 
 Best Practices
---------------
+-----------------
 
 1. **Environment Adaptation**
    - Adjust clustering parameters based on environment type
@@ -1177,7 +1177,7 @@ Best Practices
    - Update clustering parameters based on performance
 
 Common Issues and Solutions
---------------------------
+-------------------------------
 
 **Issue: Too many small clusters detected**
 
@@ -1211,7 +1211,7 @@ Common Issues and Solutions
        print("Stereo not enabled - check stereo_configs")
 
 See Also
---------
+-----------
 
 - :doc:`../api/perception` - Complete Perception API reference
 - :doc:`/user_guide/vision` - Vision module user guide  
