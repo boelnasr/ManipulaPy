@@ -61,21 +61,42 @@ class SerialManipulator:
         self.M_list = M_list
         self.G_list = G_list
         self.omega_list = omega_list
+        
+        # Extract r_list from S_list if not provided
         self.r_list = r_list if r_list is not None else utils.extract_r_list(S_list)
+        # Extract b_list from B_list if not provided  
         self.b_list = b_list if b_list is not None else utils.extract_r_list(B_list)
+        
+        # Generate S_list if not provided
         self.S_list = (
             S_list
             if S_list is not None
             else utils.extract_screw_list(-omega_list, self.r_list)
         )
+        
+        # Generate B_list if not provided
         self.B_list = (
             B_list
             if B_list is not None
             else utils.extract_screw_list(omega_list, self.b_list)
         )
-        self.joint_limits = (
-            joint_limits if joint_limits is not None else [(None, None)] * len(M_list)
-        )
+        
+        # Determine number of joints for joint limits
+        if joint_limits is not None:
+            self.joint_limits = joint_limits
+        else:
+            # Try to infer number of joints from available data
+            if hasattr(omega_list, 'shape'):
+                if omega_list.ndim == 2:
+                    n_joints = omega_list.shape[1]
+                else:
+                    n_joints = len(omega_list) // 3 if len(omega_list) % 3 == 0 else len(omega_list)
+            elif hasattr(M_list, 'shape'):
+                n_joints = 6  # Default assumption for 6-DOF robot
+            else:
+                n_joints = 6  # Default fallback
+            
+            self.joint_limits = [(None, None)] * n_joints
 
     def update_state(self, joint_positions, joint_velocities=None):
         """
@@ -180,6 +201,7 @@ class SerialManipulator:
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return J
+    
     def iterative_inverse_kinematics(
         self,
         T_desired,
