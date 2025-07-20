@@ -9,7 +9,7 @@
 @article{corke2021,
   title={Robotics, Vision and Control: Fundamental Algorithms in {MATLAB}, {Python} and {Julia}},
   author={Corke, Peter and Haviland, Jesse},
-  journal={Robots, Autonomous Systems},
+  journal={Springer Tracts in Advanced Robotics},
   volume={1},
   year={2021},
   publisher={Springer},
@@ -17,10 +17,14 @@
 }
 
 @article{chitta2012moveit,
-  title={{MoveIt!}: An Overview},
-  author={Chitta, Sachin and Sucan, Ioan A and Cousins, Steve},
-  journal={IEEE Robotics \& Automation Magazine},
+  title={{MoveIt!}: An Introduction},
+  author={Chitta, Sachin and Sucan, Ioan A. and Cousins, Steve},
+  journal={AI Matters},
+  volume={3},
+  number={4},
+  pages={4--9},
   year={2012},
+  publisher={ACM},
   url={https://moveit.ros.org/}
 }
 
@@ -28,54 +32,95 @@
   title={{PyBullet}: Physics simulation for games, robotics, and machine learning},
   author={Coumans, Erwin and Bai, Yunfei},
   year={2019},
-  url={http://pybullet.org}
+  url={http://pybullet.org},
+  note={Open-source physics engine}
 }
 
-@article{smits2009kdl,
+@misc{smits2009kdl,
   title={The Kinematics and Dynamics Library ({KDL})},
-  author={Smits, Ruben},
-  journal={OROCOS Project},
+  author={Smits, Ruben and Soetens, Peter and Bruyninckx, Herman},
   year={2009},
+  organization={OROCOS Project},
   url={https://www.orocos.org/kdl.html}
 }
 
-@misc{jocher2022,
-  title={Ultralytics {YOLO}},
-  author={Jocher, Glenn and others},
-  year={2022},
-  url={https://github.com/ultralytics/yolov8}
+@software{Jocher_Ultralytics_YOLO_2023,   
+  author   = {Glenn Jocher and Jing Qiu and Ayush Chaurasia},
+  title    = {{Ultralytics YOLO}},
+  version  = {8.0.0},
+  year     = {2023},
+  month    = {January},
+  license  = {AGPL-3.0},
+  url      = {https://github.com/ultralytics/ultralytics},
+  note     = {GitHub repository}
 }
 
 @inproceedings{liang2018gpu,
   author    = {Liang, H. and Du, X. and Xiao, J.},
   title     = {GPU-based high-performance robot dynamics computation},
-  booktitle = {IEEE Int. Conf. on Robotics and Automation (ICRA)},
+  booktitle = {Proceedings of the IEEE International Conference on Robotics and Automation (ICRA)},
   year      = {2018},
-  pages     = {2396--2402}
+  pages     = {2396--2402},
+  organization = {IEEE}
 }
+
+@article{morton2025oscbf,
+  author = {Morton, Daniel and Pavone, Marco},
+  title = {Safe, Task-Consistent Manipulation with Operational Space Control Barrier Functions},
+  year = {2025},
+  journal = {arXiv preprint arXiv:2503.06736},
+  note = {Submitted to IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Hangzhou, 2025},
+}
+
+
+@misc{Pinocchio2025,
+author = {Carpentier, Justin and Mansard, Nicolas and Valenza, Florian and Mirabel, Joseph and Saurel, Guilhem and Budhiraja, Rohan},
+license = {BSD-2-Clause},
+month = may,
+title = {{Pinocchio - Efficient and versatile Rigid Body Dynamics algorithms}},
+url = {https://github.com/stack-of-tasks/pinocchio},
+version = {3.7.0},
+year = {2025}
+}
+
+
 @article{chu2021boundary,
-  title        = {An Approach to Boundary Detection for 3‑D Point Clouds Based on {DBSCAN} Clustering},
+  title        = {An Approach to Boundary Detection for {3D} Point Clouds Based on {DBSCAN} Clustering},
   author       = {Yuan Chu and Li Wang and Mei Zhang},
   journal      = {Pattern Recognition},
   volume       = {124},
   pages        = {108431},
   year         = {2021},
-  month        = {Nov},
+  month        = {November},
+  publisher    = {Elsevier},
   doi          = {10.1016/j.patcog.2021.108431}
 }
+@INPROCEEDINGS{sundaralingam2023curobo,
+  author={Sundaralingam, Balakumar and Hari, Siva Kumar Sastry and Fishman, Adam and Garrett, Caelan and Van Wyk, Karl and Blukis, Valts and Millane, Alexander and Oleynikova, Helen and Handa, Ankur and Ramos, Fabio and Ratliff, Nathan and Fox, Dieter},
+  booktitle={2023 IEEE International Conference on Robotics and Automation (ICRA)}, 
+  title={CuRobo: Parallelized Collision-Free Robot Motion Generation}, 
+  year={2023},
+  volume={},
+  number={},
+  pages={8112-8119},
+  keywords={Robot motion;Automation;Graphics processing units;Estimation;Manipulators;Libraries;Planning},
+  doi={10.1109/ICRA48891.2023.10160765}}
 
-@misc{shahid2024,
-  author = {Shahid, A. and Ibrahim, M.},
-  title  = {Fast Trajectory Optimization for Manipulators Using CUDA Kernels},
-  year   = {2024},
-  note   = {preprint under review}
-}
 @article{cupy2021,
-  title={CuPy: A NumPy-Compatible Library for NVIDIA GPU Calculations},
+  title={CuPy: A {NumPy}-Compatible Library for {NVIDIA} {GPU} Calculations},
   author={Okuta, Ryosuke and Unno, Yuya and Nishino, Daisuke and Hido, Shohei and Loomis, Crissman},
-  journal={Proceedings of Workshop on Machine Learning Systems (LearningSys) in The Thirty-first Annual Conference on Neural Information Processing Systems (NeurIPS)},
+  journal={Proceedings of Workshop on Machine Learning Systems (LearningSys) at NeurIPS},
   year={2017},
-  note={Available at: \url{https://github.com/cupy/cupy}},
   url={https://cupy.dev},
-  publisher={NeurIPS}
+  note={Available at: \url{https://github.com/cupy/cupy}}
+}
+
+@misc{pyroki2025,
+    title={PyRoki: A Modular Toolkit for Robot Kinematic Optimization}, 
+    author={Chung Min Kim* and Brent Yi* and Hongsuk Choi and Yi Ma and Ken Goldberg and Angjoo Kanazawa},
+    year={2025},
+    eprint={2505.03728},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO},
+    url={https://arxiv.org/abs/2505.03728}, 
 }

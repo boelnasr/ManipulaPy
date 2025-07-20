@@ -429,17 +429,112 @@ python -m pytest tests/test_dynamics.py -v
 python -m pytest tests/test_control.py -v
 python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
 
-# Performance benchmarks
-python -m pytest tests/test_performance.py -v --benchmark-only
 ```
-
+<!-- 
 ### Coverage Statistics
 
 - **Kinematics**: >95% test coverage
 - **Dynamics**: >90% test coverage  
 - **Control**: >88% test coverage
 - **Perception**: >85% test coverage
-- **GPU Kernels**: >80% test coverage
+- **GPU Kernels**: >80% test coverage -->
+
+---
+
+## 🧪 Benchmarking & Validation
+
+ManipulaPy includes a comprehensive benchmarking suite to validate performance and accuracy across different hardware configurations.
+
+### Benchmark Suite
+
+Located in the `Benchmark/` directory, the suite provides three key tools:
+
+| Benchmark | Purpose | Use Case |
+|-----------|---------|----------|
+| `performance_benchmark.py` | Comprehensive performance analysis | Full system evaluation and optimization |
+| `accuracy_benchmark.py` | Numerical precision validation | Algorithm correctness verification |
+| `quick_benchmark.py` | Fast development testing | CI/CD integration and regression testing |
+
+### Real Performance Results
+
+**Latest benchmark on 16-core CPU, 31.1GB RAM, NVIDIA GPU (30 SMs):**
+
+```bash
+=== ManipulaPy Performance Benchmark Results ===
+Hardware: 16-core CPU, 31.1GB RAM, NVIDIA GPU (30 SMs, 1024 threads/block)
+Test Configuration: Large-scale problems (10K-100K trajectory points)
+
+Overall Performance:
+  Total Tests: 36 scenarios
+  Success Rate: 91.7% (33/36) ✅
+  Overall Speedup: 13.02× average acceleration
+  CPU Mean Time: 6.88s → GPU Mean Time: 0.53s
+
+🚀 EXCEPTIONAL PERFORMANCE HIGHLIGHTS:
+
+Inverse Dynamics (CUDA Accelerated):
+  Mean GPU Speedup: 3,624× (3.6K times faster!)
+  Peak Performance: 5,563× speedup achieved
+  Real-time Impact: 7s → 0.002s computation
+
+Joint Trajectory Planning:
+  Mean GPU Speedup: 2.29×
+  Best Case: 7.96× speedup
+  Large Problems: Consistent GPU acceleration
+
+Cartesian Trajectories:
+  Mean GPU Speedup: 1.02× (CPU competitive)
+  Consistent Performance: ±0.04 variance
+```
+
+### Performance Recommendations
+
+**🎯 OPTIMAL GPU USE CASES:**
+- ✅ Inverse dynamics computation (**1000×-5000× speedup**)
+- ✅ Large trajectory generation (>10K points)
+- ✅ Batch processing multiple trajectories
+- ✅ Real-time control applications
+
+**⚠️ CPU-OPTIMAL SCENARIOS:**
+- Small trajectories (<1K points)
+- Cartesian space interpolation
+- Single-shot computations
+- Development and debugging
+
+### Running Benchmarks
+
+```bash
+# Quick performance check (< 60 seconds)
+cd Benchmark/
+python quick_benchmark.py
+
+# Comprehensive GPU vs CPU analysis
+python performance_benchmark.py --gpu --plot --save-results
+
+# Validate numerical accuracy
+python accuracy_benchmark.py --tolerance 1e-8
+```
+
+### CI/CD Integration
+
+Perfect for continuous integration workflows:
+
+```yaml
+# GitHub Actions integration
+- name: Validate Performance
+  run: |
+    cd Benchmark/
+    python quick_benchmark.py --ci-mode
+```
+
+**Key Benefits:**
+- 🚀 **Massive Acceleration**: Up to 5,563× speedup for dynamics
+- 🎯 **Precision Validation**: 1e-8 numerical accuracy maintained
+- ⚡ **Regression Detection**: Catch performance degradation early
+- 📊 **Smart Optimization**: Automatic GPU/CPU selection
+- 🔄 **CI/CD Ready**: Automated testing for development workflows
+
+*For detailed benchmarking documentation and complete results, see [`Benchmark/README.md`](Benchmark/README.md)*
 
 ---
 
