@@ -1,0 +1,84 @@
+{
+  "timestamp": "2025-07-20_16-10-55",
+  "overview": {
+    "total_successful_tests": 33,
+    "test_types": [
+      "joint_trajectory",
+      "inverse_dynamics",
+      "cartesian_trajectory",
+      "batch_processing"
+    ],
+    "implementations": [
+      "cpu",
+      "gpu"
+    ],
+    "joint_counts_tested": [
+      3,
+      6
+    ],
+    "point_counts_tested": [
+      500,
+      10000,
+      50000,
+      100000
+    ]
+  },
+  "performance_summary": {
+    "joint_trajectory": {
+      "count": 12,
+      "mean_time": 0.0465597957243315,
+      "std_time": 0.09226339089458134,
+      "min_time": 0.002742890666316574,
+      "max_time": 0.33044171099512215,
+      "mean_memory": 0.8590494791666666,
+      "implementations": [
+        "cpu",
+        "gpu"
+      ],
+      "average_speedup": 2.063726697678088
+    },
+    "inverse_dynamics": {
+      "count": 9,
+      "mean_time": 7.9306450165534415,
+      "std_time": 12.561901583189004,
+      "min_time": 0.0048750623148710774,
+      "max_time": 31.848963552503847,
+      "mean_memory": 0.22265625,
+      "implementations": [
+        "cpu",
+        "gpu"
+      ],
+      "average_speedup": 1731.0759835378562
+    },
+    "cartesian_trajectory": {
+      "count": 6,
+      "mean_time": 3.5372215068346122,
+      "std_time": 2.6054102968953274,
+      "min_time": 0.6946314100059681,
+      "max_time": 6.682329270668561,
+      "mean_memory": 0.018880208333333332,
+      "implementations": [
+        "cpu",
+        "gpu"
+      ],
+      "average_speedup": 1.0449075208397223
+    },
+    "batch_processing": {
+      "count": 6,
+      "mean_time": 0.0750013980012025,
+      "std_time": 0.012647501111247605,
+      "min_time": 0.06174040366507446,
+      "max_time": 0.09063811633192624,
+      "mean_memory": 0.6666666666666666,
+      "implementations": [
+        "gpu"
+      ]
+    }
+  },
+  "timing_statistics": {
+    "overall_min_time": 0.002742890666316574,
+    "overall_max_time": 31.848963552503847,
+    "overall_mean_time": 2.8366018220208433,
+    "overall_std_time": 7.228644302798966
+  }
+}

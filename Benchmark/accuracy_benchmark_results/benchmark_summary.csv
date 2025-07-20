@@ -1,0 +1,5 @@
+Component,Success Rate (%),Avg Time (ms),Accuracy Metric,Metric Type
+Forward Kinematics,100.0,0.1707291603088379,0.0,Consistency Error
+Inverse Kinematics,92.0,811.7181658744812,0.3676608307043933,Position Error (m)
+Jacobian,100.0,0.2320241928100586,2.638889973105958,Numerical Error
+Dynamics,100.0,1.9468879699707031,3.0130323058437874e-14,Consistency Error
