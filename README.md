@@ -59,12 +59,32 @@ ManipulaPy is a modern, comprehensive framework that bridges the gap between bas
 
 ---
 
+
+
 ## 🚀 Quick Start
+
+### Prerequisites
+
+Before installing ManipulaPy, make sure your system has:
+
+1. **NVIDIA Drivers & CUDA Toolkit**  
+   - `nvcc` on your `PATH` (e.g. via `sudo apt install nvidia-cuda-toolkit` or the [official NVIDIA CUDA installer](https://developer.nvidia.com/cuda-downloads)).  
+   - Verify with:
+     ```bash
+     nvidia-smi       # should list your GPU(s) and driver version
+     nvcc --version   # should print CUDA version
+     ```
+
+2. **cuDNN**  
+   - Download and install cuDNN for your CUDA version from NVIDIA’s website.  
+   - Verify headers/libs under `/usr/include` and `/usr/lib/x86_64-linux-gnu` (or your distro’s equivalent).
+
+---
 
 ### Installation
 
 ```bash
-# Basic installation
+# Basic installation (CPU-only)
 pip install ManipulaPy
 
 # With GPU support (CUDA 11.x)
@@ -73,11 +93,31 @@ pip install ManipulaPy[gpu-cuda11]
 # With GPU support (CUDA 12.x)
 pip install ManipulaPy[gpu-cuda12]
 
-# Development installation
+# Development installation (with dev extras)
 git clone https://github.com/boelnasr/ManipulaPy.git
 cd ManipulaPy
 pip install -e .[dev]
+````
+
+---
+
+### Post‐Install Check
+
+After installation, confirm that ManipulaPy can see your GPU:
+
+```bash
+# Check that CUDA is available to ManipulaPy
+python3 - <<EOF
+import manipulapy
+if manipulapy.cuda.is_available():
+    print("✅ CUDA is available:", manipulapy.cuda.get_device_name())
+else:
+    raise RuntimeError("❌ CUDA not detected by ManipulaPy")
+EOF
 ```
+
+If you see the ✅ message with your GPU name, you’re all set! Otherwise, double‑check the CUDA Toolkit and cuDNN installation steps above. \`\`\`
+
 
 ### 30-Second Demo
 
