@@ -47,7 +47,7 @@ from ManipulaPy.cuda_kernels import *
 # ---------------------------------------------------------------------
 # Package metadata
 # ---------------------------------------------------------------------
-__version__ = "1.1.0"            
+__version__ = "1.1.1"            
 __author__  = "Mohamed Aboelnar"
 __license__ = "AGPL-3.0-or-later"
 
