@@ -77,7 +77,6 @@ def extract_omega_list(Slist):
     """
     return np.array(Slist)[:, :3]
 
-
 def extract_screw_list(omega_list, r_list):
     """
     Build a 6xn screw-axis matrix from (3xn) angular velocities 'omega_list'
@@ -91,12 +90,60 @@ def extract_screw_list(omega_list, r_list):
     if omega_list is None or r_list is None:
         return None
 
+    # Convert to numpy arrays if not already
+    omega_list = np.asarray(omega_list)
+    r_list = np.asarray(r_list)
+    
+    # Handle case where r_list is empty or 1D
+    if r_list.size == 0:
+        # Create a default r_list with zeros
+        if omega_list.ndim == 2:
+            n_joints = omega_list.shape[1]
+        else:
+            n_joints = omega_list.shape[0] // 3 if omega_list.ndim == 1 else 1
+        r_list = np.zeros((3, n_joints))
+    elif r_list.ndim == 1:
+        # If r_list is 1D, reshape or handle appropriately
+        if r_list.size == 0:
+            if omega_list.ndim == 2:
+                n_joints = omega_list.shape[1]
+            else:
+                n_joints = 1
+            r_list = np.zeros((3, n_joints))
+        elif r_list.size == 3:
+            # Single position vector, reshape to (3, 1)
+            r_list = r_list.reshape(3, 1)
+        else:
+            # Multiple positions in 1D array, try to reshape
+            if r_list.size % 3 == 0:
+                n_positions = r_list.size // 3
+                r_list = r_list.reshape(3, n_positions)
+            else:
+                raise ValueError(f"Cannot reshape r_list of size {r_list.size} into (3, n) format")
+
+    # Ensure omega_list is also 2D
+    if omega_list.ndim == 1:
+        if omega_list.size % 3 == 0:
+            n_joints = omega_list.size // 3
+            omega_list = omega_list.reshape(3, n_joints)
+        else:
+            raise ValueError(f"Cannot reshape omega_list of size {omega_list.size} into (3, n) format")
+
     w_rows, w_cols = omega_list.shape
     r_rows, r_cols = r_list.shape
+    
     if w_rows != 3 or r_rows != 3:
         raise ValueError("omega_list and r_list must each have 3 rows.")
     if w_cols != r_cols:
-        raise ValueError("omega_list and r_list must have the same number of columns.")
+        # Try to broadcast if one has only one column
+        if r_cols == 1 and w_cols > 1:
+            r_list = np.tile(r_list, (1, w_cols))
+            r_cols = w_cols
+        elif w_cols == 1 and r_cols > 1:
+            omega_list = np.tile(omega_list, (1, r_cols))
+            w_cols = r_cols
+        else:
+            raise ValueError(f"omega_list and r_list must have the same number of columns. Got {w_cols} and {r_cols}.")
 
     S = np.zeros((6, w_cols), dtype=float)
     for i in range(w_cols):
