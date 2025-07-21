@@ -423,35 +423,98 @@ for name, result in results.items():
 
 ## 📁 Examples & Tutorials
 
-The `Examples/` directory contains comprehensive demonstrations:
+The `Examples/` directory contains comprehensive demonstrations organized into three levels:
 
-| Example | Description | Complexity |
-|---------|-------------|------------|
-| `basic_kinematics.py` | Forward/inverse kinematics with visualization | ⭐ |
-| `trajectory_planning_demo.py` | GPU-accelerated path planning | ⭐⭐ |
-| `dynamics_and_control.py` | Complete dynamics and control analysis | ⭐⭐ |
-| `simulation_complete.py` | Full PyBullet simulation pipeline | ⭐⭐⭐ |
-| `perception_stereo.py` | Stereo vision and object detection | ⭐⭐⭐ |
-| `performance_comparison.py` | GPU vs CPU performance analysis | ⭐⭐ |
-| `advanced_control.py` | Multiple control strategies comparison | ⭐⭐⭐ |
+### 🎯 Basic Examples (⭐)
+Perfect for getting started with ManipulaPy fundamentals.
 
-### Running Examples
+| Example | Description | Output |
+|---------|-------------|--------|
+| `kinematics_basic_demo.py` | Forward/inverse kinematics with visualization | Manipulability analysis plots |
+| `dynamics_basic_demo.py` | Mass matrix, Coriolis forces, gravity compensation | Complete robot analysis |
+| `control_basic_demo.py` | PID, computed torque, feedforward control | Control strategy comparison |
+| `urdf_processing_basic_demo.py` | URDF to SerialManipulator conversion | Configuration space analysis |
+| `visualization_basic_demo.py` | End-effector paths and workspace visualization | 3D trajectory plots |
+
+### 🔧 Intermediate Examples (⭐⭐)
+Advanced features and integrated systems.
+
+| Example | Description | Key Features |
+|---------|-------------|--------------|
+| `trajectory_planning_intermediate_demo.py` | Multi-segment trajectories and optimization | GPU acceleration, smoothing |
+| `singularity_analysis_intermediate_demo.py` | Workspace analysis and singularity avoidance | Manipulability ellipsoids |
+| `control_comparison_intermediate_demo.py` | Multiple control strategies benchmarking | Real-time monitoring |
+| `perception_intermediate_demo.py` | Computer vision pipeline with clustering | YOLO detection, stereo vision |
+| `simulation_intermediate_demo.py` | Complete PyBullet integration | Real-time physics simulation |
+
+### 🚀 Advanced Examples (⭐⭐⭐)
+Research-grade implementations and high-performance computing.
+
+| Example | Description | Advanced Features |
+|---------|-------------|-------------------|
+| `gpu_acceleration_advanced_demo.py` | CUDA kernels and performance optimization | Memory efficiency analysis |
+| `batch_processing_advanced_demo.py` | Large-scale trajectory generation | Batch scaling analysis |
+| `collision_avoidance_advanced_demo.py` | Real-time obstacle avoidance | Potential field visualization |
+| `optimal_control_advanced_demo.py` | Advanced control algorithms | Performance statistics |
+| `stereo_vision_advanced_demo.py` | 3D perception and point cloud processing | Advanced perception analysis |
+| `real_robot_integration_advanced_demo.py` | Hardware integration examples | Real-time simulation |
+
+### 🏃‍♂️ Running Examples
 
 ```bash
 cd Examples/
 
-# Basic kinematics
-python basic_kinematics.py
+# Basic Examples - Start here!
+cd basic_examples/
+python kinematics_basic_demo.py
+python dynamics_basic_demo.py
+python control_basic_demo.py
 
-# Advanced trajectory planning
-python trajectory_planning_demo.py --gpu --visualize
+# Intermediate Examples - Integrated systems
+cd ../intermediate_examples/
+python trajectory_planning_intermediate_demo.py
+python perception_intermediate_demo.py --enable-yolo
+python simulation_intermediate_demo.py --urdf simple_arm.urdf
 
-# Complete simulation
-python simulation_complete.py --urdf path/to/robot.urdf
+# Advanced Examples - Research-grade
+cd ../advanced_examples/
+python gpu_acceleration_advanced_demo.py --benchmark
+python batch_processing_advanced_demo.py --size 1000
+python collision_avoidance_advanced_demo.py --visualize
 ```
 
----
+### 📊 Example Outputs
 
+The examples generate various outputs:
+- **📈 Analysis Reports**: `.txt` files with detailed performance metrics
+- **📊 Visualizations**: `.png` plots for trajectories, workspaces, and analysis
+- **📝 Logs**: `.log` files for debugging and monitoring
+- **🎯 Models**: Pre-trained YOLO models and URDF files
+
+### 🎨 Generated Visualizations
+
+Examples create rich visualizations including:
+- **Trajectory Analysis**: Multi-segment paths and optimization results
+- **Workspace Visualization**: 3D manipulability and reachability analysis  
+- **Control Performance**: Real-time monitoring and comparison plots
+- **Perception Results**: Object detection, clustering, and stereo vision
+- **Performance Benchmarks**: GPU vs CPU timing and memory usage
+
+
+
+### 🔍 Example Selection Guide
+
+**New to ManipulaPy?** → Start with `basic_examples/kinematics_basic_demo.py`
+
+**Need trajectory planning?** → Try `intermediate_examples/trajectory_planning_intermediate_demo.py`
+
+**Working with vision?** → Check `intermediate_examples/perception_intermediate_demo.py`
+
+**Performance optimization?** → Explore `advanced_examples/gpu_acceleration_advanced_demo.py`
+
+**Research applications?** → Dive into `advanced_examples/batch_processing_advanced_demo.py`
+
+---
 ## 🧪 Testing & Validation
 
 ### Test Suite
@@ -467,7 +530,6 @@ python -m pytest tests/ -v --cov=ManipulaPy
 python -m pytest tests/test_kinematics.py -v
 python -m pytest tests/test_dynamics.py -v
 python -m pytest tests/test_control.py -v
-python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
 
 ```
 <!-- 
@@ -477,7 +539,9 @@ python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
 - **Dynamics**: >90% test coverage  
 - **Control**: >88% test coverage
 - **Perception**: >85% test coverage
-- **GPU Kernels**: >80% test coverage -->
+- **GPU Kernels**: >80% test coverage 
+python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
+-->
 
 ---
 
@@ -555,28 +619,6 @@ python performance_benchmark.py --gpu --plot --save-results
 python accuracy_benchmark.py --tolerance 1e-8
 ```
 
-### CI/CD Integration
-
-Perfect for continuous integration workflows:
-
-```yaml
-# GitHub Actions integration
-- name: Validate Performance
-  run: |
-    cd Benchmark/
-    python quick_benchmark.py --ci-mode
-```
-
-**Key Benefits:**
-- 🚀 **Massive Acceleration**: Up to 5,563× speedup for dynamics
-- 🎯 **Precision Validation**: 1e-8 numerical accuracy maintained
-- ⚡ **Regression Detection**: Catch performance degradation early
-- 📊 **Smart Optimization**: Automatic GPU/CPU selection
-- 🔄 **CI/CD Ready**: Automated testing for development workflows
-
-*For detailed benchmarking documentation and complete results, see [`Benchmark/README.md`](Benchmark/README.md)*
-
----
 
 ## 📖 Documentation
 
