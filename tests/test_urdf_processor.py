@@ -3,7 +3,7 @@
 import unittest
 import os
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
-from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file
+from ManipulaPy.ManipulaPy_data.ur5 import urdf_file as xarm_urdf_file
 
 
 class TestURDFProcessor(unittest.TestCase):
@@ -123,6 +123,7 @@ class TestURDFProcessor(unittest.TestCase):
             self.fail(f"Could not read URDF file: {e}")
             
         print(f"✅ URDF file validation passed: {self.urdf_path}")
+        
 
 
 if __name__ == "__main__":
