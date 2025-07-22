@@ -76,7 +76,7 @@ Before installing ManipulaPy, make sure your system has:
      ```
 
 2. **cuDNN**  
-   - Download and install cuDNN for your CUDA version from NVIDIA’s website.  
+   - Download and install cuDNN for your CUDA version from [NVIDIA's cuDNN installation guide](https://docs.nvidia.com/deeplearning/cudnn/installation/latest/).  
    - Verify headers/libs under `/usr/include` and `/usr/lib/x86_64-linux-gnu` (or your distro’s equivalent).
 
 ---
@@ -108,9 +108,9 @@ After installation, confirm that ManipulaPy can see your GPU:
 ```bash
 # Check that CUDA is available to ManipulaPy
 python3 - <<EOF
-import manipulapy
-if manipulapy.cuda.is_available():
-    print("✅ CUDA is available:", manipulapy.cuda.get_device_name())
+import ManipulaPy
+if ManipulaPy.cuda.is_available():
+    print("✅ CUDA is available:", ManipulaPy.cuda.get_device_name())
 else:
     raise RuntimeError("❌ CUDA not detected by ManipulaPy")
 EOF
@@ -530,18 +530,44 @@ python -m pytest tests/ -v --cov=ManipulaPy
 python -m pytest tests/test_kinematics.py -v
 python -m pytest tests/test_dynamics.py -v
 python -m pytest tests/test_control.py -v
+python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
 
 ```
-<!-- 
-### Coverage Statistics
 
-- **Kinematics**: >95% test coverage
-- **Dynamics**: >90% test coverage  
-- **Control**: >88% test coverage
-- **Perception**: >85% test coverage
-- **GPU Kernels**: >80% test coverage 
-python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
--->
+### ✅ High-Coverage Modules
+
+| Module              | Coverage | Notes                             |
+| ------------------- | -------- | --------------------------------- |
+| `kinematics.py`     | **98%**  | Excellent — near full coverage    |
+| `dynamics.py`       | **100%** | Fully tested                      |
+| `perception.py`     | **92%**  | Very solid coverage               |
+| `vision.py`         | **83%**  | Good; some PyBullet paths skipped |
+| `urdf_processor.py` | **81%**  | Strong test coverage              |
+
+---
+
+### ⚠️ Needs More Testing
+
+| Module           | Coverage | Notes                                                    |
+| ---------------- | -------- | -------------------------------------------------------- |
+| `control.py`     | **81%**  | Many skipped due to CuPy mock — test with GPU to improve |
+| `sim.py`         | **77%**  | Manual control & GUI parts partially tested              |
+| `singularity.py` | **64%**  | Workspace plots & CUDA sampling untested                 |
+| `utils.py`       | **61%**  | Some math utils & decorators untested                    |
+
+---
+
+### 🚨 Low/No Coverage
+
+| Module               | Coverage | Notes                                                 |
+| -------------------- | -------- | ----------------------------------------------------- |
+| `path_planning.py`   | **39%**  | Large gaps in CUDA-accelerated and plotting logic     |
+| `cuda_kernels.py`    | **16%**  | Most tests skipped — `NUMBA_DISABLE_CUDA=1`           |
+| `transformations.py` | **0%**   | Not tested at all — consider adding basic SE(3) tests |
+
+---
+
+
 
 ---
 
