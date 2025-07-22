@@ -157,7 +157,7 @@ Inverse Kinematics (Newton–Raphson / Damped Least Squares)
 with damping :math:`\lambda` for numerical stability.
 
 SerialManipulator Class
-----------------------
+-----------------------
 
 Constructor
 ~~~~~~~~~~~
