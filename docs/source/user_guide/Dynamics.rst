@@ -7,7 +7,7 @@ This comprehensive guide covers robot dynamics computations in ManipulaPy, optim
    This guide is written for Python 3.10.12 users and includes version-specific optimizations and performance improvements.
 
 Introduction to Robot Dynamics
--------------------------------
+----------------------------------
 
 Robot dynamics deals with the relationship between forces/torques and motion in robotic systems. Unlike kinematics, which only considers geometric relationships, dynamics incorporates:
 
@@ -18,7 +18,7 @@ Robot dynamics deals with the relationship between forces/torques and motion in 
 - **Joint torques** required for desired motion
 
 Mathematical Background
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The core equation of motion for an n-DOF serial manipulator is the **Newton–Euler** (or **Lagrange**) form:
 
@@ -49,22 +49,25 @@ where for each link *i*,
 
 **Coriolis & Centrifugal**
 
-Combined velocity‐dependent forces
+Combined velocity‐dependent forces:
 
 .. math::
-   C(\boldsymbol\theta,\dot{\boldsymbol\theta})\,\dot{\boldsymbol\theta}
-     = \begin{bmatrix}
-         \sum_{j,k=1}^{n}\Gamma_{1jk}(\boldsymbol\theta)\,\dot\theta_{j}\,\dot\theta_{k}\\[6pt]
-         \vdots\\[3pt]
-         \sum_{j,k=1}^{n}\Gamma_{njk}(\boldsymbol\theta)\,\dot\theta_{j}\,\dot\theta_{k}
-       \end{bmatrix},
-\quad
-\Gamma_{ijk}
-  = \tfrac12\!\bigl(\tfrac{\partial M_{ij}}{\partial\theta_{k}}
-                    +\tfrac{\partial M_{ik}}{\partial\theta_{j}}
-                    -\tfrac{\partial M_{jk}}{\partial\theta_{i}}\bigr)
 
-the **Christoffel symbols** of the first kind.
+   C(\boldsymbol{\theta}, \dot{\boldsymbol{\theta}}) \, \dot{\boldsymbol{\theta}} =
+   \begin{bmatrix}
+       \sum\limits_{j,k=1}^{n} \Gamma_{1jk}(\boldsymbol{\theta}) \, \dot{\theta}_{j} \, \dot{\theta}_{k} \\[6pt]
+       \vdots \\[3pt]
+       \sum\limits_{j,k=1}^{n} \Gamma_{njk}(\boldsymbol{\theta}) \, \dot{\theta}_{j} \, \dot{\theta}_{k}
+   \end{bmatrix},
+   \quad
+   \Gamma_{ijk} =
+   \frac{1}{2} \left(
+       \frac{\partial M_{ij}}{\partial \theta_k} +
+       \frac{\partial M_{ik}}{\partial \theta_j} -
+       \frac{\partial M_{jk}}{\partial \theta_i}
+   \right)
+
+
 
 **Gravity**
 
@@ -113,7 +116,7 @@ This formulation underlies both:
 - **Forward Dynamics:** compute :math:`\ddot{\boldsymbol\theta}` via :math:`\ddot{\boldsymbol\theta} = M(\theta)^{-1}\bigl(\boldsymbol\tau - C\,\dot{\boldsymbol\theta} - G - J^{T}\mathbf F_{\mathrm{ext}}\bigr)`
 
 Key Concepts
-~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
 
 **Forward Dynamics**
    Given joint torques, compute joint accelerations: :math:`\ddot{\boldsymbol\theta} = f(\boldsymbol\tau, \boldsymbol\theta, \dot{\boldsymbol\theta})`
@@ -131,7 +134,7 @@ Setting Up Robot Dynamics
 --------------------------
 
 Basic Setup from URDF
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -147,7 +150,7 @@ Basic Setup from URDF
    print(f"Robot has {len(dynamics.Glist)} links with inertial properties")
 
 Manual Setup
-~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 For custom robots or when URDF is not available:
 
@@ -193,12 +196,12 @@ For custom robots or when URDF is not available:
    )
 
 Mass Matrix Computation
------------------------
+---------------------------
 
 The mass matrix represents the robot's inertial properties and varies with configuration.
 
 Computing Mass Matrix
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -216,7 +219,7 @@ Computing Mass Matrix
    print(f"Matrix is positive definite: {np.all(np.linalg.eigvals(M) > 0)}")
 
 Configuration Dependence
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The mass matrix changes with robot configuration:
 
@@ -255,7 +258,7 @@ The mass matrix changes with robot configuration:
    plt.show()
 
 Caching for Performance
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For real-time applications, cache mass matrix computations:
 
@@ -284,12 +287,12 @@ For real-time applications, cache mass matrix computations:
    M = cached_dynamics.mass_matrix_cached(theta)
 
 Velocity-Dependent Forces
--------------------------
+----------------------------
 
 Coriolis and centrifugal forces arise from robot motion and joint coupling.
 
 Computing Velocity Forces
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -304,7 +307,7 @@ Computing Velocity Forces
    print(f"Force magnitude: {np.linalg.norm(c)}")
 
 Analyzing Velocity Effects
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -335,7 +338,7 @@ Analyzing Velocity Effects
    analyze_velocity_effects(dynamics, theta)
 
 Centrifugal vs Coriolis
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Separate centrifugal (velocity²) and Coriolis (cross-coupling) effects:
 
