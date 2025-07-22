@@ -40,10 +40,18 @@ These integration challenges manifest as:
 ![ManipulaPy manipulation pipeline architecture showing unified data flow from sensors through planning to control, with GPU acceleration throughout.](system_architecture.png)
 
 Core design principles:
-1. **Unified data structures**: All components share consistent representations (PoE screws, SE(3) transforms, GPU tensors)
-2. **GPU-first architecture**: Trajectories, dynamics, and perception processing execute on GPU without CPU round-trips  
-3. **Temporal synchronization**: Built-in 1 kHz control loop keeps sensors, planners, and actuators phase-locked
-4. **Extensible perception**: Multiple obstacle representations (primitives, point clouds, SDFs) supported simultaneously
+
+1. **Unified data structures**  
+   All components share consistent representations (PoE screws, SE(3) transforms, GPU tensors)
+
+2. **GPU-first architecture**  
+   Trajectories, dynamics, and perception processing execute on GPU without CPU round-trips
+
+3. **Temporal synchronization**  
+   Built-in 1 kHz control loop keeps sensors, planners, and actuators phase-locked
+
+4. **Extensible perception**  
+   Multiple obstacle representations (primitives, point clouds, SDFs) supported simultaneously
 
 Performance benchmarks demonstrating the claimed **13× overall speedup** are reproducible via ` Benchmarks/performance_benchmark.py` (requires CUDA-capable GPU).
 
@@ -53,7 +61,6 @@ Performance benchmarks demonstrating the claimed **13× overall speedup** are re
 
 ManipulaPy's architecture centers on a **unified manipulation pipeline** that maintains data consistency from sensor input to motor commands. Rather than loosely coupled modules, the system implements a coherent data flow where each component builds upon shared representations:
 
-![ManipulaPy system architecture showing the flow from URDF processing through kinematics, dynamics, perception, planning, and control with GPU acceleration throughout.](system_architecture.png)
 
 **Core Pipeline Components:**
 
