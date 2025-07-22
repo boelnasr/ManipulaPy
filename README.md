@@ -11,8 +11,7 @@
 
 **A comprehensive, GPU-accelerated Python package for robotic manipulator analysis, simulation, planning, control, and perception.**
 
-[Quick Start](#quick-start) • [Documentation](#documentation) • [Examples](#examples--tutorials) • [Installation](#installation) • [Contributing](#contributing)
-
+[Quick Start](#-quick-start) • [Documentation](#-documentation) • [Examples & Tutorials](#-examples--tutorials) • [Installation](#installation) • [Contributing](#-contributing)
 
 </div>
 

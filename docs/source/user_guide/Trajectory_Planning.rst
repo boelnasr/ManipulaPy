@@ -22,9 +22,9 @@ Mathematical Background
 This section summarizes the key mathematical constructs behind joint-space and Cartesian trajectory generation, as well as obstacle avoidance via potential fields.
 
 Joint-Space Time Scaling
-----------------------------
+-------------------------
 
-Given start :math:`\boldsymbol\theta_{0}` and end :math:`\boldsymbol\theta_{f}`, total duration :math:`T`, define a scalar time-scaling function
+Given start :math:`\boldsymbol\theta_{0}` and end :math:`\boldsymbol\theta_{f}`, total duration :math:`T`, define a scalar time-scaling function:
 
 .. math::
    s = \frac{t}{T}, \quad s \in [0,1]
@@ -41,24 +41,24 @@ Common choices:
   .. math::
      \sigma_{5}(s) = 10s^{3} - 15s^{4} + 6s^{5}
 
+**Joint-space trajectory:**
+
 .. math::
-   \mathbf{q}(t) = \mathbf{q}_{\text{start}} + \sigma(s) \cdot (\mathbf{q}_{\text{end}} - \mathbf{q}_{\text{start}})
+   \boldsymbol\theta(t) = \boldsymbol\theta_{0} + \bigl(\boldsymbol\theta_{f} - \boldsymbol\theta_{0}\bigr)\,\sigma_{m}(s)
 
-   \boldsymbol\theta(t)
-     = \boldsymbol\theta_{0}
-       + \bigl(\boldsymbol\theta_{f} - \boldsymbol\theta_{0}\bigr)\,\sigma_{m}(s),
+with derivatives:
 
-with
+- **Velocity:**
 
-- velocity:  
-  :math:`\dot{\boldsymbol\theta}(t)
-     = \frac{1}{T}\bigl(\boldsymbol\theta_{f}-\boldsymbol\theta_{0}\bigr)\,\sigma_{m}'(s)`
+  .. math::
+     \dot{\boldsymbol\theta}(t) = \frac{1}{T}\bigl(\boldsymbol\theta_{f}-\boldsymbol\theta_{0}\bigr)\,\sigma_{m}'(s)
 
-- acceleration:  
-  :math:`\ddot{\boldsymbol\theta}(t)
-     = \frac{1}{T^{2}}\bigl(\boldsymbol\theta_{f}-\boldsymbol\theta_{0}\bigr)\,\sigma_{m}''(s)`
+- **Acceleration:**
 
-where :math:`m=3` or :math:`5` for cubic/quintic.
+  .. math::
+     \ddot{\boldsymbol\theta}(t) = \frac{1}{T^{2}}\bigl(\boldsymbol\theta_{f}-\boldsymbol\theta_{0}\bigr)\,\sigma_{m}''(s)
+
+where :math:`m=3` or :math:`5` for cubic/quintic time scaling.
 
 
 Cartesian-Space Interpolation
