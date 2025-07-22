@@ -11,7 +11,7 @@
 
 **A comprehensive, GPU-accelerated Python package for robotic manipulator analysis, simulation, planning, control, and perception.**
 
-[Quick Start](#-quick-start) • [Documentation](#-documentation) • [Examples & Tutorials](#-examples--tutorials) • [Installation](#installation) • [Contributing](#-contributing)
+[Quick Start](#quick-start) • [Documentation](#documentation) • [Examples](#examples) • [Installation](#installation) • [Contributing](#contributing)
 
 </div>
 
@@ -61,7 +61,7 @@ ManipulaPy is a modern, comprehensive framework that bridges the gap between bas
 
 
 
-## 🚀 Quick Start
+## <a id="quick-start"></a>🚀 Quick Start
 
 ### Prerequisites
 
@@ -81,7 +81,7 @@ Before installing ManipulaPy, make sure your system has:
 
 ---
 
-### Installation
+<h2 id="installation">Installation</h2>
 
 ```bash
 # Basic installation (CPU-only)
@@ -426,7 +426,8 @@ for name, result in results.items():
 
 ---
 
-## 📁 Examples & Tutorials
+<h2 id="examples">📁 Examples & Tutorials</h2>
+
 
 The `Examples/` directory contains comprehensive demonstrations organized into three levels:
 
@@ -651,7 +652,8 @@ python accuracy_benchmark.py --tolerance 1e-8
 ```
 
 
-## 📖 Documentation
+<h2 id="documentation">📖 Documentation</h2>
+
 
 ### Online Documentation
 - **[Complete API Reference](https://manipulapy.readthedocs.io/)**
@@ -679,7 +681,8 @@ if props:
 
 ---
 
-## 🤝 Contributing
+<h2 id="contributing">🤝 Contributing</h2>
+
 
 We love your input! Whether you’re reporting a bug, proposing a new feature, or improving our docs, here’s how to get started:
 
