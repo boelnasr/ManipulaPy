@@ -17,6 +17,9 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 # Add the package to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['NUMBA_DISABLE_CUDA'] = '1'
+os.environ['MANIPULAPY_FORCE_CPU'] = '1'
 
 class MockModule:
     """Enhanced mock module that handles iteration and common operations properly."""
