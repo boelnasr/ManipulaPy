@@ -159,7 +159,7 @@ For simulation and debugging, use PyBullet's virtual cameras:
 - **Interactive positioning** for optimal camera placement
 
 Stereo Vision Pipeline
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For 3D reconstruction, configure a stereo camera pair:
 
@@ -252,7 +252,7 @@ Configure and manage multiple cameras simultaneously:
    print(f"📷 Side camera detected {len(obstacles_side)} obstacles")
 
 OpenCV Camera Integration
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Use real hardware cameras with OpenCV:
 
@@ -281,7 +281,7 @@ Use real hardware cameras with OpenCV:
    # when use_opencv=True
 
 Camera Calibration Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Understanding the camera configuration parameters:
 
@@ -315,7 +315,7 @@ Performance Optimization
 ------------------------
 
 Memory Management
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -338,7 +338,7 @@ Memory Management
        vision.release()
 
 Efficient Object Detection
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -393,7 +393,7 @@ Robust Error Handling
            vision.release()
 
 Debugging Tips
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -418,7 +418,7 @@ Debugging Tips
        print(f"   FOV: {camera['fov']}°")
 
 Common Issues and Solutions
---------------------------
+--------------------------------
 
 **Issue: No objects detected by YOLO**
 
@@ -463,10 +463,10 @@ Common Issues and Solutions
    print(f"Near/far planes: {camera['near']} - {camera['far']}")
 
 Real-World Applications
-----------------------
+---------------------------
 
 Robot Navigation
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -493,7 +493,7 @@ Robot Navigation
        return safe_trajectory, obstacles
 
 Pick and Place Operations
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -518,7 +518,7 @@ Pick and Place Operations
        # ... (integrate with kinematics and planning)
 
 Best Practices
---------------
+-----------------
 
 1. **Camera Placement**
    - Position cameras for optimal workspace coverage
@@ -546,7 +546,7 @@ Best Practices
    - Use vision confidence scores in decision making
 
 See Also
---------
+-----------
 
 - :doc:`../api/vision` - Complete Vision API reference
 - :doc:`Perception` - Higher-level perception capabilities

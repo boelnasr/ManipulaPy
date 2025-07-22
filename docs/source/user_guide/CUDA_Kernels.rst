@@ -1,5 +1,5 @@
 CUDA Kernels User Guide
-=======================
+==========================
 
 This guide covers the **CUDA acceleration** features in ManipulaPy, which provide GPU-accelerated functions for high-performance robotic computations including trajectory planning, dynamics computation, and potential field calculations.
 
@@ -8,7 +8,7 @@ This guide covers the **CUDA acceleration** features in ManipulaPy, which provid
    :depth: 2
 
 What is GPU Acceleration?
--------------------------
+----------------------------
 
 **GPU acceleration** uses NVIDIA graphics cards to perform parallel computations much faster than traditional CPU processing. ManipulaPy leverages CUDA through:
 
@@ -24,10 +24,10 @@ Key benefits include:
 - **Seamless Integration**: Works directly with existing ManipulaPy classes
 
 Mathematical Foundation
------------------------
+--------------------------
 
 CUDA Kernel Implementation
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Trajectory Generation Kernel:**
 
@@ -60,10 +60,10 @@ Parallel inverse dynamics using the Newton-Euler formulation:
 Each GPU thread processes one trajectory point simultaneously.
 
 Installation and Setup
-----------------------
+-------------------------
 
 System Requirements
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 **Hardware:**
 - NVIDIA GPU with Compute Capability 3.0 or higher
@@ -76,7 +76,7 @@ System Requirements
 - Python 3.8+
 
 Installation Options
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 **Option 1: Full GPU Support (Recommended)**
 
@@ -96,7 +96,7 @@ Installation Options
    pip install ManipulaPy
 
 Verification
-~~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -123,10 +123,10 @@ Verification
        CUPY_AVAILABLE = False
 
 Available CUDA Kernels
-----------------------
+-------------------------
 
 Trajectory Generation Kernels
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **trajectory_kernel**
 
@@ -157,7 +157,7 @@ Generates Cartesian space trajectories for end-effector motion.
    def cartesian_trajectory_kernel(pstart, pend, traj_pos, traj_vel, traj_acc, Tf, N, method):
 
 Dynamics Computation Kernels
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **inverse_dynamics_kernel**
 
@@ -187,7 +187,7 @@ Simulates robot motion given applied torques.
        Glist, Slist, M, thetamat, dthetamat, ddthetamat, joint_limits):
 
 Potential Field Kernels
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **attractive_potential_kernel**
 
@@ -217,10 +217,10 @@ Computes gradients of potential fields for navigation.
    def gradient_kernel(potential, gradient):
 
 Using GPU Acceleration
-----------------------
+-------------------------
 
 Basic Trajectory Generation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -263,7 +263,7 @@ Basic Trajectory Generation
    trajectory = generate_gpu_trajectory_example()
 
 TrajectoryPlanning with GPU Kernels
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -302,7 +302,7 @@ TrajectoryPlanning with GPU Kernels
    print(f"Computed torques shape: {torques.shape}")
 
 Batch Dynamics Computation
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -345,7 +345,7 @@ Batch Dynamics Computation
    trajectory_torques = compute_trajectory_dynamics_example()
 
 Potential Field Path Planning
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -380,10 +380,10 @@ Potential Field Path Planning
    potential_values = potential_field_example()
 
 Performance Optimization
-------------------------
+--------------------------
 
 Memory Management
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -435,7 +435,7 @@ Memory Management
    cleanup_gpu_memory()
 
 GPU Configuration Check
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -460,7 +460,7 @@ GPU Configuration Check
    check_gpu_configuration()
 
 Memory Pool Management
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -507,10 +507,10 @@ Memory Pool Management
    cleanup_gpu_memory()
 
 CPU Fallback
-------------
+--------------
 
 Automatic Fallback System
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ManipulaPy modules automatically fall back to CPU computation when GPU acceleration is not available:
 
@@ -550,8 +550,7 @@ The ManipulaPy modules automatically fall back to CPU computation when GPU accel
    test_trajectory = test_cpu_fallback()
 
 Performance Comparison
-~~~~~~~~~~~~~~~~~~~~~
-
+~~~~~~~~~~~~~~~~~~~~~~~~~
 .. code-block:: python
 
    def compare_cpu_gpu_performance():
@@ -603,10 +602,10 @@ Performance Comparison
    perf_results = compare_cpu_gpu_performance()
 
 Troubleshooting
----------------
+------------------
 
 Common Issues and Solutions
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **CUDA Installation Issues**
 
@@ -720,10 +719,10 @@ Debugging:
    benchmark_trajectory_generation()
 
 Best Practices
---------------
+----------------
 
 Data Types
-~~~~~~~~~
+~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -735,7 +734,7 @@ Data Types
    thetastart = np.zeros(6, dtype=np.float64)
 
 Problem Sizing
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -774,7 +773,7 @@ Problem Sizing
        return trajectory
 
 Error Handling
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -832,7 +831,7 @@ Error Handling
        }
 
 Memory Management
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -873,7 +872,7 @@ Memory Management
                pass
 
 Performance Optimization
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -928,10 +927,10 @@ Performance Optimization
    results = processor.process_batch(configs)
 
 Integration with ManipulaPy
----------------------------
+------------------------------
 
 Integration with Simulation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -970,7 +969,7 @@ Integration with Simulation
    final_position = gpu_accelerated_simulation()
 
 Integration with Control
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1045,10 +1044,10 @@ Integration with Control
    control_torque = gpu_accelerated_control()
 
 Working Examples
----------------
+------------------
 
 Complete GPU Workflow Example
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1151,7 +1150,7 @@ Complete GPU Workflow Example
    results = complete_gpu_workflow_example()
 
 Batch Processing Example
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1213,7 +1212,7 @@ Batch Processing Example
    batch_results = batch_processing_example()
 
 Performance Profiling Example
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1302,7 +1301,7 @@ Performance Profiling Example
    profile_results = performance_profiling_example()
 
 When to Use GPU Acceleration
-----------------------------
+-------------------------------
 
 **Recommended for:**
 
@@ -1320,7 +1319,7 @@ When to Use GPU Acceleration
 - **Development/debugging phases** where CPU debugging is easier
 
 Performance Guidelines
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table:: Problem Size Recommendations
    :header-rows: 1
@@ -1348,10 +1347,10 @@ Performance Guidelines
      - 50-100x speedup
 
 Getting Started Checklist
--------------------------
+----------------------------
 
 Installation and Setup
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. **✅ Install CUDA support**: ``pip install cupy-cuda11x numba ManipulaPy``
 2. **✅ Verify installation**: Check ``cuda.is_available()``
@@ -1361,7 +1360,7 @@ Installation and Setup
 6. **✅ Monitor system**: Watch for memory usage and thermal limits
 
 Quick Start Guide
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1400,7 +1399,7 @@ Quick Start Guide
    print(f"Computed {torques.shape[0]} torque values")
 
 Common Patterns
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 **Pattern 1: Batch Processing**
 
@@ -1462,7 +1461,7 @@ Common Patterns
 
 
 Conclusion
-----------
+-------------
 
 The ManipulaPy CUDA Kernels module provides significant performance improvements for robotics applications through:
 
@@ -1476,6 +1475,6 @@ The GPU acceleration is built into ManipulaPy's core modules like ``TrajectoryPl
 For additional support and advanced usage patterns, refer to the `ManipulaPy documentation <https://manipulapy.readthedocs.io>`_ and `GitHub repository <https://github.com/manipulapy/ManipulaPy>`_.
 
 API Reference
-~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 For complete function documentation: :doc:`../api/cuda_kernels`

@@ -4,7 +4,7 @@ Trajectory Planning User Guide
 This guide covers the trajectory planning capabilities in ManipulaPy, including joint-space and Cartesian-space trajectory generation, dynamics integration, and collision avoidance using CUDA acceleration.
 
 Introduction
------------
+----------------
 
 The TrajectoryPlanning class provides comprehensive trajectory generation and execution capabilities for robotic manipulators. It combines kinematic trajectory planning with dynamic analysis and collision avoidance to generate feasible, smooth robot motions.
 
@@ -17,39 +17,32 @@ The TrajectoryPlanning class provides comprehensive trajectory generation and ex
 - Support for various trajectory optimization objectives
 
 Mathematical Background
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This section summarizes the key mathematical constructs behind joint-space and Cartesian trajectory generation, as well as obstacle avoidance via potential fields.
 
 Joint-Space Time Scaling
-------------------------
+----------------------------
 
 Given start :math:`\boldsymbol\theta_{0}` and end :math:`\boldsymbol\theta_{f}`, total duration :math:`T`, define a scalar time-scaling function
 
 .. math::
-
-   s = \frac{t}{T}, 
-   \quad s\in[0,1].
+   s = \frac{t}{T}, \quad s \in [0,1]
 
 Common choices:
 
 - **Cubic** (zero end-velocity):
-  
-  .. math::
 
-     \sigma_{3}(s)
-       = 3s^{2} - 2s^{3},
+  .. math::
+     \sigma_{3}(s) = 3s^{2} - 2s^{3}
 
 - **Quintic** (zero end-velocity & zero end-acceleration):
 
   .. math::
-
-     \sigma_{5}(s)
-       = 10s^{3} - 15s^{4} + 6s^{5}.
-
-Joint-space trajectory:
+     \sigma_{5}(s) = 10s^{3} - 15s^{4} + 6s^{5}
 
 .. math::
+   \mathbf{q}(t) = \mathbf{q}_{\text{start}} + \sigma(s) \cdot (\mathbf{q}_{\text{end}} - \mathbf{q}_{\text{start}})
 
    \boldsymbol\theta(t)
      = \boldsymbol\theta_{0}
@@ -67,8 +60,9 @@ with
 
 where :math:`m=3` or :math:`5` for cubic/quintic.
 
+
 Cartesian-Space Interpolation
------------------------------
+--------------------------------
 
 Given start/end end-effector poses :math:`X_{0},X_{f}\in SE(3)`, define the relative transform
 
@@ -149,10 +143,10 @@ This mathematical framework underlies all high-level methods in the `TrajectoryP
 
 
 Basic Usage
-----------
+---------------
 
 Setting Up Trajectory Planning
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -180,7 +174,7 @@ Setting Up Trajectory Planning
    print("Trajectory planner initialized successfully")
 
 Simple Joint Trajectory
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -208,10 +202,10 @@ Simple Joint Trajectory
    np.testing.assert_allclose(trajectory['positions'][-1], theta_end, rtol=1e-3)
 
 TrajectoryPlanning Class
------------------------
+---------------------------
 
 Class Constructor
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -233,10 +227,10 @@ Class Constructor
 - ``potential_field``: Potential field for obstacle avoidance
 
 Core Methods
------------
+----------------
 
 joint_trajectory()
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 Generates smooth joint-space trajectories with CUDA acceleration:
 
@@ -293,7 +287,7 @@ Generates smooth joint-space trajectories with CUDA acceleration:
    cubic_traj, quintic_traj = joint_trajectory_example()
 
 cartesian_trajectory()
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Generates Cartesian-space trajectories for end-effector motion:
 
@@ -388,10 +382,10 @@ Generates Cartesian-space trajectories for end-effector motion:
    cartesian_traj = cartesian_trajectory_example()
 
 Dynamics Integration
--------------------
+-----------------------
 
 inverse_dynamics_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Computes required joint torques along a trajectory:
 
@@ -457,7 +451,7 @@ Computes required joint torques along a trajectory:
    trajectory_torques = dynamics_analysis_example()
 
 forward_dynamics_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Simulates robot motion given applied torques:
 
@@ -580,10 +574,10 @@ Simulates robot motion given applied torques:
    simulation_result = forward_dynamics_simulation()
 
 Trajectory Visualization
------------------------
+---------------------------
 
 plot_trajectory()
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 Static plotting of trajectory data:
 
@@ -614,7 +608,7 @@ Static plotting of trajectory data:
    sample_trajectory = trajectory_visualization_example()
 
 plot_cartesian_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Visualization for Cartesian trajectories:
 
@@ -647,10 +641,10 @@ Visualization for Cartesian trajectories:
    cartesian_viz = cartesian_visualization_example()
 
 Advanced Features
-----------------
+---------------------
 
 Collision Avoidance
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 The trajectory planner includes collision detection and avoidance:
 
@@ -692,7 +686,7 @@ The trajectory planner includes collision detection and avoidance:
    safe_trajectory = collision_avoidance_example()
 
 Multi-Point Trajectories
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Creating trajectories through multiple waypoints:
 
@@ -813,10 +807,10 @@ Creating trajectories through multiple waypoints:
    multi_traj, waypoints = multi_waypoint_trajectory()
 
 Performance Optimization
------------------------
+---------------------------
 
 CUDA Acceleration
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 The trajectory planner uses CUDA for high-performance computations:
 
@@ -878,7 +872,7 @@ The trajectory planner uses CUDA for high-performance computations:
    perf_traj, traj_time, dyn_time = performance_comparison()
 
 Batch Processing
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Processing multiple trajectories efficiently:
 
@@ -944,10 +938,10 @@ Processing multiple trajectories efficiently:
    batch_trajs, batch_torques = batch_trajectory_processing()
 
 Real-Time Applications
----------------------
+-------------------------
 
 Trajectory Execution
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Real-time trajectory following for robot control:
 
@@ -1145,10 +1139,10 @@ Real-time trajectory following for robot control:
    execution_results = real_time_trajectory_execution()
 
 Practical Applications
----------------------
+-------------------------
 
 Pick and Place Operation
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Complete pick-and-place trajectory planning:
 
@@ -1347,10 +1341,10 @@ Complete pick-and-place trajectory planning:
    pick_place_traj, pick_place_torques = pick_and_place_trajectory()
 
 Best Practices
--------------
+-----------------
 
 Trajectory Design Guidelines
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1424,7 +1418,7 @@ Trajectory Design Guidelines
    design_guidelines = trajectory_design_guidelines()
 
 Error Handling and Debugging
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1542,7 +1536,7 @@ Error Handling and Debugging
    debug_result = trajectory_debugging_tools()
 
 Summary
--------
+-----------
 
 The ManipulaPy Trajectory Planning module provides comprehensive trajectory generation capabilities for robotic manipulators:
 

@@ -11,7 +11,8 @@
 
 **A comprehensive, GPU-accelerated Python package for robotic manipulator analysis, simulation, planning, control, and perception.**
 
-[Quick Start](#-quick-start) • [Documentation](#-documentation) • [Examples](#-examples) • [Installation](#-installation) • [Contributing](#-contributing)
+[Quick Start](#quick-start) • [Documentation](#documentation) • [Examples](#examples--tutorials) • [Installation](#installation) • [Contributing](#contributing)
+
 
 </div>
 
@@ -108,12 +109,17 @@ After installation, confirm that ManipulaPy can see your GPU:
 ```bash
 # Check that CUDA is available to ManipulaPy
 python3 - <<EOF
-import ManipulaPy
-if ManipulaPy.cuda.is_available():
-    print("✅ CUDA is available:", ManipulaPy.cuda.get_device_name())
+from ManipulaPy import cuda_kernels
+
+if cuda_kernels.check_cuda_availability():
+    props = cuda_kernels.get_gpu_properties()
+    print(f"✅ CUDA is available on device: {props['name']} "
+          f"({props['multiprocessor_count']} SMs, "
+          f"{props['max_threads_per_block']} max threads/block)")
 else:
-    raise RuntimeError("❌ CUDA not detected by ManipulaPy")
+    raise RuntimeError("❌ CUDA not detected or not properly configured in ManipulaPy.")
 EOF
+
 ```
 
 If you see the ✅ message with your GPU name, you’re all set! Otherwise, double‑check the CUDA Toolkit and cuDNN installation steps above. \`\`\`

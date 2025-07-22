@@ -651,10 +651,10 @@ Configure multiple simulation instances for parallel processing:
        return results
 
 Troubleshooting Guide
---------------------
+-------------------------
 
 Common Issues and Solutions
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **1. Black screen or no GUI**
 
@@ -753,7 +753,7 @@ Reduce time step and increase solver iterations:
        import numpy as cp
 
 Debugging Tools
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Enable detailed logging and visualization:
 
@@ -783,7 +783,7 @@ Enable detailed logging and visualization:
                time.sleep(0.1)
 
 Performance Benchmarks
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Typical performance metrics for reference:
 
@@ -813,7 +813,7 @@ Typical performance metrics for reference:
      - With CuPy controller
 
 Best Practices
---------------
+--------------------
 
 1. **Always validate trajectories** before execution
 2. **Use appropriate time steps** for your application
@@ -824,7 +824,7 @@ Best Practices
 7. **Profile performance** to identify bottlenecks
 
 Integration with Other Modules
------------------------------
+----------------------------------
 
 The Simulation module integrates seamlessly with other ManipulaPy components:
 

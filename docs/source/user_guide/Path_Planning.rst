@@ -4,7 +4,7 @@ Optimized Path Planning User Guide
 This guide covers the highly optimized trajectory planning capabilities in ManipulaPy, including adaptive GPU/CPU execution, memory pooling, batch processing, and advanced performance optimizations for robotic manipulators.
 
 Introduction
------------
+--------------
 
 The optimized `TrajectoryPlanning` class (now `OptimizedTrajectoryPlanning`) provides comprehensive trajectory generation and execution capabilities with significant performance improvements through CUDA acceleration and intelligent adaptive execution strategies.
 
@@ -25,7 +25,7 @@ The optimized `TrajectoryPlanning` class (now `OptimizedTrajectoryPlanning`) pro
 - Backward compatibility with existing `TrajectoryPlanning` interface
 
 Mathematical Background
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The mathematical foundation remains the same as the original implementation, with optimizations focused on computational efficiency rather than algorithmic changes. The core time-scaling functions, dynamics computations, and collision avoidance methods are preserved while being accelerated through parallel execution.
 
@@ -37,7 +37,7 @@ The mathematical foundation remains the same as the original implementation, wit
 4. **Kernel Fusion**: Multiple operations combined into single kernel launches to reduce overhead
 
 Getting Started
---------------
+------------------
 
 Basic Setup with Optimizations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

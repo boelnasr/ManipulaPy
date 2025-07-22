@@ -22,7 +22,7 @@ Mathematical Foundation
 -----------------------
 
 Product of Exponentials Formula
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The forward kinematics is computed using:
 
@@ -160,7 +160,7 @@ SerialManipulator Class
 ----------------------
 
 Constructor
-~~~~~~~~~~
+~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -184,10 +184,10 @@ Constructor
 - **joint_limits**: List of (min, max) tuples for each joint
 
 Creating a Robot Model
----------------------
+----------------------
 
 From URDF (Recommended)
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -202,7 +202,7 @@ From URDF (Recommended)
    print(f"Home position: {robot.M_list[:3, 3]}")
 
 Manual Definition
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -271,7 +271,7 @@ Basic Forward Kinematics
    print(f"End-effector orientation:\n{rotation_matrix}")
 
 Space vs Body Frames
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -286,7 +286,7 @@ Space vs Body Frames
    print(f"Space vs Body frame error: {error:.2e}")  # Should be ~0
 
 End-Effector Pose as Vector
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -300,7 +300,7 @@ End-Effector Pose as Vector
    print(f"Orientation (degrees): {np.degrees(euler_angles)}")
 
 Multiple Configurations
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -360,7 +360,7 @@ Basic Inverse Kinematics
        print("❌ IK failed to converge")
 
 Advanced IK Options
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -375,7 +375,7 @@ Advanced IK Options
    )
 
 Multiple IK Solutions
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -418,10 +418,10 @@ Multiple IK Solutions
    print(f"Found {len(multiple_solutions)} distinct solutions")
 
 Jacobian Matrix
----------------
+--------------------
 
 Computing the Jacobian
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -437,7 +437,7 @@ Computing the Jacobian
    print(f"Body Jacobian shape: {J_body.shape}")    # (6, n_joints)
 
 Jacobian Analysis
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -476,10 +476,10 @@ Jacobian Analysis
    J, cond_num = analyze_jacobian(robot, theta)
 
 Velocity Kinematics
--------------------
+--------------------
 
 End-Effector Velocity
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -501,7 +501,7 @@ End-Effector Velocity
    print(f"Angular velocity: {angular_velocity} rad/s")
 
 Joint Velocities from Desired Motion
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -520,10 +520,10 @@ Joint Velocities from Desired Motion
    print(f"Velocity error: {error:.2e}")
 
 State Management
-----------------
+-------------------
 
 Robot State Tracking
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -548,10 +548,10 @@ Robot State Tracking
    print(f"Current EE velocity: {current_velocity}")
 
 Working Examples
----------------
+----------------
 
 Complete Workflow Example
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -634,10 +634,10 @@ Complete Workflow Example
    example_robot = complete_kinematics_example()
 
 Common Issues and Solutions
---------------------------
+---------------------------
 
 Troubleshooting IK Convergence
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -683,7 +683,7 @@ Troubleshooting IK Convergence
        return None
 
 Best Practices
---------------
+------------------
 
 1. **Robot Definition**
    - Use URDF files when possible for real robots
@@ -708,7 +708,7 @@ Best Practices
    - Use appropriate tolerances (don't over-specify)
 
 Next Steps
-----------
+---------------
 
 - **Dynamics**: Add forces and inertias → :doc:`Dynamics`
 - **Trajectory Planning**: Plan smooth motions → :doc:`Trajectory_Planning`  
@@ -716,6 +716,5 @@ Next Steps
 - **Simulation**: Test in PyBullet → :doc:`Simulation`
 
 API Reference
-~~~~~~~~~~~~
-
+~~~~~~~~~~~~~
 For complete function documentation: :doc:`../api/kinematics`

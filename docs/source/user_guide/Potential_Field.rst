@@ -8,26 +8,26 @@ This comprehensive guide covers the potential field path-planning tools in Manip
    and performance tips.
 
 Introduction to Potential Fields
--------------------------------
+--------------------------------------
 
 Potential field methods treat the robot as a point moving under the influence of an artificial
-potential surface.  The robot is “pulled” toward the goal by an _attractive_ potential and
-“pushed” away from obstacles by _repulsive_ potentials.  By following the negative gradient
+potential surface. The robot is "pulled" toward the goal by an **attractive** potential and
+"pushed" away from obstacles by **repulsive** potentials. By following the negative gradient
 of the combined field, the robot can find a collision-free path.
 
 Key components:
 
-- **Attractive potential**  draws the robot toward the goal.  
-- **Repulsive potential**   pushes the robot away from obstacles within an influence radius.  
-- **Gradient**             direction of steepest descent in the combined potential.  
-- **Collision checking**   rapid test whether a given configuration is in collision.  
+- **Attractive potential** draws the robot toward the goal.  
+- **Repulsive potential** pushes the robot away from obstacles within an influence radius.  
+- **Gradient** direction of steepest descent in the combined potential.  
+- **Collision checking** rapid test whether a given configuration is in collision.  
 
 Mathematical Background
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Let :math:`\mathbf q \in \mathbb R^n` be the robot’s configuration (e.g., joint angles).  
-Let :math:`\mathbf q_{\mathrm{goal}}` be the goal configuration, and let  
-:math:`\{\,\mathbf o_i\in\mathbb R^n\}` be a set of obstacle points.
+Let :math:`\mathbf{q} \in \mathbb{R}^n` be the robot's configuration (e.g., joint angles).  
+Let :math:`\mathbf{q}_{\mathrm{goal}}` be the goal configuration, and let  
+:math:`\{\mathbf{o}_i \in \mathbb{R}^n\}` be a set of obstacle points.
 
 Attractive Potential
 ^^^^^^^^^^^^^^^^^^^^
@@ -35,10 +35,10 @@ Attractive Potential
 A common quadratic attractive potential:
 
 .. math::
-   U_{\mathrm{att}}(\mathbf q)
-     = \tfrac12\,k_{\mathrm{att}}\,\|\mathbf q - \mathbf q_{\mathrm{goal}}\|^2
+   U_{\mathrm{att}}(\mathbf{q})
+     = \frac{1}{2} k_{\mathrm{att}} \|\mathbf{q} - \mathbf{q}_{\mathrm{goal}}\|^2
 
-where :math:`k_{\mathrm{att}}>0` is the attractive gain.
+where :math:`k_{\mathrm{att}} > 0` is the attractive gain.
 
 Repulsive Potential
 ^^^^^^^^^^^^^^^^^^^
@@ -46,16 +46,15 @@ Repulsive Potential
 An inverse-distance repulsive potential, active only within an influence distance :math:`d_0`:
 
 .. math::
-   U_{\mathrm{rep}}(\mathbf q)
+   U_{\mathrm{rep}}(\mathbf{q})
      = \sum_{i}
        \begin{cases}
-         \tfrac12\,k_{\mathrm{rep}}\!\bigl(\tfrac{1}{d_i} - \tfrac{1}{d_0}\bigr)^2
-           & d_i \le d_0,\\[6pt]
-         0 & d_i > d_0,
+         \frac{1}{2} k_{\mathrm{rep}} \left(\frac{1}{d_i} - \frac{1}{d_0}\right)^2
+           & \text{if } d_i \leq d_0,\\
+         0 & \text{if } d_i > d_0,
        \end{cases}
-\quad
-   d_i = \|\mathbf q - \mathbf o_i\|,
-   \;k_{\mathrm{rep}}>0.
+
+where :math:`d_i = \|\mathbf{q} - \mathbf{o}_i\|` and :math:`k_{\mathrm{rep}} > 0`.
 
 Total Potential and Gradient
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -63,40 +62,40 @@ Total Potential and Gradient
 The combined potential:
 
 .. math::
-   U(\mathbf q)
-     = U_{\mathrm{att}}(\mathbf q)
-       + U_{\mathrm{rep}}(\mathbf q).
+   U(\mathbf{q})
+     = U_{\mathrm{att}}(\mathbf{q})
+       + U_{\mathrm{rep}}(\mathbf{q}).
 
-The control “force” is the negative gradient:
+The control "force" is the negative gradient:
 
 .. math::
-   \mathbf F(\mathbf q)
-     = -\,\nabla U(\mathbf q)
-     = -\nabla U_{\mathrm{att}}(\mathbf q)
-       -\nabla U_{\mathrm{rep}}(\mathbf q).
+   \mathbf{F}(\mathbf{q})
+     = -\nabla U(\mathbf{q})
+     = -\nabla U_{\mathrm{att}}(\mathbf{q})
+       - \nabla U_{\mathrm{rep}}(\mathbf{q}).
 
 Closed-form gradients:
 
 .. math::
-   \nabla U_{\mathrm{att}}(\mathbf q)
-     = k_{\mathrm{att}}\,(\mathbf q - \mathbf q_{\mathrm{goal}}),
+   \nabla U_{\mathrm{att}}(\mathbf{q})
+     = k_{\mathrm{att}} (\mathbf{q} - \mathbf{q}_{\mathrm{goal}}),
 
 .. math::
-   \nabla U_{\mathrm{rep}}(\mathbf q)
-     = \sum_{i:\,d_i \le d_0}
+   \nabla U_{\mathrm{rep}}(\mathbf{q})
+     = \sum_{i: d_i \leq d_0}
        k_{\mathrm{rep}}
-       \bigl(\tfrac{1}{d_i} - \tfrac{1}{d_0}\bigr)
-       \tfrac{1}{d_i^3}\,(\mathbf q - \mathbf o_i).
+       \left(\frac{1}{d_i} - \frac{1}{d_0}\right)
+       \frac{1}{d_i^3} (\mathbf{q} - \mathbf{o}_i).
 
 Class Reference
 ---------------
 
 ManipulaPy provides two main classes in this module:
 
-- **`PotentialField`**  
+- **PotentialField**  
   Compute attractive & repulsive potentials and their gradients.
 
-- **`CollisionChecker`**  
+- **CollisionChecker**  
   Use URDF geometry to build convex hulls and test for self-collision.
 
 Installation
@@ -168,18 +167,20 @@ Usage Examples
 Advanced Topics
 ---------------
 
-### Performance Tips
+Performance Tips
+~~~~~~~~~~~~~~~~
 
-- **Vectorize obstacle list**: stack obstacles into an :math:`(m\times n)` array and
+- **Vectorize obstacle list**: stack obstacles into an :math:`(m \times n)` array and
   compute all distances at once for large :math:`m`.  
 - **Tune gains**: high :math:`k_{\mathrm{rep}}` produces stronger obstacle avoidance but
   may create local minima.  
-- **Cache gradient**: if you repeatedly query similar :math:`\mathbf q`, memoize the result.
+- **Cache gradient**: if you repeatedly query similar :math:`\mathbf{q}`, memoize the result.
 
-### Combining with Trajectory Planning
+Combining with Trajectory Planning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-You can integrate the gradient from `PotentialField` into your
-`TrajectoryPlanning` loop to adjust intermediate waypoints:
+You can integrate the gradient from ``PotentialField`` into your
+``TrajectoryPlanning`` loop to adjust intermediate waypoints:
 
 .. code-block:: python
 
@@ -197,11 +198,11 @@ Troubleshooting
 ---------------
 
 - **Zero repulsive gradient**  
-  If your robot never “feels” obstacles, check that
-  `influence_distance` is larger than the minimum :math:`d_i`.  
+  If your robot never "feels" obstacles, check that
+  ``influence_distance`` is larger than the minimum :math:`d_i`.  
 
 - **Local minima**  
-  Potential fields can trap in local minima.  Hybridize with RRT or rapidly-exploring
+  Potential fields can trap in local minima. Hybridize with RRT or rapidly-exploring
   random tree to escape.  
 
 - **Performance bottleneck**  
@@ -211,7 +212,7 @@ Troubleshooting
 References
 ----------
 
-- Latombe, J.-C., _Robot Motion Planning_, Kluwer, 1991.  
-- Khatib, O., “Real-time obstacle avoidance for manipulators and mobile robots,”
-  _IEEE IJRR_, 1986.  
-- urchin.urdf — URDF parser for Python (used for mesh loading and convex hulls).  
+- Latombe, J.-C., *Robot Motion Planning*, Kluwer, 1991.  
+- Khatib, O., "Real-time obstacle avoidance for manipulators and mobile robots,"
+  *IEEE IJRR*, 1986.  
+- urchin.urdf — URDF parser for Python (used for mesh loading and convex hulls).

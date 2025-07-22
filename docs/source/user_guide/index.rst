@@ -233,10 +233,10 @@ Choose your learning path based on your experience level and goals:
    </div>
 
 📖 Guide Categories
-------------------
+-----------------------
 
 Core Robotics
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 Essential concepts every robotics engineer should master:
 
@@ -372,7 +372,7 @@ Computer vision, environmental understanding, and intelligent robot behavior:
    </div>
 
 Advanced Topics
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Cutting-edge techniques for performance and analysis:
 
@@ -403,7 +403,7 @@ Cutting-edge techniques for performance and analysis:
    </div>
 
 🎯 Quick Reference
------------------
+----------------------
 
 .. raw:: html
 
@@ -460,7 +460,7 @@ Cutting-edge techniques for performance and analysis:
    </div>
 
 💡 Study Tips
--------------
+-------------------
 
 .. raw:: html
 
@@ -497,7 +497,7 @@ Cutting-edge techniques for performance and analysis:
    </div>
 
 🆘 Need Help?
-------------
+----------------
 
 If you get stuck:
 

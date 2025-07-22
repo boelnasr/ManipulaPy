@@ -4,7 +4,7 @@ URDF Processor User Guide
 This guide covers the URDF Processor module in ManipulaPy, which converts URDF (Unified Robot Description Format) files into SerialManipulator and ManipulatorDynamics objects for analytical robotics computations.
 
 Introduction
------------
+-------------------
 
 The URDF Processor bridges the gap between URDF robot descriptions and ManipulaPy's analytical framework. It automatically extracts kinematic and dynamic parameters from URDF files and creates the necessary objects for robotics analysis.
 
@@ -16,10 +16,10 @@ The URDF Processor bridges the gap between URDF robot descriptions and ManipulaP
 - Conversion to SerialManipulator and ManipulatorDynamics objects
 
 Basic Usage
-----------
+-----------------
 
 Simple URDF Loading
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -40,7 +40,7 @@ Simple URDF Loading
    print(f"End-effector position: {T[:3, 3]}")
 
 Using Built-in Models
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -53,10 +53,10 @@ Using Built-in Models
    print(f"Robot has {len(robot.joint_limits)} joints")
 
 URDFToSerialManipulator Class
-----------------------------
+-------------------------------
 
 Class Constructor
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -74,7 +74,8 @@ Class Constructor
 - ``robot``: Loaded URDF object from urchin library
 
 Extracted Parameters
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
+
 
 The ``robot_data`` dictionary contains:
 
@@ -90,10 +91,10 @@ The ``robot_data`` dictionary contains:
    print(f"Number of inertia matrices: {len(data['Glist'])}")     # n links
 
 Core Methods
------------
+---------------
 
 load_urdf()
-~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 Extracts kinematic and dynamic parameters from the URDF file:
 
@@ -121,7 +122,7 @@ Extracts kinematic and dynamic parameters from the URDF file:
        print(f"Home position: {M[:3, 3]}")
 
 initialize_serial_manipulator()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Creates the SerialManipulator object:
 
@@ -137,7 +138,7 @@ Creates the SerialManipulator object:
    print(f"Home configuration:\n{robot.M_list}")
 
 initialize_manipulator_dynamics()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Creates the ManipulatorDynamics object:
 
@@ -159,10 +160,10 @@ Creates the ManipulatorDynamics object:
    print(f"Gravity forces: {g}")
 
 Joint Limit Handling
--------------------
+----------------------------
 
 PyBullet Integration
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 When ``use_pybullet_limits=True``, the processor extracts joint limits from PyBullet:
 
@@ -201,10 +202,10 @@ Custom Joint Limits
    robot.joint_limits = custom_limits[:len(robot.joint_limits)]
 
 Utility Methods
---------------
+-------------------
 
 Static Methods
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -225,7 +226,7 @@ Static Methods
    print(f"Screw axes shape: {Slist.shape}")  # (6, 2)
 
 Visualization Methods
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -250,10 +251,10 @@ Visualization Methods
    print(f"Joint names: {joint_info['joint_names']}")
 
 Working Example
---------------
+--------------------
 
 Complete Robot Setup
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -295,7 +296,7 @@ Complete Robot Setup
    processor = complete_robot_setup()
 
 Kinematics and Dynamics Usage
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -348,10 +349,10 @@ Kinematics and Dynamics Usage
    robot, dynamics = kinematics_dynamics_example()
 
 Error Handling
---------------
+-----------------
 
 Common Issues and Solutions
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -402,10 +403,10 @@ Common Issues and Solutions
    processor = robust_urdf_loading("robot.urdf")
 
 Best Practices
--------------
+-----------------
 
 URDF File Requirements
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 For optimal results, ensure your URDF file has:
 
@@ -416,7 +417,7 @@ For optimal results, ensure your URDF file has:
 5. **Accessible mesh files** (if using complex geometries)
 
 Performance Tips
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -433,7 +434,7 @@ Performance Tips
    processor = get_robot_processor("robot.urdf")
 
 Validation Checklist
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 Before using a processed URDF:
 
@@ -473,16 +474,19 @@ Summary
 The URDF Processor provides seamless conversion from URDF robot descriptions to ManipulaPy's analytical framework:
 
 **Key Components:**
+
 - **URDFToSerialManipulator class**: Main interface for URDF processing
 - **Automatic parameter extraction**: Kinematic and dynamic properties
 - **Joint limit handling**: PyBullet integration for realistic limits
 - **Object creation**: SerialManipulator and ManipulatorDynamics instances
 
-**Typical Workflow:**
+***Typical Workflow:**
+
 1. Load URDF file with ``URDFToSerialManipulator(urdf_path)``
 2. Access ``serial_manipulator`` for kinematics computations
-3. Access ``dynamics`` for dynamics computations  
+3. Access ``dynamics`` for dynamics computations
 4. Use standard ManipulaPy methods for analysis and control
+
 
 **Best Practices:**
 - Validate URDF files before processing
