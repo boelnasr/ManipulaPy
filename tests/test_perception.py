@@ -2,6 +2,9 @@
 """
 test_perception.py - Comprehensive tests for the Perception module.
 Tests the higher-level perception functionality that uses Vision.
+
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import unittest

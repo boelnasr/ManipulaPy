@@ -18,7 +18,7 @@ Key optimizations:
 - Cache-friendly memory access patterns
 - Warp-level optimizations for maximum throughput
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 

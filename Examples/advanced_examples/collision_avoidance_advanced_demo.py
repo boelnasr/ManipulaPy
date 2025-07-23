@@ -10,7 +10,7 @@ This demo showcases advanced collision avoidance capabilities including:
 - Comprehensive visualization and analysis
 - Performance benchmarking between CPU/GPU implementations
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 

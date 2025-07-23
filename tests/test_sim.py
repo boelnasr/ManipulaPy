@@ -21,6 +21,9 @@ Fixed issues:
 - Added proper attribute initialization in __init__
 - Fixed set_joint_positions size mismatch handling
 - Fixed planner and controller initialization
+
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import os

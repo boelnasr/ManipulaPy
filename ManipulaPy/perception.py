@@ -7,7 +7,7 @@ This module provides higher-level perception capabilities for robotic systems in
 obstacle detection, 3D point cloud generation, clustering, and integration with Vision
 modules for comprehensive environmental understanding.
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 
 This file is part of ManipulaPy.
 

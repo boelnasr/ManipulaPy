@@ -7,6 +7,8 @@ A test suite for ManipulaPy's ManipulatorDynamics class,
 mirroring the style used in test_kinematics.py. Here, we
 explicitly provide S_list, B_list, Glist, etc., so no calls to
 utils.extract_screw_list(...) are necessary.
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import unittest

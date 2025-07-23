@@ -13,7 +13,7 @@ The module supports:
 - Pose vector to homogeneous transformation matrix conversion
 - Type-annotated functions for better code clarity and IDE support
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 
 This file is part of ManipulaPy.
 

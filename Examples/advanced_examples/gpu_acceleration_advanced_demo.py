@@ -9,7 +9,8 @@ memory optimization, and performance benchmarking for large-scale computations.
 Usage:
     python gpu_acceleration_advanced_demo.py [--benchmark] [--memory-test]
 
-Author: ManipulaPy Development Team
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import numpy as np

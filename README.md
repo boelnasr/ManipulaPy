@@ -771,10 +771,10 @@ If you use ManipulaPy in your research, please cite:
 ```bibtex
 @software{manipulapy2025,
   title={ManipulaPy: A Comprehensive Python Package for Robotic Manipulator Analysis and Control},
-  author={Mohamed Aboelnar},
+  author={Mohamed Aboelnasr},
   year={2025},
   url={https://github.com/boelnasr/ManipulaPy},
-  version={1.1.0},
+  version={1.1.1},
   license={AGPL-3.0-or-later},
 
 }
@@ -809,7 +809,7 @@ All dependencies are AGPL-3.0 compatible:
 
 ### Contact Information
 
-**Created and maintained by Mohamed Aboelnar**
+**Created and maintained by Mohamed Aboelnasr**
 
 - 📧 **Email**: [aboelnasr1997@gmail.com](mailto:aboelnasr1997@gmail.com)
 - 🐙 **GitHub**: [@boelnasr](https://github.com/boelnasr)
