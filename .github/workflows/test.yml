@@ -242,163 +242,271 @@ jobs:
           
           # Create the enhanced analysis script
           cat > analyze_coverage.py << 'EOF'
-        #!/usr/bin/env python3
-        """Enhanced Coverage Analysis for ManipulaPy"""
-        import xml.etree.ElementTree as ET
-        import sys
-        from pathlib import Path
-        
-        def analyze_coverage(xml_file="coverage.xml"):
-            """Extract detailed coverage information per module."""
-            
-            if not Path(xml_file).exists():
-                print(f"❌ Coverage file {xml_file} not found")
-                return None
-                
-            try:
-                tree = ET.parse(xml_file)
-                root = tree.getroot()
-                
-                # Overall statistics
-                overall_coverage = float(root.attrib['line-rate']) * 100
-                overall_branch = float(root.attrib.get('branch-rate', 0)) * 100
-                
-                print(f"📊 Overall Coverage: {overall_coverage:.1f}% (lines)")
-                print(f"🌿 Overall Branch Coverage: {overall_branch:.1f}%")
-                print("=" * 60)
-                
-                # Per-module detailed analysis
-                modules = []
-                for package in root.findall('.//package'):
-                    name = package.attrib['name'].replace('ManipulaPy.', '').replace('ManipulaPy', 'root')
-                    if not name or name == 'root':  # Skip empty names or root
-                        continue
-                        
-                    line_rate = float(package.attrib['line-rate']) * 100
-                    branch_rate = float(package.attrib.get('branch-rate', 0)) * 100
-                    
-                    # Count total lines and covered lines
-                    total_lines = 0
-                    covered_lines = 0
-                    
-                    for line in package.findall('.//line'):
-                        total_lines += 1
-                        if int(line.attrib['hits']) > 0:
-                            covered_lines += 1
-                    
-                    modules.append({
-                        'name': name,
-                        'line_rate': line_rate,
-                        'branch_rate': branch_rate,
-                        'total_lines': total_lines,
-                        'covered_lines': covered_lines,
-                        'uncovered_lines': total_lines - covered_lines
-                    })
-                
-                # Sort by coverage rate (descending)
-                modules.sort(key=lambda x: x['line_rate'], reverse=True)
-                
-                # Display results
-                print(f"{'Module':<20} {'Lines':<8} {'Branches':<10} {'Total':<8} {'Covered':<8} {'Missing':<8}")
-                print("-" * 70)
-                
-                for module in modules:
-                    # Status emoji
-                    if module['line_rate'] >= 90:
-                        emoji = "🟢"
-                    elif module['line_rate'] >= 80:
-                        emoji = "✅"
-                    elif module['line_rate'] >= 60:
-                        emoji = "⚠️"
-                    else:
-                        emoji = "❌"
-                        
-                    print(f"{emoji} {module['name']:<18} "
-                          f"{module['line_rate']:>6.1f}% "
-                          f"{module['branch_rate']:>8.1f}% "
-                          f"{module['total_lines']:>6} "
-                          f"{module['covered_lines']:>6} "
-                          f"{module['uncovered_lines']:>6}")
-                
-                print("=" * 60)
-                
-                # Summary statistics
-                high_coverage = sum(1 for m in modules if m['line_rate'] >= 80)
-                medium_coverage = sum(1 for m in modules if 60 <= m['line_rate'] < 80)
-                low_coverage = sum(1 for m in modules if m['line_rate'] < 60)
-                
-                print(f"📈 Coverage Distribution:")
-                print(f"  🟢 High (≥80%): {high_coverage} modules")
-                print(f"  ⚠️  Medium (60-79%): {medium_coverage} modules") 
-                print(f"  ❌ Low (<60%): {low_coverage} modules")
-                
-                # Identify modules needing attention
-                needs_attention = [m for m in modules if m['line_rate'] < 70]
-                if needs_attention:
-                    print(f"\n🎯 Modules needing attention:")
-                    for module in needs_attention:
-                        print(f"  • {module['name']}: {module['line_rate']:.1f}% "
-                              f"({module['uncovered_lines']} uncovered lines)")
-                
-                # Generate coverage badge
-                if overall_coverage >= 90:
-                    color = "brightgreen"
-                elif overall_coverage >= 80:
-                    color = "green" 
-                elif overall_coverage >= 70:
-                    color = "yellowgreen"
-                elif overall_coverage >= 60:
-                    color = "yellow"
-                else:
-                    color = "red"
-                    
-                badge_url = f"https://img.shields.io/badge/coverage-{overall_coverage:.1f}%25-{color}"
-                print(f"\n🏷️ Coverage Badge: {badge_url}")
-                
-                # Generate GitHub Actions summary markdown
-                with open("coverage_summary.md", "w") as f:
-                    f.write(f"# 📊 Coverage Report\n\n")
-                    f.write(f"![Coverage]({badge_url})\n\n")
-                    f.write(f"**Overall Coverage:** {overall_coverage:.1f}% | **Branch Coverage:** {overall_branch:.1f}%\n\n")
-                    f.write(f"## Module Coverage Details\n\n")
-                    f.write(f"| Module | Line Coverage | Branch Coverage | Total Lines | Covered | Missing |\n")
-                    f.write(f"|--------|---------------|-----------------|-------------|---------|----------|\n")
-                    
-                    for module in modules:
-                        emoji = "🟢" if module['line_rate'] >= 90 else "✅" if module['line_rate'] >= 80 else "⚠️" if module['line_rate'] >= 60 else "❌"
-                        f.write(f"| {emoji} **{module['name']}** | {module['line_rate']:.1f}% | {module['branch_rate']:.1f}% | "
-                               f"{module['total_lines']} | {module['covered_lines']} | {module['uncovered_lines']} |\n")
-                    
-                    f.write(f"\n## Summary\n\n")
-                    f.write(f"- 🟢 **High Coverage (≥80%):** {high_coverage} modules\n")
-                    f.write(f"- ⚠️ **Medium Coverage (60-79%):** {medium_coverage} modules\n") 
-                    f.write(f"- ❌ **Low Coverage (<60%):** {low_coverage} modules\n\n")
-                    
-                    if needs_attention:
-                        f.write(f"### 🎯 Modules Needing Attention\n\n")
-                        for module in needs_attention:
-                            f.write(f"- **{module['name']}**: {module['line_rate']:.1f}% ({module['uncovered_lines']} uncovered lines)\n")
-                
-                return {
-                    'overall_coverage': overall_coverage,
-                    'overall_branch': overall_branch,
-                    'modules': modules,
-                    'badge_url': badge_url
-                }
-                
-            except Exception as e:
-                print(f"❌ Error parsing coverage XML: {e}")
-                return None
-        
-        if __name__ == "__main__":
-            xml_file = sys.argv[1] if len(sys.argv) > 1 else "coverage.xml"
-            result = analyze_coverage(xml_file)
-            
-            if result:
-                print(f"\n📄 Detailed report saved to: coverage_summary.md")
+#!/usr/bin/env python3
+"""Enhanced Coverage Analysis for ManipulaPy"""
+import xml.etree.ElementTree as ET
+import sys
+from pathlib import Path
+
+def format_missing_lines(lines):
+    """Format missing line numbers into ranges like coverage.py"""
+    if not lines:
+        return ""
+    
+    lines = sorted(lines)
+    ranges = []
+    start = lines[0]
+    end = lines[0]
+    
+    for line in lines[1:]:
+        if line == end + 1:
+            end = line
+        else:
+            if start == end:
+                ranges.append(str(start))
             else:
-                print(f"❌ Failed to generate coverage analysis")
-        EOF
+                ranges.append(f"{start}-{end}")
+            start = end = line
+    
+    # Add the last range
+    if start == end:
+        ranges.append(str(start))
+    else:
+        ranges.append(f"{start}-{end}")
+    
+    # Limit output length to avoid too long lines
+    result = ", ".join(ranges)
+    if len(result) > 80:
+        result = result[:77] + "..."
+    return result
+
+def analyze_coverage(xml_file="coverage.xml"):
+    """Extract detailed coverage information per module."""
+    
+    if not Path(xml_file).exists():
+        print(f"❌ Coverage file {xml_file} not found")
+        return None
+        
+    try:
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+        
+        # Overall statistics
+        overall_coverage = float(root.attrib['line-rate']) * 100
+        overall_branch = float(root.attrib.get('branch-rate', 0)) * 100
+        
+        print(f"📊 Overall Coverage: {overall_coverage:.1f}% (lines)")
+        print(f"🌿 Overall Branch Coverage: {overall_branch:.1f}%")
+        print("=" * 60)
+        
+        # Per-module detailed analysis
+        modules = []
+        for package in root.findall('.//package'):
+            name = package.attrib['name'].replace('ManipulaPy.', '').replace('ManipulaPy', 'root')
+            if not name or name == 'root':  # Skip empty names or root
+                continue
+                
+            line_rate = float(package.attrib['line-rate']) * 100
+            branch_rate = float(package.attrib.get('branch-rate', 0)) * 100
+            
+            # Detailed line analysis from classes
+            total_stmts = 0
+            missed_stmts = 0
+            total_branches = 0
+            partial_branches = 0
+            missing_lines = []
+            
+            for cls in package.findall('.//class'):
+                for line in cls.findall('.//line'):
+                    line_num = int(line.attrib['number'])
+                    hits = int(line.attrib['hits'])
+                    branch = line.attrib.get('branch', 'false') == 'true'
+                    
+                    total_stmts += 1
+                    if hits == 0:
+                        missed_stmts += 1
+                        missing_lines.append(line_num)
+                    
+                    if branch:
+                        total_branches += 1
+                        # Check for partial branch coverage
+                        condition_coverage = line.attrib.get('condition-coverage', '')
+                        if condition_coverage and '(' in condition_coverage:
+                            # Parse condition coverage like "50% (1/2)"
+                            try:
+                                covered = condition_coverage.split('(')[1].split('/')[0]
+                                total = condition_coverage.split('(')[1].split('/')[1].rstrip(')')
+                                if int(covered) < int(total):
+                                    partial_branches += 1
+                            except:
+                                pass  # Skip malformed coverage data
+            
+            # Format missing lines
+            missing_ranges = format_missing_lines(missing_lines)
+            
+            modules.append({
+                'name': name,
+                'stmts': total_stmts,
+                'miss': missed_stmts,
+                'branch': total_branches,
+                'brpart': partial_branches,
+                'line_rate': line_rate,
+                'branch_rate': branch_rate,
+                'missing_lines': missing_ranges
+            })
+        
+        # Sort by coverage rate (descending)
+        modules.sort(key=lambda x: x['line_rate'], reverse=True)
+        
+        # Display detailed coverage table like coverage.py
+        print()
+        print("Name                     Stmts   Miss Branch BrPart  Cover   Missing")
+        print("-" * 75)
+        
+        for module in modules:
+            filename = f"ManipulaPy/{module['name']}.py"
+            print(f"{filename:<24} {module['stmts']:>5} {module['miss']:>6} "
+                  f"{module['branch']:>6} {module['brpart']:>6} {module['line_rate']:>6.1f}%   "
+                  f"{module['missing_lines']}")
+        
+        print("-" * 75)
+        print(f"{'TOTAL':<24} {sum(m['stmts'] for m in modules):>5} "
+              f"{sum(m['miss'] for m in modules):>6} "
+              f"{sum(m['branch'] for m in modules):>6} "
+              f"{sum(m['brpart'] for m in modules):>6} "
+              f"{overall_coverage:>6.1f}%")
+        print("=" * 75)
+        
+        # Also display simplified summary
+        print()
+        print(f"{'Module':<20} {'Lines':<8} {'Branches':<10} {'Total':<8} {'Covered':<8} {'Missing':<8}")
+        print("-" * 70)
+        
+        for module in modules:
+            covered = module['stmts'] - module['miss']
+            # Status emoji
+            if module['line_rate'] >= 90:
+                emoji = "🟢"
+            elif module['line_rate'] >= 80:
+                emoji = "✅"
+            elif module['line_rate'] >= 60:
+                emoji = "⚠️"
+            else:
+                emoji = "❌"
+                
+            print(f"{emoji} {module['name']:<18} "
+                  f"{module['line_rate']:>6.1f}% "
+                  f"{module['branch_rate']:>8.1f}% "
+                  f"{module['stmts']:>6} "
+                  f"{covered:>6} "
+                  f"{module['miss']:>6}")
+        
+        print("=" * 70)
+        
+        # Summary statistics
+        high_coverage = sum(1 for m in modules if m['line_rate'] >= 80)
+        medium_coverage = sum(1 for m in modules if 60 <= m['line_rate'] < 80)
+        low_coverage = sum(1 for m in modules if m['line_rate'] < 60)
+        
+        print(f"📈 Coverage Distribution:")
+        print(f"  🟢 High (≥80%): {high_coverage} modules")
+        print(f"  ⚠️  Medium (60-79%): {medium_coverage} modules") 
+        print(f"  ❌ Low (<60%): {low_coverage} modules")
+        
+        # Identify modules needing attention
+        needs_attention = [m for m in modules if m['line_rate'] < 70]
+        if needs_attention:
+            print(f"\n🎯 Modules needing attention:")
+            for module in needs_attention:
+                print(f"  • {module['name']}: {module['line_rate']:.1f}% "
+                      f"({module['miss']} uncovered statements)")
+        
+        # Generate coverage badge
+        if overall_coverage >= 90:
+            color = "brightgreen"
+        elif overall_coverage >= 80:
+            color = "green" 
+        elif overall_coverage >= 70:
+            color = "yellowgreen"
+        elif overall_coverage >= 60:
+            color = "yellow"
+        else:
+            color = "red"
+            
+        badge_url = f"https://img.shields.io/badge/coverage-{overall_coverage:.1f}%25-{color}"
+        print(f"\n🏷️ Coverage Badge: {badge_url}")
+        
+        # Generate GitHub Actions summary markdown
+        with open("coverage_summary.md", "w") as f:
+            f.write(f"# 📊 Coverage Report\n\n")
+            f.write(f"![Coverage]({badge_url})\n\n")
+            f.write(f"**Overall Coverage:** {overall_coverage:.1f}% | **Branch Coverage:** {overall_branch:.1f}%\n\n")
+            
+            # Coverage.py style table
+            f.write(f"## Detailed Coverage Report\n\n")
+            f.write(f"```\n")
+            f.write(f"Name                     Stmts   Miss Branch BrPart  Cover   Missing\n")
+            f.write(f"{'-' * 75}\n")
+            for module in modules:
+                filename = f"ManipulaPy/{module['name']}.py"
+                missing_short = module['missing_lines'][:50] + "..." if len(module['missing_lines']) > 50 else module['missing_lines']
+                f.write(f"{filename:<24} {module['stmts']:>5} {module['miss']:>6} "
+                       f"{module['branch']:>6} {module['brpart']:>6} {module['line_rate']:>6.1f}%   "
+                       f"{missing_short}\n")
+            
+            f.write(f"{'-' * 75}\n")
+            f.write(f"{'TOTAL':<24} {sum(m['stmts'] for m in modules):>5} "
+                   f"{sum(m['miss'] for m in modules):>6} "
+                   f"{sum(m['branch'] for m in modules):>6} "
+                   f"{sum(m['brpart'] for m in modules):>6} "
+                   f"{overall_coverage:>6.1f}%\n")
+            f.write(f"```\n\n")
+            
+            # Summary table
+            f.write(f"## Module Coverage Summary\n\n")
+            f.write(f"| Module | Line Coverage | Branch Coverage | Statements | Missing | Status |\n")
+            f.write(f"|--------|---------------|-----------------|------------|---------|--------|\n")
+            
+            for module in modules:
+                emoji = "🟢" if module['line_rate'] >= 90 else "✅" if module['line_rate'] >= 80 else "⚠️" if module['line_rate'] >= 60 else "❌"
+                status = "Excellent" if module['line_rate'] >= 90 else "Good" if module['line_rate'] >= 80 else "Fair" if module['line_rate'] >= 60 else "Needs Work"
+                f.write(f"| {emoji} **{module['name']}** | {module['line_rate']:.1f}% | {module['branch_rate']:.1f}% | "
+                       f"{module['stmts']} | {module['miss']} | {status} |\n")
+            
+            f.write(f"\n## Summary\n\n")
+            f.write(f"- 🟢 **High Coverage (≥80%):** {high_coverage} modules\n")
+            f.write(f"- ⚠️ **Medium Coverage (60-79%):** {medium_coverage} modules\n") 
+            f.write(f"- ❌ **Low Coverage (<60%):** {low_coverage} modules\n\n")
+            
+            if needs_attention:
+                f.write(f"### 🎯 Modules Needing Attention\n\n")
+                for module in needs_attention:
+                    f.write(f"- **{module['name']}**: {module['line_rate']:.1f}% ({module['miss']} uncovered statements)\n")
+                    if module['missing_lines']:
+                        f.write(f"  - Missing lines: {module['missing_lines']}\n")
+        
+        return {
+            'overall_coverage': overall_coverage,
+            'overall_branch': overall_branch,
+            'modules': modules,
+            'badge_url': badge_url
+        }
+        
+    except Exception as e:
+        print(f"❌ Error parsing coverage XML: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+if __name__ == "__main__":
+    xml_file = sys.argv[1] if len(sys.argv) > 1 else "coverage.xml"
+    result = analyze_coverage(xml_file)
+    
+    if result:
+        print(f"\n📄 Detailed report saved to: coverage_summary.md")
+    else:
+        print(f"❌ Failed to generate coverage analysis")
+EOF
           
           # Run the analysis
           python analyze_coverage.py coverage.xml
