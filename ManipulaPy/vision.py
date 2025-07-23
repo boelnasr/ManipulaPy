@@ -181,12 +181,15 @@ class Vision:
         self.show_plot = show_plot
 
         # Load YOLO Model for Object Detection
-        try:
-            self.yolo_model = YOLO("yolov8m.pt")  # Ensure this model file is available
-            self.logger.info("✅ YOLO model loaded successfully.")
-        except Exception as e:
-            self.logger.error(f"❌ Failed to load YOLO model: {e}")
-            self.yolo_model = None  # Prevent crashes
+# Load YOLO (optional)
+        self.yolo_model = None
+        if ULTRALYTICS_AVAILABLE:
+            try:
+                self.yolo_model = YOLO("yolov8m.pt")
+                self.logger.info("✅ YOLO model loaded successfully.")
+            except Exception as e:
+                self.logger.warning(f"YOLO load failed ({e}); continuing without it.")
+
 
         # Camera configuration (Monocular or Stereo)
         self.cameras = {}
@@ -498,72 +501,93 @@ class Vision:
     # --------------------------------------------------------------------------
     # Basic Obstacle Detection
     # --------------------------------------------------------------------------
-
     def detect_obstacles(
-        self, depth_image, rgb_image, depth_threshold=0.0, camera_index=0, step=5
+        self,
+        depth_image: np.ndarray,
+        rgb_image: np.ndarray,
+        depth_threshold: float = 0.0,
+        camera_index: int = 0,
+        step: int = 5,
     ):
         """
-        Detects obstacles using YOLO for object detection + median depth for 3D positioning.
-        Returns positions and orientations (in the XY plane).
-        """
-        if self.yolo_model is None:
-            self.logger.warning("⚠️ YOLO model is missing! Skipping object detection.")
-            return np.empty((0, 3)), np.array([])
+        Detect obstacles with YOLO (if available) and estimate 3D positions via depth.
 
+        Returns
+        -------
+        positions : (N, 3) float32 array
+        orientations : (N,) float32 array  (yaw angles in degrees in XY plane)
+        """
+        # --------- Basic sanity checks ----------
         if depth_image is None or rgb_image is None:
             self.logger.error("❌ Invalid depth or RGB input")
-            return np.empty((0, 3)), np.array([])
+            return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
-        # 1. YOLO inference
-        results = self.yolo_model(rgb_image, conf=0.3)
-        if not results or results[0].boxes is None or len(results[0].boxes) == 0:
-            self.logger.warning("❌ No objects detected by YOLO")
-            return np.empty((0, 3)), np.array([])
+        if camera_index not in self.cameras:
+            self.logger.error(f"Camera index {camera_index} not found.")
+            return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
-        boxes = results[0].boxes  # No filtering by class!
+        if self.yolo_model is None:
+            self.logger.warning("⚠️ YOLO model is missing! Skipping object detection.")
+            return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
+
+        # --------- YOLO inference (guarded) ----------
+        try:
+            results = self.yolo_model(rgb_image, conf=0.3)
+        except Exception as e:
+            self.logger.warning(f"YOLO inference failed ({e}); returning empty.")
+            return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
+
+        if not results or getattr(results[0], "boxes", None) is None or len(results[0].boxes) == 0:
+            self.logger.info("No objects detected by YOLO.")
+            return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
+
+        boxes = results[0].boxes
+
+        fx = self.cameras[camera_index]["intrinsic_matrix"][0, 0]
+        fy = self.cameras[camera_index]["intrinsic_matrix"][1, 1]
+        cx_i = self.cameras[camera_index]["intrinsic_matrix"][0, 2]
+        cy_i = self.cameras[camera_index]["intrinsic_matrix"][1, 2]
 
         positions = []
         orientations = []
 
         for box in boxes:
-            # 2. Extract bounding box coordinates
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+            # xyxy may be tensor/ndarray; make sure it’s a flat list of 4 ints
+            xyxy = getattr(box, "xyxy", None)
+            if xyxy is None:
+                continue
+            coords = np.array(xyxy[0]).astype(int).tolist()
+            if len(coords) != 4:
+                continue
+            x1, y1, x2, y2 = coords
 
-            # Get median depth in the bounding box
-            depth_roi = depth_image[y1:y2, x1:x2]
+            # Subsample ROI to speed up median depth if 'step' > 1
+            depth_roi = depth_image[y1:y2:step, x1:x2:step]
             valid_depths = depth_roi[depth_roi > 0]
-            if len(valid_depths) == 0:
-                continue  # skip empty depth region
-            mean_depth = np.median(valid_depths)
+            if valid_depths.size == 0:
+                continue
+
+            mean_depth = float(np.median(valid_depths))
             if mean_depth > depth_threshold:
-                continue  # skip if object is too far away
+                # Too far -> ignore
+                continue
 
-            # 3. Approximate 3D position using the bounding box center
-            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            # Center pixel
+            cx_pix = (x1 + x2) // 2
+            cy_pix = (y1 + y2) // 2
 
-            fx, fy = (
-                self.cameras[camera_index]["intrinsic_matrix"][0, 0],
-                self.cameras[camera_index]["intrinsic_matrix"][1, 1],
-            )
-            cx_intrinsic, cy_intrinsic = (
-                self.cameras[camera_index]["intrinsic_matrix"][0, 2],
-                self.cameras[camera_index]["intrinsic_matrix"][1, 2],
-            )
-
-            x_cam = (cx - cx_intrinsic) * mean_depth / fx
-            y_cam = (cy - cy_intrinsic) * mean_depth / fy
+            x_cam = (cx_pix - cx_i) * mean_depth / fx
+            y_cam = (cy_pix - cy_i) * mean_depth / fy
             z_cam = mean_depth
+
             positions.append([x_cam, y_cam, z_cam])
+            orientations.append(np.degrees(np.arctan2(y_cam, x_cam)))
 
-            # 4. Compute simple orientation in XY plane
-            angle_deg = np.degrees(np.arctan2(y_cam, x_cam))
-            orientations.append(angle_deg)
+        if not positions:
+            self.logger.info("No obstacles kept after depth filtering.")
+            return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
-        if len(positions) == 0:
-            self.logger.warning("❌ No obstacles detected after depth check!")
-            return np.empty((0, 3)), np.array([])
-
-        return np.array(positions), np.array(orientations)
+        return np.asarray(positions, dtype=np.float32), np.asarray(orientations, dtype=np.float32)
 
     # --------------------------------------------------------------------------
     # Stereo Methods
