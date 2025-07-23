@@ -612,6 +612,22 @@ jobs:
           echo "- Vision: 29 passed, 1 skipped" >> $GITHUB_STEP_SUMMARY
         fi
 
+        # -----------------------------
+        #  Per-module table (this is
+        #  what you asked for) 👇
+        # -----------------------------
+        if [ -f .coverage ]; then
+          echo "## 📄 Per-module Coverage" >> $GITHUB_STEP_SUMMARY
+          {
+            echo '```txt'
+            # -m  ==  show missing lines; gives columns:
+            # Name  Stmts  Miss  Branch  BrPart  Cover  Missing
+            coverage report -m
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+        else
+          echo "⚠️ No .coverage file – cannot render per-module table" >> $GITHUB_STEP_SUMMARY
+        fi
   integration-test:
     runs-on: ubuntu-latest
     needs: test
