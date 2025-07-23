@@ -28,8 +28,8 @@ import warnings
 import sys
 
 # Package metadata
-__version__ = "1.1.1"
-__author__ = "Mohamed Aboelnar"
+__version__ = "1.1.2"
+__author__ = "Mohamed Aboelnasr"
 __license__ = "AGPL-3.0-or-later"
 
 # Core modules that should always be available
