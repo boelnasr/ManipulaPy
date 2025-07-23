@@ -80,40 +80,9 @@ jobs:
 
     - name: Verify ManipulaPy installation
       run: |
-        # Test core package import
         python -c "import ManipulaPy; print(f'ManipulaPy version: {ManipulaPy.__version__}')"
-        
-        # Test core modules (should always work)
-        python -c "from ManipulaPy import utils; print('✅ Utils module imported successfully')"
-        python -c "import torch; print(f'✅ PyTorch {torch.__version__} available')"
-        
-        # Test core functionality (requires torch)
-        python -c "
-        try:
-            from ManipulaPy import kinematics, dynamics
-            print('✅ Core kinematics and dynamics modules imported successfully')
-        except ImportError as e:
-            print(f'⚠️  Core modules import failed: {e}')
-            exit(1)
-        "
-        
-        # Test optional modules (may fail gracefully)
-        python -c "
-        import warnings
-        warnings.filterwarnings('ignore', category=ImportWarning)
-        
-        try:
-            from ManipulaPy import vision
-            print('✅ Vision module imported successfully')
-        except ImportError:
-            print('ℹ️  Vision module not available (missing ultralytics)')
-        
-        try:
-            from ManipulaPy import simulation  
-            print('✅ Simulation module imported successfully')
-        except ImportError:
-            print('ℹ️  Simulation module not available (optional dependencies missing)')
-        "
+        python -c "from ManipulaPy import kinematics, dynamics, utils; print('✅ Core modules imported successfully')"
+        python -c "import torch; print(f'✅ PyTorch integration working: {torch.__version__}')"
 
     - name: Set up display for tests
       run: |
@@ -158,21 +127,12 @@ jobs:
             print(f'✅ ManipulaPy {ManipulaPy.__version__} imported successfully')
             
             print('Testing core modules...')
-            from ManipulaPy import utils
-            print('✅ Utils module imported successfully')
+            from ManipulaPy import utils, kinematics, dynamics
+            print('✅ Core modules imported successfully')
             
             print('Testing PyTorch integration...')
             import torch
             print(f'✅ PyTorch {torch.__version__} available')
-            
-            # Test core modules that require torch
-            try:
-                from ManipulaPy import kinematics, dynamics
-                print('✅ Core kinematics and dynamics modules imported successfully')
-            except ImportError as e:
-                print(f'❌ Core modules failed: {e}')
-                traceback.print_exc()
-                sys.exit(1)
             
             print('Testing basic functionality...')
             import numpy as np
@@ -193,22 +153,6 @@ jobs:
             tensor = torch.tensor([1.0, 2.0, 3.0])
             assert tensor.shape == (3,)
             print('✅ PyTorch tensor operations working')
-            
-            # Test optional modules (should not fail the test)
-            import warnings
-            warnings.filterwarnings('ignore', category=ImportWarning)
-            
-            try:
-                from ManipulaPy import vision
-                print('ℹ️  Vision module available')
-            except ImportError:
-                print('ℹ️  Vision module not available (expected in CI)')
-            
-            try:
-                from ManipulaPy import simulation
-                print('ℹ️  Simulation module available')
-            except ImportError:
-                print('ℹ️  Simulation module not available (expected in CI)')
             
             print('✅ All basic tests passed!')
             

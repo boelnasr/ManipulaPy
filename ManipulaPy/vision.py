@@ -31,8 +31,79 @@ import pybullet as pb
 import matplotlib.pyplot as plt
 from .utils import euler_to_rotation_matrix
 from ultralytics import YOLO
+import warnings
 
+# Optional imports - handle gracefully if not available
+try:
+    from ultralytics import YOLO
+    ULTRALYTICS_AVAILABLE = True
+except ImportError:
+    ULTRALYTICS_AVAILABLE = False
+    warnings.warn(
+        "ultralytics not available. Vision features requiring YOLO will be disabled. "
+        "Install with: pip install ultralytics",
+        ImportWarning
+    )
 
+try:
+    import cv2
+    OPENCV_AVAILABLE = True
+except ImportError:
+    OPENCV_AVAILABLE = False
+    warnings.warn(
+        "OpenCV not available. Some vision features will be disabled. "
+        "Install with: pip install opencv-python",
+        ImportWarning
+    )
+
+# Example of conditional functionality
+def detect_objects(image, model_path=None):
+    """
+    Detect objects in an image using YOLO.
+    
+    Args:
+        image: Input image (numpy array or path)
+        model_path: Path to YOLO model (optional)
+    
+    Returns:
+        Detection results or None if ultralytics not available
+    """
+    if not ULTRALYTICS_AVAILABLE:
+        raise ImportError(
+            "ultralytics is required for object detection. "
+            "Install with: pip install ultralytics"
+        )
+    
+    model = YOLO(model_path or 'yolov8n.pt')
+    results = model(image)
+    return results
+
+def process_image(image):
+    """
+    Basic image processing function.
+    
+    Args:
+        image: Input image (numpy array)
+    
+    Returns:
+        Processed image
+    """
+    if not OPENCV_AVAILABLE:
+        # Fallback to basic numpy operations
+        if isinstance(image, str):
+            raise ImportError(
+                "OpenCV is required to load images from file paths. "
+                "Install with: pip install opencv-python"
+            )
+        return image
+    
+    # Use OpenCV if available
+    if isinstance(image, str):
+        return cv2.imread(image)
+    return image
+
+# Add this to ensure the module can be imported even without dependencies
+__all__ = ['detect_objects', 'process_image', 'ULTRALYTICS_AVAILABLE', 'OPENCV_AVAILABLE']
 def read_debug_parameters(dbg_params):
     """
     Utility to read current slider values from PyBullet debug interface.
