@@ -346,21 +346,25 @@ jobs:
         if [ -f coverage.xml ]; then
           echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
           python -c "
-          try:
-              import xml.etree.ElementTree as ET
-              tree = ET.parse('coverage.xml')
-              root = tree.getroot()
-              coverage = float(root.attrib['line-rate']) * 100
-              print(f'📊 Overall Coverage: {coverage:.1f}%')
-              
-              print('\\n### Module Coverage:')
-              for package in root.findall('.//package'):
-                  name = package.attrib['name'].replace('ManipulaPy.', '')
-                  rate = float(package.attrib['line-rate']) * 100
-                  emoji = '✅' if rate > 80 else '⚠️' if rate > 60 else '❌'
-                  print(f'{emoji} {name}: {rate:.1f}%')
-          except Exception as e:
-              print(f'Could not parse coverage: {e}')
+        import xml.etree.ElementTree as ET
+        import sys
+        
+        try:
+            tree = ET.parse('coverage.xml')
+            root = tree.getroot()
+            coverage = float(root.attrib['line-rate']) * 100
+            print(f'📊 Overall Coverage: {coverage:.1f}%')
+            
+            print()
+            print('### Module Coverage:')
+            for package in root.findall('.//package'):
+                name = package.attrib['name'].replace('ManipulaPy.', '')
+                rate = float(package.attrib['line-rate']) * 100
+                emoji = '✅' if rate > 80 else '⚠️' if rate > 60 else '❌'
+                print(f'{emoji} {name}: {rate:.1f}%')
+        except Exception as e:
+            print(f'Could not parse coverage: {e}')
+            sys.exit(1)
           " >> $GITHUB_STEP_SUMMARY
         else
           echo "No coverage file generated" >> $GITHUB_STEP_SUMMARY
