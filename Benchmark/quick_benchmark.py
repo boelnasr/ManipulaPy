@@ -13,7 +13,14 @@ This benchmark suite tests performance across all ManipulaPy modules:
 
 Usage:
     python benchmark_manipulapy.py [--module MODULE] [--iterations N] [--save-results]
+    Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
+# Auto-install optional dependencies (pandas, seaborn) if missing
+import importlib, subprocess, sys
+for _pkg in ("pandas", "seaborn"):
+    if importlib.util.find_spec(_pkg) is None:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", _pkg])
 
 import time
 import numpy as np

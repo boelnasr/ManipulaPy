@@ -7,9 +7,14 @@ This script provides comprehensive accuracy benchmarks for the ManipulaPy librar
 testing various components including kinematics, dynamics, trajectory planning,
 control algorithms, and GPU vs CPU implementations using real robot data.
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
+# Auto-install optional dependencies (pandas, seaborn) if missing
+import importlib, subprocess, sys
+for _pkg in ("pandas", "seaborn"):
+    if importlib.util.find_spec(_pkg) is None:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", _pkg])
 
 import numpy as np
 import time
