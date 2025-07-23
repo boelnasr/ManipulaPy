@@ -30,6 +30,9 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
 ]
 keywords = [
     "robotics",
@@ -38,6 +41,9 @@ keywords = [
     "trajectory-planning",
     "simulation",
     "cuda",
+    "computer-vision",
+    "control-systems",
+    "manipulator",
 ]
 
 # ------------------------------------------------------------------
@@ -69,6 +75,13 @@ vision = [
     "pillow>=8.0.0",
 ]
 
+# Vision dependencies for headless environments (CI-friendly)
+vision-headless = [
+    "opencv-python-headless>=4.5",
+    "ultralytics>=8.0",
+    "pillow>=8.0.0",
+]
+
 # AI/ML dependencies
 ml = [
     "torch>=1.8.0",
@@ -89,12 +102,14 @@ dev = [
     "pytest-mock>=3.6.0",
     "pytest-xvfb>=2.0.0",
     "pytest-timeout>=2.1.0",
+    "pytest-benchmark>=4.0.0",
     "coverage[toml]>=6.0.0",
     "black>=22.0.0",
     "flake8>=4.0.0",
     "isort>=5.10.0",
     "mypy>=0.950",
     "pre-commit>=2.15.0",
+    "tox>=4.0.0",
 ]
 
 # Documentation dependencies
@@ -102,14 +117,30 @@ docs = [
     "sphinx>=4.0.0",
     "sphinx-rtd-theme>=1.0.0",
     "myst-parser>=0.15.0",
+    "sphinx-autodoc-typehints>=1.12.0",
+    "nbsphinx>=0.8.0",
+    "jupyter>=1.0.0",
+]
+
+# CI-specific dependencies
+ci = [
+    "pytest>=6.0.0",
+    "pytest-cov>=3.0.0",
+    "pytest-mock>=3.6.0",
+    "pytest-xvfb>=2.0.0",
+    "pytest-timeout>=2.1.0",
+    "coverage[toml]>=6.0.0",
+    "opencv-python-headless>=4.5",
+    "tomli>=1.2.0;python_version<'3.11'",
 ]
 
 # Testing combinations
 test-core = ["ManipulaPy[dev]"]
 test-simulation = ["ManipulaPy[dev,simulation]"]
-test-vision = ["ManipulaPy[dev,vision]"]
+test-vision = ["ManipulaPy[dev,vision-headless]"]
 test-gpu = ["ManipulaPy[dev,gpu-cuda11]"]
-test-full = ["ManipulaPy[dev,simulation,vision,ml]"]
+test-full = ["ManipulaPy[dev,simulation,vision-headless,ml]"]
+test-ci = ["ManipulaPy[ci]"]
 
 # All optional dependencies
 all = ["ManipulaPy[core-optional,simulation,vision,ml,docs]"]
@@ -119,11 +150,18 @@ Homepage = "https://github.com/boelnasr/ManipulaPy"
 Documentation = "https://manipulapy.readthedocs.io/"
 Repository = "https://github.com/boelnasr/ManipulaPy.git"
 "Bug Tracker" = "https://github.com/boelnasr/ManipulaPy/issues"
+"Changelog" = "https://github.com/boelnasr/ManipulaPy/blob/main/CHANGELOG.md"
+"Funding" = "https://github.com/sponsors/boelnasr"
 
 # ------------------------------------------------------------------
 [tool.setuptools]
 packages = ["ManipulaPy"]
 include-package-data = true
+zip-safe = false
+
+[tool.setuptools.dynamic]
+# Optional: make version dynamic if you have a _version.py file
+# version = {attr = "ManipulaPy._version.__version__"}
 
 [tool.setuptools.package-data]
 "ManipulaPy" = [
@@ -134,6 +172,7 @@ include-package-data = true
     "*.stl",
     "*.dae",
     "*.obj",
+    "py.typed",  # PEP 561 compliance for type checking
 ]
 "ManipulaPy.ManipulaPy_data" = ["*"]
 "ManipulaPy.ManipulaPy_data.xarm" = [
@@ -160,6 +199,14 @@ include-package-data = true
 [tool.setuptools.package-dir]
 "" = "."
 
+# ------------------------------------------------------------------
+# Entry points (if you have CLI tools)
+# [project.scripts]
+# manipulapy = "ManipulaPy.cli:main"
+
+# [project.gui-scripts]
+# manipulapy-gui = "ManipulaPy.gui:main"
+
 # ==================================================================================
 # TESTING CONFIGURATION
 # ==================================================================================
@@ -177,6 +224,8 @@ addopts = [
     "--tb=short",
     "--maxfail=10",
     "--disable-warnings",
+    "-v",
+    "--durations=10",  # Show 10 slowest tests
 ]
 
 markers = [
@@ -189,6 +238,9 @@ markers = [
     "simulation: marks tests requiring simulation dependencies (PyBullet, URCHIN)",
     "ml: marks tests requiring machine learning dependencies",
     "network: marks tests requiring network access",
+    "benchmark: marks tests as benchmarks",
+    "parametrize: marks parametrized tests",
+    "functional: marks functional tests",
 ]
 
 filterwarnings = [
@@ -203,12 +255,22 @@ filterwarnings = [
     "ignore:.*torch.*:UserWarning",
     "ignore:.*matplotlib.*:UserWarning",
     "ignore::RuntimeWarning:numba.*",
+    "ignore::FutureWarning:torch.*",
+    "ignore::DeprecationWarning:pkg_resources.*",
+    "ignore:.*pkg_resources.*:DeprecationWarning",
 ]
 
 timeout = 300
 timeout_method = "thread"
+log_cli = false
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
-# Use norecursedirs instead of collect_ignore (which is not a valid pytest option)
+# Pytest collection configuration
+
+
+# Use norecursedirs instead of collect_ignore for directories
 norecursedirs = [
     "build",
     "dist", 
@@ -226,6 +288,8 @@ norecursedirs = [
     "docs",
     "venv*",
     "htmlcov",
+    ".mypy_cache",
+    "node_modules",
 ]
 
 # ==================================================================================
@@ -236,6 +300,7 @@ norecursedirs = [
 source = ["ManipulaPy"]
 branch = true
 parallel = true
+context = "${COVERAGE_CONTEXT}"
 omit = [
     "*/tests/*",
     "*/test_*", 
@@ -256,6 +321,8 @@ omit = [
     "*/.venv/*",
     "*/paper/*",
     "*/figures/*",
+    "*/.pytest_cache/*",
+    "*/.mypy_cache/*",
 ]
 
 [tool.coverage.paths]
@@ -263,6 +330,7 @@ source = [
     "ManipulaPy/",
     "*/site-packages/ManipulaPy/",
     "*/lib/python*/site-packages/ManipulaPy/",
+    "*/lib/python*/dist-packages/ManipulaPy/",
 ]
 
 [tool.coverage.report]
@@ -270,6 +338,7 @@ show_missing = true
 precision = 1
 skip_covered = false
 skip_empty = false
+sort = "Cover"
 
 exclude_lines = [
     "pragma: no cover",
@@ -313,6 +382,7 @@ exclude_lines = [
     "raise NotImplementedError",
     "return NotImplemented",
     "TYPE_CHECKING",
+    "\\.\\.\\.",  # Ellipsis in type stubs
 ]
 
 [tool.coverage.html]
@@ -321,6 +391,9 @@ title = "ManipulaPy Coverage Report"
 
 [tool.coverage.xml]
 output = "coverage.xml"
+
+[tool.coverage.json]
+output = "coverage.json"
 
 # ==================================================================================
 # CODE QUALITY TOOLS
@@ -389,6 +462,7 @@ skip_glob = [
     "paper/*",
     "figures/*",
 ]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 
 [tool.mypy]
 python_version = "3.8"
@@ -405,6 +479,9 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 show_error_codes = true
+pretty = true
+show_column_numbers = true
+show_error_context = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -425,26 +502,35 @@ module = [
 ignore_missing_imports = true
 
 [tool.ruff]
+target-version = "py38"
+line-length = 88
 select = [
-    "E",
-    "W",
-    "F",
-    "I",
-    "B",
-    "C4",
-    "UP",
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+    "SIM", # flake8-simplify
 ]
 ignore = [
-    "E501",
-    "B008",
-    "C901",
+    "E501",  # line too long, handled by black
+    "B008",  # do not perform function calls in argument defaults
+    "C901",  # too complex
+    "B904",  # raise ... from err
 ]
-line-length = 88
-target-version = "py38"
+unfixable = [
+    "B",  # Avoid fixing flake8-bugbear violations
+]
 
 [tool.ruff.per-file-ignores]
-"__init__.py" = ["F401"]
-"tests/*" = ["B011"]
+"__init__.py" = ["F401", "F403"]
+"tests/*" = ["B011", "S101"]
+"**/conftest.py" = ["F401", "F403"]
+
+[tool.ruff.mccabe]
+max-complexity = 15
 
 [tool.bandit]
 exclude_dirs = [
@@ -454,4 +540,58 @@ exclude_dirs = [
     "Benchmark",
     "benchmark_results",
 ]
-skips = ["B101", "B601"]
+skips = ["B101", "B601", "B602"]
+
+[tool.bandit.assert_used]
+skips = ["**/test_*.py", "**/tests/*.py"]
+
+# ==================================================================================
+# ADDITIONAL TOOLS
+# ==================================================================================
+
+[tool.vulture]
+min_confidence = 80
+paths = ["ManipulaPy"]
+exclude = ["ManipulaPy_data/"]
+
+[tool.docformatter]
+make-summary-multi-line = false
+close-quotes-on-newline = true
+wrap-summaries = 88
+wrap-descriptions = 88
+
+# ==================================================================================
+# TOX CONFIGURATION (for multi-environment testing)
+# ==================================================================================
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+isolated_build = true
+envlist = py38,py39,py310,py311,coverage,docs,lint
+
+[testenv]
+extras = test-ci
+commands = pytest {posargs}
+setenv =
+    SKIP_CUDA_TESTS = true
+    SKIP_VISION_TESTS = true  
+    SKIP_SIMULATION_TESTS = true
+
+[testenv:coverage]
+extras = test-ci
+commands = 
+    pytest --cov=ManipulaPy --cov-report=html --cov-report=xml
+
+[testenv:docs]
+extras = docs
+commands = sphinx-build -b html docs docs/_build/html
+
+[testenv:lint]
+extras = dev
+commands = 
+    black --check ManipulaPy/
+    isort --check-only ManipulaPy/
+    flake8 ManipulaPy/
+    mypy ManipulaPy/
+"""
