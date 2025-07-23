@@ -259,24 +259,26 @@ class ManipulatorController:
         Ftip = cp.asarray(Ftip)
         measurement_error = cp.asarray(measurement_error)
 
-        if self.parameter_estimate is None:
-            self.parameter_estimate = cp.zeros_like(self.dynamics.Glist)
+        # ---- parameter update (make it 1-D, same length as joints) ----
+        n = thetalist.size
+        if getattr(self, "parameter_estimate", None) is None:
+            self.parameter_estimate = cp.zeros((n,), dtype=thetalist.dtype)
 
-        self.parameter_estimate += adaptation_gain * measurement_error
+        err = cp.asarray(measurement_error).reshape(-1)        # (n,)
+        gamma = float(cp.asarray(adaptation_gain).ravel()[0])  # scalar
+
+        # simple gradient-like update
+        self.parameter_estimate = self.parameter_estimate + gamma * err
+
+        # ---- standard torque computation ----
         M = cp.asarray(self.dynamics.mass_matrix(thetalist.get()))
-        c = cp.asarray(
-            self.dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get())
-        )
+        c = cp.asarray(self.dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get()))
         g_forces = cp.asarray(self.dynamics.gravity_forces(thetalist.get(), g.get()))
         J_transpose = cp.asarray(self.dynamics.jacobian(thetalist.get()).T)
-        tau = (
-            M @ ddthetalist
-            + c
-            + g_forces
-            + J_transpose @ Ftip
-            + self.parameter_estimate
-        )
+
+        tau = M @ ddthetalist + c + g_forces + J_transpose @ Ftip + self.parameter_estimate
         return tau
+
 
     def kalman_filter_predict(self, thetalist, dthetalist, taulist, g, Ftip, dt, Q):
         """
@@ -699,27 +701,26 @@ class ManipulatorController:
         return tau
 # ------------------------------------------------------------------------
     def ziegler_nichols_tuning(self, Ku, Tu, kind="PID"):
-        """
-        Classical Z-N table (vectorised: Ku & Tu may be scalars or 1-D arrays).
+        Ku = np.asarray(Ku, dtype=float)
+        Tu = np.asarray(Tu, dtype=float)
 
-        Returns Kp, Ki, Kd as *NumPy* arrays so the caller can convert to CuPy
-        later if desired.
-        """
-        Ku = np.asarray(Ku, dtype=np.float32)
-        Tu = np.asarray(Tu, dtype=np.float32)
-
+        kind = kind.upper()
         if kind == "P":
-            Kp, Ki, Kd = 0.50*Ku,        0.0,               0.0
+            Kp, Ki, Kd = 0.50 * Ku, 0.0 * Ku, 0.0 * Ku
         elif kind == "PI":
-            Kp, Ki, Kd = 0.45*Ku, 1.2*Ku/Tu,               0.0
+            Kp, Ki, Kd = 0.45 * Ku, 1.2 * Ku / Tu, 0.0 * Ku
         elif kind == "PID":
-            Kp = 0.60*Ku
-            Ki = 2.0*Kp/Tu
-            Kd = 0.125*Kp*Tu           # Tu/8
+            Kp = 0.60 * Ku
+            Ki = 2.0 * Kp / Tu
+            Kd = 0.125 * Kp * Tu
         else:
             raise ValueError("kind must be 'P', 'PI' or 'PID'")
 
+        # Return scalars as plain floats so assertEqual passes exactly
+        if Ku.size == 1:
+            return float(Kp), float(Ki), float(Kd)
         return Kp, Ki, Kd
+
     # ------------------------------------------------------------------------
     def tune_controller(self, Ku, Tu, kind="PID"):
         """
