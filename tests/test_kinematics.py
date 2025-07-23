@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+"""
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
+"""
 import unittest
 import numpy as np
 from unittest.mock import patch, MagicMock

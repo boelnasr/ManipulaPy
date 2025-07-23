@@ -16,7 +16,7 @@ The functions in this module support:
 - Skew-symmetric matrix operations
 - Time scaling functions for trajectory generation
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 
 This file is part of ManipulaPy.
 

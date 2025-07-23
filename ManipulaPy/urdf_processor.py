@@ -7,7 +7,7 @@ This module provides comprehensive URDF (Unified Robot Description Format) proce
 capabilities including conversion to SerialManipulator objects, extraction of kinematic
 and dynamic parameters, and integration with PyBullet for simulation and visualization.
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 
 This file is part of ManipulaPy.
 

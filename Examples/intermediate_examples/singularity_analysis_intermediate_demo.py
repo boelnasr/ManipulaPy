@@ -13,7 +13,7 @@ This demo showcases comprehensive singularity analysis capabilities including:
 - Dexterity measures and optimization
 - GPU-accelerated workspace sampling
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 

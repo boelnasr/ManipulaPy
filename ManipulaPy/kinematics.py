@@ -8,7 +8,7 @@ This module provides classes and functions for performing kinematic analysis and
 for serial manipulators, including forward and inverse kinematics, Jacobian calculations,
 and end-effector velocity calculations.
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 
 This file is part of ManipulaPy.

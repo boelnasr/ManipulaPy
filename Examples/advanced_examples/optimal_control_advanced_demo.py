@@ -9,7 +9,8 @@ model predictive control, and adaptive control with parameter estimation.
 Usage:
     python optimal_control_advanced_demo.py
 
-Author: ManipulaPy Development Team
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import numpy as np

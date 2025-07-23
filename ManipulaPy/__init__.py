@@ -8,7 +8,7 @@ This package provides tools for the analysis and manipulation of robotic systems
 including kinematics, dynamics, singularity analysis, path planning, and URDF processing utilities.
 
 License: GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by

@@ -15,7 +15,7 @@ This script demonstrates the perception and vision capabilities of the ManipulaP
 
 All generated plots and images are saved in the same folder as this script.
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 

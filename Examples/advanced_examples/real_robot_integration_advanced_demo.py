@@ -9,7 +9,8 @@ real-time control, and safety monitoring for physical robot systems.
 Usage:
     python real_robot_integration_advanced_demo.py [--robot-ip IP]
 
-Author: ManipulaPy Development Team
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import numpy as np

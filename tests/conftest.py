@@ -8,6 +8,9 @@ This configuration:
 - Provides comprehensive test fixtures and utilities
 - Handles CI environments gracefully
 - Enables proper coverage reporting
+
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import sys

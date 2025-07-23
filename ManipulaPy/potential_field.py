@@ -7,7 +7,7 @@ This module provides potential field path planning capabilities including attrac
 and repulsive potential computations, gradient calculations, and collision checking
 for robotic manipulator motion planning in cluttered environments.
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 
 This file is part of ManipulaPy.
 

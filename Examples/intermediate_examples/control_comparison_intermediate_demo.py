@@ -9,7 +9,8 @@ PID, computed torque, adaptive, and robust control methods.
 Usage:
     python control_comparison_intermediate_demo.py
 
-Author: ManipulaPy Development Team
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import numpy as np

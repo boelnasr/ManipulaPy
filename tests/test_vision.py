@@ -2,6 +2,8 @@
 """
 test_vision_perception.py - Comprehensive tests for Vision and Perception modules
 Tests both mocked and real functionality when modules are available
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import unittest

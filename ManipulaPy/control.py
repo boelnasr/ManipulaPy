@@ -6,7 +6,7 @@ Control Module - ManipulaPy
 This module provides various control algorithms for robotic manipulators including
 PID, computed torque, adaptive, and robust control methods with GPU acceleration.
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 
 This file is part of ManipulaPy.

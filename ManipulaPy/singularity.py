@@ -7,7 +7,7 @@ This module provides comprehensive singularity analysis capabilities for robotic
 manipulators including singularity detection, manipulability ellipsoid visualization,
 workspace analysis, and condition number computations with optional CUDA acceleration.
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 
 This file is part of ManipulaPy.
 

@@ -15,7 +15,7 @@ Key optimizations:
 - 2D parallelization for better GPU utilization
 - Advanced kernel selection for 40x+ speedups
 
-Copyright (c) 2025 Mohamed Aboelnar
+Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
