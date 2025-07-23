@@ -1,466 +1,422 @@
-# ──────────────────────────────────────────────────────────────
-# Project build configuration for ManipulaPy
-# ──────────────────────────────────────────────────────────────
+name: CI Tests
 
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
 
-# ------------------------------------------------------------------
-[project]
-name = "ManipulaPy"
-version = "1.1.1"                      
-authors = [
-    { name = "Mohamed Aboelnar", email = "aboelnasr1997@gmail.com" },
-]
-description = "A comprehensive Python package for robotic manipulator analysis and control"
-readme = "README.md"
-license = { text = "AGPL-3.0-or-later" }
-requires-python = ">=3.8"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8, 3.9, "3.10", 3.11]
+      fail-fast: false
+        
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          libegl1-mesa-dev \
+          libxrandr2 \
+          libxinerama1 \
+          libxcursor1 \
+          libxi6 \
+          libxtst6 \
+          xvfb
 
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Scientific/Engineering :: Physics",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-]
-keywords = [
-    "robotics",
-    "kinematics",
-    "dynamics",
-    "trajectory-planning",
-    "simulation",
-    "cuda",
-]
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
 
-# ------------------------------------------------------------------
-# Core runtime dependencies - ENSURE ALL CORE DEPS ARE HERE
-dependencies = [
-    "numpy>=1.19.2",
-    "scipy>=1.5.2", 
-    "matplotlib>=3.3",
-    "numba>=0.55",
-    "torch>=1.8.0",
-]
+    - name: Install base dependencies
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install pytest pytest-cov pytest-mock pytest-timeout coverage[toml]
 
-[project.optional-dependencies]
-# Core optional dependencies
-core-optional = [
-    "scikit-learn>=1.0",
-]
+    - name: Install PyTorch (CPU version for CI)
+      run: |
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        python -c "import torch; print(f'✅ PyTorch {torch.__version__} installed successfully')"
 
-# Simulation dependencies
-simulation = [
-    "pybullet>=3.0.6",
-    "urchin>=0.0.27",
-    "trimesh>=3.9.14",
-]
+    - name: Install ManipulaPy in development mode
+      run: |
+        pip install -e .
 
-# Vision dependencies  
-vision = [
-    "opencv-python>=4.5",
-    "ultralytics>=8.0",
-    "pillow>=8.0.0",
-]
+    - name: Install test dependencies
+      run: |
+        pip install \
+          numpy>=1.19.0 \
+          scipy>=1.6.0 \
+          matplotlib>=3.3.0 \
+          scikit-learn>=1.0.0 \
+          pillow>=8.0.0
 
-# AI/ML dependencies (torch moved to core)
-ml = [
-    "scikit-learn>=1.0",
-    "torchvision>=0.9.0",
-]
+    - name: Install optional dependencies (continue on error)
+      continue-on-error: true
+      run: |
+        # These may not be available in CI, but install if possible
+        pip install pybullet || echo "PyBullet installation failed (expected in CI)"
+        pip install opencv-python || echo "OpenCV installation failed"
+        pip install urchin || echo "URCHIN installation failed"
+        pip install ultralytics || echo "Ultralytics installation failed (expected in CI)"
 
-# GPU support
-gpu-cuda11 = ["cupy-cuda11x>=10.0.0"]
-gpu-cuda12 = ["cupy-cuda12x>=12.0.0"]
-gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
-gpu-pycuda = ["pycuda>=2021.1"]
-gpu = ["cupy-cuda11x>=10.0.0"]
+    - name: Verify ManipulaPy installation
+      run: |
+        # Test core package import
+        python -c "import ManipulaPy; print(f'ManipulaPy version: {ManipulaPy.__version__}')"
+        
+        # Test core modules (should always work)
+        python -c "from ManipulaPy import utils; print('✅ Utils module imported successfully')"
+        python -c "import torch; print(f'✅ PyTorch {torch.__version__} available')"
+        
+        # Test core functionality (requires torch)
+        python -c "
+        try:
+            from ManipulaPy import kinematics, dynamics
+            print('✅ Core kinematics and dynamics modules imported successfully')
+        except ImportError as e:
+            print(f'⚠️  Core modules import failed: {e}')
+            exit(1)
+        "
+        
+        # Test optional modules (may fail gracefully)
+        python -c "
+        import warnings
+        warnings.filterwarnings('ignore', category=ImportWarning)
+        
+        try:
+            from ManipulaPy import vision
+            print('✅ Vision module imported successfully')
+        except ImportError:
+            print('ℹ️  Vision module not available (missing ultralytics)')
+        
+        try:
+            from ManipulaPy import simulation  
+            print('✅ Simulation module imported successfully')
+        except ImportError:
+            print('ℹ️  Simulation module not available (optional dependencies missing)')
+        "
 
-# Development and testing dependencies
-dev = [
-    "pytest>=6.0.0",
-    "pytest-cov>=3.0.0",
-    "pytest-mock>=3.6.0",
-    "pytest-xvfb>=2.0.0",
-    "pytest-timeout>=2.1.0",  # This plugin is needed for timeout config
-    "coverage[toml]>=6.0.0",
-    "black>=22.0.0",
-    "flake8>=4.0.0",
-    "isort>=5.10.0",
-    "mypy>=0.950",
-    "pre-commit>=2.15.0",
-]
+    - name: Set up display for tests
+      run: |
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 3
 
-# Documentation dependencies
-docs = [
-    "sphinx>=4.0.0",
-    "sphinx-rtd-theme>=1.0.0",
-    "myst-parser>=0.15.0",
-]
+    - name: Run core tests with coverage
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        DISPLAY: ":99"
+        QT_QPA_PLATFORM: "offscreen"
+        MPLBACKEND: "Agg"
+        SKIP_CUDA_TESTS: "true" 
+        SKIP_VISION_TESTS: "true"
+        SKIP_SIMULATION_TESTS: "true"
+      run: |
+        # Check if tests directory exists and list test files
+        echo "📁 Checking test directory contents:"
+        if [ -d "tests/" ]; then
+          find tests/ -name "*.py" -type f | head -10
+          echo "Total test files: $(find tests/ -name "test_*.py" -o -name "*_test.py" | wc -l)"
+        else
+          echo "❌ tests/ directory not found!"
+          exit 1
+        fi
+        
+        # Run tests with proper configuration
+        echo "🧪 Running tests..."
+        python -m pytest tests/ -v \
+          --cov=ManipulaPy \
+          --cov-report=term-missing \
+          --cov-report=xml:coverage.xml \
+          --cov-report=html:htmlcov \
+          --tb=short \
+          --disable-warnings \
+          --maxfail=5 \
+          -x
 
-# Testing combinations
-test-core = ["ManipulaPy[dev]"]
-test-simulation = ["ManipulaPy[dev,simulation]"]
-test-vision = ["ManipulaPy[dev,vision]"]
-test-gpu = ["ManipulaPy[dev,gpu-cuda11]"]
-test-full = ["ManipulaPy[dev,simulation,vision,ml]"]
+    - name: Run basic functionality tests (fallback)
+      if: failure()
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        # Fallback: test basic imports and core functionality
+        python -c "
+        import sys
+        import traceback
+        
+        try:
+            print('Testing ManipulaPy import...')
+            import ManipulaPy
+            print(f'✅ ManipulaPy {ManipulaPy.__version__} imported successfully')
+            
+            print('Testing core modules...')
+            from ManipulaPy import utils
+            print('✅ Utils module imported successfully')
+            
+            print('Testing PyTorch integration...')
+            import torch
+            print(f'✅ PyTorch {torch.__version__} available')
+            
+            # Test core modules that require torch
+            try:
+                from ManipulaPy import kinematics, dynamics
+                print('✅ Core kinematics and dynamics modules imported successfully')
+            except ImportError as e:
+                print(f'❌ Core modules failed: {e}')
+                traceback.print_exc()
+                sys.exit(1)
+            
+            print('Testing basic functionality...')
+            import numpy as np
+            
+            # Test utils
+            R = np.eye(3)
+            euler = utils.rotation_matrix_to_euler_angles(R)
+            assert np.allclose(euler, [0, 0, 0])
+            print('✅ Utils functions working')
+            
+            # Test basic math operations
+            v = np.array([1, 2, 3])
+            S = utils.skew_symmetric(v)
+            assert S.shape == (3, 3)
+            print('✅ Mathematical operations working')
+            
+            # Test PyTorch tensor creation (basic torch functionality)
+            tensor = torch.tensor([1.0, 2.0, 3.0])
+            assert tensor.shape == (3,)
+            print('✅ PyTorch tensor operations working')
+            
+            # Test optional modules (should not fail the test)
+            import warnings
+            warnings.filterwarnings('ignore', category=ImportWarning)
+            
+            try:
+                from ManipulaPy import vision
+                print('ℹ️  Vision module available')
+            except ImportError:
+                print('ℹ️  Vision module not available (expected in CI)')
+            
+            try:
+                from ManipulaPy import simulation
+                print('ℹ️  Simulation module available')
+            except ImportError:
+                print('ℹ️  Simulation module not available (expected in CI)')
+            
+            print('✅ All basic tests passed!')
+            
+        except Exception as e:
+            print(f'❌ Test failed: {e}')
+            traceback.print_exc()
+            sys.exit(1)
+        "
 
-# All optional dependencies
-all = ["ManipulaPy[core-optional,simulation,vision,ml,docs]"]
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.9' && success()
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
 
-[project.urls]
-Homepage = "https://github.com/boelnasr/ManipulaPy"
-Documentation = "https://manipulapy.readthedocs.io/"
-Repository = "https://github.com/boelnasr/ManipulaPy.git"
-"Bug Tracker" = "https://github.com/boelnasr/ManipulaPy/issues"
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: matrix.python-version == '3.9'
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: |
+          htmlcov/
+          coverage.xml
+        retention-days: 30
+          
+    - name: Display coverage summary
+      if: matrix.python-version == '3.9'
+      run: |
+        if [ -f coverage.xml ]; then
+          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+          python -c "
+          try:
+              import xml.etree.ElementTree as ET
+              tree = ET.parse('coverage.xml')
+              root = tree.getroot()
+              coverage = float(root.attrib['line-rate']) * 100
+              print(f'📊 Overall Coverage: {coverage:.1f}%')
+              
+              print('\\n### Module Coverage:')
+              for package in root.findall('.//package'):
+                  name = package.attrib['name'].replace('ManipulaPy.', '')
+                  rate = float(package.attrib['line-rate']) * 100
+                  emoji = '✅' if rate > 80 else '⚠️' if rate > 60 else '❌'
+                  print(f'{emoji} {name}: {rate:.1f}%')
+          except Exception as e:
+              print(f'Could not parse coverage: {e}')
+          " >> $GITHUB_STEP_SUMMARY
+        else
+          echo "No coverage file generated" >> $GITHUB_STEP_SUMMARY
+        fi
 
-# ------------------------------------------------------------------
-[tool.setuptools]
-packages = ["ManipulaPy"]
-include-package-data = true
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.9
 
-[tool.setuptools.package-data]
-"ManipulaPy" = [
-    "*.yml",
-    "*.yaml",
-    "*.json",
-    "*.urdf",
-    "*.stl",
-    "*.dae",
-    "*.obj",
-]
-"ManipulaPy.ManipulaPy_data" = ["*"]
-"ManipulaPy.ManipulaPy_data.xarm" = [
-    "*.urdf",
-    "*.stl",
-    "*.dae", 
-    "*.obj",
-    "*.yml",
-    "*.yaml",
-    "xarm_description/**/*",
-    "xarm_gripper/**/*",
-]
-"ManipulaPy.ManipulaPy_data.ur5" = [
-    "*.urdf",
-    "*.stl",
-    "*.dae",
-    "*.obj", 
-    "*.yml",
-    "*.yaml",
-    "collision/**/*",
-    "visual/**/*",
-]
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgl1-mesa-dev xvfb
 
-[tool.setuptools.package-dir]
-"" = "."
+    - name: Install ManipulaPy
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        pip install -e .
+        pip install numpy scipy matplotlib
 
-# ==================================================================================
-# TESTING CONFIGURATION
-# ==================================================================================
+    - name: Run integration tests
+      env:
+        DISPLAY: ":99"
+        QT_QPA_PLATFORM: "offscreen"
+        MPLBACKEND: "Agg"
+      run: |
+        # Start virtual display
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 3
+        
+        # Test end-to-end functionality
+        python -c "
+        import numpy as np
+        import torch
+        from ManipulaPy.kinematics import SerialManipulator
+        from ManipulaPy import utils
+        
+        print('🔄 Running integration tests...')
+        
+        # Test PyTorch integration
+        print('✅ PyTorch integration test passed')
+        tensor = torch.tensor([1.0, 2.0, 3.0])
+        assert tensor.shape == (3,)
+        
+        # Create a simple robot configuration
+        M_list = np.eye(4)
+        M_list[:3, 3] = [0, 0, 1.0]
+        
+        omega_list = np.array([[0, 0, 1], [0, 1, 0], [0, 0, 1], [0, 1, 0], [0, 0, 1], [0, 1, 0]]).T
+        r_list = np.array([[0, 0, 0], [0, 0, 0.1], [0, 0, 0.2], [0, 0, 0.3], [0, 0, 0.4], [0, 0, 0.5]]).T
+        
+        S_list = utils.extract_screw_list(omega_list, r_list)
+        B_list = S_list.copy()
+        
+        # Create robot
+        robot = SerialManipulator(M_list, omega_list, r_list, S_list=S_list, B_list=B_list)
+        
+        # Test forward kinematics
+        joint_angles = np.array([0.1, 0.2, -0.3, 0.1, 0.2, 0.1])
+        T = robot.forward_kinematics(joint_angles)
+        
+        print(f'✅ Forward kinematics result shape: {T.shape}')
+        assert T.shape == (4, 4), f'Expected (4,4), got {T.shape}'
+        
+        # Test Jacobian
+        J = robot.jacobian(joint_angles)
+        print(f'✅ Jacobian shape: {J.shape}')
+        assert J.shape == (6, 6), f'Expected (6,6), got {J.shape}'
+        
+        print('✅ Integration tests passed!')
+        "
 
-[tool.pytest.ini_options]
-minversion = "6.0"
-testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-python_classes = ["Test*"] 
-python_functions = ["test_*"]
-addopts = [
-    "-ra",
-    "--strict-markers",
-    "--strict-config",
-    "--tb=short",
-    "--maxfail=10",
-    "--disable-warnings",
-    "--durations=10",  # Show 10 slowest tests
-]
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.9
 
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "cuda: marks tests as requiring GPU/CUDA (will skip if not available)",
-    "gpu: alias for cuda marker",
-    "integration: marks tests as integration tests",
-    "unit: marks tests as unit tests",
-    "vision: marks tests requiring vision dependencies (OpenCV, YOLO)",
-    "simulation: marks tests requiring simulation dependencies (PyBullet, URCHIN)",
-    "ml: marks tests requiring machine learning dependencies",
-    "network: marks tests requiring network access",
-]
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort
 
-filterwarnings = [
-    "ignore::UserWarning",
-    "ignore::DeprecationWarning",
-    "ignore::PendingDeprecationWarning",
-    "ignore:.*CUDA.*:UserWarning",
-    "ignore:.*cupy.*:UserWarning", 
-    "ignore:.*numba.*:UserWarning",
-    "ignore:.*OpenGL.*:UserWarning",
-    "ignore:.*PyBullet.*:UserWarning",
-    "ignore:.*torch.*:UserWarning",
-    "ignore:.*matplotlib.*:UserWarning",
-    "ignore::RuntimeWarning:numba.*",
-    "ignore::ImportWarning",  # Ignore our graceful import warnings
-]
+    - name: Check code formatting with black
+      continue-on-error: true
+      run: |
+        black --check --diff ManipulaPy/ || echo "⚠️ Code formatting issues found"
 
-# Only include timeout if pytest-timeout is installed
-# In CI, we'll install pytest-timeout, but for basic testing it's optional
-# timeout = 300
-# timeout_method = "thread"
+    - name: Check import sorting with isort
+      continue-on-error: true
+      run: |
+        isort --check-only --diff ManipulaPy/ || echo "⚠️ Import sorting issues found"
 
-# Use norecursedirs instead of collect_ignore (which is not a valid pytest option)
-norecursedirs = [
-    "build",
-    "dist", 
-    ".eggs",
-    "*.egg-info",
-    ".git",
-    ".tox",
-    ".pytest_cache",
-    "__pycache__",
-    "Examples*",
-    "Benchmark*", 
-    "benchmark_results*",
-    "paper",
-    "figures",
-    "docs",
-    "venv*",
-    "htmlcov",
-]
+    - name: Lint with flake8
+      continue-on-error: true
+      run: |
+        # Critical errors only
+        flake8 ManipulaPy/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Style issues (non-blocking)
+        flake8 ManipulaPy/ --count --exit-zero --max-complexity=15 --max-line-length=120 --statistics
 
-# ==================================================================================
-# COVERAGE CONFIGURATION
-# ==================================================================================
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.9
 
-[tool.coverage.run]
-source = ["ManipulaPy"]
-branch = true
-parallel = true
-omit = [
-    "*/tests/*",
-    "*/test_*", 
-    "*/*test*.py",
-    "*/Examples/*",
-    "*/Examples_old_backup_*/*",
-    "*/Benchmark/*",
-    "*/benchmark_results/*",
-    "*/docs/*",
-    "*/__pycache__/*",
-    "*/build/*",
-    "*/dist/*",
-    "*/_version.py",
-    "setup.py",
-    "*/ManipulaPy_data/*",
-    "*/venv*/*",
-    "*/env/*",
-    "*/.venv/*",
-    "*/paper/*",
-    "*/figures/*",
-]
+    - name: Install build tools
+      run: |
+        python -m pip install --upgrade pip build wheel
 
-[tool.coverage.paths]
-source = [
-    "ManipulaPy/",
-    "*/site-packages/ManipulaPy/",
-    "*/lib/python*/site-packages/ManipulaPy/",
-]
+    - name: Install PyTorch for build test
+      run: |
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-[tool.coverage.report]
-show_missing = true
-precision = 1
-skip_covered = false
-skip_empty = false
+    - name: Build package
+      run: |
+        python -m build
 
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self\\.debug",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError", 
-    "raise RuntimeError",
-    "raise ValueError",
-    "if 0:",
-    "if False:",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-    "if not CUDA_AVAILABLE:",
-    "if not CUPY_AVAILABLE:",
-    "except ImportError:",
-    "except ModuleNotFoundError:",
-    "cuda\\..*",
-    "cupy\\..*",
-    "CUDA not available",
-    "GPU not available",
-    "RuntimeError.*CUDA.*",
-    "if not OPENCV_AVAILABLE:",
-    "if not PYBULLET_AVAILABLE:",
-    "if not YOLO_AVAILABLE:",
-    "OpenCV not available",
-    "PyBullet not available", 
-    "YOLO not available",
-    "ultralytics.*",
-    "if sys\\.platform",
-    "if platform\\.system",
-    "@abstractmethod",
-    "@abc\\.abstractmethod",
-    "class .*\\bProtocol\\):",
-    "except.*Exception",
-    "except.*Error",
-    "except.*Warning",
-    "def __del__",
-    "try:.*finally:",
-    "raise NotImplementedError",
-    "return NotImplemented",
-    "TYPE_CHECKING",
-    # Exclude graceful import handling
-    "warnings\\.warn.*ImportWarning",
-    "_CORE_MODULES\\.append",
-    "_OPTIONAL_MODULES\\.append",
-]
-
-[tool.coverage.html]
-directory = "htmlcov"
-title = "ManipulaPy Coverage Report"
-
-[tool.coverage.xml]
-output = "coverage.xml"
-
-# ==================================================================================
-# CODE QUALITY TOOLS
-# ==================================================================================
-
-[tool.black]
-line-length = 88
-target-version = ["py38", "py39", "py310", "py311"]
-include = "\\.pyi?$"
-extend-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-  | __pycache__
-  | ManipulaPy_data
-  | Examples
-  | Examples_old_backup_.*
-  | Benchmark
-  | benchmark_results
-  | paper
-  | figures
-)/
-'''
-
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-line_length = 88
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-known_first_party = ["ManipulaPy"]
-known_third_party = [
-    "numpy",
-    "scipy",
-    "matplotlib",
-    "cv2",
-    "pybullet",
-    "torch",
-    "numba", 
-    "cupy",
-    "ultralytics",
-    "sklearn",
-    "urchin",
-    "trimesh",
-    "PIL",
-    "pytest",
-]
-skip_glob = [
-    "ManipulaPy_data/*",
-    "build/*",
-    "dist/*",
-    "Examples/*",
-    "Examples_old_backup_*/*",
-    "Benchmark/*",
-    "benchmark_results/*",
-    "paper/*",
-    "figures/*",
-]
-
-[tool.mypy]
-python_version = "3.8"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-check_untyped_defs = true
-disallow_untyped_decorators = false
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
-show_error_codes = true
-
-[[tool.mypy.overrides]]
-module = [
-    "pybullet.*",
-    "urchin.*",
-    "ultralytics.*",
-    "cupy.*",
-    "numba.*",
-    "cv2.*",
-    "matplotlib.*",
-    "scipy.*",
-    "trimesh.*",
-    "pycuda.*",
-    "PIL.*",
-    "sklearn.*",
-    "torch.*",
-]
-ignore_missing_imports = true
-
-[tool.ruff]
-select = [
-    "E",
-    "W",
-    "F",
-    "I",
-    "B",
-    "C4",
-    "UP",
-]
-ignore = [
-    "E501",
-    "B008",
-    "C901",
-]
-line-length = 88
-target-version = "py38"
-
-[tool.ruff.per-file-ignores]
-"__init__.py" = ["F401"]
-"tests/*" = ["B011"]
-
-[tool.bandit]
-exclude_dirs = [
-    "tests",
-    "Examples", 
-    "Examples_old_backup_*",
-    "Benchmark",
-    "benchmark_results",
-]
-skips = ["B101", "B601"]
+    - name: Check distribution
+      run: |
+        ls -la dist/
+        python -m pip install dist/*.whl
+        python -c "import ManipulaPy; print(f'✅ Installed ManipulaPy {ManipulaPy.__version__}')"
+        python -c "from ManipulaPy import kinematics; print('✅ Kinematics module with PyTorch working')"
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist-packages
+        path: dist/
+        retention-days: 7
