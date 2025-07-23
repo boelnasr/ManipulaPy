@@ -36,6 +36,9 @@ os.environ['CUDA_VISIBLE_DEVICES'] = ''
 os.environ['NUMBA_DISABLE_CUDA'] = '1'
 os.environ['MANIPULAPY_FORCE_CPU'] = '1'
 os.environ['TORCH_USE_CUDA_DSA'] = '0'
+# Files/dirs pytest should skip during collection
+collect_ignore = ["setup.py", "ManipulaPy_data", "build", "dist"]
+
 
 # ============================================================================
 # Enhanced Mock Classes
@@ -471,12 +474,9 @@ def create_smart_mock(module_name):
 
 # GPU-only modules that should always be mocked
 ALWAYS_MOCK = [
-    "cupy",
-    "pycuda", 
-    "pycuda.driver",
-    "pycuda.autoinit",
-    "numba.cuda",
-    "numba.cuda.random",
+    "cupy", "pycuda", "pycuda.driver", "pycuda.autoinit",
+    "numba.cuda", "numba.cuda.random",
+    "torchvision", "torchvision.ops", "torchvision.transforms", "torchvision.io",
 ]
 
 # Simulation/complex modules that are problematic in CI
