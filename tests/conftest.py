@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-Smart conftest.py that only mocks what's truly unavailable or GPU-only.
-Allows proper testing of CPU-capable libraries while gracefully handling missing dependencies.
+Smart conftest.py for ManipulaPy test suite.
+
+This configuration:
+- Only mocks what's truly unavailable or GPU-only
+- Allows proper testing of CPU-capable libraries when available
+- Provides comprehensive test fixtures and utilities
+- Handles CI environments gracefully
+- Enables proper coverage reporting
 """
 
 import sys
@@ -9,17 +15,31 @@ import os
 from unittest.mock import Mock, MagicMock
 import warnings
 import numpy as np
+import pytest
+import types
+
+# Set up matplotlib for headless testing
 import matplotlib
 matplotlib.use('Agg')
-# Suppress warnings during testing
+
+# Suppress common warnings during testing
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=UserWarning) 
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
 
 # Add the package to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+# Force CPU-only execution
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
 os.environ['NUMBA_DISABLE_CUDA'] = '1'
 os.environ['MANIPULAPY_FORCE_CPU'] = '1'
+os.environ['TORCH_USE_CUDA_DSA'] = '0'
+
+# ============================================================================
+# Enhanced Mock Classes
+# ============================================================================
 
 class MockModule:
     """Enhanced mock module that handles iteration and common operations properly."""
@@ -49,7 +69,6 @@ class CuPyArrayMock:
     """Enhanced CuPy array mock with proper numpy compatibility and type safety."""
     
     def __init__(self, data, dtype=None):
-        # Convert to appropriate dtype, defaulting to float32 for GPU simulation
         if dtype is None:
             dtype = np.float32 if np.issubdtype(np.asarray(data).dtype, np.floating) else np.asarray(data).dtype
         self._data = np.asarray(data, dtype=dtype)
@@ -74,9 +93,6 @@ class CuPyArrayMock:
     
     def __repr__(self):
         return f"CuPyArrayMock({self._data})"
-    
-    def __str__(self):
-        return str(self._data)
     
     # Math operations with proper type handling
     def __add__(self, other):
@@ -112,20 +128,6 @@ class CuPyArrayMock:
             self._data += other._data.astype(self._data.dtype)
         else:
             self._data += np.asarray(other, dtype=self._data.dtype)
-        return self
-    
-    def __isub__(self, other):
-        if hasattr(other, '_data'):
-            self._data -= other._data.astype(self._data.dtype)
-        else:
-            self._data -= np.asarray(other, dtype=self._data.dtype)
-        return self
-    
-    def __imul__(self, other):
-        if hasattr(other, '_data'):
-            self._data *= other._data.astype(self._data.dtype)
-        else:
-            self._data *= np.asarray(other, dtype=self._data.dtype)
         return self
     
     # Array properties
@@ -210,31 +212,6 @@ class CuPyMock:
             
         return CuPyArrayMock(np.clip(data, a_min, a_max))
     
-    # Math functions
-    def sqrt(self, arr):
-        data = arr._data if hasattr(arr, '_data') else np.asarray(arr)
-        return CuPyArrayMock(np.sqrt(data))
-    
-    def sin(self, arr):
-        data = arr._data if hasattr(arr, '_data') else np.asarray(arr)
-        return CuPyArrayMock(np.sin(data))
-    
-    def cos(self, arr):
-        data = arr._data if hasattr(arr, '_data') else np.asarray(arr)
-        return CuPyArrayMock(np.cos(data))
-    
-    # Random module
-    @property
-    def random(self):
-        class RandomMock:
-            def randn(self, *args, **kwargs):
-                return CuPyArrayMock(np.random.randn(*args, **kwargs))
-            def uniform(self, low=0, high=1, size=None):
-                return CuPyArrayMock(np.random.uniform(low, high, size))
-            def normal(self, *args, **kwargs):
-                return CuPyArrayMock(np.random.normal(*args, **kwargs))
-        return RandomMock()
-    
     # Linear algebra
     @property
     def linalg(self):
@@ -254,10 +231,6 @@ class CuPyMock:
                 if np.isscalar(result):
                     return result
                 return CuPyArrayMock(result)
-            
-            def det(self, a):
-                a_data = a._data if hasattr(a, '_data') else np.asarray(a)
-                return np.linalg.det(a_data)
         
         return LinAlg()
     
@@ -283,6 +256,10 @@ class CuPyMock:
         
         return MockModule(f"cupy.{name}")
 
+# ============================================================================
+# Dependency Testing and Smart Mocking
+# ============================================================================
+
 def test_module_availability(module_name):
     """Test if a module is available and can be imported."""
     try:
@@ -292,7 +269,6 @@ def test_module_availability(module_name):
         return False
     except Exception as e:
         # Module exists but has issues (like missing system deps)
-        print(f"Warning: {module_name} has import issues: {e}")
         return False
 
 def create_smart_mock(module_name):
@@ -309,8 +285,6 @@ def create_smart_mock(module_name):
         torch_mock.eye = lambda *args, **kwargs: Mock()
         torch_mock.cuda = MockModule("torch.cuda")
         torch_mock.cuda.is_available = lambda: False
-        torch_mock.nn = MockModule("torch.nn")
-        torch_mock.optim = MockModule("torch.optim")
         torch_mock.device = lambda x: Mock()
         torch_mock.float32 = np.float32
         torch_mock.float64 = np.float64
@@ -320,20 +294,14 @@ def create_smart_mock(module_name):
         cv2_mock = MockModule("cv2")
         # OpenCV constants
         cv2_mock.INTER_LINEAR = 1
-        cv2_mock.INTER_CUBIC = 2
         cv2_mock.COLOR_BGR2GRAY = 6
-        cv2_mock.COLOR_BGR2RGB = 4
-        cv2_mock.COLOR_RGB2BGR = 3
         cv2_mock.CV_32FC1 = 5
         cv2_mock.CALIB_ZERO_DISPARITY = 1024
         
-        # Mock functions that return reasonable values
+        # Mock functions
         cv2_mock.remap = lambda img, *args, **kwargs: img
         cv2_mock.cvtColor = lambda img, code: img
-        cv2_mock.GaussianBlur = lambda img, ksize, sigma: img
-        cv2_mock.VideoCapture = lambda x: Mock(isOpened=lambda: False, release=lambda: None)
-        
-        # Stereo functions
+        cv2_mock.VideoCapture = lambda x: Mock(isOpened=lambda: False)
         cv2_mock.StereoSGBM_create = lambda **kwargs: Mock(
             compute=lambda l, r: np.zeros((480, 640), dtype=np.float32)
         )
@@ -430,11 +398,7 @@ def create_smart_mock(module_name):
         numba_mock.prange = prange
         numba_mock.cuda = MockModule("numba.cuda")
         numba_mock.cuda.jit = jit
-        numba_mock.cuda.random = MockModule("numba.cuda.random")
-        numba_mock.cuda.random.create_xoroshiro128p_states = lambda n, seed=None: None
-        numba_mock.cuda.random.xoroshiro128p_uniform_float32 = lambda states, thread_id: 0.5
         numba_mock.float32 = np.float32
-        numba_mock.float64 = np.float64
         numba_mock.int32 = np.int32
         
         return numba_mock
@@ -447,15 +411,9 @@ def create_smart_mock(module_name):
         pb_mock.disconnect = lambda: None
         pb_mock.resetSimulation = lambda: None
         pb_mock.setGravity = lambda x, y, z: None
-        pb_mock.setTimeStep = lambda dt: None
         pb_mock.loadURDF = lambda path, *args, **kwargs: 0
         pb_mock.getNumJoints = lambda robot_id: 6
         pb_mock.stepSimulation = lambda: None
-        
-        # Camera functions
-        pb_mock.computeViewMatrix = lambda *args, **kwargs: np.eye(4).flatten()
-        pb_mock.computeProjectionMatrixFOV = lambda *args, **kwargs: np.eye(4).flatten()
-        pb_mock.computeViewMatrixFromYawPitchRoll = lambda *args, **kwargs: np.eye(4).flatten()
         
         def getCameraImage(width, height, **kwargs):
             rgba = np.random.randint(0, 255, (height, width, 4), dtype=np.uint8)
@@ -464,19 +422,10 @@ def create_smart_mock(module_name):
             return (width, height, rgba, depth, segmentation)
         
         pb_mock.getCameraImage = getCameraImage
-        
-        # Joint control
         pb_mock.setJointMotorControlArray = lambda *args, **kwargs: None
         pb_mock.getJointState = lambda robot_id, joint_id: (0.0, 0.0, [0]*6, 0.0)
-        pb_mock.getJointInfo = lambda robot_id, joint_id: (
-            0, f"joint_{joint_id}", 0, -1, -1, 0, 0.0, 0.0, -np.pi, np.pi, 1000.0, 100.0, 
-            f"link_{joint_id}", [0, 0, 1], [0, 0, 0], [0, 0, 0, 1], -1
-        )
-        
-        # Debug interface
         pb_mock.addUserDebugParameter = lambda name, min_val, max_val, default: len(name)
         pb_mock.readUserDebugParameter = lambda param_id: 0.0
-        pb_mock.addUserDebugLine = lambda *args, **kwargs: None
         
         # Constants
         pb_mock.GUI = 1
@@ -501,10 +450,10 @@ def create_smart_mock(module_name):
                 return MockURDF()
             
             def show(self):
-                print(f"Mock URDF visualization for {self}")
+                pass
             
             def animate(self, *args, **kwargs):
-                print("Mock URDF animation")
+                pass
             
             def link_fk(self, cfg=None):
                 return {}
@@ -516,81 +465,278 @@ def create_smart_mock(module_name):
     else:
         return MockModule(module_name)
 
+# ============================================================================
+# Intelligent Mocking Setup
+# ============================================================================
+
 # GPU-only modules that should always be mocked
 ALWAYS_MOCK = [
-    "cupy",              # GPU-only library
-    "pycuda",            # GPU-only
-    "pycuda.driver",     # GPU-only
-    "pycuda.autoinit",   # GPU-only
-    "numba.cuda",        # GPU-specific part of numba
-    "numba.cuda.random", # GPU-specific
+    "cupy",
+    "pycuda", 
+    "pycuda.driver",
+    "pycuda.autoinit",
+    "numba.cuda",
+    "numba.cuda.random",
 ]
 
-# Simulation/complex modules that are problematic in CI but not strictly GPU-only
+# Simulation/complex modules that are problematic in CI
 MOCK_IN_CI = [
-    "pybullet",          # Complex simulation, headless issues
-    "urchin",            # URDF library, may not be available
-    "urchin.urdf",       # URDF library, may not be available
+    "pybullet",
+    "urchin",
+    "urchin.urdf",
 ]
 
 # CPU libraries that should be tested when available
 TEST_WHEN_AVAILABLE = [
-    "torch",             # Has CPU support, should test when available
-    "cv2",               # OpenCV - pure CPU library
-    "sklearn",           # Scikit-learn - pure CPU library  
-    "sklearn.cluster",   # Part of scikit-learn
-    "ultralytics",       # YOLO can run on CPU
-    "numba",             # Core numba works without CUDA
+    "torch",
+    "cv2", 
+    "sklearn",
+    "sklearn.cluster",
+    "ultralytics",
+    "numba",
 ]
 
-# Setup mocks intelligently
 print("🔧 Setting up intelligent test environment...")
 
 # Always mock GPU-only modules
 for module_name in ALWAYS_MOCK:
     sys.modules[module_name] = create_smart_mock(module_name)
-    print(f"🚫 Always mocked: {module_name} (GPU-only)")
 
-# Mock simulation modules (can be conditional based on CI environment)
+# Mock simulation modules in CI
 in_ci = os.environ.get('CI', '').lower() in ('true', '1', 'yes')
 for module_name in MOCK_IN_CI:
     if in_ci or not test_module_availability(module_name):
         sys.modules[module_name] = create_smart_mock(module_name)
-        print(f"🤖 Mocked: {module_name} (simulation/CI)")
-    else:
-        print(f"🎯 Available: {module_name} (will be tested)")
 
 # Only mock CPU libraries if they're actually unavailable
 for module_name in TEST_WHEN_AVAILABLE:
-    if test_module_availability(module_name):
-        print(f"✅ Available: {module_name} (will be tested)")
-    else:
+    if not test_module_availability(module_name):
         mock = create_smart_mock(module_name)
         if mock is not None:
             sys.modules[module_name] = mock
-            print(f"❌ Mocked: {module_name} (unavailable)")
 
-# Set environment variables to ensure CPU-only execution
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
-os.environ['TORCH_USE_CUDA_DSA'] = '0'
-os.environ['NUMBA_DISABLE_CUDA'] = '1'
-os.environ['MANIPULAPY_FORCE_CPU'] = '1'
+# ============================================================================
+# Dependency Availability Checks for Test Markers
+# ============================================================================
 
-print("✅ Smart test environment ready - testing real libraries when available!")
+CUDA_AVAILABLE = False  # Always false due to mocking
+CUPY_AVAILABLE = False  # Always false due to mocking
+OPENCV_AVAILABLE = test_module_availability('cv2')
+PYBULLET_AVAILABLE = test_module_availability('pybullet') and not in_ci
+YOLO_AVAILABLE = test_module_availability('ultralytics')
+SKLEARN_AVAILABLE = test_module_availability('sklearn')
+TORCH_AVAILABLE = test_module_availability('torch')
 
-# Additional test configuration
-import pytest
+# Environment flags from CI
+SKIP_CUDA_TESTS = True  # Always skip due to mocking
+SKIP_VISION_TESTS = os.environ.get('SKIP_VISION_TESTS', 'false').lower() == 'true'
+SKIP_SIMULATION_TESTS = os.environ.get('SKIP_SIMULATION_TESTS', 'false').lower() == 'true' or in_ci
 
-# Configure pytest to handle async operations if needed
+# ============================================================================
+# Pytest Configuration
+# ============================================================================
+
+def pytest_addoption(parser):
+    """Add custom command line options."""
+    parser.addoption(
+        "--skip-cuda",
+        action="store_true",
+        default=True,  # Always skip CUDA
+        help="Skip tests that require CUDA/GPU"
+    )
+    parser.addoption(
+        "--skip-vision",
+        action="store_true", 
+        default=SKIP_VISION_TESTS,
+        help="Skip tests that require vision dependencies"
+    )
+    parser.addoption(
+        "--skip-simulation",
+        action="store_true",
+        default=SKIP_SIMULATION_TESTS,
+        help="Skip tests that require simulation dependencies"
+    )
+    parser.addoption(
+        "--run-slow",
+        action="store_true",
+        default=False,
+        help="Run slow tests"
+    )
+
+def pytest_configure(config):
+    """Configure pytest markers and environment."""
+    # Register custom markers
+    config.addinivalue_line("markers", "cuda: mark test as requiring CUDA")
+    config.addinivalue_line("markers", "gpu: alias for cuda marker") 
+    config.addinivalue_line("markers", "vision: mark test as requiring vision deps")
+    config.addinivalue_line("markers", "simulation: mark test as requiring simulation deps")
+    config.addinivalue_line("markers", "slow: mark test as slow")
+    config.addinivalue_line("markers", "integration: mark test as integration test")
+    config.addinivalue_line("markers", "unit: mark test as unit test")
+
+def pytest_collection_modifyitems(config, items):
+    """Modify test collection based on available dependencies and options."""
+    # Skip markers
+    skip_cuda = pytest.mark.skip(reason="CUDA not available (always skipped in tests)")
+    skip_vision = pytest.mark.skip(reason="Vision dependencies not available or skipped")
+    skip_simulation = pytest.mark.skip(reason="Simulation dependencies not available or skipped")
+    skip_slow = pytest.mark.skip(reason="Slow tests skipped (use --run-slow to run)")
+    
+    for item in items:
+        # Skip CUDA tests (always)
+        if "cuda" in item.keywords or "gpu" in item.keywords:
+            item.add_marker(skip_cuda)
+        
+        # Skip vision tests if not available
+        if "vision" in item.keywords and (not OPENCV_AVAILABLE or config.getoption("--skip-vision")):
+            item.add_marker(skip_vision)
+            
+        # Skip simulation tests if not available  
+        if "simulation" in item.keywords and (not PYBULLET_AVAILABLE or config.getoption("--skip-simulation")):
+            item.add_marker(skip_simulation)
+            
+        # Skip slow tests unless requested
+        if "slow" in item.keywords and not config.getoption("--run-slow"):
+            item.add_marker(skip_slow)
+
+# ============================================================================
+# Test Fixtures
+# ============================================================================
+
+@pytest.fixture
+def tolerance():
+    """Default numerical tolerance for tests."""
+    return 1e-6
+
+@pytest.fixture
+def simple_robot_config():
+    """Create a simple robot configuration for testing."""
+    num_joints = 6
+    
+    # Home configuration matrix
+    M_list = np.eye(4, dtype=np.float32)
+    M_list[:3, 3] = [0, 0, 1.0]  # End-effector at (0,0,1)
+    
+    # Screw axes for a simple 6-DOF robot
+    S_list = np.zeros((6, num_joints), dtype=np.float32)
+    for i in range(num_joints):
+        if i % 2 == 0:  # Revolute joints around Z
+            S_list[2, i] = 1.0
+        else:  # Revolute joints around Y  
+            S_list[1, i] = 1.0
+        S_list[5, i] = 0.1 * i  # Some translation component
+    
+    # Body screw axes (simplified)
+    B_list = S_list.copy()
+    
+    # Inertia matrices
+    G_list = []
+    for i in range(num_joints):
+        G = np.eye(6, dtype=np.float32)
+        G[:3, :3] *= 0.1  # Inertia tensor
+        G[3:, 3:] *= 1.0  # Mass
+        G_list.append(G)
+    
+    # Joint limits
+    joint_limits = [(-np.pi, np.pi) for _ in range(num_joints)]
+    torque_limits = [(-100.0, 100.0) for _ in range(num_joints)]
+    
+    return {
+        'M_list': M_list,
+        'S_list': S_list,
+        'B_list': B_list, 
+        'G_list': G_list,
+        'joint_limits': joint_limits,
+        'torque_limits': torque_limits,
+        'num_joints': num_joints
+    }
+
+@pytest.fixture
+def sample_joint_angles():
+    """Sample joint angles for testing."""
+    return np.array([0.1, 0.2, -0.3, 0.1, 0.2, 0.1], dtype=np.float32)
+
 @pytest.fixture(autouse=True)
 def setup_test_environment():
     """Set up the test environment for each test."""
-    # Ensure clean state
-    import warnings
+    # Set random seed for reproducibility
+    np.random.seed(42)
+    
+    # Suppress additional warnings
     warnings.filterwarnings("ignore", category=FutureWarning)
-    warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
     
     yield
     
     # Cleanup after each test
     pass
+
+# ============================================================================
+# Utility Functions
+# ============================================================================
+
+def assert_array_almost_equal(actual, expected, tolerance=1e-6, msg=""):
+    """Assert that two arrays are almost equal within tolerance."""
+    actual = np.asarray(actual)
+    expected = np.asarray(expected)
+    
+    assert actual.shape == expected.shape, f"Shape mismatch: {actual.shape} != {expected.shape}. {msg}"
+    
+    diff = np.abs(actual - expected)
+    max_diff = np.max(diff)
+    
+    assert max_diff < tolerance, (
+        f"Arrays not equal within tolerance {tolerance}. "
+        f"Max difference: {max_diff}. {msg}"
+    )
+
+def requires_dependency(dependency_name):
+    """Decorator to skip tests if dependency is not available."""
+    availability_map = {
+        'cuda': False,  # Always false
+        'cupy': False,  # Always false
+        'opencv': OPENCV_AVAILABLE and not SKIP_VISION_TESTS,
+        'pybullet': PYBULLET_AVAILABLE and not SKIP_SIMULATION_TESTS,
+        'yolo': YOLO_AVAILABLE and not SKIP_VISION_TESTS,
+        'sklearn': SKLEARN_AVAILABLE,
+        'torch': TORCH_AVAILABLE,
+    }
+    
+    available = availability_map.get(dependency_name.lower(), False)
+    
+    return pytest.mark.skipif(
+        not available,
+        reason=f"{dependency_name} not available or skipped"
+    )
+
+# ============================================================================
+# Session Reporting
+# ============================================================================
+
+def pytest_sessionstart(session):
+    """Report test session start with environment info."""
+    print("\n" + "="*60)
+    print("ManipulaPy Test Suite")
+    print("="*60)
+    print(f"Python: {sys.version}")
+    print(f"NumPy: {np.__version__}")
+    
+    # Dependency status
+    deps = [
+        ("CUDA/Numba", False),  # Always false due to mocking
+        ("CuPy", False),       # Always false due to mocking
+        ("OpenCV", OPENCV_AVAILABLE and not SKIP_VISION_TESTS),
+        ("PyBullet", PYBULLET_AVAILABLE and not SKIP_SIMULATION_TESTS),
+        ("YOLO", YOLO_AVAILABLE and not SKIP_VISION_TESTS),
+        ("Scikit-learn", SKLEARN_AVAILABLE),
+        ("PyTorch", TORCH_AVAILABLE),
+    ]
+    
+    print("\nDependency Status:")
+    for name, available in deps:
+        status = "✅" if available else "❌"
+        print(f"  {status} {name}")
+    
+    print("="*60)
+
+print("✅ Smart test environment ready - testing real libraries when available!")

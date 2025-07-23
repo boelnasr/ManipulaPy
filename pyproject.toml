@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 # ------------------------------------------------------------------
 [project]
-name = "ManipulaPy"                    # exact PyPI casing
+name = "ManipulaPy"
 version = "1.1.1"                      
 authors = [
     { name = "Mohamed Aboelnar", email = "aboelnasr1997@gmail.com" },
@@ -41,39 +41,59 @@ keywords = [
 ]
 
 # ------------------------------------------------------------------
-# Core runtime dependencies - FIXED: Removed problematic GPU dependencies from core
+# Core runtime dependencies
 dependencies = [
     "numpy>=1.19.2",
     "scipy>=1.5.2",
-    "pybullet>=3.0.6",
-    "trimesh>=3.9.14",
-    "urchin>=0.0.27",
-    "numba>=0.55",
     "matplotlib>=3.3",
-    "scikit-learn>=1.0",
-    "opencv-python>=4.5",
-    "ultralytics>=8.0",
-    "torch>=1.8.0",
+    "numba>=0.55",
 ]
 
 [project.optional-dependencies]
-# GPU support - Multiple options to handle different CUDA versions
+# Core optional dependencies
+core-optional = [
+    "scikit-learn>=1.0",
+]
+
+# Simulation dependencies
+simulation = [
+    "pybullet>=3.0.6",
+    "urchin>=0.0.27",
+    "trimesh>=3.9.14",
+]
+
+# Vision dependencies  
+vision = [
+    "opencv-python>=4.5",
+    "ultralytics>=8.0",
+    "pillow>=8.0.0",
+]
+
+# AI/ML dependencies
+ml = [
+    "torch>=1.8.0",
+    "scikit-learn>=1.0",
+]
+
+# GPU support
 gpu-cuda11 = ["cupy-cuda11x>=10.0.0"]
 gpu-cuda12 = ["cupy-cuda12x>=12.0.0"]
 gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
-# Legacy PyCUDA (alternative to CuPy)
 gpu-pycuda = ["pycuda>=2021.1"]
-# All GPU options combined
-gpu = ["cupy-cuda11x>=10.0.0"]  # Default to CUDA 11
+gpu = ["cupy-cuda11x>=10.0.0"]
 
-# Development dependencies
+# Development and testing dependencies
 dev = [
     "pytest>=6.0.0",
-    "pytest-cov>=2.0.0",
-    "black>=21.0.0",
-    "flake8>=3.8.0",
-    "isort>=5.0.0",
-    "mypy>=0.910",
+    "pytest-cov>=3.0.0",
+    "pytest-mock>=3.6.0",
+    "pytest-xvfb>=2.0.0",
+    "pytest-timeout>=2.1.0",
+    "coverage[toml]>=6.0.0",
+    "black>=22.0.0",
+    "flake8>=4.0.0",
+    "isort>=5.10.0",
+    "mypy>=0.950",
     "pre-commit>=2.15.0",
 ]
 
@@ -84,13 +104,15 @@ docs = [
     "myst-parser>=0.15.0",
 ]
 
-# Testing with GPU support
-test-gpu = [
-    "ManipulaPy[dev,gpu-cuda11]"
-]
+# Testing combinations
+test-core = ["ManipulaPy[dev]"]
+test-simulation = ["ManipulaPy[dev,simulation]"]
+test-vision = ["ManipulaPy[dev,vision]"]
+test-gpu = ["ManipulaPy[dev,gpu-cuda11]"]
+test-full = ["ManipulaPy[dev,simulation,vision,ml]"]
 
-# All optional dependencies (excluding GPU to avoid installation issues)
-all = ["ManipulaPy[dev,docs]"]
+# All optional dependencies
+all = ["ManipulaPy[core-optional,simulation,vision,ml,docs]"]
 
 [project.urls]
 Homepage = "https://github.com/boelnasr/ManipulaPy"
@@ -103,7 +125,6 @@ Repository = "https://github.com/boelnasr/ManipulaPy.git"
 packages = ["ManipulaPy"]
 include-package-data = true
 
-# FIXED: Proper package data inclusion for subdirectories
 [tool.setuptools.package-data]
 "ManipulaPy" = [
     "*.yml",
@@ -136,18 +157,180 @@ include-package-data = true
     "visual/**/*",
 ]
 
-# Alternative approach using MANIFEST.in file
 [tool.setuptools.package-dir]
 "" = "."
 
-# ------------------------------------------------------------------
-# Code-style & static-analysis tooling
-# ------------------------------------------------------------------
+# ==================================================================================
+# TESTING CONFIGURATION
+# ==================================================================================
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"] 
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+    "--maxfail=10",
+    "--disable-warnings",
+]
+
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "cuda: marks tests as requiring GPU/CUDA (will skip if not available)",
+    "gpu: alias for cuda marker",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "vision: marks tests requiring vision dependencies (OpenCV, YOLO)",
+    "simulation: marks tests requiring simulation dependencies (PyBullet, URCHIN)",
+    "ml: marks tests requiring machine learning dependencies",
+    "network: marks tests requiring network access",
+]
+
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore:.*CUDA.*:UserWarning",
+    "ignore:.*cupy.*:UserWarning", 
+    "ignore:.*numba.*:UserWarning",
+    "ignore:.*OpenGL.*:UserWarning",
+    "ignore:.*PyBullet.*:UserWarning",
+    "ignore:.*torch.*:UserWarning",
+    "ignore:.*matplotlib.*:UserWarning",
+    "ignore::RuntimeWarning:numba.*",
+]
+
+timeout = 300
+timeout_method = "thread"
+
+# Use norecursedirs instead of collect_ignore (which is not a valid pytest option)
+norecursedirs = [
+    "build",
+    "dist", 
+    ".eggs",
+    "*.egg-info",
+    ".git",
+    ".tox",
+    ".pytest_cache",
+    "__pycache__",
+    "Examples*",
+    "Benchmark*", 
+    "benchmark_results*",
+    "paper",
+    "figures",
+    "docs",
+    "venv*",
+    "htmlcov",
+]
+
+# ==================================================================================
+# COVERAGE CONFIGURATION
+# ==================================================================================
+
+[tool.coverage.run]
+source = ["ManipulaPy"]
+branch = true
+parallel = true
+omit = [
+    "*/tests/*",
+    "*/test_*", 
+    "*/*test*.py",
+    "*/Examples/*",
+    "*/Examples_old_backup_*/*",
+    "*/Benchmark/*",
+    "*/benchmark_results/*",
+    "*/docs/*",
+    "*/__pycache__/*",
+    "*/build/*",
+    "*/dist/*",
+    "*/_version.py",
+    "setup.py",
+    "*/ManipulaPy_data/*",
+    "*/venv*/*",
+    "*/env/*",
+    "*/.venv/*",
+    "*/paper/*",
+    "*/figures/*",
+]
+
+[tool.coverage.paths]
+source = [
+    "ManipulaPy/",
+    "*/site-packages/ManipulaPy/",
+    "*/lib/python*/site-packages/ManipulaPy/",
+]
+
+[tool.coverage.report]
+show_missing = true
+precision = 1
+skip_covered = false
+skip_empty = false
+
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self\\.debug",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError", 
+    "raise RuntimeError",
+    "raise ValueError",
+    "if 0:",
+    "if False:",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "if not CUDA_AVAILABLE:",
+    "if not CUPY_AVAILABLE:",
+    "except ImportError:",
+    "except ModuleNotFoundError:",
+    "cuda\\..*",
+    "cupy\\..*",
+    "CUDA not available",
+    "GPU not available",
+    "RuntimeError.*CUDA.*",
+    "if not OPENCV_AVAILABLE:",
+    "if not PYBULLET_AVAILABLE:",
+    "if not YOLO_AVAILABLE:",
+    "OpenCV not available",
+    "PyBullet not available", 
+    "YOLO not available",
+    "ultralytics.*",
+    "if sys\\.platform",
+    "if platform\\.system",
+    "@abstractmethod",
+    "@abc\\.abstractmethod",
+    "class .*\\bProtocol\\):",
+    "except.*Exception",
+    "except.*Error",
+    "except.*Warning",
+    "def __del__",
+    "try:.*finally:",
+    "raise NotImplementedError",
+    "return NotImplemented",
+    "TYPE_CHECKING",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+title = "ManipulaPy Coverage Report"
+
+[tool.coverage.xml]
+output = "coverage.xml"
+
+# ==================================================================================
+# CODE QUALITY TOOLS
+# ==================================================================================
+
 [tool.black]
 line-length = 88
 target-version = ["py38", "py39", "py310", "py311"]
 include = "\\.pyi?$"
-exclude = '''
+extend-exclude = '''
 /(
     \.eggs
   | \.git
@@ -160,6 +343,13 @@ exclude = '''
   | build
   | dist
   | __pycache__
+  | ManipulaPy_data
+  | Examples
+  | Examples_old_backup_.*
+  | Benchmark
+  | benchmark_results
+  | paper
+  | figures
 )/
 '''
 
@@ -167,6 +357,10 @@ exclude = '''
 profile = "black"
 multi_line_output = 3
 line_length = 88
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
 known_first_party = ["ManipulaPy"]
 known_third_party = [
     "numpy",
@@ -175,42 +369,25 @@ known_third_party = [
     "cv2",
     "pybullet",
     "torch",
-    "numba",
+    "numba", 
     "cupy",
     "ultralytics",
     "sklearn",
     "urchin",
     "trimesh",
+    "PIL",
+    "pytest",
 ]
-
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "-ra -q --strict-markers --strict-config"
-testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-
-[tool.coverage.run]
-source = ["ManipulaPy"]
-omit = [
-    "*/tests/*",
-    "*/test_*",
-    "setup.py",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
+skip_glob = [
+    "ManipulaPy_data/*",
+    "build/*",
+    "dist/*",
+    "Examples/*",
+    "Examples_old_backup_*/*",
+    "Benchmark/*",
+    "benchmark_results/*",
+    "paper/*",
+    "figures/*",
 ]
 
 [tool.mypy]
@@ -227,6 +404,7 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+show_error_codes = true
 
 [[tool.mypy.overrides]]
 module = [
@@ -240,27 +418,40 @@ module = [
     "scipy.*",
     "trimesh.*",
     "pycuda.*",
+    "PIL.*",
+    "sklearn.*",
+    "torch.*",
 ]
 ignore_missing_imports = true
 
-[tool.flake8]
-max-line-length = 88
-extend-ignore = [
-    "E203",  # whitespace before ':'
-    "E501",  # line too long (handled by black)
-    "W503",  # line break before binary operator
+[tool.ruff]
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "B",
+    "C4",
+    "UP",
 ]
-exclude = [
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    ".eggs",
-    "*.egg-info",
-    ".venv",
-    ".tox",
+ignore = [
+    "E501",
+    "B008",
+    "C901",
 ]
+line-length = 88
+target-version = "py38"
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["B011"]
 
 [tool.bandit]
-exclude_dirs = ["tests"]
+exclude_dirs = [
+    "tests",
+    "Examples", 
+    "Examples_old_backup_*",
+    "Benchmark",
+    "benchmark_results",
+]
 skips = ["B101", "B601"]
