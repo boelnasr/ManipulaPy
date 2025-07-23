@@ -1,4 +1,54 @@
-include ManipulaPy/ManipulaPy_data/ur5/ur5.urdf
-include ManipulaPy/ManipulaPy_data/ur5/visual/*.dae
-include ManipulaPy/ManipulaPy_data/xarm/xarm6_robot.urdf
-include ManipulaPy/ManipulaPy_data/xarm/visual/*.dae
+# Include the README and license files
+include README.md
+include LICENSE  
+include CHANGELOG.md
+include CODE_OF_CONDUCT.md
+
+# Include all Python files in the main package
+recursive-include ManipulaPy *.py
+
+# Include ALL files in ManipulaPy_data directory (most important!)
+recursive-include ManipulaPy/ManipulaPy_data *
+
+# Specifically include URDF and mesh files
+recursive-include ManipulaPy/ManipulaPy_data *.urdf
+recursive-include ManipulaPy/ManipulaPy_data *.dae  
+recursive-include ManipulaPy/ManipulaPy_data *.stl
+recursive-include ManipulaPy/ManipulaPy_data *.obj
+recursive-include ManipulaPy/ManipulaPy_data *.mesh
+recursive-include ManipulaPy/ManipulaPy_data *.xml
+recursive-include ManipulaPy/ManipulaPy_data *.yaml
+recursive-include ManipulaPy/ManipulaPy_data *.json
+
+# Include configuration files
+recursive-include ManipulaPy *.yaml *.json *.xml *.cfg *.ini
+
+# Include documentation assets
+recursive-include ManipulaPy/docs *
+recursive-include docs *
+
+# Include benchmark scripts
+recursive-include ManipulaPy/Benchmark *.py *.md
+
+# Include examples
+recursive-include Examples *.py *.md *.urdf
+
+# Include tests
+recursive-include tests *.py
+
+# Exclude unwanted files
+global-exclude *.pyc
+global-exclude *.pyo  
+global-exclude *~
+global-exclude *.tmp
+global-exclude .DS_Store
+global-exclude __pycache__
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+
+# Exclude development files
+exclude .gitignore
+exclude .pre-commit-config.yaml
+exclude tox.ini
+exclude .travis.yml
+exclude .github
