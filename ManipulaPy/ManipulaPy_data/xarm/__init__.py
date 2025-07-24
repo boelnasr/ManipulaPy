@@ -1,71 +1,32 @@
 #!/usr/bin/env python3
-"""
-XARM Robot Model Data
-
-This module provides access to XARM robot URDF files and related assets.
-"""
-
+"""xArm Robot Model Data"""
 import os
-import pkg_resources
+from pathlib import Path
 
-# Get the path to this module
-_module_path = os.path.dirname(__file__)
+# Path to this robot's data directory
+DATA_DIR = Path(__file__).parent
 
-def get_urdf_path(model='xarm6_robot'):
-    """
-    Get the path to an XARM URDF file.
-    
-    Args:
-        model (str): URDF model name. Options:
-            - 'xarm6_robot' (default)
-            - 'xarm6_robot_white' 
-            - 'xarm6_with_gripper'
-            - 'base', 'link1', 'link2', etc.
-    
-    Returns:
-        str: Path to the URDF file
-    """
-    urdf_filename = f"{model}.urdf"
-    try:
-        # Try pkg_resources first (works with pip installs)
-        return pkg_resources.resource_filename(__name__, urdf_filename)
-    except:
-        # Fallback to direct path
-        return os.path.join(_module_path, urdf_filename)
-
-def get_description_path():
-    """Get the path to the XARM description directory."""
-    try:
-        return pkg_resources.resource_filename(__name__, 'xarm_description')
-    except:
-        return os.path.join(_module_path, 'xarm_description')
-
-def get_gripper_path():
-    """Get the path to the XARM gripper directory."""
-    try:
-        return pkg_resources.resource_filename(__name__, 'xarm_gripper')
-    except:
-        return os.path.join(_module_path, 'xarm_gripper')
-
-def list_available_models():
-    """List all available URDF models."""
-    models = []
-    try:
-        # List all .urdf files in the directory
-        for file in os.listdir(_module_path):
-            if file.endswith('.urdf'):
-                models.append(file[:-5])  # Remove .urdf extension
-    except:
-        pass
-    return models
-
-# Export the main URDF path for easy access
-urdf_file = get_urdf_path('xarm6_robot')
-
-__all__ = [
-    'get_urdf_path', 
-    'get_description_path', 
-    'get_gripper_path', 
-    'list_available_models',
-    'urdf_file'
+# Find the main URDF file (try common names)
+_urdf_candidates = [
+    "xarm6_robot.urdf",
+    "xarm6_robot_white.urdf",
+    "xarm6_with_gripper.urdf",
+    "xarm_robot.urdf", 
+    "xarm.urdf",
 ]
+
+urdf_file = None
+for candidate in _urdf_candidates:
+    candidate_path = DATA_DIR / candidate
+    if candidate_path.exists():
+        urdf_file = str(candidate_path)
+        break
+
+if urdf_file is None:
+    # Fallback to first .urdf file found
+    urdf_files = list(DATA_DIR.glob("*.urdf"))
+    if urdf_files:
+        urdf_file = str(urdf_files[0])
+
+# Export the URDF path for easy access
+__all__ = ['urdf_file', 'DATA_DIR']

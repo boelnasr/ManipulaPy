@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 # ------------------------------------------------------------------
 [project]
 name = "ManipulaPy"
-version = "1.1.2"                      
+version = "1.1.3"                      
 authors = [
     { name = "Mohamed Aboelnasr", email = "aboelnasr1997@gmail.com" },
 ]
@@ -50,9 +50,17 @@ keywords = [
 # Core runtime dependencies
 dependencies = [
     "numpy>=1.19.2",
-    "scipy>=1.5.2",
+    "scipy>=1.5.2", 
     "matplotlib>=3.3",
     "numba>=0.55",
+    "pybullet>=3.0.6",
+    "urchin>=0.0.27",
+    "trimesh>=3.9.14",
+    "torch>=1.8.0",
+    "scikit-learn>=1.0",
+    "opencv-python>=4.5",
+    "ultralytics>=8.0",
+    "pillow>=8.0.0",
 ]
 
 [project.optional-dependencies]
@@ -61,12 +69,7 @@ core-optional = [
     "scikit-learn>=1.0",
 ]
 
-# Simulation dependencies
-simulation = [
-    "pybullet>=3.0.6",
-    "urchin>=0.0.27",
-    "trimesh>=3.9.14",
-]
+
 
 # Vision dependencies  
 vision = [
@@ -155,9 +158,8 @@ Repository = "https://github.com/boelnasr/ManipulaPy.git"
 
 # ------------------------------------------------------------------
 [tool.setuptools]
-packages = ["ManipulaPy"]
+packages = ["ManipulaPy", "ManipulaPy.ManipulaPy_data", "ManipulaPy.ManipulaPy_data.ur5", "ManipulaPy.ManipulaPy_data.xarm"]
 include-package-data = true
-zip-safe = false
 
 [tool.setuptools.dynamic]
 # Optional: make version dynamic if you have a _version.py file
@@ -173,6 +175,15 @@ zip-safe = false
     "*.dae",
     "*.obj",
     "py.typed",  # PEP 561 compliance for type checking
+    "ManipulaPy_data/*",
+    "ManipulaPy_data/*/*",
+    "ManipulaPy_data/*/*/*",
+    "ManipulaPy_data/*/*/*/*",
+    "ManipulaPy_data/*/*/*/*/*",
+    "ManipulaPy_data/ur5/ur5.urdf",
+    "ManipulaPy_data/ur5/visual/*.dae",
+    "ManipulaPy_data/xarm/xarm6_robot.urdf",
+    "ManipulaPy_data/xarm/visual/*.dae"
 ]
 "ManipulaPy.ManipulaPy_data" = ["*"]
 "ManipulaPy.ManipulaPy_data.xarm" = [
