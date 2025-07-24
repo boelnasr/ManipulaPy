@@ -5,14 +5,16 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="ManipulaPy",
-    version="1.1.2",  # Major feature release with GPU acceleration and vision pipeline
+    version="1.1.3",  
     author="Mohamed Aboelnasr",
     author_email="aboelnasr1997@gmail.com",
     description="A comprehensive, GPU-accelerated Python framework for robotic manipulation, perception, and control",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/boelnasr/ManipulaPy",
-    packages=find_packages(),
+    
+    # FIXED: Properly find all packages including ManipulaPy_data
+    packages=find_packages(include=['ManipulaPy', 'ManipulaPy.*']),
     
     # Core dependencies - required for basic functionality
     install_requires=[
@@ -133,77 +135,20 @@ setup(
     # Python version requirements
     python_requires=">=3.8",
     
-    # Include additional package data - COMPREHENSIVE VERSION
+    # FIXED: Simplified and working package data configuration
     include_package_data=True,
     package_data={
         "ManipulaPy": [
-            # ALL files in ManipulaPy_data directory (recursive)
             "ManipulaPy_data/*",
-            "ManipulaPy_data/**/*",
-            "ManipulaPy_data/**/**/*",
-            "ManipulaPy_data/**/**/**/*",
-            
-            # Specific robot model files
-            "ManipulaPy_data/ur5/*",
-            "ManipulaPy_data/ur5/**/*",
-            "ManipulaPy_data/ur5/visual/*",
-            "ManipulaPy_data/ur5/collision/*",
-            "ManipulaPy_data/xarm/*",
-            "ManipulaPy_data/xarm/**/*",
-            "ManipulaPy_data/xarm/xarm_description/*",
-            "ManipulaPy_data/xarm/xarm_description/**/*",
-            "ManipulaPy_data/xarm/xarm_gripper/*",
-            "ManipulaPy_data/xarm/xarm_gripper/**/*",
-            
-            # Specific file types
-            "ManipulaPy_data/*.urdf",
-            "ManipulaPy_data/**/*.urdf",
-            "ManipulaPy_data/*.dae",
-            "ManipulaPy_data/**/*.dae",
-            "ManipulaPy_data/*.stl",
-            "ManipulaPy_data/**/*.stl",
-            "ManipulaPy_data/*.obj",
-            "ManipulaPy_data/**/*.obj",
-            "ManipulaPy_data/*.mesh",
-            "ManipulaPy_data/**/*.mesh",
-            "ManipulaPy_data/*.xml",
-            "ManipulaPy_data/**/*.xml",
-            "ManipulaPy_data/*.yaml",
-            "ManipulaPy_data/**/*.yaml",
-            "ManipulaPy_data/*.yml",
-            "ManipulaPy_data/**/*.yml",
-            "ManipulaPy_data/*.json",
-            "ManipulaPy_data/**/*.json",
-            "ManipulaPy_data/*.cfg",
-            "ManipulaPy_data/**/*.cfg",
-            "ManipulaPy_data/*.ini",
-            "ManipulaPy_data/**/*.ini",
-            "ManipulaPy_data/*.txt",
-            "ManipulaPy_data/**/*.txt",
-            "ManipulaPy_data/*.md",
-            "ManipulaPy_data/**/*.md",
-            
-            # Configuration files in main package
-            "*.yaml",
-            "*.yml",
-            "*.json",
-            "*.xml",
-            "*.cfg",
-            "*.ini",
-            
-            # Documentation assets
-            "docs/_static/*",
-            "docs/**/*",
-            
-            # Benchmark data and scripts
-            "Benchmark/*.py",
-            "Benchmark/*.md",
-            "Benchmark/**/*",
+            "ManipulaPy_data/*/*",
+            "ManipulaPy_data/*/*/*",
+            "ManipulaPy_data/*/*/*/*",
+            "ManipulaPy_data/*/*/*/*/*",
+            "ManipulaPy_data/ur5/ur5.urdf",
+            "ManipulaPy_data/ur5/visual/*.dae",
+            "ManipulaPy_data/xarm/xarm6_robot.urdf",
+            "ManipulaPy_data/xarm/visual/*.dae"
         ],
-        # Also include data for subpackages
-        "ManipulaPy.ManipulaPy_data": ["*", "**/*"],
-        "ManipulaPy.ManipulaPy_data.ur5": ["*", "**/*"],
-        "ManipulaPy.ManipulaPy_data.xarm": ["*", "**/*"],
     },
     
     # Project URLs for PyPI

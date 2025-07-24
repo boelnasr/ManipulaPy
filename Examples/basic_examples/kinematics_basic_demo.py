@@ -1,1222 +1,777 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """
-Basic Control Demo - ManipulaPy
+Basic Kinematics Demo: Forward and Inverse Kinematics Fundamentals
 
-This demo showcases the fundamental control capabilities of ManipulaPy including:
-- PID Control
-- Computed Torque Control  
-- PD with Feedforward Control
-- Joint Space Control
-- Cartesian Space Control
-- Controller tuning with Ziegler-Nichols method
-- Performance analysis and visualization
+This example demonstrates fundamental kinematic operations for robotic manipulators including
+forward kinematics computation, inverse kinematics solving, Jacobian analysis, and basic
+visualization of robot configurations and workspace.
 
-Copyright (c) 2025 Mohamed Aboelnasr
-Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
+Usage:
+    python kinematics_basic_demo.py
+
+Expected Output:
+    - Console output showing joint angles and end-effector poses
+    - Matplotlib plots of robot configurations and Jacobian analysis
+    - Convergence information for inverse kinematics
+    - Workspace visualization and joint limit analysis
+
+Author: ManipulaPy Development Team
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
-import time
-import logging
 from pathlib import Path
-import matplotlib
-matplotlib.use("Agg")  # prevents any GUI backend from being invoked
+import sys
+import time
 
-# ManipulaPy imports
+# Add ManipulaPy to path if needed
 try:
-    from ManipulaPy.kinematics import SerialManipulator
-    from ManipulaPy.dynamics import ManipulatorDynamics
-    from ManipulaPy.control import ManipulatorController
-    from ManipulaPy.urdf_processor import URDFToSerialManipulator
-    from ManipulaPy import utils
-    from ManipulaPy.ManipulaPy_data.xarm import urdf_file
-except ImportError as e:
-    print(f"Error importing ManipulaPy modules: {e}")
-    print("Please ensure ManipulaPy is properly installed.")
-    exit(1)
-
-# Optional GPU acceleration
-try:
-    import cupy as cp
-    GPU_AVAILABLE = True
-    print("✅ GPU acceleration available")
+    import ManipulaPy
 except ImportError:
-    GPU_AVAILABLE = False
-    print("⚠️ GPU acceleration not available, using CPU only")
+    sys.path.append(str(Path(__file__).parent.parent))
+    import ManipulaPy
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from ManipulaPy.urdf_processor import URDFToSerialManipulator
+from ManipulaPy.kinematics import SerialManipulator
+import matplotlib
+matplotlib.use('TkAgg')
 
-class BasicControlDemo:
+class KinematicsBasicDemo:
     """
-    Demonstrates basic control algorithms for robotic manipulators using the built-in XArm robot.
+    Comprehensive demonstration of basic kinematics operations.
     """
     
-    def __init__(self, use_simple_robot=False):
-        """
-        Initialize the control demo.
+    def __init__(self):
+        """Initialize the demo with robot model loading."""
+        self.robot = None
+        self.joint_limits = None
+        self.n_joints = 0
         
-        Args:
-            use_simple_robot: If True, creates a simple 3-DOF robot. 
-                             If False (default), uses the built-in XArm robot.
-        """
-        self.use_simple_robot = use_simple_robot
-        self.setup_robot()
-        self.setup_controller()
+    def run_demo(self):
+        """Run the complete kinematics demonstration."""
+        print("=" * 70)
+        print("   ManipulaPy: Basic Kinematics Demo")
+        print("=" * 70)
+        print()
         
-    def setup_robot(self):
-        """Set up the robot model (either XArm or simple)."""
-        if self.use_simple_robot:
-            self.setup_simple_robot()
-        else:
-            self.setup_xarm_robot()
+        # Step 1: Load robot model
+        if not self.load_robot_model():
+            return False
             
-    def setup_xarm_robot(self):
-        """Load the built-in XArm robot from ManipulaPy data."""
-        logger.info("Setting up XArm robot from built-in data...")
+        # Step 2: Demonstrate forward kinematics
+        self.demonstrate_forward_kinematics()
+        
+        # Step 3: Demonstrate inverse kinematics
+        self.demonstrate_inverse_kinematics()
+        
+        # Step 4: Demonstrate Jacobian analysis
+        self.demonstrate_jacobian_analysis()
+        
+        # Step 5: Demonstrate workspace analysis
+        self.demonstrate_workspace_analysis()
+        
+        # Step 6: Create comprehensive visualizations
+        self.create_visualizations()
+        
+        print("\n" + "=" * 70)
+        print("✅ Kinematics demo completed successfully!")
+        print("📊 Check the generated plots for detailed analysis")
+        print("=" * 70)
+        
+        return True
+    
+    def load_robot_model(self):
+        """Load and initialize robot model."""
+        print("🤖 Loading Robot Model")
+        print("-" * 30)
+        
+        # Try to load built-in robot models
+        urdf_file = None
+        robot_name = "Unknown"
         
         try:
-            # Load XArm robot using built-in URDF
-            logger.info(f"Loading XArm URDF from: {urdf_file}")
+            from ManipulaPy.ManipulaPy_data.xarm import urdf_file
+            robot_name = "xArm 6-DOF"
+            print(f"📁 Using built-in {robot_name} model")
+        except ImportError:
+            try:
+                from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
+                robot_name = "UR5"
+                print(f"📁 Using built-in {robot_name} model")
+            except ImportError:
+                print("❌ No built-in robot models found!")
+                print("💡 Please ensure ManipulaPy is properly installed with robot data.")
+                print("💡 You can also provide your own URDF file path.")
+                return False
+        
+        try:
+            # Process URDF and create robot model
+            print(f"⚙️ Processing URDF file...")
             urdf_processor = URDFToSerialManipulator(urdf_file)
             self.robot = urdf_processor.serial_manipulator
-            self.dynamics = urdf_processor.dynamics
-            
-            # Get joint limits from the robot
             self.joint_limits = np.array(self.robot.joint_limits)
-            num_joints = len(self.joint_limits)
+            self.n_joints = len(self.joint_limits)
             
-            # XArm typical torque limits (approximate values for demonstration)
-            # These are conservative values for safe operation
-            xarm_torque_limits = {
-                6: [(-50, 50), (-50, 50), (-30, 30), (-15, 15), (-15, 15), (-10, 10)],  # 6-DOF XArm
-                7: [(-50, 50), (-50, 50), (-30, 30), (-15, 15), (-15, 15), (-10, 10), (-5, 5)]  # 7-DOF XArm
-            }
+            print(f"✅ {robot_name} loaded successfully!")
+            print(f"   • Number of joints: {self.n_joints}")
+            print(f"   • Joint limits:")
             
-            if num_joints in xarm_torque_limits:
-                self.torque_limits = np.array(xarm_torque_limits[num_joints])
-            else:
-                # Default conservative limits
-                self.torque_limits = np.array([(-30, 30)] * num_joints)
-                logger.warning(f"Using default torque limits for {num_joints}-DOF robot")
+            for i, (min_val, max_val) in enumerate(self.joint_limits):
+                range_deg = np.degrees(max_val - min_val)
+                print(f"     Joint {i+1}: [{min_val:.2f}, {max_val:.2f}] rad "
+                      f"(range: {range_deg:.1f}°)")
             
-            logger.info(f"✅ Loaded {num_joints}-DOF XArm robot successfully")
-            logger.info(f"   Joint limits: {self.joint_limits.shape}")
-            logger.info(f"   Torque limits: {self.torque_limits.shape}")
+            return True
             
-            # Display joint limit information
-            for i, (joint_min, joint_max) in enumerate(self.joint_limits):
-                logger.info(f"   Joint {i+1}: [{joint_min:.3f}, {joint_max:.3f}] rad "
-                          f"([{np.degrees(joint_min):.1f}, {np.degrees(joint_max):.1f}] deg)")
-                          
         except Exception as e:
-            logger.error(f"Failed to load XArm robot: {e}")
-            logger.info("Falling back to simple robot...")
-            self.use_simple_robot = True
-            self.setup_simple_robot()
-            
-    def setup_simple_robot(self):
-        """Create a simple 3-DOF planar robot for demonstration (fallback)."""
-        logger.info("Setting up simple 3-DOF planar robot as fallback...")
-        
-        # Robot parameters (3-DOF planar robot)
-        L1, L2, L3 = 1.0, 0.8, 0.6  # Link lengths
-        
-        # Home position (all joints at zero)
-        M = np.array([
-            [1, 0, 0, L1 + L2 + L3],
-            [0, 1, 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
-        
-        # Screw axes in space frame
-        S_list = np.array([
-            [0, 0, 0],      # omega (rotation axes)
-            [0, 0, 0],
-            [1, 1, 1],
-            [0, 0, 0],      # v (linear velocities)
-            [0, 0, 0],
-            [0, L1, L1+L2]
-        ])
-        
-        # Body frame screw axes
-        B_list = np.array([
-            [0, 0, 0],
-            [0, 0, 0], 
-            [1, 1, 1],
-            [0, 0, 0],
-            [0, 0, 0],
-            [L2+L3, L3, 0]
-        ])
-        
-        # Inertia matrices (simplified)
-        G_list = []
-        for i in range(3):
-            # Simplified inertia matrix for each link
-            mass = 1.0  # 1 kg per link
-            Ixx = Iyy = Izz = 0.1  # Simplified inertia values
-            G = np.array([
-                [Ixx, 0, 0, 0, 0, 0],
-                [0, Iyy, 0, 0, 0, 0],
-                [0, 0, Izz, 0, 0, 0],
-                [0, 0, 0, mass, 0, 0],
-                [0, 0, 0, 0, mass, 0],
-                [0, 0, 0, 0, 0, mass]
-            ])
-            G_list.append(G)
-        
-        # Joint limits (radians)
-        joint_limits = [(-np.pi, np.pi), (-np.pi/2, np.pi/2), (-np.pi/3, np.pi/3)]
-        
-        # Extract omega and r lists
-        omega_list = S_list[:3, :]
-        r_list = utils.extract_r_list(S_list)
-        
-        # Create manipulator objects
-        self.robot = SerialManipulator(
-            M_list=M,
-            omega_list=omega_list,
-            r_list=r_list,
-            S_list=S_list,
-            B_list=B_list,
-            G_list=G_list,
-            joint_limits=joint_limits
-        )
-        
-        self.dynamics = ManipulatorDynamics(
-            M_list=M,
-            omega_list=omega_list,
-            r_list=r_list,
-            b_list=None,
-            S_list=S_list,
-            B_list=B_list,
-            Glist=G_list
-        )
-        
-        # Control parameters
-        self.joint_limits = np.array(joint_limits)
-        self.torque_limits = np.array([(-10, 10), (-8, 8), (-5, 5)])  # Nm
-        
-        logger.info("✅ Simple robot setup complete")
+            print(f"❌ Error loading robot model: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
     
-    def get_safe_joint_targets(self):
-        """Get safe joint target positions within limits for the current robot."""
-        num_joints = len(self.joint_limits)
+    def demonstrate_forward_kinematics(self):
+        """Demonstrate forward kinematics with multiple configurations."""
+        print(f"\n🔧 Forward Kinematics Demonstration")
+        print("-" * 40)
         
-        if not self.use_simple_robot:  # XArm robot
-            # Conservative targets for XArm within joint limits
-            # These are safe positions that don't cause singularities
-            safe_targets = {
-                6: np.array([np.pi/6, np.pi/8, np.pi/4, np.pi/6, np.pi/8, np.pi/6]),  # 6-DOF
-                7: np.array([np.pi/6, np.pi/8, np.pi/4, np.pi/6, np.pi/8, np.pi/6, np.pi/8])  # 7-DOF
+        # Test configurations
+        test_configs = {
+            "Home (Zero)": np.zeros(self.n_joints),
+            "Mid-range": np.array([np.mean(limits) for limits in self.joint_limits]),
+            "Random": np.random.uniform(
+                self.joint_limits[:, 0], 
+                self.joint_limits[:, 1]
+            ),
+            "Test Pose": self._generate_safe_test_pose()
+        }
+        
+        self.fk_results = {}
+        
+        for config_name, joint_angles in test_configs.items():
+            print(f"\n📍 Configuration: {config_name}")
+            print(f"   Joint angles: {joint_angles}")
+            
+            # Compute forward kinematics
+            start_time = time.time()
+            T_end = self.robot.forward_kinematics(joint_angles)
+            fk_time = time.time() - start_time
+            
+            # Extract position and orientation
+            position = T_end[:3, 3]
+            rotation_matrix = T_end[:3, :3]
+            
+            # Convert rotation matrix to Euler angles (ZYX convention)
+            euler_angles = self._rotation_matrix_to_euler_zyx(rotation_matrix)
+            
+            print(f"   End-effector position: [{position[0]:.4f}, {position[1]:.4f}, {position[2]:.4f}] m")
+            print(f"   End-effector orientation (ZYX Euler): [{np.degrees(euler_angles[0]):.1f}°, "
+                  f"{np.degrees(euler_angles[1]):.1f}°, {np.degrees(euler_angles[2]):.1f}°]")
+            print(f"   Computation time: {fk_time*1000:.2f} ms")
+            
+            # Store results for visualization
+            self.fk_results[config_name] = {
+                'joint_angles': joint_angles,
+                'position': position,
+                'orientation': euler_angles,
+                'transform': T_end,
+                'computation_time': fk_time
             }
-            
-            if num_joints in safe_targets:
-                targets = safe_targets[num_joints]
-            else:
-                # Generate safe targets automatically
-                targets = np.array([
-                    (self.joint_limits[i, 0] + self.joint_limits[i, 1]) * 0.2
-                    for i in range(num_joints)
-                ])
-        else:  # Simple robot
-            targets = np.array([np.pi/4, np.pi/6, -np.pi/8][:num_joints])
         
-        # Ensure targets are within limits
-        targets = np.clip(targets, self.joint_limits[:, 0], self.joint_limits[:, 1])
-        
-        return targets
+        # Performance analysis
+        avg_time = np.mean([result['computation_time'] for result in self.fk_results.values()])
+        print(f"\n📊 Forward Kinematics Performance:")
+        print(f"   Average computation time: {avg_time*1000:.2f} ms")
+        print(f"   Frequency capability: {1/avg_time:.0f} Hz")
     
-    def get_trajectory_amplitudes(self):
-        """Get safe trajectory amplitudes for the current robot."""
-        num_joints = len(self.joint_limits)
+    def demonstrate_inverse_kinematics(self):
+        """Demonstrate inverse kinematics with different target poses."""
+        print(f"\n🎯 Inverse Kinematics Demonstration")
+        print("-" * 40)
         
-        if not self.use_simple_robot:  # XArm robot
-            # Conservative amplitudes to avoid joint limits
-            range_factor = 0.3  # Use 30% of joint range
-            amplitudes = np.array([
-                (self.joint_limits[i, 1] - self.joint_limits[i, 0]) * range_factor
-                for i in range(num_joints)
-            ])
-        else:  # Simple robot
-            amplitudes = np.array([np.pi/6, np.pi/8, np.pi/10][:num_joints])
+        # Use forward kinematics results as IK targets
+        target_configs = list(self.fk_results.keys())[1:3]  # Skip home, use mid-range and random
         
-        return amplitudes
+        self.ik_results = {}
         
-    def setup_urdf_robot(self):
-        """Legacy method - now redirects to XArm setup."""
-        logger.info("Redirecting to built-in XArm robot...")
-        self.setup_xarm_robot()
-        
-    def setup_controller(self):
-        """Initialize the manipulator controller."""
-        self.controller = ManipulatorController(self.dynamics)
-        logger.info("✅ Controller initialized")
-        
-    def demonstrate_pid_control(self):
-        """Demonstrate PID control with step response analysis."""
-        logger.info("\n🎯 Demonstrating PID Control...")
-        
-        # Control parameters
-        num_joints = len(self.joint_limits)
-        Kp = np.array([100.0] * num_joints)
-        Ki = np.array([10.0] * num_joints)
-        Kd = np.array([20.0] * num_joints)
-        
-        # Simulation parameters
-        dt = 0.01  # 10 ms time step
-        T_final = 5.0  # 5 second simulation
-        time_steps = int(T_final / dt)
-        
-        # Target positions (step inputs) - use safe targets for current robot
-        target_positions = self.get_safe_joint_targets()
-        target_velocities = np.zeros(num_joints)
-        
-        # Initial conditions
-        current_positions = np.zeros(num_joints)
-        current_velocities = np.zeros(num_joints)
-        
-        # Data storage
-        time_history = []
-        position_history = []
-        velocity_history = []
-        torque_history = []
-        error_history = []
-        
-        logger.info(f"Running PID simulation for {T_final}s with {time_steps} steps...")
-        
-        for step in range(time_steps):
-            current_time = step * dt
+        for config_name in target_configs:
+            fk_result = self.fk_results[config_name]
+            target_pose = fk_result['transform']
+            target_position = fk_result['position']
             
-            # PID control
-            control_torques = self.controller.pid_control(
-                thetalistd=target_positions,
-                dthetalistd=target_velocities,
-                thetalist=current_positions,
-                dthetalist=current_velocities,
-                dt=dt,
-                Kp=Kp,
-                Ki=Ki,
-                Kd=Kd
+            print(f"\n🎯 Target: {config_name}")
+            print(f"   Target position: [{target_position[0]:.4f}, {target_position[1]:.4f}, {target_position[2]:.4f}] m")
+            
+            # Generate initial guess (perturbed from solution)
+            true_solution = fk_result['joint_angles']
+            initial_guess = true_solution + np.random.normal(0, 0.1, self.n_joints)
+            
+            # Ensure initial guess is within joint limits
+            initial_guess = np.clip(initial_guess, 
+                                  self.joint_limits[:, 0], 
+                                  self.joint_limits[:, 1])
+            
+            print(f"   Initial guess: {initial_guess}")
+            
+            # Solve inverse kinematics
+            start_time = time.time()
+            solution, success, iterations = self.robot.iterative_inverse_kinematics(
+                T_desired=target_pose,
+                thetalist0=initial_guess,
+                eomg=1e-6,      # Orientation tolerance
+                ev=1e-6,        # Position tolerance
+                max_iterations=1000,
+                plot_residuals=False,  # We'll handle plotting separately
+                damping=1e-2,   # Damping for numerical stability
+                step_cap=0.3    # Maximum step size
             )
+            ik_time = time.time() - start_time
             
-            # Convert to numpy if using GPU
-            if GPU_AVAILABLE and hasattr(control_torques, 'get'):
-                control_torques = control_torques.get()
+            if success:
+                print(f"   ✅ IK converged in {iterations} iterations ({ik_time*1000:.1f} ms)")
+                print(f"   Solution: {solution}")
+                
+                # Verify the solution
+                verification_pose = self.robot.forward_kinematics(solution)
+                position_error = np.linalg.norm(verification_pose[:3, 3] - target_position)
+                orientation_error = self._compute_orientation_error(verification_pose[:3, :3], target_pose[:3, :3])
+                
+                print(f"   Verification:")
+                print(f"     Position error: {position_error:.2e} m")
+                print(f"     Orientation error: {orientation_error:.2e} rad")
+                
+                # Compare with true solution
+                joint_error = np.linalg.norm(solution - true_solution)
+                print(f"     Joint space error: {joint_error:.4f} rad")
+                
+                self.ik_results[config_name] = {
+                    'target_pose': target_pose,
+                    'initial_guess': initial_guess,
+                    'solution': solution,
+                    'true_solution': true_solution,
+                    'iterations': iterations,
+                    'computation_time': ik_time,
+                    'position_error': position_error,
+                    'orientation_error': orientation_error,
+                    'joint_error': joint_error,
+                    'success': True
+                }
+                
+            else:
+                print(f"   ❌ IK failed to converge after {iterations} iterations")
+                self.ik_results[config_name] = {
+                    'success': False,
+                    'iterations': iterations,
+                    'computation_time': ik_time
+                }
+        
+        # IK Performance Summary
+        successful_iks = [result for result in self.ik_results.values() if result['success']]
+        if successful_iks:
+            avg_iterations = np.mean([result['iterations'] for result in successful_iks])
+            avg_time = np.mean([result['computation_time'] for result in successful_iks])
+            avg_position_error = np.mean([result['position_error'] for result in successful_iks])
             
-            # Apply torque limits
-            control_torques = np.clip(
-                control_torques, 
-                self.torque_limits[:, 0], 
-                self.torque_limits[:, 1]
-            )
+            print(f"\n📊 Inverse Kinematics Performance:")
+            print(f"   Success rate: {len(successful_iks)}/{len(self.ik_results)} ({100*len(successful_iks)/len(self.ik_results):.1f}%)")
+            print(f"   Average iterations: {avg_iterations:.1f}")
+            print(f"   Average computation time: {avg_time*1000:.1f} ms")
+            print(f"   Average position accuracy: {avg_position_error:.2e} m")
+    
+    def demonstrate_jacobian_analysis(self):
+        """Demonstrate Jacobian computation and analysis."""
+        print(f"\n📐 Jacobian Analysis Demonstration")
+        print("-" * 40)
+        
+        self.jacobian_results = {}
+        
+        # Analyze Jacobian at different configurations
+        for config_name, fk_result in self.fk_results.items():
+            joint_angles = fk_result['joint_angles']
             
-            # Simple integration (Euler method)
-            # In a real system, you would use forward dynamics
-            # For demo purposes, we'll use a simplified model
-            mass_matrix = np.diag([1.0] * num_joints)  # Simplified
-            accelerations = np.linalg.solve(mass_matrix, control_torques)
+            print(f"\n📐 Configuration: {config_name}")
             
-            # Update states
-            current_velocities += accelerations * dt
-            current_positions += current_velocities * dt
+            # Compute Jacobian matrices
+            start_time = time.time()
+            J_space = self.robot.jacobian(joint_angles, frame="space")
+            J_body = self.robot.jacobian(joint_angles, frame="body")
+            jacobian_time = time.time() - start_time
             
-            # Apply joint limits
-            current_positions = np.clip(
-                current_positions,
-                self.joint_limits[:, 0],
+            # Analyze Jacobian properties
+            det_J_space = np.linalg.det(J_space @ J_space.T)  # For non-square Jacobians
+            cond_J_space = np.linalg.cond(J_space)
+            
+            # Compute manipulability
+            manipulability = np.sqrt(det_J_space) if det_J_space >= 0 else 0
+            
+            # Singular value decomposition
+            U, sigma, Vh = np.linalg.svd(J_space)
+            min_singular_value = np.min(sigma)
+            max_singular_value = np.max(sigma)
+            
+            print(f"   Jacobian shape: {J_space.shape}")
+            print(f"   Condition number: {cond_J_space:.2f}")
+            print(f"   Manipulability: {manipulability:.6f}")
+            print(f"   Singular values: [{np.min(sigma):.4f}, {np.max(sigma):.4f}]")
+            print(f"   Computation time: {jacobian_time*1000:.2f} ms")
+            
+            # Check for near-singularity
+            is_near_singular = min_singular_value < 1e-3
+            if is_near_singular:
+                print(f"   ⚠️ Near singular configuration (min σ = {min_singular_value:.2e})")
+            else:
+                print(f"   ✅ Well-conditioned configuration")
+            
+            self.jacobian_results[config_name] = {
+                'J_space': J_space,
+                'J_body': J_body,
+                'condition_number': cond_J_space,
+                'manipulability': manipulability,
+                'singular_values': sigma,
+                'min_singular_value': min_singular_value,
+                'max_singular_value': max_singular_value,
+                'is_near_singular': is_near_singular,
+                'computation_time': jacobian_time
+            }
+        
+        # Jacobian Performance Summary
+        avg_time = np.mean([result['computation_time'] for result in self.jacobian_results.values()])
+        print(f"\n📊 Jacobian Analysis Performance:")
+        print(f"   Average computation time: {avg_time*1000:.2f} ms")
+        print(f"   Frequency capability: {1/avg_time:.0f} Hz")
+    
+    def demonstrate_workspace_analysis(self):
+        """Demonstrate basic workspace analysis."""
+        print(f"\n🌍 Workspace Analysis Demonstration")
+        print("-" * 40)
+        
+        print("🔍 Sampling robot workspace...")
+        
+        # Generate random configurations within joint limits
+        n_samples = 1000
+        workspace_points = []
+        
+        start_time = time.time()
+        for i in range(n_samples):
+            # Generate random joint configuration
+            joint_config = np.random.uniform(
+                self.joint_limits[:, 0], 
                 self.joint_limits[:, 1]
             )
             
-            # Store data
-            time_history.append(current_time)
-            position_history.append(current_positions.copy())
-            velocity_history.append(current_velocities.copy())
-            torque_history.append(control_torques.copy())
-            error_history.append(target_positions - current_positions)
-            
-        # Convert to numpy arrays
-        time_history = np.array(time_history)
-        position_history = np.array(position_history)
-        velocity_history = np.array(velocity_history)
-        torque_history = np.array(torque_history)
-        error_history = np.array(error_history)
+            # Compute forward kinematics
+            T = self.robot.forward_kinematics(joint_config)
+            workspace_points.append(T[:3, 3])
         
-        # Plot results
-        self.plot_pid_results(
-            time_history, position_history, velocity_history, 
-            torque_history, error_history, target_positions
-        )
+        sampling_time = time.time() - start_time
+        workspace_points = np.array(workspace_points)
         
-        # Analyze performance
-        self.analyze_step_response(time_history, position_history, target_positions)
+        # Analyze workspace properties
+        workspace_center = np.mean(workspace_points, axis=0)
+        workspace_std = np.std(workspace_points, axis=0)
+        workspace_range = np.max(workspace_points, axis=0) - np.min(workspace_points, axis=0)
         
-        logger.info("✅ PID control demonstration complete")
+        print(f"✅ Sampled {n_samples} workspace points in {sampling_time:.2f} seconds")
+        print(f"   Workspace center: [{workspace_center[0]:.3f}, {workspace_center[1]:.3f}, {workspace_center[2]:.3f}] m")
+        print(f"   Workspace range: [{workspace_range[0]:.3f}, {workspace_range[1]:.3f}, {workspace_range[2]:.3f}] m")
+        print(f"   Workspace volume (approx): {np.prod(workspace_range):.3f} m³")
         
-    def plot_pid_results(self, time_hist, pos_hist, vel_hist, torque_hist, error_hist, targets):
-        """Plot PID control results."""
-        num_joints = pos_hist.shape[1]
-        
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle('PID Control Results', fontsize=16, fontweight='bold')
-        
-        # Position tracking
-        ax = axes[0, 0]
-        for i in range(num_joints):
-            ax.plot(time_hist, pos_hist[:, i], label=f'Joint {i+1}', linewidth=2)
-            ax.axhline(y=targets[i], color=f'C{i}', linestyle='--', alpha=0.7)
-        ax.set_title('Joint Positions', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Position (rad)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Velocity profiles
-        ax = axes[0, 1]
-        for i in range(num_joints):
-            ax.plot(time_hist, vel_hist[:, i], label=f'Joint {i+1}', linewidth=2)
-        ax.set_title('Joint Velocities', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Velocity (rad/s)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Control torques
-        ax = axes[1, 0]
-        for i in range(num_joints):
-            ax.plot(time_hist, torque_hist[:, i], label=f'Joint {i+1}', linewidth=2)
-        ax.set_title('Control Torques', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Torque (Nm)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Tracking errors
-        ax = axes[1, 1]
-        for i in range(num_joints):
-            ax.plot(time_hist, error_hist[:, i], label=f'Joint {i+1}', linewidth=2)
-        ax.set_title('Tracking Errors', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Error (rad)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.show()
-        
-    def analyze_step_response(self, time_hist, pos_hist, targets):
-        """Analyze step response characteristics."""
-        logger.info("\n📊 Step Response Analysis:")
-        
-        for joint in range(pos_hist.shape[1]):
-            target = targets[joint]
-            response = pos_hist[:, joint]
-            
-            # Rise time (10% to 90% of final value)
-            final_value = response[-1]
-            rise_start_idx = np.where(response >= 0.1 * target)[0]
-            rise_end_idx = np.where(response >= 0.9 * target)[0]
-            
-            if len(rise_start_idx) > 0 and len(rise_end_idx) > 0:
-                rise_time = time_hist[rise_end_idx[0]] - time_hist[rise_start_idx[0]]
-            else:
-                rise_time = float('inf')
-            
-            # Settling time (within 2% of target)
-            settling_indices = np.where(np.abs(response - target) <= 0.02 * target)[0]
-            if len(settling_indices) > 0:
-                settling_time = time_hist[settling_indices[0]]
-            else:
-                settling_time = float('inf')
-            
-            # Overshoot
-            max_response = np.max(response)
-            overshoot = max(0, (max_response - target) / target * 100)
-            
-            # Steady-state error
-            steady_state_error = abs(final_value - target)
-            
-            logger.info(f"  Joint {joint+1}:")
-            logger.info(f"    Rise time: {rise_time:.3f}s")
-            logger.info(f"    Settling time: {settling_time:.3f}s")
-            logger.info(f"    Overshoot: {overshoot:.1f}%")
-            logger.info(f"    Steady-state error: {steady_state_error:.4f} rad")
-            
-    def demonstrate_computed_torque_control(self):
-        """Demonstrate computed torque control for trajectory tracking."""
-        logger.info("\n🎯 Demonstrating Computed Torque Control...")
-        
-        # Generate a simple trajectory
-        T_final = 5.0
-        dt = 0.01
-        time_steps = int(T_final / dt)
-        num_joints = len(self.joint_limits)
-        
-        # Sinusoidal trajectory
-        time_history = np.linspace(0, T_final, time_steps)
-        amplitude = np.array([np.pi/6] * num_joints)
-        frequency = np.array([0.5] * num_joints)
-        
-        # Desired trajectory
-        desired_positions = np.array([
-            amplitude * np.sin(2 * np.pi * frequency[i] * time_history)
-            for i in range(num_joints)
-        ]).T
-        
-        desired_velocities = np.array([
-            amplitude * 2 * np.pi * frequency[i] * np.cos(2 * np.pi * frequency[i] * time_history)
-            for i in range(num_joints)
-        ]).T
-        
-        desired_accelerations = np.array([
-            -amplitude * (2 * np.pi * frequency[i])**2 * np.sin(2 * np.pi * frequency[i] * time_history)
-            for i in range(num_joints)
-        ]).T
-        
-        # Control gains
-        Kp = np.array([200.0] * num_joints)
-        Ki = np.array([50.0] * num_joints)
-        Kd = np.array([50.0] * num_joints)
-        
-        # Gravity vector
-        gravity = np.array([0, 0, -9.81])
-        Ftip = np.zeros(6)  # No external forces
-        
-        # Initial conditions
-        current_positions = np.zeros(num_joints)
-        current_velocities = np.zeros(num_joints)
-        
-        # Data storage
-        actual_positions = []
-        actual_velocities = []
-        control_torques = []
-        tracking_errors = []
-        
-        logger.info(f"Running computed torque simulation...")
-        
-        for step in range(time_steps):
-            # Computed torque control
-            torques = self.controller.computed_torque_control(
-                thetalistd=desired_positions[step],
-                dthetalistd=desired_velocities[step],
-                ddthetalistd=desired_accelerations[step],
-                thetalist=current_positions,
-                dthetalist=current_velocities,
-                g=gravity,
-                dt=dt,
-                Kp=Kp,
-                Ki=Ki,
-                Kd=Kd
-            )
-            
-            # Convert from GPU if necessary
-            if GPU_AVAILABLE and hasattr(torques, 'get'):
-                torques = torques.get()
-            
-            # Apply torque limits
-            torques = np.clip(torques, self.torque_limits[:, 0], self.torque_limits[:, 1])
-            
-            # Simplified dynamics integration
-            mass_matrix = np.diag([1.0] * num_joints)
-            accelerations = np.linalg.solve(mass_matrix, torques)
-            
-            # Update states
-            current_velocities += accelerations * dt
-            current_positions += current_velocities * dt
-            
-            # Store data
-            actual_positions.append(current_positions.copy())
-            actual_velocities.append(current_velocities.copy())
-            control_torques.append(torques.copy())
-            tracking_errors.append(desired_positions[step] - current_positions)
-            
-        # Convert to numpy arrays
-        actual_positions = np.array(actual_positions)
-        actual_velocities = np.array(actual_velocities)
-        control_torques = np.array(control_torques)
-        tracking_errors = np.array(tracking_errors)
-        
-        # Plot results
-        self.plot_computed_torque_results(
-            time_history, desired_positions, actual_positions,
-            control_torques, tracking_errors
-        )
-        
-        # Calculate RMS tracking error
-        rms_errors = np.sqrt(np.mean(tracking_errors**2, axis=0))
-        logger.info("📊 Tracking Performance:")
-        for i, rms_error in enumerate(rms_errors):
-            logger.info(f"  Joint {i+1} RMS error: {rms_error:.4f} rad")
-            
-        logger.info("✅ Computed torque control demonstration complete")
-        
-    def plot_computed_torque_results(self, time_hist, desired_pos, actual_pos, torques, errors):
-        """Plot computed torque control results."""
-        num_joints = actual_pos.shape[1]
-        
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle('Computed Torque Control Results', fontsize=16, fontweight='bold')
-        
-        # Position tracking
-        ax = axes[0, 0]
-        for i in range(num_joints):
-            ax.plot(time_hist, desired_pos[:, i], '--', label=f'Desired {i+1}', 
-                   linewidth=2, alpha=0.8)
-            ax.plot(time_hist, actual_pos[:, i], '-', label=f'Actual {i+1}', 
-                   linewidth=2)
-        ax.set_title('Position Tracking', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Position (rad)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Tracking errors
-        ax = axes[0, 1]
-        for i in range(num_joints):
-            ax.plot(time_hist, errors[:, i], label=f'Joint {i+1}', linewidth=2)
-        ax.set_title('Tracking Errors', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Error (rad)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Control torques
-        ax = axes[1, 0]
-        for i in range(num_joints):
-            ax.plot(time_hist, torques[:, i], label=f'Joint {i+1}', linewidth=2)
-        ax.set_title('Control Torques', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Torque (Nm)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Error statistics
-        ax = axes[1, 1]
-        rms_errors = np.sqrt(np.mean(errors**2, axis=0))
-        max_errors = np.max(np.abs(errors), axis=0)
-        
-        x_pos = np.arange(num_joints)
-        width = 0.35
-        ax.bar(x_pos - width/2, rms_errors, width, label='RMS Error', alpha=0.8)
-        ax.bar(x_pos + width/2, max_errors, width, label='Max Error', alpha=0.8)
-        
-        ax.set_title('Error Statistics', fontweight='bold')
-        ax.set_xlabel('Joint Number')
-        ax.set_ylabel('Error (rad)')
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels([f'J{i+1}' for i in range(num_joints)])
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.show()
-        
-    def demonstrate_controller_tuning(self):
-        """Demonstrate automatic controller tuning using Ziegler-Nichols method."""
-        logger.info("\n🎯 Demonstrating Controller Tuning (Ziegler-Nichols)...")
-        
-        num_joints = len(self.joint_limits)
-        
-        # For demonstration, we'll use mock ultimate gain and period values
-        # In practice, these would be determined experimentally
-        ultimate_gains = np.array([150.0, 120.0, 100.0][:num_joints])
-        ultimate_periods = np.array([0.8, 1.0, 1.2][:num_joints])
-        
-        logger.info("📐 Computing controller gains using Ziegler-Nichols method...")
-        
-        # Tune for different controller types
-        controller_types = ['P', 'PI', 'PID']
-        tuned_gains = {}
-        
-        for ctrl_type in controller_types:
-            Kp, Ki, Kd = self.controller.ziegler_nichols_tuning(
-                ultimate_gains, ultimate_periods, kind=ctrl_type
-            )
-            tuned_gains[ctrl_type] = {'Kp': Kp, 'Ki': Ki, 'Kd': Kd}
-            
-            logger.info(f"  {ctrl_type} Controller gains:")
-            logger.info(f"    Kp: {Kp}")
-            logger.info(f"    Ki: {Ki}")
-            logger.info(f"    Kd: {Kd}")
-            
-        # Demonstrate the tuning method with actual ultimate gain finding
-        logger.info("\n🔍 Finding ultimate gain and period for Joint 1...")
-        
-        # Use the controller's method to find ultimate parameters
-        initial_angles = np.zeros(num_joints)
-        target_angles = np.array([np.pi/6] * num_joints)
+        self.workspace_results = {
+            'points': workspace_points,
+            'center': workspace_center,
+            'range': workspace_range,
+            'std': workspace_std,
+            'sampling_time': sampling_time
+        }
+    
+    def create_visualizations(self):
+        """Create comprehensive visualization plots."""
+        print(f"\n📊 Creating Visualization Plots")
+        print("-" * 40)
         
         try:
-            ultimate_gain, ultimate_period, gain_history, error_history = \
-                self.controller.find_ultimate_gain_and_period(
-                    initial_angles, target_angles, dt=0.01, max_steps=500
-                )
+            # Create comprehensive figure
+            fig = plt.figure(figsize=(20, 15))
+            fig.suptitle('ManipulaPy: Basic Kinematics Demo - Comprehensive Analysis', fontsize=16, fontweight='bold')
             
-            logger.info(f"  Found ultimate gain: {ultimate_gain:.2f}")
-            logger.info(f"  Found ultimate period: {ultimate_period:.3f}s")
+            # Plot 1: Joint Configurations Comparison
+            ax1 = plt.subplot(3, 4, 1)
+            self._plot_joint_configurations(ax1)
             
-            # Plot the gain search process
-            self.plot_tuning_results(gain_history, error_history)
+            # Plot 2: End-Effector Positions
+            ax2 = plt.subplot(3, 4, 2)
+            self._plot_end_effector_positions(ax2)
             
-        except Exception as e:
-            logger.warning(f"Ultimate gain finding failed: {e}")
-            logger.info("Using predefined values for demonstration")
+            # Plot 3: Jacobian Condition Numbers
+            ax3 = plt.subplot(3, 4, 3)
+            self._plot_jacobian_analysis(ax3)
             
-        logger.info("✅ Controller tuning demonstration complete")
-        
-    def plot_tuning_results(self, gain_history, error_history):
-        """Plot controller tuning results."""
-        fig, axes = plt.subplots(2, 1, figsize=(12, 8))
-        fig.suptitle('Controller Tuning Results', fontsize=16, fontweight='bold')
-        
-        # Gain progression
-        ax = axes[0]
-        ax.plot(gain_history, 'o-', linewidth=2, markersize=6)
-        ax.set_title('Gain Progression During Tuning', fontweight='bold')
-        ax.set_xlabel('Iteration')
-        ax.set_ylabel('Proportional Gain')
-        ax.grid(True, alpha=0.3)
-        
-        # Error evolution for each gain
-        ax = axes[1]
-        for i, errors in enumerate(error_history[:min(5, len(error_history))]):
-            if GPU_AVAILABLE and hasattr(errors, 'get'):
-                errors = errors.get()
-            time_steps = np.arange(len(errors)) * 0.01
-            ax.plot(time_steps, errors, label=f'Gain {gain_history[i]:.1f}', 
-                   linewidth=2, alpha=0.7)
-        
-        ax.set_title('Error Evolution for Different Gains', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('System Error')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.show()
-        
-    def demonstrate_cartesian_control(self):
-        """Demonstrate Cartesian space control."""
-        logger.info("\n🎯 Demonstrating Cartesian Space Control...")
-        
-        num_joints = len(self.joint_limits)
-        
-        # Current joint configuration (safe starting position)
-        current_joint_angles = self.get_safe_joint_targets() * 0.1  # Small initial offset
-        current_joint_velocities = np.zeros(num_joints)
-        
-        # Desired Cartesian position (relative to current end-effector position)
-        current_transform = self.robot.forward_kinematics(current_joint_angles)
-        current_ee_pos = current_transform[:3, 3]
-        
-        # Move 10cm in positive X direction from current position
-        desired_position = current_ee_pos + np.array([0.1, 0.0, 0.0])
-        
-        # Control gains
-        Kp = np.array([100.0, 100.0, 100.0])  # Position gains
-        Kd = np.array([20.0, 20.0, 20.0])     # Damping gains
-        
-        # Simulate control
-        logger.info("Computing Cartesian control torques...")
-        
-        try:
-            control_torques = self.controller.cartesian_space_control(
-                desired_position=desired_position,
-                current_joint_angles=current_joint_angles,
-                current_joint_velocities=current_joint_velocities,
-                Kp=Kp,
-                Kd=Kd
-            )
+            # Plot 4: Manipulability Analysis
+            ax4 = plt.subplot(3, 4, 4)
+            self._plot_manipulability_analysis(ax4)
             
-            # Convert from GPU if necessary
-            if GPU_AVAILABLE and hasattr(control_torques, 'get'):
-                control_torques = control_torques.get()
-                
-            # Current end-effector position
-            current_transform = self.robot.forward_kinematics(current_joint_angles)
-            current_position = current_transform[:3, 3]
+            # Plot 5: Workspace 3D Scatter
+            ax5 = plt.subplot(3, 4, 5, projection='3d')
+            self._plot_workspace_3d(ax5)
             
-            # Position error
-            position_error = desired_position - current_position
-            error_magnitude = np.linalg.norm(position_error)
+            # Plot 6: Workspace Projections
+            ax6 = plt.subplot(3, 4, 6)
+            self._plot_workspace_projections(ax6)
             
-            logger.info("📊 Cartesian Control Results:")
-            logger.info(f"  Current EE position: [{current_position[0]:.3f}, {current_position[1]:.3f}, {current_position[2]:.3f}]")
-            logger.info(f"  Desired EE position: [{desired_position[0]:.3f}, {desired_position[1]:.3f}, {desired_position[2]:.3f}]")
-            logger.info(f"  Position error magnitude: {error_magnitude:.4f} m")
-            logger.info(f"  Control torques: {control_torques}")
+            # Plot 7: IK Convergence Analysis
+            ax7 = plt.subplot(3, 4, 7)
+            self._plot_ik_convergence(ax7)
             
-            # Visualize results
-            self.plot_cartesian_control_results(
-                current_position, desired_position, position_error, control_torques
-            )
+            # Plot 8: Jacobian Heatmap
+            ax8 = plt.subplot(3, 4, 8)
+            self._plot_jacobian_heatmap(ax8)
+            
+            # Plot 9: Joint Limits Visualization
+            ax9 = plt.subplot(3, 4, 9)
+            self._plot_joint_limits(ax9)
+            
+            # Plot 10: Performance Metrics
+            ax10 = plt.subplot(3, 4, 10)
+            self._plot_performance_metrics(ax10)
+            
+            # Plot 11: Singular Values Analysis
+            ax11 = plt.subplot(3, 4, 11)
+            self._plot_singular_values(ax11)
+            
+            # Plot 12: Error Analysis
+            ax12 = plt.subplot(3, 4, 12)
+            self._plot_error_analysis(ax12)
+            
+            plt.tight_layout()
+            plt.show()
+            
+            print("✅ Visualization plots created successfully!")
             
         except Exception as e:
-            logger.error(f"Cartesian control failed: {e}")
-            
-        logger.info("✅ Cartesian space control demonstration complete")
+            print(f"⚠️ Error creating visualizations: {e}")
+            print("This might be due to missing display or matplotlib backend issues.")
+    
+    def _plot_joint_configurations(self, ax):
+        """Plot joint configurations comparison."""
+        configs = list(self.fk_results.keys())
+        joint_angles_data = [self.fk_results[config]['joint_angles'] for config in configs]
         
-    def plot_cartesian_control_results(self, current_pos, desired_pos, error, torques):
-        """Plot Cartesian control results."""
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        fig.suptitle('Cartesian Space Control Results', fontsize=16, fontweight='bold')
+        x = np.arange(self.n_joints)
+        width = 0.2
         
-        # Position comparison
-        ax = axes[0]
-        coords = ['X', 'Y', 'Z']
-        x_pos = np.arange(len(coords))
-        width = 0.35
+        for i, (config, angles) in enumerate(zip(configs, joint_angles_data)):
+            ax.bar(x + i*width, np.degrees(angles), width, label=config, alpha=0.8)
         
-        ax.bar(x_pos - width/2, current_pos, width, label='Current', alpha=0.8)
-        ax.bar(x_pos + width/2, desired_pos, width, label='Desired', alpha=0.8)
-        
-        ax.set_title('End-Effector Position', fontweight='bold')
-        ax.set_xlabel('Coordinate')
-        ax.set_ylabel('Position (m)')
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(coords)
+        ax.set_xlabel('Joint Index')
+        ax.set_ylabel('Joint Angle (degrees)')
+        ax.set_title('Joint Configurations Comparison')
+        ax.set_xticks(x + width * (len(configs)-1)/2)
+        ax.set_xticklabels([f'J{i+1}' for i in range(self.n_joints)])
         ax.legend()
         ax.grid(True, alpha=0.3)
+    
+    def _plot_end_effector_positions(self, ax):
+        """Plot end-effector positions."""
+        configs = list(self.fk_results.keys())
+        positions = [self.fk_results[config]['position'] for config in configs]
         
-        # Position error
-        ax = axes[1]
-        colors = ['red' if abs(e) > 0.01 else 'green' for e in error]
-        bars = ax.bar(coords, error, color=colors, alpha=0.7)
-        ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
-        ax.set_title('Position Error', fontweight='bold')
-        ax.set_xlabel('Coordinate')
-        ax.set_ylabel('Error (m)')
+        x_pos = [pos[0] for pos in positions]
+        y_pos = [pos[1] for pos in positions]
+        z_pos = [pos[2] for pos in positions]
+        
+        ax.scatter(x_pos, y_pos, c=z_pos, cmap='viridis', s=100, alpha=0.8)
+        
+        for i, config in enumerate(configs):
+            ax.annotate(config, (x_pos[i], y_pos[i]), xytext=(5, 5), 
+                       textcoords='offset points', fontsize=8)
+        
+        ax.set_xlabel('X Position (m)')
+        ax.set_ylabel('Y Position (m)')
+        ax.set_title('End-Effector Positions (Z as color)')
+        ax.grid(True, alpha=0.3)
+        ax.axis('equal')
+        
+        # Add colorbar
+        cbar = plt.colorbar(ax.collections[0], ax=ax)
+        cbar.set_label('Z Position (m)')
+    
+    def _plot_jacobian_analysis(self, ax):
+        """Plot Jacobian condition numbers."""
+        configs = list(self.jacobian_results.keys())
+        condition_numbers = [self.jacobian_results[config]['condition_number'] for config in configs]
+        
+        bars = ax.bar(configs, condition_numbers, alpha=0.8, color='skyblue')
+        ax.set_ylabel('Condition Number')
+        ax.set_title('Jacobian Condition Numbers')
+        ax.tick_params(axis='x', rotation=45)
         ax.grid(True, alpha=0.3)
         
-        # Add error values on bars
-        for bar, err in zip(bars, error):
+        # Add value labels on bars
+        for bar, value in zip(bars, condition_numbers):
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + 0.001*np.sign(height),
-                   f'{err:.3f}', ha='center', va='bottom' if height >= 0 else 'top')
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                   f'{value:.1f}', ha='center', va='bottom', fontsize=8)
+    
+    def _plot_manipulability_analysis(self, ax):
+        """Plot manipulability analysis."""
+        configs = list(self.jacobian_results.keys())
+        manipulability = [self.jacobian_results[config]['manipulability'] for config in configs]
         
-        # Control torques
-        ax = axes[2]
-        joint_labels = [f'J{i+1}' for i in range(len(torques))]
-        colors = ['red' if abs(t) > 5.0 else 'blue' for t in torques]
-        bars = ax.bar(joint_labels, torques, color=colors, alpha=0.7)
-        ax.axhline(y=0, color='black', linestyle='-', alpha=0.3)
-        ax.set_title('Control Torques', fontweight='bold')
-        ax.set_xlabel('Joint')
-        ax.set_ylabel('Torque (Nm)')
+        bars = ax.bar(configs, manipulability, alpha=0.8, color='lightcoral')
+        ax.set_ylabel('Manipulability')
+        ax.set_title('Manipulability Index')
+        ax.tick_params(axis='x', rotation=45)
         ax.grid(True, alpha=0.3)
         
-        # Add torque values on bars
-        for bar, torque in zip(bars, torques):
+        # Add value labels on bars
+        for bar, value in zip(bars, manipulability):
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1*np.sign(height),
-                   f'{torque:.2f}', ha='center', va='bottom' if height >= 0 else 'top')
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.001,
+                   f'{value:.3f}', ha='center', va='bottom', fontsize=8)
+    
+    def _plot_workspace_3d(self, ax):
+        """Plot 3D workspace."""
+        points = self.workspace_results['points']
         
-        plt.tight_layout()
-        plt.show()
+        # Subsample for better visualization
+        n_plot = min(500, len(points))
+        indices = np.random.choice(len(points), n_plot, replace=False)
+        plot_points = points[indices]
         
-    def demonstrate_feedforward_control(self):
-        """Demonstrate PD control with feedforward compensation."""
-        logger.info("\n🎯 Demonstrating PD + Feedforward Control...")
+        ax.scatter(plot_points[:, 0], plot_points[:, 1], plot_points[:, 2], 
+                  alpha=0.6, s=20, c=plot_points[:, 2], cmap='plasma')
         
-        num_joints = len(self.joint_limits)
+        ax.set_xlabel('X (m)')
+        ax.set_ylabel('Y (m)')
+        ax.set_zlabel('Z (m)')
+        ax.set_title('Robot Workspace (3D)')
+    
+    def _plot_workspace_projections(self, ax):
+        """Plot workspace projections."""
+        points = self.workspace_results['points']
         
-        # Desired trajectory (safe targets for current robot)
-        desired_position = self.get_safe_joint_targets() * 0.5  # Conservative targets
-        desired_velocity = np.zeros(num_joints)
-        desired_acceleration = np.zeros(num_joints)
+        ax.scatter(points[:, 0], points[:, 1], alpha=0.5, s=10, c='blue', label='XY Projection')
+        ax.set_xlabel('X Position (m)')
+        ax.set_ylabel('Y Position (m)')
+        ax.set_title('Workspace XY Projection')
+        ax.grid(True, alpha=0.3)
+        ax.axis('equal')
+        ax.legend()
+    
+    def _plot_ik_convergence(self, ax):
+        """Plot IK convergence analysis."""
+        if not self.ik_results:
+            ax.text(0.5, 0.5, 'No IK results\navailable', ha='center', va='center', transform=ax.transAxes)
+            ax.set_title('IK Convergence Analysis')
+            return
         
-        # Current state
-        current_position = np.zeros(num_joints)
-        current_velocity = np.zeros(num_joints)
+        configs = [config for config, result in self.ik_results.items() if result['success']]
+        iterations = [self.ik_results[config]['iterations'] for config in configs]
+        times = [self.ik_results[config]['computation_time']*1000 for config in configs]
         
-        # Control gains
-        Kp = np.array([150.0] * num_joints)
-        Kd = np.array([30.0] * num_joints)
+        ax2 = ax.twinx()
         
-        # System parameters
-        gravity = np.array([0, 0, -9.81])
-        Ftip = np.zeros(6)
+        bars1 = ax.bar([i-0.2 for i in range(len(configs))], iterations, 0.4, 
+                      label='Iterations', alpha=0.8, color='steelblue')
+        bars2 = ax2.bar([i+0.2 for i in range(len(configs))], times, 0.4, 
+                       label='Time (ms)', alpha=0.8, color='orange')
         
-        logger.info("Computing feedforward control signals...")
+        ax.set_xlabel('Configuration')
+        ax.set_ylabel('Iterations', color='steelblue')
+        ax2.set_ylabel('Time (ms)', color='orange')
+        ax.set_title('IK Convergence Performance')
+        ax.set_xticks(range(len(configs)))
+        ax.set_xticklabels(configs, rotation=45)
         
-        try:
-            # Pure PD control
-            pd_torques = self.controller.pd_control(
-                desired_position=desired_position,
-                desired_velocity=desired_velocity,
-                current_position=current_position,
-                current_velocity=current_velocity,
-                Kp=Kp,
-                Kd=Kd
-            )
-            
-            # Pure feedforward control
-            ff_torques = self.controller.feedforward_control(
-                desired_position=desired_position,
-                desired_velocity=desired_velocity,
-                desired_acceleration=desired_acceleration,
-                g=gravity,
-                Ftip=Ftip
-            )
-            
-            # Combined PD + Feedforward control
-            combined_torques = self.controller.pd_feedforward_control(
-                desired_position=desired_position,
-                desired_velocity=desired_velocity,
-                desired_acceleration=desired_acceleration,
-                current_position=current_position,
-                current_velocity=current_velocity,
-                Kp=Kp,
-                Kd=Kd,
-                g=gravity,
-                Ftip=Ftip
-            )
-            
-            # Convert from GPU if necessary
-            if GPU_AVAILABLE:
-                if hasattr(pd_torques, 'get'):
-                    pd_torques = pd_torques.get()
-                if hasattr(ff_torques, 'get'):
-                    ff_torques = ff_torques.get()
-                if hasattr(combined_torques, 'get'):
-                    combined_torques = combined_torques.get()
-            
-            logger.info("📊 Feedforward Control Analysis:")
-            logger.info(f"  PD torques: {pd_torques}")
-            logger.info(f"  Feedforward torques: {ff_torques}")
-            logger.info(f"  Combined torques: {combined_torques}")
-            
-            # Analyze contribution of each component
-            pd_contribution = np.abs(pd_torques) / (np.abs(combined_torques) + 1e-6) * 100
-            ff_contribution = np.abs(ff_torques) / (np.abs(combined_torques) + 1e-6) * 100
-            
-            for i in range(num_joints):
-                logger.info(f"  Joint {i+1}: PD={pd_contribution[i]:.1f}%, FF={ff_contribution[i]:.1f}%")
-            
-            # Plot results
-            self.plot_feedforward_results(pd_torques, ff_torques, combined_torques)
-            
-        except Exception as e:
-            logger.error(f"Feedforward control failed: {e}")
-            
-        logger.info("✅ PD + Feedforward control demonstration complete")
+        # Add legends
+        ax.legend(loc='upper left')
+        ax2.legend(loc='upper right')
+    
+    def _plot_jacobian_heatmap(self, ax):
+        """Plot Jacobian matrix heatmap."""
+        # Use the first available Jacobian
+        config = list(self.jacobian_results.keys())[0]
+        J = self.jacobian_results[config]['J_space']
         
-    def plot_feedforward_results(self, pd_torques, ff_torques, combined_torques):
-        """Plot feedforward control analysis."""
-        num_joints = len(pd_torques)
+        im = ax.imshow(J, cmap='RdBu_r', aspect='auto')
+        ax.set_title(f'Jacobian Matrix ({config})')
+        ax.set_xlabel('Joint Index')
+        ax.set_ylabel('DOF Index')
         
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-        fig.suptitle('PD + Feedforward Control Analysis', fontsize=16, fontweight='bold')
+        # Add colorbar
+        plt.colorbar(im, ax=ax)
         
-        # Torque comparison
-        ax = axes[0]
-        joint_labels = [f'J{i+1}' for i in range(num_joints)]
-        x_pos = np.arange(num_joints)
+        # Add grid
+        ax.set_xticks(range(J.shape[1]))
+        ax.set_yticks(range(J.shape[0]))
+        ax.grid(True, alpha=0.3)
+    
+    def _plot_joint_limits(self, ax):
+        """Plot joint limits and current configurations."""
+        joint_indices = range(self.n_joints)
+        
+        # Plot joint limits as filled area
+        ax.fill_between(joint_indices, 
+                       np.degrees(self.joint_limits[:, 0]), 
+                       np.degrees(self.joint_limits[:, 1]), 
+                       alpha=0.3, color='lightgray', label='Joint Limits')
+        
+        # Plot current configurations
+        for config_name, fk_result in self.fk_results.items():
+            angles_deg = np.degrees(fk_result['joint_angles'])
+            ax.plot(joint_indices, angles_deg, 'o-', label=config_name, alpha=0.8)
+        
+        ax.set_xlabel('Joint Index')
+        ax.set_ylabel('Joint Angle (degrees)')
+        ax.set_title('Joint Angles vs Limits')
+        ax.set_xticks(joint_indices)
+        ax.set_xticklabels([f'J{i+1}' for i in joint_indices])
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+    
+    def _plot_performance_metrics(self, ax):
+        """Plot performance metrics summary."""
+        metrics = {
+            'FK Time (ms)': np.mean([r['computation_time']*1000 for r in self.fk_results.values()]),
+            'Jacobian Time (ms)': np.mean([r['computation_time']*1000 for r in self.jacobian_results.values()]),
+        }
+        
+        if self.ik_results:
+            successful_iks = [r for r in self.ik_results.values() if r['success']]
+            if successful_iks:
+                metrics['IK Time (ms)'] = np.mean([r['computation_time']*1000 for r in successful_iks])
+        
+        bars = ax.bar(metrics.keys(), metrics.values(), alpha=0.8, color=['skyblue', 'lightcoral', 'lightgreen'])
+        ax.set_ylabel('Time (ms)')
+        ax.set_title('Performance Metrics')
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(True, alpha=0.3)
+        
+        # Add value labels
+        for bar, value in zip(bars, metrics.values()):
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                   f'{value:.2f}', ha='center', va='bottom', fontsize=8)
+    
+    def _plot_singular_values(self, ax):
+        """Plot singular values analysis."""
+        configs = list(self.jacobian_results.keys())
+        
+        for i, config in enumerate(configs):
+            sigma = self.jacobian_results[config]['singular_values']
+            ax.plot(sigma, 'o-', label=config, alpha=0.8)
+        
+        ax.set_xlabel('Singular Value Index')
+        ax.set_ylabel('Singular Value')
+        ax.set_title('Jacobian Singular Values')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        ax.set_yscale('log')
+    
+    def _plot_error_analysis(self, ax):
+        """Plot error analysis for IK solutions."""
+        if not self.ik_results:
+            ax.text(0.5, 0.5, 'No IK results\navailable', ha='center', va='center', transform=ax.transAxes)
+            ax.set_title('Error Analysis')
+            return
+        
+        successful_configs = [config for config, result in self.ik_results.items() if result['success']]
+        
+        if not successful_configs:
+            ax.text(0.5, 0.5, 'No successful\nIK solutions', ha='center', va='center', transform=ax.transAxes)
+            ax.set_title('Error Analysis')
+            return
+        
+        position_errors = [self.ik_results[config]['position_error'] for config in successful_configs]
+        orientation_errors = [self.ik_results[config]['orientation_error'] for config in successful_configs]
+        joint_errors = [self.ik_results[config]['joint_error'] for config in successful_configs]
+        
+        x = np.arange(len(successful_configs))
         width = 0.25
         
-        ax.bar(x_pos - width, pd_torques, width, label='PD Only', alpha=0.8)
-        ax.bar(x_pos, ff_torques, width, label='Feedforward Only', alpha=0.8)
-        ax.bar(x_pos + width, combined_torques, width, label='PD + Feedforward', alpha=0.8)
+        ax.bar(x - width, position_errors, width, label='Position Error (m)', alpha=0.8)
+        ax.bar(x, orientation_errors, width, label='Orientation Error (rad)', alpha=0.8)
+        ax.bar(x + width, joint_errors, width, label='Joint Error (rad)', alpha=0.8)
         
-        ax.set_title('Control Torque Comparison', fontweight='bold')
-        ax.set_xlabel('Joint')
-        ax.set_ylabel('Torque (Nm)')
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(joint_labels)
+        ax.set_xlabel('Configuration')
+        ax.set_ylabel('Error')
+        ax.set_title('IK Solution Errors')
+        ax.set_xticks(x)
+        ax.set_xticklabels(successful_configs, rotation=45)
         ax.legend()
         ax.grid(True, alpha=0.3)
+        ax.set_yscale('log')
+    
+    # Helper methods
+    def _generate_safe_test_pose(self):
+        """Generate a safe test pose within joint limits."""
+        # Generate pose that's 70% towards joint limits to avoid extreme configurations
+        return 0.7 * np.random.uniform(self.joint_limits[:, 0], self.joint_limits[:, 1])
+    
+    def _rotation_matrix_to_euler_zyx(self, R):
+        """Convert rotation matrix to ZYX Euler angles."""
+        # ZYX Euler angles (roll, pitch, yaw)
+        sy = np.sqrt(R[0, 0]**2 + R[1, 0]**2)
         
-        # Component contribution
-        ax = axes[1]
-        pd_contribution = np.abs(pd_torques) / (np.abs(combined_torques) + 1e-6) * 100
-        ff_contribution = np.abs(ff_torques) / (np.abs(combined_torques) + 1e-6) * 100
+        singular = sy < 1e-6
         
-        ax.bar(x_pos, pd_contribution, width*2, label='PD Contribution', alpha=0.8)
-        ax.bar(x_pos, ff_contribution, width*2, bottom=pd_contribution, 
-               label='FF Contribution', alpha=0.8)
+        if not singular:
+            x = np.arctan2(R[2, 1], R[2, 2])  # roll
+            y = np.arctan2(-R[2, 0], sy)      # pitch
+            z = np.arctan2(R[1, 0], R[0, 0])  # yaw
+        else:
+            x = np.arctan2(-R[1, 2], R[1, 1])
+            y = np.arctan2(-R[2, 0], sy)
+            z = 0
         
-        ax.set_title('Control Component Contributions', fontweight='bold')
-        ax.set_xlabel('Joint')
-        ax.set_ylabel('Contribution (%)')
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(joint_labels)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.set_ylim(0, 100)
-        
-        plt.tight_layout()
-        plt.show()
-        
-    def demonstrate_control_comparison(self):
-        """Compare different control strategies on the same task."""
-        logger.info("\n🎯 Demonstrating Control Strategy Comparison...")
-        
-        # Define a challenging trajectory
-        T_final = 3.0
-        dt = 0.01
-        time_steps = int(T_final / dt)
-        num_joints = len(self.joint_limits)
-        
-        time_history = np.linspace(0, T_final, time_steps)
-        
-        # Multi-frequency trajectory with safe amplitudes
-        amplitude = self.get_trajectory_amplitudes() * 0.8  # Conservative amplitudes
-        freq1 = np.array([0.3, 0.4, 0.5, 0.3, 0.4, 0.3, 0.5][:num_joints])
-        freq2 = np.array([0.8, 0.6, 0.7, 0.9, 0.6, 0.8, 0.7][:num_joints])
-        
-        desired_positions = np.array([
-            amplitude[i] * (np.sin(2*np.pi*freq1[i]*time_history) + 
-                           0.3*np.sin(2*np.pi*freq2[i]*time_history))
-            for i in range(num_joints)
-        ]).T
-        
-        # Control strategies adapted for current robot
-        if not self.use_simple_robot:  # XArm robot - more conservative gains
-            strategies = {
-                'PID': {'Kp': 50, 'Ki': 10, 'Kd': 15},
-                'High_Gain_PD': {'Kp': 80, 'Ki': 0, 'Kd': 20},
-                'Aggressive_PID': {'Kp': 100, 'Ki': 25, 'Kd': 30}
-            }
-        else:  # Simple robot - can handle higher gains
-            strategies = {
-                'PID': {'Kp': 100, 'Ki': 20, 'Kd': 25},
-                'High_Gain_PD': {'Kp': 200, 'Ki': 0, 'Kd': 40},
-                'Aggressive_PID': {'Kp': 300, 'Ki': 50, 'Kd': 60}
-            }
-        
-        results = {}
-        
-        for strategy_name, gains in strategies.items():
-            logger.info(f"  Testing {strategy_name} strategy...")
-            
-            # Reset initial conditions
-            current_positions = np.zeros(num_joints)
-            current_velocities = np.zeros(num_joints)
-            
-            # Reset controller state
-            self.controller.eint = None
-            
-            positions_hist = []
-            errors_hist = []
-            torques_hist = []
-            
-            for step in range(min(500, time_steps)):  # Limit for demo
-                if strategy_name in ['PID', 'Aggressive_PID']:
-                    torques = self.controller.pid_control(
-                        thetalistd=desired_positions[step],
-                        dthetalistd=np.zeros(num_joints),
-                        thetalist=current_positions,
-                        dthetalist=current_velocities,
-                        dt=dt,
-                        Kp=np.array([gains['Kp']] * num_joints),
-                        Ki=np.array([gains['Ki']] * num_joints),
-                        Kd=np.array([gains['Kd']] * num_joints)
-                    )
-                else:  # PD control
-                    torques = self.controller.pd_control(
-                        desired_position=desired_positions[step],
-                        desired_velocity=np.zeros(num_joints),
-                        current_position=current_positions,
-                        current_velocity=current_velocities,
-                        Kp=np.array([gains['Kp']] * num_joints),
-                        Kd=np.array([gains['Kd']] * num_joints)
-                    )
-                
-                # Convert from GPU if necessary
-                if GPU_AVAILABLE and hasattr(torques, 'get'):
-                    torques = torques.get()
-                
-                # Apply limits and simple integration
-                torques = np.clip(torques, self.torque_limits[:, 0], self.torque_limits[:, 1])
-                accelerations = torques  # Simplified
-                
-                current_velocities += accelerations * dt * 0.1  # Damped
-                current_positions += current_velocities * dt
-                
-                # Store results
-                positions_hist.append(current_positions.copy())
-                errors_hist.append(desired_positions[step] - current_positions)
-                torques_hist.append(torques.copy())
-            
-            # Calculate performance metrics
-            errors_array = np.array(errors_hist)
-            rms_error = np.sqrt(np.mean(errors_array**2))
-            max_error = np.max(np.abs(errors_array))
-            
-            results[strategy_name] = {
-                'positions': np.array(positions_hist),
-                'errors': errors_array,
-                'torques': np.array(torques_hist),
-                'rms_error': rms_error,
-                'max_error': max_error,
-                'time': time_history[:len(errors_hist)]
-            }
-            
-            logger.info(f"    RMS Error: {rms_error:.4f} rad")
-            logger.info(f"    Max Error: {max_error:.4f} rad")
-        
-        # Plot comparison
-        self.plot_control_comparison(results, desired_positions)
-        
-        logger.info("✅ Control strategy comparison complete")
-        
-    def plot_control_comparison(self, results, desired_positions):
-        """Plot control strategy comparison."""
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle('Control Strategy Comparison', fontsize=16, fontweight='bold')
-        
-        # Position tracking for first joint
-        ax = axes[0, 0]
-        time_ref = results[list(results.keys())[0]]['time']
-        ax.plot(time_ref, desired_positions[:len(time_ref), 0], 'k--', 
-               linewidth=3, label='Desired', alpha=0.8)
-        
-        colors = ['blue', 'red', 'green']
-        for i, (strategy, data) in enumerate(results.items()):
-            ax.plot(data['time'], data['positions'][:, 0], 
-                   color=colors[i], linewidth=2, label=strategy, alpha=0.8)
-        
-        ax.set_title('Joint 1 Position Tracking', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Position (rad)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Tracking errors
-        ax = axes[0, 1]
-        for i, (strategy, data) in enumerate(results.items()):
-            ax.plot(data['time'], data['errors'][:, 0], 
-                   color=colors[i], linewidth=2, label=strategy, alpha=0.8)
-        
-        ax.set_title('Joint 1 Tracking Error', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Error (rad)')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Performance comparison
-        ax = axes[1, 0]
-        strategies = list(results.keys())
-        rms_errors = [results[s]['rms_error'] for s in strategies]
-        max_errors = [results[s]['max_error'] for s in strategies]
-        
-        x_pos = np.arange(len(strategies))
-        width = 0.35
-        
-        ax.bar(x_pos - width/2, rms_errors, width, label='RMS Error', alpha=0.8)
-        ax.bar(x_pos + width/2, max_errors, width, label='Max Error', alpha=0.8)
-        
-        ax.set_title('Performance Comparison', fontweight='bold')
-        ax.set_xlabel('Control Strategy')
-        ax.set_ylabel('Error (rad)')
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(strategies, rotation=15)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        # Control effort comparison
-        ax = axes[1, 1]
-        avg_torques = [np.mean(np.abs(results[s]['torques'])) for s in strategies]
-        max_torques = [np.max(np.abs(results[s]['torques'])) for s in strategies]
-        
-        ax.bar(x_pos - width/2, avg_torques, width, label='Avg Torque', alpha=0.8)
-        ax.bar(x_pos + width/2, max_torques, width, label='Max Torque', alpha=0.8)
-        
-        ax.set_title('Control Effort Comparison', fontweight='bold')
-        ax.set_xlabel('Control Strategy')
-        ax.set_ylabel('Torque (Nm)')
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(strategies, rotation=15)
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.show()
-        
-    def run_all_demonstrations(self):
-        """Run all control demonstrations."""
-        logger.info("🚀 Starting Basic Control Demonstrations")
-        logger.info("=" * 60)
-        
-        try:
-            # Run all demonstrations
-            self.demonstrate_pid_control()
-            self.demonstrate_computed_torque_control()
-            self.demonstrate_controller_tuning()
-            self.demonstrate_cartesian_control()
-            self.demonstrate_feedforward_control()
-            self.demonstrate_control_comparison()
-            
-            logger.info("\n" + "=" * 60)
-            logger.info("🎉 All control demonstrations completed successfully!")
-            
-            # Summary
-            logger.info("\n📋 Demonstration Summary:")
-            logger.info("  ✅ PID Control - Step response and tuning")
-            logger.info("  ✅ Computed Torque Control - Trajectory tracking")
-            logger.info("  ✅ Ziegler-Nichols Tuning - Automatic gain calculation")
-            logger.info("  ✅ Cartesian Space Control - End-effector positioning")
-            logger.info("  ✅ Feedforward Control - Gravity compensation")
-            logger.info("  ✅ Control Comparison - Performance analysis")
-            
-        except KeyboardInterrupt:
-            logger.info("\n⏸️ Demonstrations interrupted by user")
-        except Exception as e:
-            logger.error(f"\n❌ Error during demonstrations: {e}")
-            import traceback
-            traceback.print_exc()
+        return np.array([x, y, z])
+    
+    def _compute_orientation_error(self, R1, R2):
+        """Compute orientation error between two rotation matrices."""
+        R_error = R1.T @ R2
+        # Convert to axis-angle representation and get angle
+        trace = np.trace(R_error)
+        angle = np.arccos(np.clip((trace - 1) / 2, -1, 1))
+        return angle
+
 
 def main():
-    """Main function to run the basic control demo."""
-    print("🤖 ManipulaPy Basic Control Demo - XArm Edition")
-    print("=" * 60)
-    
-    # Check for GPU acceleration
-    if GPU_AVAILABLE:
-        print("🚀 GPU acceleration enabled")
-    else:
-        print("⚙️ Running on CPU only")
-    
-    print(f"📁 Using built-in XArm URDF: {urdf_file}")
-    
+    """Main function to run the kinematics basic demo."""
     try:
-        # Create and run the demo with XArm robot (default)
-        demo = BasicControlDemo(use_simple_robot=False)
+        # Create and run demo
+        demo = KinematicsBasicDemo()
+        success = demo.run_demo()
         
-        # Print robot information
-        num_joints = len(demo.joint_limits)
-        robot_type = "XArm" if not demo.use_simple_robot else "Simple 3-DOF"
-        print(f"🤖 Robot: {robot_type} ({num_joints} joints)")
-        print(f"📐 Joint limits: {demo.joint_limits.shape}")
-        print(f"⚡ Torque limits: {demo.torque_limits.shape}")
+        if success:
+            print("\n🎉 Demo completed successfully!")
+            print("📋 Summary of demonstrated concepts:")
+            print("   ✅ Robot model loading from URDF")
+            print("   ✅ Forward kinematics computation")
+            print("   ✅ Inverse kinematics solving")
+            print("   ✅ Jacobian matrix analysis")
+            print("   ✅ Workspace analysis")
+            print("   ✅ Performance benchmarking")
+            print("   ✅ Comprehensive visualization")
+            
+            print("\n📚 Key takeaways:")
+            print("   • Forward kinematics: Given joint angles → end-effector pose")
+            print("   • Inverse kinematics: Given end-effector pose → joint angles")
+            print("   • Jacobian: Relates joint velocities to end-effector velocities")
+            print("   • Manipulability: Measure of how well the robot can move")
+            print("   • Condition number: Indicates numerical conditioning")
+            
+            print("\n🔗 Next steps:")
+            print("   • Try intermediate_examples/trajectory_planning_intermediate_demo.py")
+            print("   • Explore basic_examples/dynamics_basic_demo.py")
+            print("   • Check out basic_examples/control_basic_demo.py")
         
-        demo.run_all_demonstrations()
-        
-        print("\n" + "=" * 60)
-        print("🎯 Demo completed! Check the plots for detailed results.")
-        print("💡 Try modifying control gains to see different behaviors.")
-        print("🔧 The demo automatically adapts to the XArm robot's characteristics.")
-        
+    except KeyboardInterrupt:
+        print("\n⏹️ Demo interrupted by user")
     except Exception as e:
-        print(f"\n❌ Demo failed: {e}")
+        print(f"\n❌ Demo failed with error: {e}")
         import traceback
         traceback.print_exc()
-        
-        # Try fallback to simple robot
-        print("\n🔄 Attempting fallback to simple robot...")
-        try:
-            demo = BasicControlDemo(use_simple_robot=True)
-            demo.run_all_demonstrations()
-            print("✅ Fallback demo completed successfully!")
-        except Exception as e2:
-            print(f"❌ Fallback also failed: {e2}")
-            return 1
-    
-    return 0
+
 
 if __name__ == "__main__":
-    exit(main())
+    main()
