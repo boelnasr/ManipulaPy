@@ -130,7 +130,7 @@ Find joint angles to reach a target position:
 
    if success:
        print(f"✅ Solution found in {iterations} iterations!")
-       print(f"🔧 Joint angles: {np.degrees(solution):.2f}°")
+       print(f"🔧 Joint angles: {np.degrees(solution)}°")
    else:
        print("❌ No solution found")
 
@@ -180,6 +180,8 @@ Your First Simulation
 
 🎬 **PyBullet Physics Simulation**
 
+Note that simulations require a CUDA installation, and a GPU.
+
 Bring your robot to life with realistic physics:
 
 .. code-block:: python
@@ -210,6 +212,8 @@ Your First Control System
 -------------------------
 
 🎛️ **Intelligent Robot Control**
+
+Note that robot control requires a CUDA installation, and a GPU.
 
 Control your robot with advanced algorithms:
 
