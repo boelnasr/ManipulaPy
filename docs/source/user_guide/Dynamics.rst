@@ -350,5 +350,3 @@ Separate centrifugal (velocity²) and Coriolis (cross-coupling) effects:
        n = len(theta)
        centrifugal = np.zeros(n)
        coriolis = np.zeros(n)
-       
-       # Centrifugal forces (diagonal

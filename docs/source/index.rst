@@ -91,7 +91,7 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
    python -c "import ManipulaPy; print('🎉 Installation successful!')"
 
 .. note:: 
-   The docs you're reading are generated from the source in `docs/`; feel free to improve them and send a pull request 🚀
+   The docs you're reading are generated from the source in `docs/`; feel free to improve them and send a [pull request](https://github.com/boelnasr/ManipulaPy/pull/new). 🚀
 
 🚀 Quick Start Examples
 ~~~~~~~~~~~~~~~~~~~~~~~
