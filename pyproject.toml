@@ -47,56 +47,55 @@ keywords = [
 ]
 
 # ------------------------------------------------------------------
-# Core runtime dependencies
+# Install all dependencies by default - let individual imports handle missing ones gracefully
 dependencies = [
+    # Core numerical computing (required)
+    "numpy>=1.19.2",
+    "scipy>=1.5.2", 
+    "matplotlib>=3.3",
+    
+    # Core robotics (required)
+    "numba>=0.55",
+    "pybullet>=3.0.6",
+    "urchin>=0.0.27",
+    "trimesh>=3.9.14",
+    
+    # Machine learning (install but handle gracefully if fails)
+    "torch>=1.8.0",
+    "scikit-learn>=1.0",
+    
+    # Vision and perception (install but handle gracefully if fails)
+    "opencv-python>=4.5",
+    "ultralytics>=8.0",
+    "pillow>=8.0.0",
+    
+    # GPU acceleration (install but handle gracefully if fails)
+    # Note: This will attempt CUDA 11.x first, fallback handled in code
+    "cupy-cuda11x>=10.0.0; sys_platform != 'darwin'",  # No CUDA on macOS typically
+]
+
+[project.optional-dependencies]
+# Minimal installation for constrained environments
+minimal = [
     "numpy>=1.19.2",
     "scipy>=1.5.2", 
     "matplotlib>=3.3",
     "numba>=0.55",
     "pybullet>=3.0.6",
     "urchin>=0.0.27",
-    "trimesh>=3.9.14",
-    "torch>=1.8.0",
-    "scikit-learn>=1.0",
-    "opencv-python>=4.5",
-    "ultralytics>=8.0",
-    "pillow>=8.0.0",
 ]
 
-[project.optional-dependencies]
-# Core optional dependencies
-core-optional = [
-    "scikit-learn>=1.0",
-]
+# Alternative GPU options for different CUDA versions
+gpu-cuda12 = ["cupy-cuda12x>=12.0.0"]
+gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
+gpu-pycuda = ["pycuda>=2021.1"]
 
-
-
-# Vision dependencies  
-vision = [
-    "opencv-python>=4.5",
-    "ultralytics>=8.0",
-    "pillow>=8.0.0",
-]
-
-# Vision dependencies for headless environments (CI-friendly)
+# Vision for headless environments (CI-friendly)
 vision-headless = [
     "opencv-python-headless>=4.5",
     "ultralytics>=8.0",
     "pillow>=8.0.0",
 ]
-
-# AI/ML dependencies
-ml = [
-    "torch>=1.8.0",
-    "scikit-learn>=1.0",
-]
-
-# GPU support
-gpu-cuda11 = ["cupy-cuda11x>=10.0.0"]
-gpu-cuda12 = ["cupy-cuda12x>=12.0.0"]
-gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
-gpu-pycuda = ["pycuda>=2021.1"]
-gpu = ["cupy-cuda11x>=10.0.0"]
 
 # Development and testing dependencies
 dev = [
@@ -137,16 +136,10 @@ ci = [
     "tomli>=1.2.0;python_version<'3.11'",
 ]
 
-# Testing combinations
-test-core = ["ManipulaPy[dev]"]
-test-simulation = ["ManipulaPy[dev,simulation]"]
-test-vision = ["ManipulaPy[dev,vision-headless]"]
-test-gpu = ["ManipulaPy[dev,gpu-cuda11]"]
-test-full = ["ManipulaPy[dev,simulation,vision-headless,ml]"]
-test-ci = ["ManipulaPy[ci]"]
-
-# All optional dependencies
-all = ["ManipulaPy[core-optional,simulation,vision,ml,docs]"]
+# Testing combinations - now reference the main package since it includes everything
+test-minimal = ["ManipulaPy[minimal,dev]"]
+test-full = ["ManipulaPy[dev]"]  # Main package already includes everything
+test-ci = ["ManipulaPy[ci,vision-headless]"]
 
 [project.urls]
 Homepage = "https://github.com/boelnasr/ManipulaPy"
@@ -279,7 +272,6 @@ log_cli_format = "%(asctime)s [%(levelname)8s] %(name)s: %(message)s"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 
 # Pytest collection configuration
-
 
 # Use norecursedirs instead of collect_ignore for directories
 norecursedirs = [
@@ -582,7 +574,7 @@ isolated_build = true
 envlist = py38,py39,py310,py311,coverage,docs,lint
 
 [testenv]
-extras = test-ci
+extras = 
 commands = pytest {posargs}
 setenv =
     SKIP_CUDA_TESTS = true
@@ -590,7 +582,7 @@ setenv =
     SKIP_SIMULATION_TESTS = true
 
 [testenv:coverage]
-extras = test-ci
+extras = 
 commands = 
     pytest --cov=ManipulaPy --cov-report=html --cov-report=xml
 
