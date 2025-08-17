@@ -2342,7 +2342,19 @@ The ManipulaPy dynamics module provides a solid foundation for both research and
 
 .. seealso::
    **Related Documentation:**
+      **Getting Started:**
    
+   - :doc:`../getting_started/index` - Installation and quick start guide
+   - :doc:`../Installation Guide` - Detailed installation instructions
+
+   **API Reference:**
+   
+   - :doc:`../api/dynamics` - Dynamics module API documentation
+   - :doc:`../api/kinematics` - Kinematics module API reference
+   - :doc:`../api/control` - Control module API reference
+   - :doc:`../api/path_planning` - Path planning module API reference
+   - :doc:`../api/simulation` - Simulation module API reference
+
    **User Guides:**
    
    - :doc:`../user_guide/Kinematics` - Robot kinematics fundamentals and forward/inverse kinematics
@@ -2354,22 +2366,5 @@ The ManipulaPy dynamics module provides a solid foundation for both research and
    - :doc:`../user_guide/Singularity_Analysis` - Singularity detection and workspace analysis
    - :doc:`../user_guide/Potential_Field` - Potential field methods and collision avoidance
    
-   **Tutorials:**
+
    
-   - :doc:`kinematics_guide` - Comprehensive kinematics tutorial
-   - :doc:`Trajectory_Planning` - Advanced trajectory planning techniques
-   - :doc:`Kinematics` - Basic kinematics concepts
-   - :doc:`Urdf Procsssor` - URDF processing tutorial
-   
-   **API Reference:**
-   
-   - :doc:`../api/dynamics` - Dynamics module API documentation
-   - :doc:`../api/kinematics` - Kinematics module API reference
-   - :doc:`../api/control` - Control module API reference
-   - :doc:`../api/path_planning` - Path planning module API reference
-   - :doc:`../api/simulation` - Simulation module API reference
-   
-   **Getting Started:**
-   
-   - :doc:`../getting_started/index` - Installation and quick start guide
-   - :doc:`../Installation Guide` - Detailed installation instructions
