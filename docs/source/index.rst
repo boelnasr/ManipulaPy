@@ -31,7 +31,7 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
                <img src="https://img.shields.io/github/actions/workflow/status/boelnasr/ManipulaPy/test.yml?branch=main&style=for-the-badge&logo=github&label=CI" alt="CI Status">
             </a>
             <a href="https://pypi.org/project/manipulapy/">
-               <img src="https://img.shields.io/pypi/dm/manipulapy?style=for-the-badge&logo=pypi&logoColor=white&label=Downloads&color=brightgreen" alt="Monthly Downloads">
+               <img src="https://static.pepy.tech/badge/manipulapy">
             </a>
             <a href="https://github.com/boelnasr/ManipulaPy">
                <img src="https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=for-the-badge&logo=github&logoColor=white&label=Stars&color=yellow" alt="GitHub Stars">
