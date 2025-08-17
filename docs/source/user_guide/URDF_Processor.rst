@@ -480,7 +480,7 @@ The URDF Processor provides seamless conversion from URDF robot descriptions to 
 - **Joint limit handling**: PyBullet integration for realistic limits
 - **Object creation**: SerialManipulator and ManipulatorDynamics instances
 
-***Typical Workflow:**
+**Typical Workflow:**
 
 1. Load URDF file with ``URDFToSerialManipulator(urdf_path)``
 2. Access ``serial_manipulator`` for kinematics computations
@@ -489,6 +489,7 @@ The URDF Processor provides seamless conversion from URDF robot descriptions to 
 
 
 **Best Practices:**
+
 - Validate URDF files before processing
 - Use PyBullet limits for realistic joint constraints
 - Cache processors for repeated use
