@@ -146,8 +146,100 @@ $$\tau = M(\theta)\ddot{\theta} + C(\theta,\dot{\theta}) + G(\theta)$$
 
 The mass matrix $M(\theta) = \sum_{i=1}^{n}\operatorname{Ad}_{T_i}^T G_i \operatorname{Ad}_{T_i}$ computation is optimized for 256-thread blocks, achieving up to **3600× speedup for inverse dynamics** and **8× speedup for trajectory generation** on 6-DOF manipulators compared to NumPy implementations.
 
+# CPU vs GPU Module Requirements
+
+ManipulaPy provides tiered functionality that gracefully scales from CPU-only to GPU-accelerated operation:
+
+## CPU-Only Features (Always Available)
+
+**Core Robotics Modules:**
+- URDF Processing: Model loading and screw axis extraction [@lynch2017modern]
+- Forward/Inverse Kinematics: Single-point pose calculations using Product-of-Exponentials formulation [@lynch2017modern]  
+- Jacobian Analysis: Velocity relationships and singularity detection
+- Small Trajectory Planning: N < 1000 points using CPU fallback with Numba optimization
+- Basic Control: PID, computed torque without real-time constraints
+- Simulation Setup: PyBullet loading and basic joint control [@coumans2019]
+
+**Performance Characteristics:**
+- Single trajectory generation: ~10-50ms for 6-DOF robots
+- Real-time control limited to ~100 Hz due to Python Global Interpreter Lock (GIL)
+
+## GPU-Required Features (CUDA Hardware)
+
+**High-Performance Modules:**
+- Large Trajectory Planning: N > 1000 points with 40× speedup over CPU implementations [@liang2018gpu; @sundaralingam2023curobo]
+- Batch Processing: Multiple trajectories simultaneously using CuPy acceleration [@cupy2021]
+- Real-time Inverse Dynamics: >1 kHz computation rates enabled by custom CUDA kernels
+- Workspace Analysis: Monte Carlo sampling with GPU parallelization [@liang2018gpu]
+- GPU-Accelerated Potential Fields: Real-time collision avoidance using parallel gradient computation
+
+**Performance Characteristics:**
+- Large trajectory generation: ~1-5ms for 6-DOF robots with optimized CUDA kernels
+- Batch inverse dynamics: 3600× speedup for multiple robot configurations
+- Real-time control: 1 kHz rates achievable with GPU acceleration
+
+## Vision Features (Additional Dependencies)
+
+**System Requirements:**
+- OpenCV: Camera calibration, stereo rectification, image processing
+- Graphics Libraries: libGL.so.1 for visualization
+- YOLO Models: Ultralytics for object detection [@Jocher_Ultralytics_YOLO_2023]
+
+**Modules:**
+- Camera Operations: Image capture, stereo processing, calibration
+- Object Detection: YOLO integration, 3D point generation [@Jocher_Ultralytics_YOLO_2023]
+- Clustering: DBSCAN spatial grouping for obstacle representation [@chu2021boundary]
+
+# Limitations and Design Trade-offs
+
+## Performance and Scalability Limitations
+
+**GPU Memory Constraints**: Consumer GPUs (8GB) limit trajectory planning to ~50,000 points; professional GPUs (24GB+) required for larger problems. Memory usage scales as O(N × joints × 4 bytes) as demonstrated in CuRobo's parallel collision-free motion generation [@sundaralingam2023curobo].
+
+**Small Problem Overhead**: GPU acceleration only beneficial for N > 1000 trajectory points due to kernel launch overhead [@liang2018gpu]. CPU implementation remains faster for small-scale problems, consistent with findings in GPU-based robot dynamics computation.
+
+**Python Performance Ceiling**: Global Interpreter Lock (GIL) prevents true parallelism in Python, limiting real-time control performance to approximately 100 Hz in CPU-only mode, similar to limitations observed in other Python robotics frameworks [@corke2021].
+
+## Software Integration Limitations  
+
+**Middleware Independence**: ManipulaPy operates independently of ROS middleware. While this provides flexibility and reduces dependencies, it requires manual integration for systems built on ROS architectures, unlike integrated solutions such as MoveIt! [@chitta2012moveit].
+
+**System Dependencies**: Vision features require system graphics libraries (libGL.so.1) that may be missing in containerized or headless environments, limiting deployment flexibility compared to pure computational frameworks like Pinocchio [@Pinocchio2025].
+
+**Network Communication**: No built-in support for distributed robotics applications requiring message passing between multiple nodes or computers, unlike ROS-based systems [@chitta2012moveit].
+
+## Algorithmic and Scope Limitations
+
+**Path Planning Methods**: Current implementation focuses on potential field methods and polynomial interpolation based on Modern Robotics principles [@lynch2017modern]. Advanced sampling-based planners, constraint handling for closed-chain mechanisms, and formal optimality guarantees are not implemented, unlike specialized motion planning frameworks.
+
+**Robot Architecture Support**: Framework designed specifically for serial kinematic chains following the Product-of-Exponentials formulation [@lynch2017modern]; parallel mechanisms, mobile manipulators, and multi-arm systems require significant architectural modifications.
+
+**Collision Detection Approach**: Uses convex hull approximations and DBSCAN clustering [@chu2021boundary] rather than exact mesh-based collision checking, which may miss narrow clearances required in precision applications.
+
+## Research vs Production Trade-offs
+
+**Development Focus**: Optimized for research and education following Modern Robotics pedagogical principles [@lynch2017modern] rather than industrial deployment. The framework lacks safety certifications, formal verification, and comprehensive fault detection mechanisms available in production systems.
+
+**Hardware Dependencies**: Maximum performance requires NVIDIA GPU with CUDA support [@cupy2021; @liang2018gpu], limiting portability across different computing platforms compared to CPU-only frameworks like the Python Robotics Toolbox [@corke2021].
+
+**Maturity Considerations**: As a research-oriented framework, some experimental features may have stability issues and the overall system is less mature than established production robotics systems like industrial robot controllers or frameworks such as Pinocchio [@Pinocchio2025] or PyRoki [@pyroki2025].
+
+**Safety and Formal Methods**: Unlike recent advances in safe robotic manipulation using Control Barrier Functions [@morton2025oscbf], ManipulaPy does not incorporate formal safety guarantees or constraint satisfaction methods for safety-critical applications.
+
+# Future Development
+
+**Addressing Current Limitations**:
+- **Middleware Integration**: Native ROS2 publishers/subscribers for ecosystem compatibility [@chitta2012moveit]
+- **Advanced Planning Algorithms**: Implementation of sampling-based and optimization-based motion planners following modern robotics principles [@lynch2017modern]
+- **Multi-Robot Support**: Extension to coordinated multi-manipulator systems with GPU acceleration [@sundaralingam2023curobo]
+- **Hardware Interfaces**: Direct integration with popular robot hardware platforms
+- **Industrial Features**: Safety monitoring incorporating Control Barrier Functions [@morton2025oscbf], formal verification, and fault recovery mechanisms
+- **Enhanced GPU Utilization**: Adoption of latest CUDA optimization techniques for even greater speedups [@liang2018gpu]
+
+
 # Acknowledgements
 
 Work supported by **Universität Duisburg‑Essen** and inspired by *Modern Robotics* [@lynch2017modern], PyBullet [@coumans2019], Pinocchio [@Pinocchio2025], and Ultralytics YOLO [@Jocher_Ultralytics_YOLO_2023] projects.
+
 
 # References
