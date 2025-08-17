@@ -59,12 +59,65 @@ ManipulaPy is a modern, comprehensive framework that bridges the gap between bas
 
 ---
 
+## 📋 Feature Availability Matrix
 
+ManipulaPy automatically enables features based on available dependencies. Here's what you can expect:
+
+### Core Features (Always Available)
+
+| Feature | CPU Performance | Dependencies | Notes |
+|---------|----------------|--------------|-------|
+| **Kinematics** | Excellent | numpy, scipy | Forward/inverse kinematics, Jacobians |
+| **Basic Dynamics** | Good | numpy, scipy | Mass matrix, Coriolis, gravity |
+| **Control Systems** | Excellent | numpy, scipy | PID, computed torque, adaptive |
+| **URDF Processing** | Fast | pybullet, urchin | Robot model conversion |
+| **Small Trajectories** | Good | numba | N < 1000 points, auto-optimized |
+
+### GPU-Accelerated Features (Optional)
+
+| Feature | CPU vs GPU | Requirements | Speedup |
+|---------|------------|--------------|---------|
+| **Large Trajectories** | 40x+ faster | CUDA, cupy | N > 1000 points |
+| **Batch Processing** | 20x+ faster | CUDA, cupy | Multiple trajectories |
+| **Inverse Dynamics** | 100x+ faster | CUDA, cupy | Large datasets |
+| **Workspace Analysis** | 10x+ faster | CUDA, cupy | Monte Carlo sampling |
+
+### Vision Features (Requires System Dependencies)
+
+| Feature | Requirements | Common Issues | Solutions |
+|---------|-------------|---------------|-----------|
+| **Camera Capture** | OpenCV, libGL.so.1 | ImportError: libGL.so.1 | `apt install libgl1-mesa-glx` |
+| **Object Detection** | ultralytics, internet | YOLO download fails | Check network, manual download |
+| **Stereo Vision** | OpenCV, calibration | Poor depth quality | Camera calibration required |
+| **3D Point Clouds** | OpenCV, numpy | Memory issues | Reduce point cloud density |
+
+### Installation Check Commands
+
+```python
+import ManipulaPy
+
+# Quick check - shows ✅/❌ for each feature
+ManipulaPy.check_dependencies()
+
+# Detailed system information
+ManipulaPy.print_system_info()
+
+# Get missing dependencies install commands
+print(ManipulaPy.get_installation_command())
+
+# Check specific feature
+try:
+    ManipulaPy.require_feature('cuda')
+    print("GPU acceleration ready!")
+except ImportError as e:
+    print(f"GPU not available: {e}")
+```
+
+---
 
 ## <a id="quick-start"></a>🚀 Quick Start
 
-### Prerequisites
-
+### Installation
 Before installing ManipulaPy, make sure your system has:
 
 1. **NVIDIA Drivers & CUDA Toolkit**  
@@ -80,49 +133,121 @@ Before installing ManipulaPy, make sure your system has:
    - Verify headers/libs under `/usr/include` and `/usr/lib/x86_64-linux-gnu` (or your distro’s equivalent).
 
 ---
-
-<h2 id="installation">Installation</h2>
+ManipulaPy attempts to install all dependencies by default for the best user experience. Missing dependencies are handled gracefully - the package will still work with available features.
 
 ```bash
-# Basic installation (CPU-only)
+# One command installs everything (recommended)
 pip install ManipulaPy
-
-# With GPU support (CUDA 11.x)
-pip install ManipulaPy[gpu-cuda11]
-
-# With GPU support (CUDA 12.x)
-pip install ManipulaPy[gpu-cuda12]
-
-# Development installation (with dev extras)
-git clone https://github.com/boelnasr/ManipulaPy.git
-cd ManipulaPy
-pip install -e .[dev]
-````
-
----
-
-### Post‐Install Check
-
-After installation, confirm that ManipulaPy can see your GPU:
-
-```bash
-# Check that CUDA is available to ManipulaPy
-python3 - <<EOF
-from ManipulaPy import cuda_kernels
-
-if cuda_kernels.check_cuda_availability():
-    props = cuda_kernels.get_gpu_properties()
-    print(f"✅ CUDA is available on device: {props['name']} "
-          f"({props['multiprocessor_count']} SMs, "
-          f"{props['max_threads_per_block']} max threads/block)")
-else:
-    raise RuntimeError("❌ CUDA not detected or not properly configured in ManipulaPy.")
-EOF
-
 ```
 
-If you see the ✅ message with your GPU name, you’re all set! Otherwise, double‑check the CUDA Toolkit and cuDNN installation steps above. \`\`\`
+**What gets installed automatically:**
+- ✅ **Core robotics** (always): kinematics, dynamics, control, basic trajectory planning
+- 🚀 **GPU acceleration** (if CUDA available): 40x+ speedups for large problems (N > 1000)
+- 👁️ **Vision features** (if system supports): camera capture, object detection, stereo vision
+- 🎮 **Simulation** (if compatible): PyBullet physics simulation and visualization
 
+### Check Your Installation
+
+After installation, verify which features are available:
+
+```python
+import ManipulaPy
+
+# Quick feature availability check
+ManipulaPy.check_dependencies()
+
+# Detailed system information
+ManipulaPy.print_system_info()
+```
+
+### Alternative Installation Options
+
+```bash
+# Minimal installation (core features only)
+pip install ManipulaPy[minimal]
+
+# Specific CUDA version if auto-detection fails
+pip install ManipulaPy[gpu-cuda12]  # For CUDA 12.x
+
+# Headless environments (CI/Docker)
+pip install ManipulaPy[vision-headless]
+
+# Development environment
+pip install ManipulaPy[dev]
+```
+
+### Troubleshooting Common Issues
+
+**🚀 GPU Acceleration Not Working:**
+```bash
+# Check CUDA installation
+nvidia-smi
+
+# Verify CUDA toolkit
+nvcc --version
+
+# Install specific CUDA version if needed
+pip install cupy-cuda11x  # or cupy-cuda12x
+```
+
+**👁️ Vision Features Not Working:**
+```bash
+# Ubuntu/Debian - fix libGL.so.1 error
+sudo apt-get install libgl1-mesa-glx libglib2.0-0
+
+# CentOS/RHEL
+sudo yum install mesa-libGL libglib2.0
+
+# Test OpenCV
+python -c "import cv2; print('OpenCV OK')"
+```
+
+**🔧 Verify Installation:**
+```python
+# Test core functionality (always works)
+from ManipulaPy.kinematics import SerialManipulator
+print("✅ Core features working")
+
+# Test GPU acceleration (if available)  
+try:
+    from ManipulaPy.cuda_kernels import check_cuda_availability
+    if check_cuda_availability():
+        print("🚀 GPU acceleration available")
+    else:
+        print("⚠️ GPU acceleration not available")
+except ImportError:
+    print("⚠️ GPU acceleration not installed")
+
+# Test vision (if available)
+try:
+    from ManipulaPy.vision import Vision
+    print("👁️ Vision features available")
+except ImportError:
+    print("⚠️ Vision features not available")
+```
+
+### What Works Without Additional Setup
+
+**✅ Always Available (CPU-only):**
+- Forward/inverse kinematics and Jacobians
+- PID, computed torque, adaptive, and robust control
+- URDF processing and robot model conversion  
+- PyBullet simulation and visualization
+- Small trajectory planning (N < 1000 points)
+- Singularity analysis and workspace computation
+
+**🚀 GPU-Accelerated (optional 40x+ speedup):**
+- Large trajectory planning (N > 1000 points)
+- Batch processing multiple trajectories
+- Monte Carlo workspace analysis
+- Inverse dynamics for long trajectories
+
+**👁️ Requires System Dependencies:**
+- Vision features: OpenCV, system graphics libraries (libGL.so.1)
+- Object detection: YOLO models (auto-downloaded on first use)
+- Stereo processing: Camera calibration data
+
+---
 
 ### 30-Second Demo
 
@@ -130,9 +255,8 @@ If you see the ✅ message with your GPU name, you’re all set! Otherwise, doub
 import numpy as np
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
-from ManipulaPy.control import ManipulatorController
 
-# Load robot model
+# Load robot model (works with any URDF)
 try:
     from ManipulaPy.ManipulaPy_data.xarm import urdf_file
 except ImportError:
@@ -143,22 +267,35 @@ urdf_processor = URDFToSerialManipulator(urdf_file)
 robot = urdf_processor.serial_manipulator
 dynamics = urdf_processor.dynamics
 
-# Forward kinematics
+# Forward kinematics (always available)
 joint_angles = np.array([0.1, 0.2, -0.3, -0.5, 0.2, 0.1])
 end_effector_pose = robot.forward_kinematics(joint_angles)
 print(f"End-effector position: {end_effector_pose[:3, 3]}")
 
-# Trajectory planning
+# GPU-accelerated trajectory planning (40x+ faster if GPU available)
 joint_limits = [(-np.pi, np.pi)] * 6
 planner = OptimizedTrajectoryPlanning(robot, urdf_file, dynamics, joint_limits)
 
 trajectory = planner.joint_trajectory(
     thetastart=np.zeros(6),
     thetaend=joint_angles,
-    Tf=5.0, N=100, method=5
+    Tf=5.0, N=1000, method=5  # Quintic time scaling
 )
 
 print(f"✅ Generated {trajectory['positions'].shape[0]} trajectory points")
+
+# Check what features are available
+import ManipulaPy
+features = ManipulaPy.get_available_features()
+print(f"Available features: {', '.join(features)}")
+
+# Get performance stats
+stats = planner.get_performance_stats()
+if stats['gpu_calls'] > 0:
+    speedup = stats.get('speedup_achieved', 0)
+    print(f"🚀 GPU acceleration achieved {speedup:.1f}x speedup!")
+else:
+    print("🖥️ Using CPU computation")
 ```
 
 ---
@@ -426,101 +563,134 @@ for name, result in results.items():
 
 ---
 
-<h2 id="examples">📁 Examples & Tutorials</h2>
+## 📁 Examples & Tutorials
 
+The `Examples/` directory contains comprehensive demonstrations that work with different feature combinations:
 
-The `Examples/` directory contains comprehensive demonstrations organized into three levels:
+### 🎯 Basic Examples (⭐) - CPU Only
 
-### 🎯 Basic Examples (⭐)
-Perfect for getting started with ManipulaPy fundamentals.
+These examples work immediately after `pip install ManipulaPy` with no additional setup required.
 
-| Example | Description | Output |
-|---------|-------------|--------|
-| `kinematics_basic_demo.py` | Forward/inverse kinematics with visualization | Manipulability analysis plots |
-| `dynamics_basic_demo.py` | Mass matrix, Coriolis forces, gravity compensation | Complete robot analysis |
-| `control_basic_demo.py` | PID, computed torque, feedforward control | Control strategy comparison |
-| `urdf_processing_basic_demo.py` | URDF to SerialManipulator conversion | Configuration space analysis |
-| `visualization_basic_demo.py` | End-effector paths and workspace visualization | 3D trajectory plots |
+| Example | Description | Requirements | Output |
+|---------|-------------|--------------|--------|
+| `kinematics_basic_demo.py` | Forward/inverse kinematics | Core only | Manipulability plots |
+| `dynamics_basic_demo.py` | Mass matrix, forces | Core only | Robot analysis |
+| `control_basic_demo.py` | PID, computed torque | Core only | Control comparison |
+| `urdf_processing_basic_demo.py` | URDF conversion | Core + PyBullet | Config analysis |
+| `small_trajectory_demo.py` | CPU trajectory planning | Core only | Path visualization |
 
-### 🔧 Intermediate Examples (⭐⭐)
-Advanced features and integrated systems.
+### 🔧 Intermediate Examples (⭐⭐) - Optional GPU
 
-| Example | Description | Key Features |
-|---------|-------------|--------------|
-| `trajectory_planning_intermediate_demo.py` | Multi-segment trajectories and optimization | GPU acceleration, smoothing |
-| `singularity_analysis_intermediate_demo.py` | Workspace analysis and singularity avoidance | Manipulability ellipsoids |
-| `control_comparison_intermediate_demo.py` | Multiple control strategies benchmarking | Real-time monitoring |
-| `perception_intermediate_demo.py` | Computer vision pipeline with clustering | YOLO detection, stereo vision |
-| `simulation_intermediate_demo.py` | Complete PyBullet integration | Real-time physics simulation |
+These examples automatically use GPU acceleration if available, gracefully fall back to CPU.
 
-### 🚀 Advanced Examples (⭐⭐⭐)
-Research-grade implementations and high-performance computing.
+| Example | Description | Auto-Detects | Performance Boost |
+|---------|-------------|--------------|-------------------|
+| `trajectory_planning_intermediate_demo.py` | Large-scale trajectories | GPU available | 40x+ if N>1000 |
+| `batch_processing_intermediate_demo.py` | Multiple trajectory generation | GPU available | 20x+ for batches |
+| `workspace_analysis_intermediate_demo.py` | Monte Carlo workspace | GPU available | 10x+ for sampling |
+| `dynamics_comparison_intermediate_demo.py` | CPU vs GPU dynamics | GPU available | 100x+ for large datasets |
 
-| Example | Description | Advanced Features |
-|---------|-------------|-------------------|
-| `gpu_acceleration_advanced_demo.py` | CUDA kernels and performance optimization | Memory efficiency analysis |
-| `batch_processing_advanced_demo.py` | Large-scale trajectory generation | Batch scaling analysis |
-| `collision_avoidance_advanced_demo.py` | Real-time obstacle avoidance | Potential field visualization |
-| `optimal_control_advanced_demo.py` | Advanced control algorithms | Performance statistics |
-| `stereo_vision_advanced_demo.py` | 3D perception and point cloud processing | Advanced perception analysis |
-| `real_robot_integration_advanced_demo.py` | Hardware integration examples | Real-time simulation |
+### 🚀 Advanced Examples (⭐⭐⭐) - Full Features
 
-### 🏃‍♂️ Running Examples
+These examples demonstrate complete integration with all available features.
+
+| Example | Description | Requirements | Notes |
+|---------|-------------|--------------|-------|
+| `perception_advanced_demo.py` | Vision + planning | OpenCV, YOLO | Auto-downloads models |
+| `stereo_vision_advanced_demo.py` | 3D perception | OpenCV, calibration | Requires camera setup |
+| `real_robot_integration_advanced_demo.py` | Hardware control | All features | Hardware-dependent |
+| `performance_optimization_advanced_demo.py` | Benchmarking suite | GPU recommended | Comprehensive analysis |
+
+### 🏃‍♂️ Running Examples with Feature Detection
 
 ```bash
 cd Examples/
 
-# Basic Examples - Start here!
+# Basic examples - always work
 cd basic_examples/
-python kinematics_basic_demo.py
-python dynamics_basic_demo.py
-python control_basic_demo.py
+python kinematics_basic_demo.py  # ✅ Always works
+python dynamics_basic_demo.py    # ✅ Always works
 
-# Intermediate Examples - Integrated systems
+# Intermediate examples - auto-detect features
 cd ../intermediate_examples/
-python trajectory_planning_intermediate_demo.py
-python perception_intermediate_demo.py --enable-yolo
-python simulation_intermediate_demo.py --urdf simple_arm.urdf
+python trajectory_planning_intermediate_demo.py  # 🚀 GPU if available
+python batch_processing_intermediate_demo.py --size 1000  # 📊 Scales with hardware
 
-# Advanced Examples - Research-grade
+# Advanced examples - check requirements first
 cd ../advanced_examples/
-python gpu_acceleration_advanced_demo.py --benchmark
-python batch_processing_advanced_demo.py --size 1000
-python collision_avoidance_advanced_demo.py --visualize
+python -c "import ManipulaPy; ManipulaPy.check_dependencies()"  # Check first
+python perception_advanced_demo.py --enable-yolo  # 👁️ Needs vision
+python stereo_vision_advanced_demo.py --camera-pair 0,1  # 📷 Needs cameras
 ```
 
-### 📊 Example Outputs
+### 📊 Example Output Management
 
-The examples generate various outputs:
-- **📈 Analysis Reports**: `.txt` files with detailed performance metrics
-- **📊 Visualizations**: `.png` plots for trajectories, workspaces, and analysis
-- **📝 Logs**: `.log` files for debugging and monitoring
-- **🎯 Models**: Pre-trained YOLO models and URDF files
+Examples automatically adapt their output based on available features:
 
-### 🎨 Generated Visualizations
+```python
+# Example auto-adaptation pattern
+def run_trajectory_example():
+    import ManipulaPy
+    
+    # Check what's available
+    features = ManipulaPy.get_available_features()
+    
+    if 'cuda' in features:
+        print("🚀 Using GPU acceleration for large trajectories")
+        N = 10000  # Large problem size
+    else:
+        print("🖥️ Using CPU computation for moderate trajectories")
+        N = 1000   # Smaller problem size
+    
+    if 'vision' in features:
+        print("👁️ Including vision-based obstacle detection")
+        enable_vision = True
+    else:
+        print("⚠️ Vision features not available, using pre-defined obstacles")
+        enable_vision = False
+    
+    # Run example with appropriate settings...
+```
 
-Examples create rich visualizations including:
-- **Trajectory Analysis**: Multi-segment paths and optimization results
-- **Workspace Visualization**: 3D manipulability and reachability analysis  
-- **Control Performance**: Real-time monitoring and comparison plots
-- **Perception Results**: Object detection, clustering, and stereo vision
-- **Performance Benchmarks**: GPU vs CPU timing and memory usage
+### 🎯 Example Selection Guide
 
+**New to ManipulaPy?**
+```bash
+# Start here - guaranteed to work
+python basic_examples/kinematics_basic_demo.py
+```
 
+**Have a GPU?**
+```bash
+# Check GPU first
+python -c "from ManipulaPy.cuda_kernels import check_cuda_availability; print('GPU:', check_cuda_availability())"
 
-### 🔍 Example Selection Guide
+# If True, try these for massive speedups
+python intermediate_examples/trajectory_planning_intermediate_demo.py --large
+python advanced_examples/performance_optimization_advanced_demo.py
+```
 
-**New to ManipulaPy?** → Start with `basic_examples/kinematics_basic_demo.py`
+**Working with cameras?**
+```bash
+# Check vision first
+python -c "import ManipulaPy; print('Vision:', 'vision' in ManipulaPy.get_available_features())"
 
-**Need trajectory planning?** → Try `intermediate_examples/trajectory_planning_intermediate_demo.py`
+# If True, try perception examples
+python intermediate_examples/perception_intermediate_demo.py
+python advanced_examples/stereo_vision_advanced_demo.py
+```
 
-**Working with vision?** → Check `intermediate_examples/perception_intermediate_demo.py`
+**Need maximum performance?**
+```bash
+# Full system check
+python -c "import ManipulaPy; ManipulaPy.check_dependencies(verbose=True)"
 
-**Performance optimization?** → Explore `advanced_examples/gpu_acceleration_advanced_demo.py`
-
-**Research applications?** → Dive into `advanced_examples/batch_processing_advanced_demo.py`
+# Run comprehensive benchmarks
+python advanced_examples/performance_optimization_advanced_demo.py --full-benchmark
+```
 
 ---
+
 ## 🧪 Testing & Validation
 
 ### Test Suite
@@ -537,7 +707,6 @@ python -m pytest tests/test_kinematics.py -v
 python -m pytest tests/test_dynamics.py -v
 python -m pytest tests/test_control.py -v
 python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
-
 ```
 
 ### ✅ High-Coverage Modules
@@ -570,10 +739,6 @@ python -m pytest tests/test_cuda_kernels.py -v  # GPU tests
 | `path_planning.py`   | **39%**  | Large gaps in CUDA-accelerated and plotting logic     |
 | `cuda_kernels.py`    | **16%**  | Most tests skipped — `NUMBA_DISABLE_CUDA=1`           |
 | `transformations.py` | **0%**   | Not tested at all — consider adding basic SE(3) tests |
-
----
-
-
 
 ---
 
@@ -651,9 +816,9 @@ python performance_benchmark.py --gpu --plot --save-results
 python accuracy_benchmark.py --tolerance 1e-8
 ```
 
+---
 
-<h2 id="documentation">📖 Documentation</h2>
-
+## 📖 Documentation
 
 ### Online Documentation
 - **[Complete API Reference](https://manipulapy.readthedocs.io/)**
@@ -681,10 +846,9 @@ if props:
 
 ---
 
-<h2 id="contributing">🤝 Contributing</h2>
+## 🤝 Contributing
 
-
-We love your input! Whether you’re reporting a bug, proposing a new feature, or improving our docs, here’s how to get started:
+We love your input! Whether you're reporting a bug, proposing a new feature, or improving our docs, here's how to get started:
 
 ### 1. Report an Issue
 Please open a GitHub Issue with:
@@ -731,7 +895,6 @@ Please open a GitHub Issue with:
 ### 4. Code of Conduct
 Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) to keep this community welcoming.  
 
-
 ### Contribution Areas
 
 - 🐛 **Bug Reports**: Issues and edge cases
@@ -774,9 +937,8 @@ If you use ManipulaPy in your research, please cite:
   author={Mohamed Aboelnasr},
   year={2025},
   url={https://github.com/boelnasr/ManipulaPy},
-  version={1.1.1},
+  version={1.1.3},
   license={AGPL-3.0-or-later},
-
 }
 ```
 
@@ -858,10 +1020,10 @@ All dependencies are AGPL-3.0 compatible:
 
 <div align="center">
 
-**🤖 ManipulaPy v1.1.0: Professional robotics tools for the Python ecosystem**
+**🤖 ManipulaPy v1.1.3: Professional robotics tools for the Python ecosystem**
 
 [![GitHub stars](https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=social)](https://github.com/boelnasr/ManipulaPy)
-[![Downloads](https://img.shields.io/pypi/dm/ManipulaPy)](https://pypi.org/project/ManipulaPy/)
+[![PyPI Downloads](https://static.pepy.tech/badge/manipulapy)](https://pepy.tech/projects/manipulapy)
 
 *Empowering robotics research and development with comprehensive, GPU-accelerated tools*
 
