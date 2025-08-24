@@ -1541,6 +1541,7 @@ Summary
 The ManipulaPy Trajectory Planning module provides comprehensive trajectory generation capabilities for robotic manipulators:
 
 **Core Features:**
+
 - **Joint-space trajectories** with cubic/quintic time scaling
 - **Cartesian-space trajectories** for end-effector motion
 - **CUDA acceleration** for high-performance computation
@@ -1548,6 +1549,7 @@ The ManipulaPy Trajectory Planning module provides comprehensive trajectory gene
 - **Collision avoidance** using potential field methods
 
 **Key Classes and Methods:**
+
 - ``TrajectoryPlanning``: Main class for trajectory generation
 - ``joint_trajectory()``: Generate smooth joint-space paths
 - ``cartesian_trajectory()``: Create end-effector trajectories  
@@ -1555,6 +1557,7 @@ The ManipulaPy Trajectory Planning module provides comprehensive trajectory gene
 - ``forward_dynamics_trajectory()``: Simulate robot motion
 
 **Advanced Capabilities:**
+
 - Multi-waypoint trajectory generation
 - Real-time trajectory execution simulation
 - Batch processing for multiple trajectories
@@ -1562,6 +1565,7 @@ The ManipulaPy Trajectory Planning module provides comprehensive trajectory gene
 - Performance optimization with CUDA
 
 **Best Practices:**
+
 - Use quintic scaling for smooth acceleration profiles
 - Validate trajectories for dynamics feasibility
 - Check joint and torque limit compliance

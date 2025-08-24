@@ -126,7 +126,7 @@ Robot: Real manipulator configurations (3-DOF and 6-DOF)
 Test Configuration: Large-scale problems (10K-100K trajectory points)
 
 ╔═══════════════════════════════════════════════════════════════╗
-║                  PRODUCTION-SCALE PERFORMANCE                ║
+║                  PRODUCTION-SCALE PERFORMANCE                 ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 Overall System Performance:
@@ -160,7 +160,7 @@ Memory Efficiency:
   • Memory scaling: Linear with problem size
 
 ╔═══════════════════════════════════════════════════════════════╗
-║                     DYNAMICS COMPUTATION                     ║
+║                     DYNAMICS COMPUTATION                      ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 Inverse Dynamics (CUDA Accelerated):
@@ -217,7 +217,7 @@ Memory Scaling:
   ✅ Efficient GPU memory management
 
 ╔═══════════════════════════════════════════════════════════════╗
-║                  PERFORMANCE RECOMMENDATIONS                 ║
+║                  PERFORMANCE RECOMMENDATIONS                  ║
 ╚═══════════════════════════════════════════════════════════════╝
 
 🎯 OPTIMAL GPU USE CASES:
@@ -256,7 +256,7 @@ Test Environment: 1000 random configurations, 100 IK targets
 Tolerance Standards: Position 1e-10m, Orientation 1e-8rad
 
 ╔═══════════════════════════════════════════════════════════════╗
-║                    KINEMATICS ACCURACY                       ║
+║                    KINEMATICS ACCURACY                        ║
 ╚═══════════════════════════════════════════════════════════════╝
 Forward Kinematics (1000 random configurations):
   ✅ Success Rate:           100.0%
@@ -281,7 +281,7 @@ Jacobian Validation (500 configurations vs numerical differentiation):
   ✅ Singularity Detection:  12 configurations flagged correctly
 
 ╔═══════════════════════════════════════════════════════════════╗
-║                     DYNAMICS VALIDATION                      ║
+║                     DYNAMICS VALIDATION                       ║
 ╚═══════════════════════════════════════════════════════════════╝
 Forward/Inverse Dynamics Consistency (200 configurations):
   ✅ Success Rate:           99.5%
@@ -297,7 +297,7 @@ Individual Component Validation:
   ✅ Joint Torque Limits:   Applied correctly in 100% of cases
 
 ╔═══════════════════════════════════════════════════════════════╗
-║                  TRAJECTORY PLANNING FIDELITY                ║
+║                  TRAJECTORY PLANNING FIDELITY                 ║
 ╚═══════════════════════════════════════════════════════════════╝
 Boundary Condition Accuracy (50 trajectories per method):
   ✅ Cubic Time Scaling:     
@@ -315,7 +315,7 @@ GPU vs CPU Numerical Consistency:
   ✅ Timing Accuracy:        Identical timestep handling
 
 ╔═══════════════════════════════════════════════════════════════╗
-║                    CONTROL ALGORITHM VALIDATION              ║
+║                    CONTROL ALGORITHM VALIDATION               ║
 ╚═══════════════════════════════════════════════════════════════╝
 PID Control (50 test scenarios):
   ✅ Success Rate:           98.0%
@@ -335,7 +335,7 @@ Ziegler-Nichols Auto-tuning (10 test cases):
   ✅ Performance Improvement: 35% average over manual tuning
 
 ╔═══════════════════════════════════════════════════════════════╗
-║                    MODULE INTEGRATION TEST                   ║
+║                    MODULE INTEGRATION TEST                    ║
 ╚═══════════════════════════════════════════════════════════════╝
 Vision & Perception:
   ✅ Image Processing:       45.2ms (640x480 RGB+depth)
