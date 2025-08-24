@@ -91,7 +91,7 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
    python -c "import ManipulaPy; print('🎉 Installation successful!')"
 
 .. note:: 
-   The docs you're reading are generated from the source in `docs/`; feel free to improve them and send a [pull request](https://github.com/boelnasr/ManipulaPy/pull/new). 🚀
+   The docs you're reading are generated from the source in ``docs/``; feel free to improve them and send a `pull request <https://github.com/boelnasr/ManipulaPy/pull/new>`_.
 
 🚀 Quick Start Examples
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -331,26 +331,19 @@ Key Features at a Glance
       </div>
    </div>
 
-Documentation map
+Documentation Map
 -----------------
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 🚀 Get Started
-
-   getting_started/index
 
 .. toctree::
    :maxdepth: 2
    :caption: 🛠️ API Reference
 
    api/index   
+
 .. toctree::
    :maxdepth: 2
    :caption: 📚 User Guides
 
-   
-   
    user_guide/index
    user_guide/Kinematics
    user_guide/Dynamics
@@ -360,12 +353,9 @@ Documentation map
    user_guide/URDF_Processor
    user_guide/Singularity_Analysis 
    user_guide/Perception
-   user_guide/vision 
    user_guide/Potential_Field
    user_guide/Collision_Checker
    user_guide/CUDA_Kernels
-
-
 
 Popular Learning Paths
 ----------------------
@@ -376,10 +366,10 @@ Popular Learning Paths
       <div class="path">
          <h4>🆕 Complete Beginner</h4>
          <ol>
-            <li><a href="getting_started/index.html">📖 Getting Started Guide</a></li>
-            <li><a href="#getting-started">🚀 Quick Start Examples ↑</a></li>
+            <li><a href="#getting-started">🚀 Quick Start Examples</a></li>
             <li><a href="user_guide/Kinematics.html">🔧 Basic Kinematics</a></li>
-            <li><a href="tutorials/index.html">🤖 First Robot Project</a></li>
+            <li><a href="user_guide/URDF_Processor.html">🤖 Robot Model Loading</a></li>
+            <li><a href="user_guide/Simulation.html">🎮 First Simulation</a></li>
          </ol>
       </div>
       <div class="path">
@@ -395,18 +385,18 @@ Popular Learning Paths
          <h4>💻 Performance Engineer</h4>
          <ol>
             <li><a href="user_guide/CUDA_Kernels.html">⚡ CUDA Setup</a></li>
-            <li><a href="tutorials/index.html">🚀 GPU Acceleration</a></li>
-            <li><a href="tutorials/index.html">📊 Performance Profiling</a></li>
-            <li><a href="tutorials/index.html">🔧 Optimization Tips</a></li>
+            <li><a href="user_guide/Trajectory_Planning.html">🚀 GPU Acceleration</a></li>
+            <li><a href="user_guide/index.html">📊 Performance Profiling</a></li>
+            <li><a href="user_guide/index.html">🔧 Optimization Tips</a></li>
          </ol>
       </div>
       <div class="path">
          <h4>👁️ Vision Engineer</h4>
          <ol>
-            <li><a href="tutorials/index.html">👁️ Vision Systems</a></li>
-            <li><a href="tutorials/index.html">🔍 Object Detection</a></li>
-            <li><a href="tutorials/index.html">🌐 3D Perception</a></li>
-            <li><a href="tutorials/index.html">🎯 Vision-Guided Control</a></li>
+            <li><a href="user_guide/Perception.html">👁️ Vision Systems</a></li>
+            <li><a href="user_guide/Perception.html">🔍 Object Detection</a></li>
+            <li><a href="user_guide/Perception.html">🌐 3D Perception</a></li>
+            <li><a href="user_guide/Control.html">🎯 Vision-Guided Control</a></li>
          </ol>
       </div>
    </div>
