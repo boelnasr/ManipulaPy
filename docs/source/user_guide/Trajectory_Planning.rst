@@ -946,203 +946,277 @@ Processing multiple trajectories efficiently:
 Real-Time Applications
 -------------------------
 
-Trajectory Execution
-~~~~~~~~~~~~~~~~~~~~~~
+High-Frequency Control Simulation
+---------------------------------
 
-Real-time trajectory following for robot control:
+.. important:: Real-time semantics
+
+   In ManipulaPy, *real-time* refers to **soft real-time (best-effort)** loops:
+   a fixed-rate cycle (e.g., 100–1000 Hz) driven by a monotonic clock where the
+   *average* period is met and small jitter/missed deadlines are acceptable.
+   Python does **not** provide hard real-time guarantees. For **hard real-time**
+   (deterministic deadlines), implement the inner loop on RT hardware/OS and
+   use ManipulaPy for trajectory generation, validation, and supervision.
+
+Control Loop Simulation at Industrial Rates
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This section demonstrates trajectory-following **simulation** at typical industrial control frequencies (100–1000 Hz). While Python cannot guarantee hard real-time, these examples show how to design trajectories suitable for deployment on dedicated RT controllers.
+
+Control Frequency Considerations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Soft Real-Time Simulation (Python):**
+
+- Simulated control loops at 100–1000 Hz.
+- Suitable for algorithm validation and controller tuning.
+- No timing guarantees — for development only.
+
+**Hard Real-Time Implementation (Target Hardware):**
+
+- Requires a real-time OS (e.g., PREEMPT_RT Linux, Xenomai, VxWorks) or MCU/PLC.
+- Deterministic timing guarantees.
+- Use ManipulaPy for offline trajectory design and export to the RT stack.
+
+Trajectory Execution Simulation (100 Hz)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The example below simulates a **100 Hz** control loop for trajectory tracking. It also includes optional soft RT scheduling to align each iteration with the 10 ms period and report deadline misses.
 
 .. code-block:: python
 
-   def real_time_trajectory_execution():
-       """Simulate real-time trajectory execution."""
-       
-       # Generate reference trajectory
+   import time
+   import numpy as np
+   import matplotlib.pyplot as plt
+
+   def simulate_high_frequency_control(enforce_timing: bool = True):
+       """
+       Simulate high-frequency trajectory following control (100 Hz).
+
+       Notes:
+       - This is a simulation, not hard real-time.
+       - Assumes 'planner' is already constructed (robot, dynamics, limits).
+       """
+
+       # Generate reference trajectory offline
        theta_start = np.array([0.1, 0.2, -0.1, 0.0, 0.3, 0.0])
-       theta_end = np.array([0.8, -0.3, 0.5, -0.2, 0.6, -0.4])
-       
+       theta_end   = np.array([0.8, -0.3,  0.5, -0.2, 0.6, -0.4])
+
        ref_trajectory = planner.joint_trajectory(
-           theta_start, theta_end, Tf=4.0, N=400, method=5  # 100 Hz
+           theta_start, theta_end, Tf=4.0, N=400, method=5  # 100 Hz (dt = 0.01 s)
        )
-       
-       # Simulation parameters
-       dt = 0.01  # 100 Hz control rate
-       n_steps = ref_trajectory['positions'].shape[0]
-       
-       # Control parameters
+
+       # Control loop target
+       dt = 0.01  # 100 Hz
+       n_steps = ref_trajectory["positions"].shape[0]
+
+       # Simple PD + feedforward gains
        Kp = np.diag([100, 80, 60, 40, 30, 20])
-       Kd = np.diag([10, 8, 6, 4, 3, 2])
-       
-       # Initialize simulation state
+       Kd = np.diag([10,  8,  6,  4,  3,  2])
+
+       # State
        current_pos = theta_start.copy()
        current_vel = np.zeros(6)
-       
-       # Storage for results
-       actual_positions = []
+
+       # Logs
+       actual_positions  = []
        actual_velocities = []
-       control_torques = []
-       tracking_errors = []
-       
-       print("Simulating real-time trajectory execution...")
-       
+       control_torques   = []
+       tracking_errors   = []
+       loop_durations    = []
+       deadline_misses   = 0
+
+       if enforce_timing:
+           next_deadline = time.perf_counter() + dt
+
+       print("Simulating control at 100 Hz (soft real-time best-effort).")
+
        for i in range(n_steps):
-           # Get reference at current time
-           ref_pos = ref_trajectory['positions'][i]
-           ref_vel = ref_trajectory['velocities'][i]
-           ref_acc = ref_trajectory['accelerations'][i]
-           
-           # Compute tracking error
+           loop_start = time.perf_counter()
+
+           # Reference at index i
+           ref_pos = ref_trajectory["positions"][i]
+           ref_vel = ref_trajectory["velocities"][i]
+           ref_acc = ref_trajectory["accelerations"][i]
+
+           # PD + feedforward inverse dynamics
            pos_error = ref_pos - current_pos
            vel_error = ref_vel - current_vel
-           
-           # PD control with feedforward
-           tau_pd = Kp @ pos_error + Kd @ vel_error
-           
-           # Feedforward compensation
+           tau_pd    = Kp @ pos_error + Kd @ vel_error
+
            tau_ff = planner.dynamics.inverse_dynamics(
                ref_pos, ref_vel, ref_acc, [0, 0, -9.81], np.zeros(6)
            )
-           
-           # Total control torque
+
            tau_total = tau_pd + tau_ff
-           
-           # Apply torque limits
+
+           # Torque limits
            for j in range(6):
-               tau_total[j] = np.clip(tau_total[j], 
-                                    planner.torque_limits[j][0], 
-                                    planner.torque_limits[j][1])
-           
-           # Simulate robot dynamics
-           acceleration = planner.dynamics.forward_dynamics(
+               lo, hi = planner.torque_limits[j]
+               tau_total[j] = np.clip(tau_total[j], lo, hi)
+
+           # Forward dynamics + Euler integrate
+           acc = planner.dynamics.forward_dynamics(
                current_pos, current_vel, tau_total, [0, 0, -9.81], np.zeros(6)
            )
-           
-           # Integrate (simple Euler integration)
-           current_vel += acceleration * dt
+           current_vel += acc * dt
            current_pos += current_vel * dt
-           
-           # Apply joint limits
+
+           # Joint limits
            for j in range(6):
-               if current_pos[j] < planner.joint_limits[j][0]:
-                   current_pos[j] = planner.joint_limits[j][0]
-                   current_vel[j] = 0
-               elif current_pos[j] > planner.joint_limits[j][1]:
-                   current_pos[j] = planner.joint_limits[j][1]
-                   current_vel[j] = 0
-           
-           # Store results
+               lo, hi = planner.joint_limits[j]
+               if current_pos[j] < lo:
+                   current_pos[j] = lo
+                   current_vel[j] = 0.0
+               elif current_pos[j] > hi:
+                   current_pos[j] = hi
+                   current_vel[j] = 0.0
+
+           # Log
            actual_positions.append(current_pos.copy())
            actual_velocities.append(current_vel.copy())
            control_torques.append(tau_total.copy())
            tracking_errors.append(np.linalg.norm(pos_error))
-       
-       # Convert to arrays
-       actual_positions = np.array(actual_positions)
+
+           # Best-effort scheduling to hit 10 ms period
+           now = time.perf_counter()
+           loop_durations.append(now - loop_start)
+
+           if enforce_timing:
+               sleep_s = next_deadline - now
+               if sleep_s > 0:
+                   time.sleep(sleep_s)
+               else:
+                   deadline_misses += 1
+               next_deadline += dt
+
+       # Arrays
+       actual_positions  = np.array(actual_positions)
        actual_velocities = np.array(actual_velocities)
-       control_torques = np.array(control_torques)
-       tracking_errors = np.array(tracking_errors)
-       
-       # Analysis
-       time_steps = np.arange(n_steps) * dt
-       
-       print("Trajectory execution completed:")
-       print(f"- Duration: {time_steps[-1]:.1f} seconds")
+       control_torques   = np.array(control_torques)
+       tracking_errors   = np.array(tracking_errors)
+       loop_durations    = np.array(loop_durations)
+       time_steps        = np.arange(n_steps) * dt
+
+       # Summary
+       jitter_ms = (loop_durations - dt) * 1e3
+       print("Simulation complete:")
+       print(f"- Duration: {time_steps[-1]:.2f} s")
        print(f"- Final tracking error: {tracking_errors[-1]:.4f} rad")
        print(f"- RMS tracking error: {np.sqrt(np.mean(tracking_errors**2)):.4f} rad")
-       print(f"- Max tracking error: {np.max(tracking_errors):.4f} rad")
-       
-       # Plot results
-       plt.figure(figsize=(15, 12))
-       
-       # Position tracking
-       plt.subplot(3, 2, 1)
-       for i in range(6):
-           plt.plot(time_steps, np.degrees(ref_trajectory['positions'][:, i]), 
-                   '--', alpha=0.7, label=f'Ref Joint {i+1}')
-           plt.plot(time_steps, np.degrees(actual_positions[:, i]), 
-                   '-', linewidth=2, label=f'Act Joint {i+1}')
-       plt.xlabel('Time (s)')
-       plt.ylabel('Position (degrees)')
-       plt.title('Position Tracking')
-       plt.legend()
-       plt.grid(True)
-       
-       # Velocity tracking
-       plt.subplot(3, 2, 2)
-       for i in range(6):
-           plt.plot(time_steps, ref_trajectory['velocities'][:, i], 
-                   '--', alpha=0.7, label=f'Ref Joint {i+1}')
-           plt.plot(time_steps, actual_velocities[:, i], 
-                   '-', linewidth=2, label=f'Act Joint {i+1}')
-       plt.xlabel('Time (s)')
-       plt.ylabel('Velocity (rad/s)')
-       plt.title('Velocity Tracking')
-       plt.legend()
-       plt.grid(True)
-       
-       # Control torques
-       plt.subplot(3, 2, 3)
-       for i in range(6):
-           plt.plot(time_steps, control_torques[:, i], label=f'Joint {i+1}')
-       plt.xlabel('Time (s)')
-       plt.ylabel('Torque (N⋅m)')
-       plt.title('Control Torques')
-       plt.legend()
-       plt.grid(True)
-       
-       # Tracking error
-       plt.subplot(3, 2, 4)
-       plt.plot(time_steps, np.degrees(tracking_errors), 'r-', linewidth=2)
-       plt.xlabel('Time (s)')
-       plt.ylabel('Tracking Error (degrees)')
-       plt.title('Position Tracking Error')
-       plt.grid(True)
-       
-       # End-effector tracking
-       ref_ee_positions = []
-       actual_ee_positions = []
-       
-       for ref_pos, act_pos in zip(ref_trajectory['positions'], actual_positions):
-           T_ref = planner.serial_manipulator.forward_kinematics(ref_pos)
-           T_act = planner.serial_manipulator.forward_kinematics(act_pos)
-           ref_ee_positions.append(T_ref[:3, 3])
-           actual_ee_positions.append(T_act[:3, 3])
-       
-       ref_ee_positions = np.array(ref_ee_positions)
-       actual_ee_positions = np.array(actual_ee_positions)
-       
-       ax = plt.subplot(3, 2, 5, projection='3d')
-       ax.plot(ref_ee_positions[:, 0], ref_ee_positions[:, 1], ref_ee_positions[:, 2], 
-              'b--', alpha=0.7, linewidth=2, label='Reference')
-       ax.plot(actual_ee_positions[:, 0], actual_ee_positions[:, 1], actual_ee_positions[:, 2], 
-              'r-', linewidth=2, label='Actual')
-       ax.set_xlabel('X (m)')
-       ax.set_ylabel('Y (m)')
-       ax.set_zlabel('Z (m)')
-       ax.set_title('End-Effector Tracking')
-       ax.legend()
-       
-       # Control effort
-       plt.subplot(3, 2, 6)
-       control_effort = np.linalg.norm(control_torques, axis=1)
-       plt.plot(time_steps, control_effort, 'g-', linewidth=2)
-       plt.xlabel('Time (s)')
-       plt.ylabel('Total Control Effort (N⋅m)')
-       plt.title('Control Effort')
-       plt.grid(True)
-       
-       plt.tight_layout()
-       plt.show()
-       
+       print(f"- Mean loop: {loop_durations.mean()*1e3:.2f} ms (target {dt*1e3:.2f} ms)")
+       print(f"- Jitter RMS: {jitter_ms.std():.2f} ms")
+       if enforce_timing:
+           print(f"- Deadline misses: {deadline_misses}")
+
+       # (Optional) Plotting omitted for brevity...
        return {
-           'reference': ref_trajectory,
-           'actual_positions': actual_positions,
-           'actual_velocities': actual_velocities,
-           'control_torques': control_torques,
-           'tracking_errors': tracking_errors
+           "reference": ref_trajectory,
+           "actual_positions": actual_positions,
+           "actual_velocities": actual_velocities,
+           "control_torques": control_torques,
+           "tracking_errors": tracking_errors,
+           "loop_durations": loop_durations,
+           "deadline_misses": deadline_misses if enforce_timing else None,
        }
-   
-   # Run real-time simulation
-   execution_results = real_time_trajectory_execution()
+
+   # Example run
+   results = simulate_high_frequency_control(enforce_timing=True)
+
+Real-Time Implementation Guidelines
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**For actual hard real-time control on hardware:**
+
+1. **Trajectory pre-computation**
+
+   .. code-block:: python
+
+      # Use ManipulaPy offline to generate trajectories
+      trajectory = planner.joint_trajectory(start, goal, Tf, N, method)
+
+      # Export for the RT system
+      np.save("trajectory_positions.npy",      trajectory["positions"])
+      np.save("trajectory_velocities.npy",     trajectory["velocities"])
+      np.save("trajectory_accelerations.npy",  trajectory["accelerations"])
+
+2. **Real-time system integration**
+
+   - Load precomputed trajectories on the RT controller.
+   - Implement the inner loop in C/C++ or an RT-capable environment.
+   - Use deterministic fieldbuses (e.g., EtherCAT) or RT IPC for setpoints.
+
+3. **Typical timing requirements**
+
+   .. list-table::
+      :header-rows: 1
+      :widths: 22 16 20 42
+
+      * - Application
+        - Frequency
+        - Timing Type
+        - Hardware Requirements
+      * - Position Control
+        - 100–200 Hz
+        - Soft RT
+        - Industrial PC + RT kernel
+      * - Force/Impedance Control
+        - 1000+ Hz
+        - Hard RT
+        - Dedicated RT controller / MCU / FPGA
+      * - Vision Servoing
+        - 60–120 Hz
+        - Soft RT
+        - Vision PC + RT bridge
+      * - Safety/Interlocks
+        - 1000+ Hz
+        - Hard RT
+        - Safety-rated hardware
+
+Performance Validation
+~~~~~~~~~~~~~~~~~~~~~~
+
+The simulation helps validate:
+
+- **Control stability** at target loop rates.
+- **Trajectory smoothness** for different time-scaling methods.
+- **Computational margins** prior to RT deployment.
+- **Tracking accuracy** under realistic timing constraints.
+
+Integration with Real-Time Systems
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Common RT platforms:**
+
+- **ROS 2 on RT kernel** — soft real-time.
+- **PREEMPT_RT / Xenomai / VxWorks** — hard real-time capable.
+- **Industrial controllers / PLCs / MCUs / FPGAs** — deterministic low-latency loops.
+
+**Example workflow:**
+
+.. code-block:: python
+
+   # 1) Design & validate offline (ManipulaPy)
+   traj = planner.joint_trajectory(...)
+
+   # 2) Validate via simulation
+   sim_out = simulate_high_frequency_control(enforce_timing=True)
+
+   # 3) Export for RT deployment
+   export_for_realtime_system(traj, target_platform="ros2_rt")
+
+   # 4) Deploy to hardware with RT guarantees (C/C++ loop + deterministic comms)
+
+Terminology Clarification
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **Simulation**: What the Python examples do (no timing guarantees).
+
+- **Soft Real-Time**: Best-effort timing; occasional jitter/misses permissible.
+
+- **Hard Real-Time**: Guaranteed deadlines; requires RT OS/hardware.
+
+- **Real-Time (generic)**: Use “soft” or “hard” explicitly to avoid ambiguity.
 
 Practical Applications
 -------------------------
