@@ -15,9 +15,13 @@ Overview
 The Vision module is a unified computer vision system that brings together:
 
 - **Monocular and stereo camera support** with flexible configuration
+
 - **YOLO-based object detection** for real-time obstacle identification
+
 - **PyBullet virtual cameras** with interactive debugging sliders
+
 - **Stereo vision pipeline** for 3D reconstruction and depth estimation
+
 - **Camera calibration utilities** for precise geometric measurements
 
 .. raw:: html
@@ -128,8 +132,11 @@ The Vision module integrates YOLOv8 for robust object detection:
 The object detection pipeline:
 
 1. **YOLO Detection**: Identifies objects in RGB images with bounding boxes
+
 2. **Depth Analysis**: Uses depth information within bounding boxes
+
 3. **3D Positioning**: Converts 2D detections to 3D world coordinates
+
 4. **Orientation Estimation**: Computes object orientation in the XY plane
 
 PyBullet Virtual Cameras
@@ -154,8 +161,11 @@ For simulation and debugging, use PyBullet's virtual cameras:
 **Debug Interface Features:**
 
 - **Real-time parameter adjustment** via PyBullet GUI sliders
+
 - **Live camera feed** displayed in matplotlib window
+
 - **Matrix visualization** for view and projection matrices
+
 - **Interactive positioning** for optimal camera placement
 
 Stereo Vision Pipeline
@@ -203,8 +213,11 @@ For 3D reconstruction, configure a stereo camera pair:
 **Stereo Pipeline Steps:**
 
 1. **Image Rectification**: Align stereo images for disparity computation
+
 2. **Disparity Calculation**: Use StereoSGBM for robust disparity estimation
+
 3. **3D Reconstruction**: Convert disparity to 3D points using camera geometry
+
 4. **Point Cloud Filtering**: Remove invalid and distant points
 
 Advanced Usage
@@ -521,26 +534,31 @@ Best Practices
 -----------------
 
 1. **Camera Placement**
+
    - Position cameras for optimal workspace coverage
    - Avoid backlighting and reflective surfaces
    - Ensure sufficient lighting for object detection
 
 2. **Calibration**
+
    - Use high-quality calibration patterns (checkerboards)
    - Capture calibration images from multiple angles
    - Verify calibration accuracy before deployment
 
 3. **Performance**
+
    - Choose appropriate image resolutions for your application
    - Balance detection accuracy with processing speed
    - Use temporal filtering for stable object tracking
 
 4. **Robustness**
+
    - Implement proper error handling for all vision operations
    - Use multiple cameras for redundancy when possible
    - Validate detection results before using in control loops
 
 5. **Integration**
+
    - Coordinate vision frame rates with control loop timing
    - Transform coordinates to robot base frame consistently
    - Use vision confidence scores in decision making

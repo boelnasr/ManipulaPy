@@ -18,8 +18,11 @@ of the combined field, the robot can find a collision-free path.
 Key components:
 
 - **Attractive potential** draws the robot toward the goal.  
+
 - **Repulsive potential** pushes the robot away from obstacles within an influence radius.  
+
 - **Gradient** direction of steepest descent in the combined potential.  
+
 - **Collision checking** rapid test whether a given configuration is in collision.  
 
 Mathematical Background

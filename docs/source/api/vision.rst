@@ -188,9 +188,13 @@ YOLO Integration
    **Detection Pipeline:**
    
    1. **YOLO Inference**: self.yolo_model(rgb_image, conf=0.3)
+
    2. **Bounding Box Extraction**: box.xyxy[0].tolist() coordinates
+
    3. **Depth Analysis**: Median depth within bounding box region
+
    4. **3D Reprojection**: Camera intrinsics-based coordinate transformation
+
    5. **Orientation Estimation**: np.arctan2(y_cam, x_cam) in XY plane
 
    **3D Transformation:**
@@ -223,10 +227,15 @@ Rectification Setup
    **Implementation Details:**
    
    1. **Parameter Extraction**: Intrinsics K1, K2 and distortions D1, D2
+
    2. **Relative Geometry**: R_lr = R_right @ R_left.T, t_lr = t_right - R_lr @ t_left
+
    3. **Type Unification**: Convert all inputs to float64 for cv2.stereoRectify
+
    4. **Rectification Computation**: cv2.stereoRectify with CALIB_ZERO_DISPARITY
+
    5. **Map Generation**: cv2.initUndistortRectifyMap for both cameras
+
    6. **Q Matrix Storage**: Disparity-to-depth transformation matrix
 
 Image Processing
@@ -487,28 +496,36 @@ YOLO Model Management
 --------------------
 
 - **Loading Failure**: Sets yolo_model = None, continues operation
+
 - **Detection Fallback**: Returns empty arrays when YOLO unavailable
+
 - **Input Validation**: Checks rgb_image and depth_image for None/invalid
 
 Stereo Processing Errors
 ------------------------
 
 - **Configuration Validation**: Checks required keys in stereo configs
+
 - **Runtime State Checking**: Validates stereo_enabled before operations
+
 - **Map Initialization**: Ensures rectification maps computed before use
 
 OpenCV Device Handling
 ----------------------
 
 - **Device Access Failure**: Raises RuntimeError with descriptive message
+
 - **Capture Validation**: Uses cap.isOpened() to verify device accessibility
+
 - **Resource Cleanup**: Automatic release in destructor and explicit method
 
 PyBullet Integration Safety
 --------------------------
 
 - **Parameter Reading**: Safe handling of missing debug parameters
+
 - **Matrix Validation**: Debug logging for view/projection matrix inspection
+
 - **Client State**: No assumptions about PyBullet connection status
 
 ---
@@ -520,21 +537,27 @@ Memory Management
 ----------------
 
 - **Image Arrays**: Contiguous memory layout for OpenCV operations
+
 - **Rectification Maps**: Persistent storage for repeated stereo processing
+
 - **Point Clouds**: Filtered arrays to reduce memory footprint
 
 Computational Efficiency
 -----------------------
 
 - **YOLO Inference**: Single forward pass per image
+
 - **Stereo Matching**: StereoSGBM optimized for quality/speed balance
+
 - **Depth Scaling**: Vectorized operations for range conversion
 
 Threading Considerations
 -----------------------
 
 - **OpenCV Capture**: Single-threaded device access
+
 - **YOLO Processing**: GPU acceleration when available
+
 - **PyBullet Integration**: Main thread simulation access required
 
 ---

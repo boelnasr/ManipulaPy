@@ -9,6 +9,7 @@ Introduction
 The TrajectoryPlanning class provides comprehensive trajectory generation and execution capabilities for robotic manipulators. It combines kinematic trajectory planning with dynamic analysis and collision avoidance to generate feasible, smooth robot motions.
 
 **Key Features:**
+
 - Joint-space trajectory generation with cubic/quintic time scaling
 - Cartesian-space trajectory planning for end-effector paths
 - CUDA-accelerated computations for real-time performance
@@ -134,8 +135,11 @@ Putting It All Together
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 1. **Time-scale** with :math:`\sigma_{3}` or :math:`\sigma_{5}` for smooth joint profiles.  
+
 2. **Interpolate** Cartesian end-effector motion on SE(3).  
+
 3. **Compute** velocities/accelerations and feed into inverse dynamics for torque evaluation.  
+
 4. **Inject** obstacle gradients from potential fields to reshape the path.  
 
 This mathematical framework underlies all high-level methods in the `TrajectoryPlanning` class.
@@ -212,6 +216,7 @@ Class Constructor
    TrajectoryPlanning(serial_manipulator, urdf_path, dynamics, joint_limits, torque_limits=None)
 
 **Parameters:**
+
 - ``serial_manipulator``: SerialManipulator instance for kinematics
 - ``urdf_path``: Path to robot URDF file for collision checking
 - ``dynamics``: ManipulatorDynamics instance for dynamics computations
@@ -219,6 +224,7 @@ Class Constructor
 - ``torque_limits``: Optional list of (min, max) torque limits
 
 **Attributes:**
+
 - ``serial_manipulator``: Robot kinematics model
 - ``dynamics``: Robot dynamics model
 - ``joint_limits``: Joint position constraints
@@ -1543,9 +1549,13 @@ The ManipulaPy Trajectory Planning module provides comprehensive trajectory gene
 **Core Features:**
 
 - **Joint-space trajectories** with cubic/quintic time scaling
+
 - **Cartesian-space trajectories** for end-effector motion
+
 - **CUDA acceleration** for high-performance computation
+
 - **Dynamics integration** for torque analysis and simulation
+
 - **Collision avoidance** using potential field methods
 
 **Key Classes and Methods:**

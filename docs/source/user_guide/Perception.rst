@@ -50,16 +50,19 @@ Key Features
 --------------
 
 **Environmental Understanding**
+
   - Real-time obstacle detection and classification
   - 3D spatial clustering using DBSCAN algorithms
   - Multi-camera data fusion and integration
 
 **Advanced Processing**
+
   - Stereo vision pipeline for depth reconstruction
   - Point cloud filtering and segmentation
   - Temporal consistency and object tracking
 
 **Robot Integration**
+
   - Direct integration with path planning modules
   - Real-time safety monitoring and collision avoidance
   - Coordinate frame transformations for robot control
@@ -167,10 +170,15 @@ The primary function of the Perception module is to detect and cluster obstacles
 The detection pipeline follows these steps:
 
 1. **Image Capture**: Acquire RGB and depth images from the vision system
+
 2. **Object Detection**: Use YOLO to identify objects in RGB images
+
 3. **Depth Integration**: Combine 2D detections with depth information
+
 4. **3D Point Generation**: Convert detections to 3D world coordinates
+
 5. **Clustering**: Group nearby points using DBSCAN algorithm
+
 6. **Filtering**: Remove noise and invalid clusters
 
 Stereo Vision Processing
@@ -1152,26 +1160,31 @@ Best Practices
 -----------------
 
 1. **Environment Adaptation**
+
    - Adjust clustering parameters based on environment type
    - Use appropriate depth thresholds for workspace size
    - Consider lighting conditions and camera placement
 
 2. **Performance Optimization**
+
    - Balance detection quality with processing speed
    - Use appropriate step sizes for depth sampling
    - Implement frame skipping for real-time applications
 
 3. **Robustness**
+
    - Always validate detection results before use
    - Implement proper error handling and recovery
    - Use temporal filtering to reduce noise
 
 4. **Integration**
+
    - Coordinate perception timing with control loops
    - Transform coordinates to robot base frame
    - Validate obstacle data before path planning
 
 5. **Maintenance**
+
    - Monitor system performance regularly
    - Log detection statistics for analysis
    - Update clustering parameters based on performance

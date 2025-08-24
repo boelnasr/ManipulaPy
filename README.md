@@ -141,6 +141,7 @@ pip install ManipulaPy
 ```
 
 **What gets installed automatically:**
+
 - ✅ **Core robotics** (always): kinematics, dynamics, control, basic trajectory planning
 - 🚀 **GPU acceleration** (if CUDA available): 40x+ speedups for large problems (N > 1000)
 - 👁️ **Vision features** (if system supports): camera capture, object detection, stereo vision
@@ -229,6 +230,7 @@ except ImportError:
 ### What Works Without Additional Setup
 
 **✅ Always Available (CPU-only):**
+
 - Forward/inverse kinematics and Jacobians
 - PID, computed torque, adaptive, and robust control
 - URDF processing and robot model conversion  
@@ -237,12 +239,14 @@ except ImportError:
 - Singularity analysis and workspace computation
 
 **🚀 GPU-Accelerated (optional 40x+ speedup):**
+
 - Large trajectory planning (N > 1000 points)
 - Batch processing multiple trajectories
 - Monte Carlo workspace analysis
 - Inverse dynamics for long trajectories
 
 **👁️ Requires System Dependencies:**
+
 - Vision features: OpenCV, system graphics libraries (libGL.so.1)
 - Object detection: YOLO models (auto-downloaded on first use)
 - Stereo processing: Camera calibration data
@@ -791,12 +795,14 @@ Cartesian Trajectories:
 ### Performance Recommendations
 
 **🎯 OPTIMAL GPU USE CASES:**
+
 - ✅ Inverse dynamics computation (**1000×-5000× speedup**)
 - ✅ Large trajectory generation (>10K points)
 - ✅ Batch processing multiple trajectories
 - ✅ Real-time control applications
 
 **⚠️ CPU-OPTIMAL SCENARIOS:**
+
 - Small trajectories (<1K points)
 - Cartesian space interpolation
 - Single-shot computations
@@ -921,6 +927,7 @@ Please follow our [Code of Conduct](CODE_OF_CONDUCT.md) to keep this community w
 ManipulaPy is licensed under the **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**.
 
 **Key Points:**
+
 - ✅ **Free to use** for research and education
 - ✅ **Modify and distribute** under same license
 - ✅ **Commercial use** allowed under AGPL terms
