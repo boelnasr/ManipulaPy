@@ -25,15 +25,23 @@ MOCK_MODULES = [
     # Computer Vision
     "cv2", "ultralytics", "opencv-python",
     
-    # Scientific Computing (keep matplotlib for docs)
+    # Scientific Computing
     "sklearn", "sklearn.cluster", "scipy", "scipy.spatial", "scipy.linalg",
-    
+
+    # Matplotlib can break autodoc in headless builds—mock it
+    "matplotlib", "matplotlib.pyplot",
+
     # Optional dependencies
     "plotly", "seaborn", "PIL", "Pillow",
 ]
 
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
+
+# Headless/CI safety for anything that still touches Matplotlib
+os.environ.setdefault("MPLBACKEND", "Agg")
+# Let your package gate heavy imports if desired (e.g., in __init__.py)
+os.environ.setdefault("SPHINX_BUILD", "1")
 
 # ── Path handling ────────────────────────────────────────
 DOCS_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -44,7 +52,7 @@ sys.path.insert(0, PROJECT_ROOT)          # so `import ManipulaPy` works
 project   = "ManipulaPy"
 author    = "Mohamed Aboelnar"
 copyright = f"{datetime.datetime.now().year}, {author}"
-version = release = "1.1.0"
+version = release = "1.1.3"
 
 # ── Core Extensions (always available) ──────────────────
 extensions = [
@@ -84,7 +92,7 @@ if not os.environ.get('READTHEDOCS'):
         "sphinx.ext.extlinks": try_add_extension("sphinx.ext.extlinks"), 
         "sphinx.ext.todo": try_add_extension("sphinx.ext.todo"),
         "sphinx.ext.ifconfig": try_add_extension("sphinx.ext.ifconfig"),
-        "sphinx_tabs": try_add_extension("sphinx_tabs"), 
+        "sphinx_tabs.tabs": try_add_extension("sphinx_tabs.tabs"),
         "sphinx_togglebutton": try_add_extension("sphinx_togglebutton"),
         "sphinxext.opengraph": try_add_extension("sphinxext.opengraph"),
         "sphinx_sitemap": try_add_extension("sphinx_sitemap"),
@@ -158,11 +166,12 @@ for _name, _mod, _opts in [
         print(f"✅ Using theme: {_selected}")
         break
 
-# ── HTML output ──────────────────────────────────────────
+# ── HTML output ─────────────────────────────────────────
 html_title = f"{project} {release} Documentation"
 html_short_title = f"{project} Docs"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
+html_baseurl = "https://manipulapy.readthedocs.io/en/latest/"
 
 # Better HTML output options
 html_show_sourcelink = True
@@ -304,12 +313,11 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 language = "en"
 today_fmt = "%B %d, %Y"
 
-# Source file encoding
-source_suffix = {".rst": None}
-
+# Source file encoding / parsers
+source_suffix = {".rst": "restructuredtext"}
 # Add markdown support if myst_parser is available
 if _optional_extensions.get("myst_parser", False):
-    source_suffix[".md"] = "myst_parser"
+    source_suffix[".md"] = "myst"
 
 # Master document
 master_doc = "index"
