@@ -24,14 +24,14 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
             <a href="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa">
                <img src="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg?style=for-the-badge" alt="JOSS Paper">
             </a>
-            <a href="https://github.com/boelnasr/ManipulaPy/blob/main/LICENSE">
+            <a href="https://github.com/boelnar/ManipulaPy/blob/main/LICENSE">
                <img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=for-the-badge" alt="License">
             </a>
-            <a href="https://github.com/boelnasr/ManipulaPy/actions">
+            <a href="https://github.com/boelnar/ManipulaPy/actions">
                <img src="https://img.shields.io/github/actions/workflow/status/boelnasr/ManipulaPy/test.yml?branch=main&style=for-the-badge&logo=github&label=CI" alt="CI Status">
             </a>
             <a href="https://pypi.org/project/manipulapy/">
-               <img src="https://static.pepy.tech/badge/manipulapy" alt="Downloads">
+               <img src="https://static.pepy.tech/badge/manipulapy">
             </a>
             <a href="https://github.com/boelnasr/ManipulaPy">
                <img src="https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=for-the-badge&logo=github&logoColor=white&label=Stars&color=yellow" alt="GitHub Stars">
@@ -54,6 +54,7 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
                <strong>Real-time Control</strong><br>
                PyBullet simulation and advanced controllers
             </div>
+
          </div>
       </div>
    </div>
@@ -61,7 +62,6 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
 .. contents:: **Quick links**
    :local:
    :depth: 1
-
 
 Getting Started
 ---------------
@@ -90,9 +90,8 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
    python -m pip install manipulapy[cuda]  # or just manipulapy
    python -c "import ManipulaPy; print('🎉 Installation successful!')"
 
-.. note::
-   The docs you're reading are generated from the source in ``docs/``; feel free to improve them and send a `pull request <https://github.com/boelnasr/ManipulaPy/pull/new>`_. 🚀
-
+.. note:: 
+   The docs you're reading are generated from the source in `docs/`; feel free to improve them and send a [pull request](https://github.com/boelnasr/ManipulaPy/pull/new). 🚀
 
 🚀 Quick Start Examples
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -297,7 +296,6 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
       </div>
    </div>
 
-
 Key Features at a Glance
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -333,7 +331,6 @@ Key Features at a Glance
       </div>
    </div>
 
-
 Documentation map
 -----------------
 
@@ -347,12 +344,13 @@ Documentation map
    :maxdepth: 2
    :caption: 🛠️ API Reference
 
-   api/index
-
+   api/index   
 .. toctree::
    :maxdepth: 2
    :caption: 📚 User Guides
 
+   
+   
    user_guide/index
    user_guide/Kinematics
    user_guide/Dynamics
@@ -360,12 +358,13 @@ Documentation map
    user_guide/Trajectory_Planning
    user_guide/Simulation
    user_guide/URDF_Processor
-   user_guide/Singularity_Analysis
+   user_guide/Singularity_Analysis 
    user_guide/Perception
-   user_guide/vision
+   user_guide/vision 
    user_guide/Potential_Field
    user_guide/Collision_Checker
    user_guide/CUDA_Kernels
+
 
 
 Popular Learning Paths
@@ -412,7 +411,6 @@ Popular Learning Paths
       </div>
    </div>
 
-
 What's New
 ----------
 
@@ -429,7 +427,6 @@ What's New
          <li><strong>Enhanced:</strong> Documentation with interactive examples</li>
       </ul>
    </div>
-
 
 Installation Options
 ~~~~~~~~~~~~~~~~~~~~
@@ -452,7 +449,6 @@ Installation Options
    git clone https://github.com/boelnasr/ManipulaPy.git
    cd ManipulaPy
    pip install -e .[dev]
-
 
 Performance Showcase
 ~~~~~~~~~~~~~~~~~~~~
@@ -482,7 +478,6 @@ Performance Showcase
       </div>
    </div>
 
-
 Citing ManipulaPy
 ~~~~~~~~~~~~~~~~~
 
@@ -497,7 +492,6 @@ If you use ManipulaPy in your research, please cite:
      url={https://github.com/boelnasr/ManipulaPy},
      version={1.1.0}
    }
-
 
 License
 -------
@@ -531,14 +525,12 @@ ManipulaPy is released under the **AGPL-3.0 License**:
 
 For commercial licensing options or AGPL compliance questions, please contact the maintainers.
 
-
 Indices and tables
 ------------------
 
 * :ref:`genindex` - Complete index of all functions, classes, and methods
 * :ref:`modindex` - Module index for quick navigation
 * :ref:`search` - Search the documentation
-
 
 .. raw:: html
 
@@ -653,11 +645,21 @@ Indices and tables
       text-align: center;
    }
 
-   .tip:nth-child(1) { background: #059669; }
-   .tip:nth-child(2) { background: #059669; }
-   .tip:nth-child(3) { background: #059669; }
-   .tip:nth-child(4) { background: #059669; }
+   .tip:nth-child(1) {
+      background: #059669; /* Strong blue */
+   }
 
+   .tip:nth-child(2) {
+      background: #059669; /* Strong red */
+   }
+
+   .tip:nth-child(3) {
+      background: #059669; /* Strong green */
+   }
+
+   .tip:nth-child(4) {
+      background: #059669; /* Strong purple */
+   }
    .tip-icon {
       font-size: 1.5rem;
       display: block;
