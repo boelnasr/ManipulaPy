@@ -74,10 +74,15 @@ Obstacle Detection Pipeline
    **Processing Pipeline:**
    
    1. **Image Acquisition**: vision.capture_image(camera_index)
+
    2. **Depth Validation**: Checks depth.ndim >= 2 and non-None status
+
    3. **Obstacle Detection**: vision.detect_obstacles() with YOLO integration
+
    4. **Point Validation**: Verifies non-None and non-empty point arrays
+
    5. **Clustering Analysis**: DBSCAN application to 3D point coordinates
+
    6. **Result Logging**: Debug information and cluster statistics
 
 ---
@@ -162,9 +167,13 @@ Clustering Analysis
    **Algorithm Details:**
    
    1. **Input Validation**: Empty array handling with early return
+
    2. **Model Instantiation**: DBSCAN(eps=eps, min_samples=min_samples)
+
    3. **Fitting**: dbscan_model.fit(points) on 3D coordinates
+
    4. **Label Extraction**: dbscan_model.labels_ array
+
    5. **Statistics Computation**: Unique label counting and noise analysis
 
 ---
@@ -218,8 +227,11 @@ Logger Configuration
    **Configuration Details:**
    
    - **Level**: DEBUG for comprehensive information
+
    - **Handler**: StreamHandler for console output
+
    - **Format**: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
    - **Duplicate Prevention**: Checks existing handlers before addition
 
 ---
@@ -228,9 +240,13 @@ Error Handling Hierarchy
 ------------------------
 
 1. **Vision Instance Validation**: Constructor-level checking
+
 2. **Image Availability**: Depth image validation with fallbacks
+
 3. **Detection Results**: None-checking with empty array returns
+
 4. **Clustering Input**: Empty point array handling
+
 5. **Resource Cleanup**: Exception-safe cleanup operations
 
 ---
@@ -267,11 +283,17 @@ Vision Module Interface
 Perception requires Vision instance with specific methods:
 
 - **capture_image()**: RGB/depth image acquisition
+
 - **detect_obstacles()**: YOLO-based object detection
+
 - **stereo_enabled**: Boolean stereo capability flag
+
 - **rectify_stereo_images()**: Stereo rectification
+
 - **compute_disparity()**: Disparity map computation
+
 - **get_stereo_point_cloud()**: 3D reconstruction
+
 - **release()**: Resource cleanup
 
 ---
@@ -284,21 +306,27 @@ Vision Failure Handling
 -----------------------
 
 - **Missing Depth**: Empty array return with warning logs
+
 - **Detection Failures**: None-result handling with error logs
+
 - **Stereo Unavailability**: Runtime exception with clear messaging
 
 Clustering Robustness
 ---------------------
 
 - **Empty Input**: Graceful handling with early return
+
 - **Insufficient Points**: DBSCAN handles minimum sample requirements
+
 - **Parameter Validation**: Implicit through sklearn parameter checking
 
 Resource Management Safety
 --------------------------
 
 - **Constructor Validation**: Immediate failure for invalid Vision instances
+
 - **Cleanup Exceptions**: Silent handling in destructor context
+
 - **Multiple Cleanup Calls**: Safe repeated release() invocation
 
 ---

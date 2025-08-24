@@ -331,8 +331,11 @@ Physics Settings
 The simulation uses PyBullet's physics engine with the following default settings:
 
 - **Gravity**: [0, 0, -9.81] m/s²
+
 - **Solver iterations**: PyBullet default
+
 - **Contact breaking threshold**: PyBullet default
+
 - **Collision detection**: Enabled for all robot links
 
 GUI Controls
@@ -341,8 +344,11 @@ GUI Controls
 When using interactive mode, the following GUI elements are available:
 
 - **Joint sliders**: Individual control for each robot joint
+
 - **Reset button**: Return robot to home position
+
 - **Gravity control**: Adjust gravitational acceleration
+
 - **Time step control**: Modify simulation time step
 
 ---
@@ -381,21 +387,25 @@ Common Issues and Solutions
    The simulation module includes comprehensive error handling for common issues:
 
 **URDF Loading Errors**
+
    - Verify URDF file path and format
    - Check for missing mesh files or textures
    - Ensure joint limits are properly defined
 
 **Physics Instability**
+
    - Reduce time step for better numerical stability
    - Check for unrealistic joint limits or masses
    - Verify contact parameters are reasonable
 
 **GUI Issues**
+
    - Ensure PyBullet GUI mode is properly initialized
    - Check for conflicting parameter names
    - Verify graphics drivers support OpenGL
 
 **Memory Issues**
+
    - Monitor CuPy memory usage for large trajectories
    - Use batch processing for very long simulations
    - Clear visualization lines periodically

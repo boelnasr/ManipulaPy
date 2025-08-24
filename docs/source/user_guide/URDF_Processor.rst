@@ -9,6 +9,7 @@ Introduction
 The URDF Processor bridges the gap between URDF robot descriptions and ManipulaPy's analytical framework. It automatically extracts kinematic and dynamic parameters from URDF files and creates the necessary objects for robotics analysis.
 
 **Key Features:**
+
 - Automatic parameter extraction from URDF files
 - Kinematic chain analysis and screw axis computation  
 - Inertial property extraction for dynamics
@@ -63,10 +64,12 @@ Class Constructor
    URDFToSerialManipulator(urdf_name, use_pybullet_limits=True)
 
 **Parameters:**
+
 - ``urdf_name`` (str): Path to the URDF file
 - ``use_pybullet_limits`` (bool): Extract joint limits from PyBullet simulation
 
 **Attributes:**
+
 - ``serial_manipulator``: SerialManipulator object for kinematics
 - ``dynamics``: ManipulatorDynamics object for dynamics  
 - ``robot_data``: Dictionary containing extracted parameters
@@ -411,9 +414,13 @@ URDF File Requirements
 For optimal results, ensure your URDF file has:
 
 1. **Proper inertial properties** for all links
+
 2. **Realistic joint limits** defined
+
 3. **Consistent coordinate frames** throughout the chain
+
 4. **Valid joint axis definitions** (unit vectors)
+
 5. **Accessible mesh files** (if using complex geometries)
 
 Performance Tips
@@ -476,8 +483,11 @@ The URDF Processor provides seamless conversion from URDF robot descriptions to 
 **Key Components:**
 
 - **URDFToSerialManipulator class**: Main interface for URDF processing
+
 - **Automatic parameter extraction**: Kinematic and dynamic properties
+
 - **Joint limit handling**: PyBullet integration for realistic limits
+
 - **Object creation**: SerialManipulator and ManipulatorDynamics instances
 
 **Typical Workflow:**

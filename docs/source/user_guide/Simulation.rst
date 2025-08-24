@@ -671,6 +671,7 @@ Common Issues and Solutions
        p.disconnect(client)
 
 **Solutions:**
+
 - Ensure X11 forwarding for remote systems: ``ssh -X username@hostname``
 - Install GUI libraries: ``sudo apt-get install python3-tk``
 - Use DIRECT mode for headless servers
@@ -816,11 +817,17 @@ Best Practices
 --------------------
 
 1. **Always validate trajectories** before execution
+
 2. **Use appropriate time steps** for your application
+
 3. **Monitor memory usage** in long simulations  
+
 4. **Enable collision checking** for safety-critical applications
+
 5. **Save simulation data** for post-analysis
+
 6. **Use GPU acceleration** for compute-intensive controllers
+
 7. **Profile performance** to identify bottlenecks
 
 Integration with Other Modules
@@ -829,9 +836,13 @@ Integration with Other Modules
 The Simulation module integrates seamlessly with other ManipulaPy components:
 
 - **Kinematics**: Forward/inverse kinematics for trajectory generation
+
 - **Dynamics**: Physics-based simulation and control
+
 - **Path Planning**: Trajectory optimization and collision avoidance  
+
 - **Control**: Closed-loop feedback control implementation
+
 - **Vision**: Sensor simulation and perception testing
 
 See Also

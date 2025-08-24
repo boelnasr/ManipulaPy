@@ -27,7 +27,9 @@ Mathematically, this happens when the Jacobian matrix becomes rank-deficient (de
 **Types of Singularities:**
 
 1. **Boundary Singularities**: Occur at workspace boundaries when the arm is fully extended
+
 2. **Interior Singularities**: Occur within the workspace when joints align in specific configurations
+
 3. **Wrist Singularities**: Occur when wrist axes align, losing rotational degrees of freedom
 
 **Physical Consequences:**
@@ -263,11 +265,14 @@ Visualization Methods
    
    Creates two ellipsoids:
    - **Blue ellipsoid**: Linear velocity capabilities
+
    - **Red ellipsoid**: Angular velocity capabilities
 
    Ellipsoid properties:
    - **Volume**: Overall manipulability measure
+
    - **Shape**: Directional velocity capabilities
+
    - **Orientation**: Principal motion directions
 
 .. py:method:: plot_workspace_monte_carlo(joint_limits, num_samples=10000)
@@ -725,17 +730,24 @@ Singularity-Aware Robot Programming
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. **Always check condition numbers** before executing trajectories
+
 2. **Use manipulability measures** for trajectory optimization
+
 3. **Implement singularity avoidance** in motion planning
+
 4. **Monitor real-time singularity metrics** during operation
+
 5. **Validate analysis results** with known test cases
 
 Integration Guidelines
 ~~~~~~~~~~~~~~~~~~~~~~
 
 - **Trajectory Planning**: Integrate singularity analysis into path optimization
+
 - **Control Systems**: Use condition numbers for adaptive control gains
+
 - **Safety Systems**: Implement singularity-based motion limits
+
 - **Performance Optimization**: Cache computations for repeated analyses
 
 See Also

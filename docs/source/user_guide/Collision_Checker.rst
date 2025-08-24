@@ -18,8 +18,11 @@ and tests for pairwise intersection at a given robot configuration.
 Key features:
 
 - **Convex hull construction** from URDF mesh vertices  
+
 - **Fast pairwise collision tests** using SciPy’s `ConvexHull.intersects`  
+
 - **Transforms hulls** by forward‐kinematics link poses  
+
 - **Self-collision detection** between any two non-adjacent links  
 
 Mathematical Background
@@ -40,7 +43,9 @@ half‐space tests under the hood.
 Workflow:
 
 1. **Load URDF** → extract mesh vertices.  
+
 2. **Build hulls** :math:`\{H_i\}` offline.  
+
 3. For each configuration :math:`\mathbf q`:  
    - Compute :math:`T_i(\mathbf q)` for each link.  
    - Transform :math:`H_i` → :math:`T_i(H_i)`.  
@@ -139,6 +144,7 @@ Troubleshooting
   subdivide large faces or use finer mesh resolution.
 
 - **Performance bottleneck**  
+
   - Precompute all hulls offline.  
   - Use fewer sample configurations in look-ahead checks.  
   - Parallelize `check_collision` calls with multiprocessing.

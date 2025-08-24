@@ -14,10 +14,15 @@ Overview
 The control module implements various control strategies:
 
 - **PID Control**: Classic feedback control
+
 - **Computed Torque Control**: Model-based linearizing control
+
 - **Adaptive Control**: Online parameter adaptation
+
 - **Robust Control**: Disturbance rejection
+
 - **Feedforward Control**: Open-loop compensation
+
 - **Kalman Filter**: State estimation and control
 
 All algorithms are GPU-accelerated and designed for real-time performance.
@@ -634,21 +639,25 @@ Common Issues and Solutions
 1. **Controller Instability**
    
    - **Cause**: Gains too high or improper tuning
+
    - **Solution**: Use Ziegler-Nichols tuning or reduce gains systematically
 
 2. **CuPy Memory Errors**
    
    - **Cause**: GPU memory exhaustion
+
    - **Solution**: Use smaller batch sizes or convert to CPU arrays when needed
 
 3. **Numerical Issues**
    
    - **Cause**: Ill-conditioned matrices or extreme values
+
    - **Solution**: Add regularization or use more robust numerical methods
 
 4. **Slow Performance**
    
    - **Cause**: Frequent CPU-GPU transfers
+
    - **Solution**: Keep computations on GPU as much as possible
 
 Best Practices

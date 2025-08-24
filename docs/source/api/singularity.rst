@@ -160,7 +160,9 @@ Jacobian Analysis
 All methods rely on the Jacobian matrix computation from the SerialManipulator:
 
 - **Frame**: Uses "space" frame for consistency
+
 - **Dimensions**: 6×n matrix (6 DOF × n joints)
+
 - **Components**: Upper 3 rows (linear), lower 3 rows (angular)
 
 Determinant Computation
@@ -169,7 +171,9 @@ Determinant Computation
 Singularity detection uses numpy.linalg.det() with absolute value comparison:
 
 - **Threshold**: 1e-4 (configurable in source)
+
 - **Method**: Direct determinant calculation
+
 - **Precision**: Double precision floating point
 
 Condition Number Calculation
@@ -178,7 +182,9 @@ Condition Number Calculation
 Uses numpy.linalg.cond() which implements:
 
 - **Method**: Ratio of largest to smallest singular values
+
 - **Algorithm**: SVD-based computation
+
 - **Stability**: Numerically stable for ill-conditioned matrices
 
 SVD Implementation
@@ -187,7 +193,9 @@ SVD Implementation
 Manipulability ellipsoid generation uses numpy.linalg.svd():
 
 - **Decomposition**: J = U @ diag(S) @ V.T
+
 - **Radii computation**: 1.0 / sqrt(S)
+
 - **Transformation**: Ellipsoid points = U @ diag(radii) @ sphere_points
 
 Convex Hull Generation
@@ -196,8 +204,11 @@ Convex Hull Generation
 Workspace visualization uses scipy.spatial.ConvexHull:
 
 - **Algorithm**: Quickhull algorithm
+
 - **Input**: N×3 array of workspace points
+
 - **Output**: Triangulated surface mesh
+
 - **Visualization**: Matplotlib plot_trisurf with viridis colormap
 
 ---
@@ -234,7 +245,9 @@ Memory Requirements
 CUDA kernel memory allocation:
 
 - **joint_samples**: num_samples × num_joints × float32
+
 - **rng_states**: num_samples × state_size
+
 - **device_joint_limits**: num_joints × 2 × float32
 
 Thread Configuration
@@ -243,7 +256,9 @@ Thread Configuration
 CUDA kernel execution parameters:
 
 - **threads_per_block**: 256 (fixed)
+
 - **blocks_per_grid**: ceil(num_samples / 256)
+
 - **total_threads**: blocks_per_grid × threads_per_block
 
 ---
@@ -255,27 +270,39 @@ Singularity Analysis Pipeline
 ----------------------------
 
 1. **Input**: Joint angles (numpy.ndarray)
+
 2. **Jacobian Computation**: SerialManipulator.jacobian()
+
 3. **Analysis**: Determinant or condition number calculation
+
 4. **Output**: Boolean or float result
 
 Manipulability Ellipsoid Pipeline
 ---------------------------------
 
 1. **Input**: Joint angles + optional axis
+
 2. **Jacobian Decomposition**: Split into linear/angular components
+
 3. **SVD Analysis**: Compute singular values and vectors
+
 4. **Ellipsoid Generation**: Transform unit sphere using SVD results
+
 5. **Visualization**: Matplotlib 3D surface plotting
 
 Workspace Analysis Pipeline
 ---------------------------
 
 1. **CUDA Setup**: Initialize device memory and random states
+
 2. **Parallel Sampling**: Generate random joint configurations
+
 3. **Host Transfer**: Copy samples from GPU to CPU
+
 4. **Forward Kinematics**: Batch computation of end-effector positions
+
 5. **Convex Hull**: Geometric analysis of workspace boundary
+
 6. **Visualization**: 3D triangulated surface rendering
 
 ---
@@ -287,21 +314,27 @@ Input Validation
 ----------------
 
 - **Joint angles**: Verified as numpy arrays with correct dimensions
+
 - **Joint limits**: Validated as list of tuples with numeric values
+
 - **Thresholds**: Checked for positive numeric values
 
 Numerical Stability
 ------------------
 
 - **Singular matrices**: Handled gracefully in condition number computation
+
 - **Zero determinants**: Managed with absolute value thresholding
+
 - **Ill-conditioned systems**: SVD provides robust decomposition
 
 CUDA Error Management
 --------------------
 
 - **Memory allocation**: Automatic cleanup on kernel completion
+
 - **Thread synchronization**: Implicit synchronization after kernel launch
+
 - **Device compatibility**: Runtime detection of CUDA availability
 
 ---

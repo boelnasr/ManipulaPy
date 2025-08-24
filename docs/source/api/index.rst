@@ -11,6 +11,7 @@ This section contains auto-generated documentation for all key modules, classes,
 .. note::
 
    - This section is **not a tutorial** – it’s for precise function/class definitions.  
+
    - For interactive examples and walkthroughs, see :ref:`tutorial-index`.  
    - For explanations, workflows, and configuration, see the :ref:`user_guide_index`.
 
@@ -62,9 +63,13 @@ This section contains auto-generated documentation for all key modules, classes,
 ---------------------------------------------------
 
 - **Module headers** show the import path: e.g., ``ManipulaPy.control.ManipulatorController``  
+
 - **Function signatures** are exact and include optional/default parameters  
+
 - **Class attributes** and properties are listed, with docstrings if provided  
+
 - **NumPy/CuPy compatibility** is noted where applicable  
+
 - **Examples** may be included for select methods/classes
 
 ---------------------------------------------------

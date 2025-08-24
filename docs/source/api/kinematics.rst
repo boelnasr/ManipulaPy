@@ -34,6 +34,7 @@ SerialManipulator Class
    .. automethod:: __init__
 
       **Parameters:**
+
         - **M_list** (*numpy.ndarray*) -- Home configuration matrix (4×4)
         - **omega_list** (*numpy.ndarray*) -- Joint rotation axes (3×n)
         - **r_list** (*numpy.ndarray*, optional) -- Joint position vectors (3×n)
@@ -50,6 +51,7 @@ SerialManipulator Class
    .. automethod:: update_state
 
       **Parameters:**
+
         - **joint_positions** (*array_like*) -- Current joint positions in radians
         - **joint_velocities** (*array_like*, optional) -- Current joint velocities in rad/s
 
@@ -60,10 +62,12 @@ SerialManipulator Class
    .. automethod:: forward_kinematics
 
       **Parameters:**
+
         - **thetalist** (*array_like*) -- Joint angles in radians
         - **frame** (*str*) -- Reference frame: "space" or "body" (default: "space")
 
       **Returns:**
+
         - **T** (*numpy.ndarray*) -- 4×4 transformation matrix
 
       **Formula (Space):** T(θ) = e^{S₁θ₁} e^{S₂θ₂} ... e^{Sₙθₙ} M
@@ -78,9 +82,11 @@ SerialManipulator Class
    .. automethod:: end_effector_pose
 
       **Parameters:**
+
         - **thetalist** (*array_like*) -- Joint angles in radians
 
       **Returns:**
+
         - **pose** (*numpy.ndarray*) -- 6-element vector [x, y, z, roll, pitch, yaw]
 
       **Components:** Position (meters) + Euler angles (radians)
@@ -90,10 +96,12 @@ SerialManipulator Class
    .. automethod:: jacobian
 
       **Parameters:**
+
         - **thetalist** (*array_like*) -- Joint angles in radians
         - **frame** (*str*) -- Reference frame: "space" or "body" (default: "space")
 
       **Returns:**
+
         - **J** (*numpy.ndarray*) -- 6×n Jacobian matrix
 
       **Structure:** J = [J_v; J_ω] where J_v is linear, J_ω is angular velocity Jacobian
@@ -105,11 +113,13 @@ SerialManipulator Class
    .. automethod:: end_effector_velocity
 
       **Parameters:**
+
         - **thetalist** (*array_like*) -- Joint angles in radians
         - **dthetalist** (*array_like*) -- Joint velocities in rad/s
         - **frame** (*str*) -- Reference frame: "space" or "body" (default: "space")
 
       **Returns:**
+
         - **V** (*numpy.ndarray*) -- 6-element twist vector [vx, vy, vz, ωx, ωy, ωz]
 
       **Formula:** V = J(θ) θ̇
@@ -117,11 +127,13 @@ SerialManipulator Class
    .. automethod:: joint_velocity
 
       **Parameters:**
+
         - **thetalist** (*array_like*) -- Joint angles in radians
         - **V_ee** (*array_like*) -- Desired end-effector velocity twist
         - **frame** (*str*) -- Reference frame: "space" or "body" (default: "space")
 
       **Returns:**
+
         - **dthetalist** (*numpy.ndarray*) -- Required joint velocities in rad/s
 
       **Formula:** θ̇ = J⁺(θ) V where J⁺ is Moore-Penrose pseudoinverse
@@ -131,6 +143,7 @@ SerialManipulator Class
    .. automethod:: iterative_inverse_kinematics
 
       **Parameters:**
+
         - **T_desired** (*numpy.ndarray*) -- Desired 4×4 transformation matrix
         - **thetalist0** (*array_like*) -- Initial guess for joint angles
         - **eomg** (*float*) -- Rotational error tolerance (default: 1e-9)
@@ -139,6 +152,7 @@ SerialManipulator Class
         - **plot_residuals** (*bool*) -- Plot convergence (default: False)
 
       **Returns:**
+
         - **thetalist** (*numpy.ndarray*) -- Solution joint angles
         - **success** (*bool*) -- Convergence status
         - **num_iterations** (*int*) -- Iterations used
@@ -152,6 +166,7 @@ SerialManipulator Class
    .. automethod:: hybrid_inverse_kinematics
 
       **Parameters:**
+
         - **T_desired** (*numpy.ndarray*) -- Desired 4×4 transformation matrix
         - **neural_network** (*torch.nn.Module*) -- Trained neural network model
         - **scaler_X** (*sklearn.preprocessing.StandardScaler*) -- Input feature scaler
@@ -163,6 +178,7 @@ SerialManipulator Class
         - **max_iterations** (*int*) -- Maximum iterations (default: 500)
 
       **Returns:**
+
         - **thetalist** (*numpy.ndarray*) -- Solution joint angles
         - **success** (*bool*) -- Convergence status
         - **num_iterations** (*int*) -- Iterations used
@@ -292,12 +308,19 @@ Key Features
 -------------
 
 - **Product of Exponentials** formulation for robust kinematics
+
 - **Dual frame support** (space and body frames) for flexibility
+
 - **Automatic screw axis** computation from joint parameters
+
 - **Damped least squares** IK with singularity handling
+
 - **Neural network integration** for improved IK initialization
+
 - **Joint limit enforcement** during inverse kinematics
+
 - **Comprehensive velocity** kinematics with pseudoinverse
+
 - **Convergence visualization** for debugging IK problems
 
 -----------------
@@ -305,16 +328,19 @@ Mathematical Background
 -----------------
 
 **Screw Theory Foundation:**
+
   - Uses 6D twist vectors to represent joint motion
   - Exponential coordinates for robust orientation handling
   - Adjoint transformations for frame conversions
 
 **Jacobian Computation:**
+
   - Space Jacobian: J_s = [Ad_{T₁} S₁, ..., Ad_{Tᵢ} Sᵢ, ...]
   - Body Jacobian: J_b computed via inverse transformations
   - Pseudoinverse used for redundant/singular configurations
 
 **Inverse Kinematics:**
+
   - Newton-Raphson iteration in twist coordinates
   - Separate convergence criteria for translation and rotation
   - Adaptive step size for stability (α = 0.058)

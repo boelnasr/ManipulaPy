@@ -9,15 +9,23 @@ Introduction
 The optimized `TrajectoryPlanning` class (now `OptimizedTrajectoryPlanning`) provides comprehensive trajectory generation and execution capabilities with significant performance improvements through CUDA acceleration and intelligent adaptive execution strategies.
 
 **Key Optimizations:**
+
 - **Adaptive GPU/CPU execution** based on problem size and hardware availability
+
 - **Memory pooling** to reduce allocation overhead and improve performance
+
 - **Batch processing** for multiple trajectories with optimized kernel launches
+
 - **Fused kernels** to minimize memory bandwidth requirements  
+
 - **Intelligent fallback** to CPU when beneficial for small problems
+
 - **2D parallelization** for better GPU utilization
+
 - **Pinned memory transfers** for faster host-device communication
 
 **Enhanced Features:**
+
 - Automatic performance tuning and statistics collection
 - Smart threshold adaptation based on execution patterns
 - Comprehensive error handling and graceful degradation
@@ -32,8 +40,11 @@ The mathematical foundation remains the same as the original implementation, wit
 **Key Computational Optimizations:**
 
 1. **Parallel Time-Scaling**: Joint trajectory computation parallelized across both time steps and joints using 2D CUDA grids
+
 2. **Vectorized Operations**: All mathematical operations vectorized for SIMD execution on both CPU and GPU
+
 3. **Memory Coalescing**: Data layouts optimized for efficient memory access patterns
+
 4. **Kernel Fusion**: Multiple operations combined into single kernel launches to reduce overhead
 
 Getting Started
@@ -1654,41 +1665,61 @@ Conclusion and Best Practices
 The optimized `TrajectoryPlanning` class provides significant performance improvements:
 
 - **Adaptive execution**: Automatically chooses optimal CPU/GPU strategy
+
 - **Batch processing**: Up to 10x speedup for multiple trajectories  
+
 - **Memory pooling**: Reduces allocation overhead by 50-80%
+
 - **CUDA acceleration**: 2-20x speedup for large problems
+
 - **Intelligent fallback**: Graceful degradation when GPU unavailable
 
 **Key Optimizations:**
 
 1. **2D Parallelization**: Trajectories computed across both time and joint dimensions
+
 2. **Fused Kernels**: Multiple operations combined to minimize memory transfers
+
 3. **Pinned Memory**: Faster host-device transfers for large datasets
+
 4. **Adaptive Thresholds**: Automatic tuning based on performance history
+
 5. **Memory Pooling**: Reuse of GPU arrays to eliminate allocation overhead
 
 **Best Practices for Production:**
 
 1. **Use Factory Function**: `create_optimized_planner()` for automatic optimization
+
 2. **Monitor Performance**: Regularly check `get_performance_stats()`
+
 3. **Configure Memory**: Set appropriate `memory_pool_size_mb` for your workload
+
 4. **Handle Errors**: Implement proper error handling for GPU failures
+
 5. **Profile First**: Use `enable_profiling=True` during development
+
 6. **Batch When Possible**: Use `batch_joint_trajectory()` for multiple paths
+
 7. **Clean Up**: Call `cleanup_gpu_memory()` when done
 
 **Migration Strategy:**
 
 - **Phase 1**: Drop-in replacement (no code changes required)
+
 - **Phase 2**: Add performance monitoring
+
 - **Phase 3**: Enable batch processing where applicable  
+
 - **Phase 4**: Fine-tune configuration for your specific use case
 
 **Configuration Guidelines:**
 
 - **High-throughput**: `cuda_threshold=50`, large `memory_pool_size_mb`
+
 - **Real-time**: `cuda_threshold=200`, moderate memory pool
+
 - **Embedded**: `use_cuda=False`, minimal memory footprint
+
 - **Development**: `enable_profiling=True`, adaptive settings
 
 The optimized trajectory planning module maintains full backward compatibility while providing substantial performance improvements. Users can benefit from optimizations immediately with existing code, then gradually adopt advanced features for maximum performance gains.

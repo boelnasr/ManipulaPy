@@ -34,6 +34,7 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: __init__
 
       **Parameters:**
+
         - **serial_manipulator** (*SerialManipulator*) -- Robot kinematics object
         - **urdf_path** (*str*) -- Path to URDF file for collision checking
         - **dynamics** (*ManipulatorDynamics*) -- Robot dynamics object
@@ -45,6 +46,7 @@ OptimizedTrajectoryPlanning Class
         - **enable_profiling** (*bool*) -- Enable CUDA profiling for performance analysis
 
       **Attributes Created:**
+
         - **collision_checker** (*CollisionChecker*) -- URDF-based collision detection
         - **potential_field** (*PotentialField*) -- Artificial potential field for obstacle avoidance
         - **cuda_available** (*bool*) -- Whether CUDA acceleration is available
@@ -56,6 +58,7 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: joint_trajectory
 
       **Parameters:**
+
         - **thetastart** (*array_like*) -- Starting joint angles in radians
         - **thetaend** (*array_like*) -- Target joint angles in radians
         - **Tf** (*float*) -- Total trajectory time in seconds
@@ -63,6 +66,7 @@ OptimizedTrajectoryPlanning Class
         - **method** (*int*) -- Time scaling method (3=cubic, 5=quintic)
 
       **Returns:**
+
         - **trajectory** (*dict*) -- Dictionary containing:
           
           - **positions** (*numpy.ndarray*) -- Joint positions (N×n)
@@ -78,6 +82,7 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: batch_joint_trajectory
 
       **Parameters:**
+
         - **thetastart_batch** (*numpy.ndarray*) -- Starting angles for multiple trajectories (batch_size, num_joints)
         - **thetaend_batch** (*numpy.ndarray*) -- Ending angles for multiple trajectories (batch_size, num_joints)
         - **Tf** (*float*) -- Total trajectory time in seconds
@@ -85,6 +90,7 @@ OptimizedTrajectoryPlanning Class
         - **method** (*int*) -- Time scaling method (3=cubic, 5=quintic)
 
       **Returns:**
+
         - **trajectory** (*dict*) -- Batch trajectory data with shape (batch_size, N, num_joints)
 
       **3D Parallelization:** Uses CUDA 3D grids for (batch, time, joint) parallel computation.
@@ -94,6 +100,7 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: cartesian_trajectory
 
       **Parameters:**
+
         - **Xstart** (*numpy.ndarray*) -- Initial SE(3) transformation matrix (4×4)
         - **Xend** (*numpy.ndarray*) -- Target SE(3) transformation matrix (4×4)
         - **Tf** (*float*) -- Total trajectory time in seconds
@@ -101,6 +108,7 @@ OptimizedTrajectoryPlanning Class
         - **method** (*int*) -- Time scaling method (3=cubic, 5=quintic)
 
       **Returns:**
+
         - **trajectory** (*dict*) -- Dictionary containing:
           
           - **positions** (*numpy.ndarray*) -- Cartesian positions (N×3)
@@ -117,6 +125,7 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: inverse_dynamics_trajectory
 
       **Parameters:**
+
         - **thetalist_trajectory** (*numpy.ndarray*) -- Joint angle trajectory (N×n)
         - **dthetalist_trajectory** (*numpy.ndarray*) -- Joint velocity trajectory (N×n)
         - **ddthetalist_trajectory** (*numpy.ndarray*) -- Joint acceleration trajectory (N×n)
@@ -124,6 +133,7 @@ OptimizedTrajectoryPlanning Class
         - **Ftip** (*array_like*, optional) -- End-effector wrench [fx, fy, fz, mx, my, mz] (default: zeros)
 
       **Returns:**
+
         - **torques** (*numpy.ndarray*) -- Required joint torques (N×n)
 
       **Adaptive Execution:** GPU with 2D parallelization for large trajectories, CPU for small ones.
@@ -135,6 +145,7 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: forward_dynamics_trajectory
 
       **Parameters:**
+
         - **thetalist** (*numpy.ndarray*) -- Initial joint angles
         - **dthetalist** (*numpy.ndarray*) -- Initial joint velocities
         - **taumat** (*numpy.ndarray*) -- Applied torque trajectory (N×n)
@@ -144,6 +155,7 @@ OptimizedTrajectoryPlanning Class
         - **intRes** (*int*) -- Integration resolution (sub-steps per dt)
 
       **Returns:**
+
         - **simulation** (*dict*) -- Dictionary containing:
           
           - **positions** (*numpy.ndarray*) -- Simulated joint positions (N×n)
@@ -203,10 +215,12 @@ OptimizedTrajectoryPlanning Class
       Determine if GPU should be used based on problem size and availability.
 
       **Parameters:**
+
         - **N** (*int*) -- Number of trajectory points
         - **num_joints** (*int*) -- Number of joints
 
       **Returns:**
+
         - **bool** -- True if GPU should be used
 
    .. automethod:: _get_or_resize_gpu_array
@@ -214,11 +228,13 @@ OptimizedTrajectoryPlanning Class
       Return a pooled CUDA array with the requested shape/dtype.
 
       **Parameters:**
+
         - **array_name** (*str*) -- Key for array cache
         - **shape** (*tuple*) -- Desired array shape
         - **dtype** (*np.dtype*) -- Desired data type
 
       **Returns:**
+
         - **cuda.device_array or None** -- GPU array or None if CUDA unavailable
 
    .. rubric:: Performance Monitoring
@@ -228,6 +244,7 @@ OptimizedTrajectoryPlanning Class
       Get comprehensive performance statistics for GPU vs CPU usage.
 
       **Returns:**
+
         - **dict** -- Performance statistics including:
           
           - **gpu_calls** (*int*) -- Number of GPU function calls
@@ -249,9 +266,11 @@ OptimizedTrajectoryPlanning Class
       Benchmark the performance of GPU vs CPU implementations.
 
       **Parameters:**
+
         - **test_cases** (*list*, optional) -- List of test cases to benchmark
 
       **Returns:**
+
         - **dict** -- Benchmark results for each test case
 
    .. rubric:: Memory Management
@@ -266,6 +285,7 @@ OptimizedTrajectoryPlanning Class
       :staticmethod:
 
       **Parameters:**
+
         - **trajectory_data** (*dict*) -- Trajectory data with positions, velocities, accelerations
         - **Tf** (*float*) -- Total trajectory time
         - **title** (*str*, optional) -- Plot title (default: "Joint Trajectory")
@@ -274,12 +294,14 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: plot_tcp_trajectory
 
       **Parameters:**
+
         - **trajectory** (*list*) -- List of joint angle configurations
         - **dt** (*float*) -- Time step between trajectory points
 
    .. automethod:: plot_cartesian_trajectory
 
       **Parameters:**
+
         - **trajectory_data** (*dict*) -- Cartesian trajectory data
         - **Tf** (*float*) -- Total trajectory time
         - **title** (*str*, optional) -- Plot title (default: "Cartesian Trajectory")
@@ -287,6 +309,7 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: plot_ee_trajectory
 
       **Parameters:**
+
         - **trajectory_data** (*dict*) -- End-effector trajectory data
         - **Tf** (*float*) -- Total trajectory time
         - **title** (*str*, optional) -- Plot title (default: "End-Effector Trajectory")
@@ -296,10 +319,12 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: calculate_derivatives
 
       **Parameters:**
+
         - **positions** (*array_like*) -- Position trajectory
         - **dt** (*float*) -- Time step between positions
 
       **Returns:**
+
         - **velocity** (*numpy.ndarray*) -- Finite difference velocities
         - **acceleration** (*numpy.ndarray*) -- Finite difference accelerations
         - **jerk** (*numpy.ndarray*) -- Finite difference jerk
@@ -307,11 +332,13 @@ OptimizedTrajectoryPlanning Class
    .. automethod:: plan_trajectory
 
       **Parameters:**
+
         - **start_position** (*list*) -- Initial joint configuration
         - **target_position** (*list*) -- Desired joint configuration
         - **obstacle_points** (*list*) -- Environment obstacle points
 
       **Returns:**
+
         - **trajectory** (*list*) -- Planned joint trajectory waypoints
 
 ------------------------
@@ -335,6 +362,7 @@ Utility Functions
    Factory function to create an optimized trajectory planner with recommended settings.
 
    **Parameters:**
+
      - **serial_manipulator** (*SerialManipulator*) -- SerialManipulator instance
      - **urdf_path** (*str*) -- Path to URDF file
      - **dynamics** (*ManipulatorDynamics*) -- ManipulatorDynamics instance
@@ -344,6 +372,7 @@ Utility Functions
      - **enable_profiling** (*bool*) -- Enable CUDA profiling
 
    **Returns:**
+
      - **OptimizedTrajectoryPlanning** -- Configured planner instance
 
 .. autofunction:: compare_implementations
@@ -351,6 +380,7 @@ Utility Functions
    Compare performance between CPU and GPU implementations.
 
    **Parameters:**
+
      - **serial_manipulator** (*SerialManipulator*) -- SerialManipulator instance
      - **urdf_path** (*str*) -- Path to URDF file
      - **dynamics** (*ManipulatorDynamics*) -- ManipulatorDynamics instance
@@ -358,6 +388,7 @@ Utility Functions
      - **test_params** (*dict*, optional) -- Test parameters
 
    **Returns:**
+
      - **dict** -- Comparison results including timing and accuracy metrics
 
 -------------------
@@ -369,6 +400,7 @@ CPU Optimization Functions
    Numba-optimized CPU trajectory generation with parallel execution.
 
    **Parameters:**
+
      - **thetastart** (*numpy.ndarray*) -- Starting joint angles
      - **thetaend** (*numpy.ndarray*) -- Ending joint angles
      - **Tf** (*float*) -- Final time
@@ -376,6 +408,7 @@ CPU Optimization Functions
      - **method** (*int*) -- Time scaling method
 
    **Returns:**
+
      - **tuple** -- (positions, velocities, accelerations) arrays
 
    **Optimization:** Uses Numba's parallel prange for CPU parallelization.
@@ -385,6 +418,7 @@ CPU Optimization Functions
    Thin wrapper for Numba-optimized trajectory computation.
 
    **Parameters:**
+
      - **thetastart** (*numpy.ndarray*) -- Starting joint angles
      - **thetaend** (*numpy.ndarray*) -- Ending joint angles
      - **Tf** (*float*) -- Final time
@@ -392,6 +426,7 @@ CPU Optimization Functions
      - **method** (*int*) -- Time scaling method
 
    **Returns:**
+
      - **tuple** -- (positions, velocities, accelerations) arrays
 
 -------------
@@ -598,34 +633,40 @@ Key Features
 -------------
 
 **Adaptive Execution:**
+
   - Automatic GPU/CPU selection based on problem size
   - Intelligent threshold adaptation based on performance history
   - Graceful fallback on GPU errors or memory constraints
 
 **CUDA Acceleration:**
+
   - 2D parallelized kernels for optimal GPU utilization
   - Shared memory optimization for time-scaling computations
   - Memory pooling to reduce allocation overhead
   - Pinned memory transfers for maximum PCIe bandwidth
 
 **Memory Management:**
+
   - Per-instance GPU array caching
   - Global memory pool with automatic cleanup
   - Configurable memory pool sizes
   - Explicit memory management controls
 
 **Performance Monitoring:**
+
   - Detailed timing statistics for GPU vs CPU usage
   - Automatic performance tracking and analysis
   - Built-in benchmarking capabilities
   - Adaptive threshold tuning based on empirical performance
 
 **Batch Processing:**
+
   - 3D parallelized batch trajectory generation
   - Efficient memory management for large batches
   - Automatic load balancing across GPU cores
 
 **Robust Operation:**
+
   - Comprehensive error handling with fallbacks
   - Automatic recovery from GPU memory issues
   - Extensive logging for debugging and optimization
@@ -635,18 +676,27 @@ Performance Characteristics
 -----------------
 
 **GPU Acceleration Thresholds:**
+
   - **Small problems** (N × joints < 200): CPU (lower overhead)
+
   - **Medium problems** (200 ≤ N × joints < 5000): Adaptive selection
+
   - **Large problems** (N × joints ≥ 5000): GPU preferred
 
 **Memory Usage:**
+
   - **Joint trajectory**: ~12 bytes per (time, joint) element
+
   - **Cartesian trajectory**: ~36 bytes per time step
+
   - **Dynamics computation**: ~20 bytes per (time, joint) element
 
 **Typical Speedups (on modern GPU):**
+
   - **Joint trajectories**: 5-20× for N > 1000
+
   - **Batch processing**: 10-50× for large batches
+
   - **Dynamics computation**: 3-15× for long trajectories
 
 -----------------
@@ -654,16 +704,19 @@ Configuration Guidelines
 -----------------
 
 **GPU Memory Pool Sizing:**
+
   - Small robots (≤6 DOF): 128-256 MB
   - Medium robots (7-12 DOF): 256-512 MB  
   - Large robots (>12 DOF): 512+ MB
 
 **CUDA Threshold Tuning:**
+
   - High-end GPUs: Lower threshold (50-100)
   - Mid-range GPUs: Medium threshold (100-200)
   - Integrated GPUs: Higher threshold (200-500)
 
 **Batch Size Recommendations:**
+
   - Memory-limited: batch_size ≤ 50
   - Compute-limited: batch_size ≤ 200
   - High-memory systems: batch_size ≤ 1000

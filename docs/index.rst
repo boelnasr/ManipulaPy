@@ -19,23 +19,27 @@ Key Features
 ------------
 
 🚀 **High Performance**
+
    - CUDA-accelerated computations for real-time applications
    - Optimized algorithms for large-scale robotic simulations
    - Efficient memory management and parallel processing
 
 🤖 **Comprehensive Robotics Suite**
+
    - Forward and inverse kinematics with multiple solvers
    - Complete dynamics modeling and simulation
    - Advanced trajectory planning with collision avoidance
    - Multiple control strategies (PID, computed torque, adaptive)
 
 🎯 **Production Ready**
+
    - URDF integration for real robot deployment
    - PyBullet simulation environment support
    - Computer vision and perception modules
    - Extensive testing and validation
 
 🔧 **Developer Friendly**
+
    - Clean, intuitive API design
    - Comprehensive documentation and examples
    - Modular architecture for easy extension
@@ -84,9 +88,13 @@ What's in the Docs
 This documentation provides comprehensive guides and references for using ManipulaPy:
 
 - **Getting Started**: Installation, basic concepts, and first examples
+
 - **User Guide**: Detailed tutorials covering all major functionality
+
 - **API Reference**: Complete documentation of all classes and functions
+
 - **Examples**: Real-world applications and case studies
+
 - **Contributing**: Guidelines for contributing to the project
 
 Contents
@@ -166,7 +174,9 @@ Community and Support
 =====================
 
 - **GitHub Repository**: `https://github.com/moabdelgaber/ManipulaPy <https://github.com/moabdelgaber/ManipulaPy>`_
+
 - **Issue Tracker**: `GitHub Issues <https://github.com/moabdelgaber/ManipulaPy/issues>`_
+
 - **Discussions**: `GitHub Discussions <https://github.com/moabdelgaber/ManipulaPy/discussions>`_
 
 License

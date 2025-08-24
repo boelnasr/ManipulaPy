@@ -34,16 +34,19 @@ URDFToSerialManipulator Class
    .. automethod:: __init__
 
       **Parameters:**
+
         - **urdf_name** (*str*) -- Path to the URDF file
         - **use_pybullet_limits** (*bool*) -- Override URDF joint limits with PyBullet values (default: True)
 
       **Process:**
+
         1. Load URDF using urchin library
         2. Extract kinematic and dynamic parameters
         3. Optionally retrieve joint limits from PyBullet
         4. Create SerialManipulator and ManipulatorDynamics objects
 
       **Attributes Created:**
+
         - **urdf_name** (*str*) -- Path to URDF file
         - **robot** (*urchin.URDF*) -- Loaded URDF object
         - **robot_data** (*dict*) -- Extracted robot parameters
@@ -55,9 +58,11 @@ URDFToSerialManipulator Class
    .. automethod:: load_urdf
 
       **Parameters:**
+
         - **urdf_name** (*str*) -- Path to the URDF file
 
       **Returns:**
+
         - **robot_data** (*dict*) -- Dictionary containing:
           
           - **M** (*numpy.ndarray*) -- Home configuration matrix (4×4)
@@ -67,6 +72,7 @@ URDFToSerialManipulator Class
           - **actuated_joints_num** (*int*) -- Number of actuated joints
 
       **Process:**
+
         1. Extract joint positions and rotation axes
         2. Build spatial inertia matrices from link properties
         3. Compute screw axes using Product of Exponentials
@@ -75,9 +81,11 @@ URDFToSerialManipulator Class
    .. automethod:: _get_joint_limits_from_pybullet
 
       **Returns:**
+
         - **joint_limits** (*list*) -- List of (lower, upper) tuples for each revolute joint
 
       **Process:**
+
         1. Connect to PyBullet in DIRECT mode (no GUI)
         2. Load URDF into PyBullet simulation
         3. Extract joint limits for all revolute joints
@@ -91,9 +99,11 @@ URDFToSerialManipulator Class
    .. automethod:: initialize_serial_manipulator
 
       **Returns:**
+
         - **manipulator** (*SerialManipulator*) -- Configured kinematics object
 
       **Configuration:**
+
         - Uses extracted URDF parameters (M, S_list, B_list)
         - Applies joint limits from PyBullet or defaults
         - Computes omega_list from screw axes
@@ -101,9 +111,11 @@ URDFToSerialManipulator Class
    .. automethod:: initialize_manipulator_dynamics
 
       **Returns:**
+
         - **dynamics** (*ManipulatorDynamics*) -- Configured dynamics object
 
       **Configuration:**
+
         - Inherits from SerialManipulator for kinematics
         - Uses spatial inertia matrices (Glist) from URDF
         - Extracts r_list from space frame screw axes
@@ -119,16 +131,21 @@ URDFToSerialManipulator Class
    .. automethod:: visualize_trajectory
 
       **Parameters:**
+
         - **cfg_trajectory** (*numpy.ndarray* or *dict*, optional) -- Joint configurations over time
         - **loop_time** (*float*) -- Animation duration in seconds (default: 3.0)
         - **use_collision** (*bool*) -- Enable collision visualization (default: False)
 
       **Trajectory Formats:**
+
         - **NumPy array:** Shape (n_timesteps, n_joints) with joint angles
+
         - **Dictionary:** {joint_name: [angles...]} mapping joint names to angle sequences
+
         - **None:** Uses default motion from 0 to π/2 for all joints
 
       **Features:**
+
         - Smooth animation between waypoints
         - Collision geometry visualization
         - Configurable playback speed
@@ -138,6 +155,7 @@ URDFToSerialManipulator Class
    .. automethod:: print_joint_info
 
       **Returns:**
+
         - **joint_info** (*dict*) -- Dictionary containing:
           
           - **num_joints** (*int*) -- Total number of joints
@@ -151,9 +169,11 @@ URDFToSerialManipulator Class
       :staticmethod:
 
       **Parameters:**
+
         - **T** (*numpy.ndarray*) -- 4×4 transformation matrix
 
       **Returns:**
+
         - **position** (*numpy.ndarray*) -- 3-element position vector [x, y, z]
 
       **Purpose:** Extract position from homogeneous transformation matrix.
@@ -162,10 +182,12 @@ URDFToSerialManipulator Class
       :staticmethod:
 
       **Parameters:**
+
         - **robot** (*urchin.URDF*) -- Loaded URDF object
         - **link_name** (*str*) -- Name of link to find
 
       **Returns:**
+
         - **link** (*urchin.Link* or *None*) -- Link object if found, None otherwise
 
       **Purpose:** Find specific link by name in URDF structure.
@@ -174,11 +196,13 @@ URDFToSerialManipulator Class
       :staticmethod:
 
       **Parameters:**
+
         - **w** (*numpy.ndarray*) -- Joint rotation axes (3×n)
         - **p** (*numpy.ndarray*) -- Joint positions (3×n)
         - **robot_dof** (*int*) -- Number of degrees of freedom
 
       **Returns:**
+
         - **Slist** (*numpy.ndarray*) -- Space frame screw axes (6×n)
 
       **Formula:** For each joint i: S_i = [ω_i; v_i] where v_i = -ω_i × p_i
@@ -331,12 +355,19 @@ Key Features
 -------------
 
 - **Automatic parameter extraction** from URDF files using urchin library
+
 - **PyBullet integration** for accurate joint limit retrieval
+
 - **Dual object creation** (SerialManipulator + ManipulatorDynamics)
+
 - **Flexible visualization** with static and animated display options
+
 - **Robust trajectory handling** supporting both array and dictionary formats
+
 - **Complete inertia processing** from URDF link properties
+
 - **Screw theory conversion** from joint parameters to screw axes
+
 - **Error handling** for malformed or missing URDF files
 
 
@@ -345,10 +376,15 @@ Dependencies
 -----------------
 
 - **urchin** -- URDF loading and visualization
+
 - **PyBullet** -- Joint limit extraction and simulation
+
 - **NumPy** -- Numerical computations and array operations
+
 - **ManipulaPy.kinematics** -- SerialManipulator class
+
 - **ManipulaPy.dynamics** -- ManipulatorDynamics class
+
 - **ManipulaPy.utils** -- Utility functions for transformations
 
 -----------------

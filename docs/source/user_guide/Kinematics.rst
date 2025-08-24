@@ -13,7 +13,9 @@ What is Robot Kinematics?
 **Robot kinematics** studies the geometry of manipulator motion without considering forces. The key problems are:
 
 - **Forward Kinematics (FK):** Given joint angles → find end-effector pose
+
 - **Inverse Kinematics (IK):** Given desired pose → find joint angles  
+
 - **Jacobian Analysis:** Relationship between joint velocities and end-effector motion
 
 ManipulaPy uses the **Product of Exponentials (PoE)** formulation with screw theory for numerically stable computations.
@@ -178,9 +180,13 @@ Constructor
    )
 
 **Key Parameters:**
+
 - **M_list**: 4×4 transformation matrix representing the home pose
+
 - **omega_list**: 3×n matrix of joint rotation axes
+
 - **S_list**: 6×n matrix of space frame screw axes (auto-computed if not provided)
+
 - **joint_limits**: List of (min, max) tuples for each joint
 
 Creating a Robot Model
@@ -686,24 +692,29 @@ Best Practices
 ------------------
 
 1. **Robot Definition**
+
    - Use URDF files when possible for real robots
    - Validate screw axes are unit vectors for revolute joints
    - Set realistic joint limits
 
 2. **Forward Kinematics**
+
    - Both space and body frames give identical results
    - Choose the frame that makes your calculations easier
 
 3. **Inverse Kinematics**
+
    - Provide good initial guesses (avoid singularities)
    - Use damping for stability near singularities
    - Try multiple initial guesses for difficult targets
 
 4. **Jacobian Analysis**
+
    - Monitor condition number to detect singularities
    - Use velocity kinematics for real-time control
 
 5. **Performance**
+
    - Cache Jacobian computations when configuration doesn't change
    - Use appropriate tolerances (don't over-specify)
 
@@ -711,8 +722,11 @@ Next Steps
 ---------------
 
 - **Dynamics**: Add forces and inertias → :doc:`Dynamics`
+
 - **Trajectory Planning**: Plan smooth motions → :doc:`Trajectory_Planning`  
+
 - **Control**: Implement feedback controllers → :doc:`Control`
+
 - **Simulation**: Test in PyBullet → :doc:`Simulation`
 
 API Reference

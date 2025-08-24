@@ -13,14 +13,19 @@ What is GPU Acceleration?
 **GPU acceleration** uses NVIDIA graphics cards to perform parallel computations much faster than traditional CPU processing. ManipulaPy leverages CUDA through:
 
 - **Numba CUDA kernels**: Low-level parallel computation
+
 - **CuPy arrays**: NumPy-compatible GPU arrays  
+
 - **Automatic fallback**: Graceful degradation to CPU when GPU unavailable
+
 - **Memory optimization**: Efficient GPU memory management
 
 Key benefits include:
 
 - **10-100x Performance Improvement**: Significant speedup for large-scale computations
+
 - **Real-time Capable**: Suitable for real-time control applications
+
 - **Seamless Integration**: Works directly with existing ManipulaPy classes
 
 Mathematical Foundation
@@ -66,11 +71,13 @@ System Requirements
 ~~~~~~~~~~~~~~~~~~~~~~
 
 **Hardware:**
+
 - NVIDIA GPU with Compute Capability 3.0 or higher
 - 4GB+ GPU memory recommended
 - PCIe 3.0 x16 slot
 
 **Software:**
+
 - NVIDIA GPU drivers (latest recommended)
 - CUDA Toolkit 11.0+ or 12.0+
 - Python 3.8+
@@ -138,13 +145,21 @@ Generates smooth joint trajectories with cubic or quintic time scaling.
    def trajectory_kernel(thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method):
 
 **Parameters:**
+
 - **thetastart**: Starting joint angles
+
 - **thetaend**: Ending joint angles  
+
 - **traj_pos**: Output trajectory positions
+
 - **traj_vel**: Output trajectory velocities
+
 - **traj_acc**: Output trajectory accelerations
+
 - **Tf**: Total trajectory time
+
 - **N**: Number of trajectory points
+
 - **method**: Time scaling method (3=cubic, 5=quintic)
 
 **cartesian_trajectory_kernel**
@@ -171,6 +186,7 @@ Computes required joint torques for given motion trajectories.
        gravity_vector, Ftip, Glist, Slist, M, torques_trajectory, torque_limits):
 
 **Features:**
+
 - Parallel computation across trajectory points
 - Includes mass matrix, Coriolis, and gravity effects
 - Automatic torque limit enforcement
@@ -1306,16 +1322,23 @@ When to Use GPU Acceleration
 **Recommended for:**
 
 - **Large trajectory generation** (N > 1000 points)
+
 - **Batch dynamics computation** for multiple trajectories
+
 - **Dense potential field calculations** with many sample points
+
 - **Real-time path planning** with many obstacles
+
 - **Iterative optimization algorithms** with repeated computations
 
 **Not recommended for:**
 
 - **Small computations** (N < 100 points)
+
 - **One-off calculations** or prototype development
+
 - **Memory-constrained systems** with limited GPU memory
+
 - **Development/debugging phases** where CPU debugging is easier
 
 Performance Guidelines
@@ -1353,10 +1376,15 @@ Installation and Setup
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. **✅ Install CUDA support**: ``pip install cupy-cuda11x numba ManipulaPy``
+
 2. **✅ Verify installation**: Check ``cuda.is_available()``
+
 3. **✅ Start with TrajectoryPlanning**: Use existing ManipulaPy classes
+
 4. **✅ Test performance**: Compare GPU vs CPU for your use case
+
 5. **✅ Optimize gradually**: Apply memory management best practices
+
 6. **✅ Monitor system**: Watch for memory usage and thermal limits
 
 Quick Start Guide
@@ -1466,8 +1494,11 @@ Conclusion
 The ManipulaPy CUDA Kernels module provides significant performance improvements for robotics applications through:
 
 - **High-Performance Computing**: 10-100x speedup for suitable workloads
+
 - **Seamless Integration**: Works directly with TrajectoryPlanning and other ManipulaPy modules
+
 - **Automatic Fallback**: Graceful degradation to CPU when GPU unavailable
+
 - **Memory Efficiency**: Optimized GPU memory management
 
 The GPU acceleration is built into ManipulaPy's core modules like ``TrajectoryPlanning``, so you can benefit from it without changing your existing code - just install the CUDA dependencies and ManipulaPy will automatically use GPU acceleration when available.

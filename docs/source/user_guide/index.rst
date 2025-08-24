@@ -502,7 +502,9 @@ Cutting-edge techniques for performance and analysis:
 If you get stuck:
 
 1. **Check the Examples** - Each guide has complete working examples
+
 2. **API Reference** - Detailed function documentation in :doc:`../api/index`
+
 3. **GitHub Issues** - Report bugs or ask questions on `GitHub <https://github.com/boelnasr/ManipulaPy/issues>`_
 
 .. raw:: html

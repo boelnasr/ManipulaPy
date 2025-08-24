@@ -9,6 +9,7 @@ Introduction
 The TrajectoryPlanning class provides comprehensive trajectory generation and execution capabilities for robotic manipulators. It combines kinematic trajectory planning with dynamic analysis and collision avoidance to generate feasible, smooth robot motions.
 
 **Key Features:**
+
 - Joint-space trajectory generation with cubic/quintic time scaling
 - Cartesian-space trajectory planning for end-effector paths
 - CUDA-accelerated computations for real-time performance
@@ -86,6 +87,7 @@ Class Constructor
    TrajectoryPlanning(serial_manipulator, urdf_path, dynamics, joint_limits, torque_limits=None)
 
 **Parameters:**
+
 - ``serial_manipulator``: SerialManipulator instance for kinematics
 - ``urdf_path``: Path to robot URDF file for collision checking
 - ``dynamics``: ManipulatorDynamics instance for dynamics computations
@@ -93,6 +95,7 @@ Class Constructor
 - ``torque_limits``: Optional list of (min, max) torque limits
 
 **Attributes:**
+
 - ``serial_manipulator``: Robot kinematics model
 - ``dynamics``: Robot dynamics model
 - ``joint_limits``: Joint position constraints
@@ -1415,13 +1418,19 @@ Summary
 The ManipulaPy Trajectory Planning module provides comprehensive trajectory generation capabilities for robotic manipulators:
 
 **Core Features:**
+
 - **Joint-space trajectories** with cubic/quintic time scaling
+
 - **Cartesian-space trajectories** for end-effector motion
+
 - **CUDA acceleration** for high-performance computation
+
 - **Dynamics integration** for torque analysis and simulation
+
 - **Collision avoidance** using potential field methods
 
 **Key Classes and Methods:**
+
 - ``TrajectoryPlanning``: Main class for trajectory generation
 - ``joint_trajectory()``: Generate smooth joint-space paths
 - ``cartesian_trajectory()``: Create end-effector trajectories  
@@ -1429,6 +1438,7 @@ The ManipulaPy Trajectory Planning module provides comprehensive trajectory gene
 - ``forward_dynamics_trajectory()``: Simulate robot motion
 
 **Advanced Capabilities:**
+
 - Multi-waypoint trajectory generation
 - Real-time trajectory execution simulation
 - Batch processing for multiple trajectories
@@ -1436,6 +1446,7 @@ The ManipulaPy Trajectory Planning module provides comprehensive trajectory gene
 - Performance optimization with CUDA
 
 **Best Practices:**
+
 - Use quintic scaling for smooth acceleration profiles
 - Validate trajectories for dynamics feasibility
 - Check joint and torque limit compliance

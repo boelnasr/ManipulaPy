@@ -12,9 +12,13 @@ Introduction to Robot Dynamics
 Robot dynamics deals with the relationship between forces/torques and motion in robotic systems. Unlike kinematics, which only considers geometric relationships, dynamics incorporates:
 
 - **Mass properties** of robot links
+
 - **Inertial forces** due to acceleration
+
 - **Gravitational forces** acting on the robot
+
 - **External forces** applied to the robot
+
 - **Joint torques** required for desired motion
 
 Mathematical Background
@@ -2078,10 +2082,15 @@ Summary
 The ManipulaPy dynamics module provides a comprehensive implementation of robot dynamics computations. Key features include:
 
 - **Efficient mass matrix computation** with caching
+
 - **Accurate Coriolis force calculation** using numerical methods
+
 - **Gravity compensation** for various orientations
+
 - **Forward and inverse dynamics** for control applications
+
 - **Numerical stability** checks and error handling
+
 - **Performance optimization** for real-time applications
 
 The module is designed for both educational and practical applications, providing clear mathematical foundations while maintaining computational efficiency suitable for real-time control systems.
