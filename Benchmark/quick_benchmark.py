@@ -17,10 +17,18 @@ Usage:
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 # Auto-install optional dependencies (pandas, seaborn) if missing
-import importlib, subprocess, sys
-for _pkg in ("pandas", "seaborn"):
-    if importlib.util.find_spec(_pkg) is None:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", _pkg])
+import subprocess
+import sys
+
+try:
+    import pandas
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pandas"])
+
+try:
+    import seaborn
+except ImportError:
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "seaborn"])
 
 import time
 import numpy as np
