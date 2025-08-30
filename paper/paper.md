@@ -2,7 +2,7 @@
 title: "ManipulaPy: A GPU-Accelerated Python Framework for Robotic Manipulation, Perception, and Control"
 tags: [robotics, manipulator, simulation, kinematics, dynamics, perception, cuda, trajectory-planning, computer-vision]
 authors:
-  - name: M.I.M. AboElNasr
+  - name: M.I.M.AboElNasr
     orcid: 0000-0002-1768-2031
     affiliation: 1
 affiliations:
@@ -14,7 +14,7 @@ bibliography: paper.bib
 
 # Summary
 
-**ManipulaPy** is an open-source Python toolbox that unifies the entire manipulation pipeline—from URDF parsing to GPU-accelerated dynamics, vision-based perception, planning and control—within a single API. Built on the Product-of-Exponentials model [@lynch2017modern] (similar to Pinocchio [@Pinocchio2025] but with GPU acceleration), PyBullet [@coumans2019], CuPy [@cupy2021] and custom CUDA kernels [@liang2018gpu], the library enables researchers to move from robot description to real-time control with up to **13× overall performance improvement** and **3600× faster inverse dynamics** on a 6-DOF UR5 compared to NumPy baseline. Performance claims are reproducible via benchmarks in `benchmarks/README.md`.
+**ManipulaPy** is an open-source Python toolbox that unifies the entire manipulation pipeline—from URDF parsing to GPU-accelerated dynamics, vision-based perception, planning and control—within a single API. Built on the Product-of-Exponentials model [@lynch2017modern] (similar to Pinocchio [@Pinocchio2025] but with GPU acceleration), PyBullet [@coumans2019], CuPy [@cupy2021] and custom CUDA kernels [@liang2018gpu], the library enables researchers to move from robot description to real-time control with up to **13× overall performance improvement**. On 6-DOF arms, a specialized inverse-dynamics prototype attains up to **3600×** over NumPy, while our **DOF-agnostic GPU trajectory kernels** (joint & Cartesian) accelerate **7-DOF and higher** manipulators in practice. Performance claims are reproducible via benchmarks in `benchmarks/README.md`.
 
 # Statement of Need
 
@@ -67,7 +67,7 @@ ManipulaPy's architecture centers on a **unified manipulation pipeline** that ma
 
 **Robot Model Processing** converts URDF descriptions into Product-of-Exponentials representations, extracting screw axes, mass properties, and joint constraints through PyBullet integration. This creates the fundamental `SerialManipulator` and `ManipulatorDynamics` objects used throughout the system.
 
-**Kinematics and Dynamics** implement GPU-accelerated forward/inverse kinematics, Jacobian computation, and Newton-Euler dynamics. Custom CUDA kernels optimize critical operations for 6-DOF manipulators, enabling real-time performance at 1 kHz control rates.
+**Kinematics and Dynamics** provide vectorized FK/IK and Jacobians and **GPU-accelerated trajectory time-scaling** (joint & Cartesian) that is **DOF-agnostic** (applies to 6- and 7-DOF+). A **specialized 6-DOF inverse-dynamics prototype** demonstrates up to 3600× speedup; the **released GPU dynamics kernels** are shape-agnostic but **simplified** (per-joint/diagonalized). The **fully coupled n-DOF spatial dynamics** remain on the CPU path for exactness.
 
 **Perception Integration** processes sensor data through a multi-stage pipeline supporting diverse input modalities. The `vision.py` module handles low-level camera operations (stereo rectification, calibration, image capture), while `perception.py` provides high-level semantic processing (object detection, clustering, obstacle representation). This separation allows users to plug in custom sensors while maintaining consistent 3D obstacle representations.
 
@@ -139,19 +139,29 @@ This flexibility allows researchers to choose optimal representations for their 
 
 Like Pinocchio [@Pinocchio2025], ManipulaPy adopts the Product-of-Exponentials formulation for robot kinematics. However, while Pinocchio achieves performance through highly optimized C++ implementations, ManipulaPy provides GPU acceleration across the entire manipulation pipeline:
 
-$$T(\theta) = e^{S_1 \theta_1} \cdots e^{S_n \theta_n} M$$
+$T(\theta) = e^{S_1 \theta_1} \cdots e^{S_n \theta_n} M$
 
 where each screw axis $S_i \in \mathbb{R}^6$ encodes joint motion and $M \in SE(3)$ represents the home configuration. The space-frame Jacobian becomes:
 
-$$J(\theta) = \left[\operatorname{Ad}_{T_1}S_1, \ldots, S_n\right]$$
+$J(\theta) = \left[\operatorname{Ad}_{T_1}S_1, \ldots, S_n\right]$
 
 ## GPU-Accelerated Dynamics
 
 Custom CUDA kernels parallelize the recursive Newton-Euler algorithm for the fundamental dynamics equation:
 
-$$\tau = M(\theta)\ddot{\theta} + C(\theta,\dot{\theta}) + G(\theta)$$
+$\tau = M(\theta)\ddot{\theta} + C(\theta,\dot{\theta}) + G(\theta)$
 
-The mass matrix $M(\theta) = \sum_{i=1}^{n}\operatorname{Ad}_{T_i}^T G_i \operatorname{Ad}_{T_i}$ computation is optimized for 256-thread blocks, achieving up to **3600× speedup for inverse dynamics** and **8× speedup for trajectory generation** on 6-DOF manipulators compared to NumPy implementations.
+The mass matrix $M(\theta) = \sum_{i=1}^{n}\operatorname{Ad}_{T_i}^T G_i \operatorname{Ad}_{T_i}$ computation is optimized for 256-thread blocks.
+
+For **trajectory time-scaling**, our CUDA kernels are **DOF-agnostic** and deliver up to **8×** over NumPy for 6- and 7-DOF manipulators. For **inverse dynamics**, a **specialized 6-DOF spatial-algebra prototype** achieves up to **3600×** versus NumPy. In the current release, GPU dynamics kernels are **shape-agnostic but simplified** (per-joint/diagonalized); the **fully coupled n-DOF** formulation is provided on the CPU path.
+
+| Kernel family | DOF support | Accuracy model | 7-DOF benefit |
+|---|---|---|---|
+| Trajectory (joint & Cartesian) | DOF-agnostic | Exact time-scaling | ✅ Full GPU speedup |
+| Batch trajectory | DOF-agnostic | Exact time-scaling | ✅ Full GPU speedup |
+| Potential field | DOF-agnostic | Exact as defined | ✅ Full GPU speedup |
+| Inverse/Forward dynamics (GPU, released) | DOF-agnostic (shape) | Simplified per-joint | ⚠️ Fast, not fully coupled |
+| Inverse/Forward dynamics (CPU) | n-DOF | Fully coupled spatial algebra | ✅ Exact reference |
 
 # CPU vs GPU Module Requirements
 
