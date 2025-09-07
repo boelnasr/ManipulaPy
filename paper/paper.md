@@ -23,10 +23,12 @@ Modern manipulation research requires tight integration of geometry, dynamics, p
 | **Library** | **Core Strengths** | **Integration Challenges** |
 |-------------|-------------------|---------------------------|
 | MoveIt [@chitta2012moveit] | Mature sampling-based planners | Custom ROS nodes for sensor integration, external plugins for real-time dynamics, no native GPU acceleration |
+|             |                   |                           |
 | Pinocchio [@Pinocchio2025] | High-performance PoE dynamics (C++) | CPU-only; perception & planning must be synchronized manually |
+|             |                   |                           |
 | CuRobo [@sundaralingam2023curobo] | GPU collision checking & trajectory optimization | Planning-focused; lacks perception pipeline and closed-loop control |
+|             |                   |                           |
 | Python Robotics Toolbox [@corke2021] | Educational algorithms, clear APIs | CPU-only; users build simulation/control/vision components separately |
-
 These integration challenges manifest as sensor-planner gaps, dynamics-control mismatches, GPU memory fragmentation, and synchronization complexity between components.
 
 **ManipulaPy** eliminates these integration burdens through a unified Python API that maintains data consistency across the entire manipulation pipeline with GPU acceleration throughout.
