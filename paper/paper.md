@@ -65,26 +65,6 @@ ManipulaPy's perception system converts raw sensor data into actionable robot kn
 
 **Robot Integration** maintains multiple obstacle representations simultaneously (geometric primitives, point clouds, SDFs) with 5–15 Hz refresh rates during trajectory execution.
 
-# Theory and Implementation
-
-## Product-of-Exponentials Kinematics
-
-Like Pinocchio [@Pinocchio2025], ManipulaPy adopts the PoE formulation for robot kinematics, but provides GPU acceleration across the entire manipulation pipeline:
-
-$$T(\theta) = e^{S_1 \theta_1} \cdots e^{S_n \theta_n} M$$
-
-where each screw axis $S_i \in \mathbb{R}^6$ encodes joint motion and $M \in SE(3)$ represents the home configuration. The space-frame Jacobian becomes:
-
-$$J(\theta) = \left[\operatorname{Ad}_{T_1}S_1, \ldots, S_n\right]$$
-
-## GPU-Accelerated Dynamics
-
-Custom CUDA kernels parallelize computation for the fundamental dynamics equation:
-
-$$\tau = M(\theta)\ddot{\theta} + C(\theta,\dot{\theta}) + G(\theta)$$
-
-The mass matrix computation $M(\theta) = \sum_{i=1}^{n}\operatorname{Ad}_{T_i}^T G_i \operatorname{Ad}_{T_i}$ is optimized for 256-thread blocks.
-
 ![GPU-accelerated trajectory execution demonstration in PyBullet simulation. A 6-DOF robotic manipulator executes a complex trajectory while avoiding dynamic obstacles in real-time. The trajectory planning utilizes GPU acceleration for 40× speedup over CPU implementation, enabling 1 kHz control rates with real-time collision avoidance through potential field methods integrated with CUDA kernels.](manipulapy_trajectory.png)
 
 # CPU vs GPU Module Requirements
