@@ -12,7 +12,7 @@
 
 **A comprehensive, GPU-accelerated Python package for robotic manipulator analysis, simulation, planning, control, and perception.**
 
-[Quick Start](#quick-start) • [Documentation](#documentation) • [Examples](#examples) • [Installation](#installation) • [Contributing](#contributing)
+[Quick Start](#quick-start) • [Documentation](https://manipulapy.readthedocs.io/en/latest/index.html) • [Examples](#examples) • [Installation](#installation) • [Contributing](#contributing)
 
 </div>
 
