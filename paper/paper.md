@@ -33,7 +33,7 @@ These integration challenges manifest as sensor-planner gaps, dynamics-control m
 
 **ManipulaPy** eliminates these integration burdens through a unified Python API that maintains data consistency across the entire manipulation pipeline with GPU acceleration throughout.
 
-![Figure 1: System architecture of ManipulaPy showing the unified manipulation pipeline. The framework integrates URDF processing, GPU-accelerated kinematics and dynamics, motion planning with collision avoidance, multiple control strategies, and PyBullet simulation within a single API. Data flows consistently between components without manual synchronization, while GPU acceleration provides 40× speedup for trajectory generation and real-time dynamics computation.](system_architecture.png)
+![ System architecture of ManipulaPy showing the unified manipulation pipeline. The framework integrates URDF processing, GPU-accelerated kinematics and dynamics, motion planning with collision avoidance, multiple control strategies, and PyBullet simulation within a single API. Data flows consistently between components without manual synchronization, while GPU acceleration provides 40× speedup for trajectory generation and real-time dynamics computation.](system_architecture.png)
 
 # Library Architecture
 
@@ -51,7 +51,7 @@ ManipulaPy implements a unified manipulation pipeline with coherent data flow wh
 
 # Vision and Perception Pipeline
 
-![Figure 2: ManipulaPy vision and perception pipeline architecture. The five-stage pipeline processes raw sensor data from stereo cameras and RGB-D sensors through object detection using YOLO v8, transforms 2D detections to 3D world coordinates, applies DBSCAN clustering for object segmentation, and maintains multiple obstacle representations (point clouds, geometric primitives, SDFs) for robot integration at 5-15 Hz refresh rates during trajectory execution.](vision_pipeline.png)
+![ManipulaPy vision and perception pipeline architecture. The five-stage pipeline processes raw sensor data from stereo cameras and RGB-D sensors through object detection using YOLO v8, transforms 2D detections to 3D world coordinates, applies DBSCAN clustering for object segmentation, and maintains multiple obstacle representations (point clouds, geometric primitives, SDFs) for robot integration at 5-15 Hz refresh rates during trajectory execution.](vision_pipeline.png)
 
 ManipulaPy's perception system converts raw sensor data into actionable robot knowledge through a five-stage pipeline:
 
@@ -85,7 +85,7 @@ $$\tau = M(\theta)\ddot{\theta} + C(\theta,\dot{\theta}) + G(\theta)$$
 
 The mass matrix computation $M(\theta) = \sum_{i=1}^{n}\operatorname{Ad}_{T_i}^T G_i \operatorname{Ad}_{T_i}$ is optimized for 256-thread blocks.
 
-![Figure 3: GPU-accelerated trajectory execution demonstration in PyBullet simulation. A 6-DOF robotic manipulator executes a complex trajectory while avoiding dynamic obstacles in real-time. The trajectory planning utilizes GPU acceleration for 40× speedup over CPU implementation, enabling 1 kHz control rates with real-time collision avoidance through potential field methods integrated with CUDA kernels.](manipulapy_trajectory.png)
+![GPU-accelerated trajectory execution demonstration in PyBullet simulation. A 6-DOF robotic manipulator executes a complex trajectory while avoiding dynamic obstacles in real-time. The trajectory planning utilizes GPU acceleration for 40× speedup over CPU implementation, enabling 1 kHz control rates with real-time collision avoidance through potential field methods integrated with CUDA kernels.](manipulapy_trajectory.png)
 
 # CPU vs GPU Module Requirements
 
