@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 ![CI](https://github.com/boelnasr/ManipulaPy/actions/workflows/test.yml/badge.svg?branch=main)
 ![Test Status](https://img.shields.io/badge/tests-passing-brightgreen)
+[![codecov](https://codecov.io/gh/boelnasr/ManipulaPy/branch/main/graph/badge.svg)](https://codecov.io/gh/boelnasr/ManipulaPy)
 [![status](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg)](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa)
 
 **A comprehensive, GPU-accelerated Python package for robotic manipulator analysis, simulation, planning, control, and perception.**
