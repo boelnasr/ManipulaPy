@@ -1,37 +1,40 @@
-name: Draft PDF
+# .github/workflows/draft-pdf.yml
+
+permissions:
+  contents: write   # needed to create/upload a Release
 
 on:
   push:
-    paths:
-      - paper/paper.md
-      - paper/paper.bib
-      - .github/workflows/draft-pdf.yml
-
-permissions:
-  contents: write  # Required for EndBug/add-and-commit to work
+    tags:
+      - 'v*'        # run when you push v1.2.3 style tags
 
 jobs:
-  paper:
+  paper-draft:
     runs-on: ubuntu-latest
-    name: Paper Draft
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Build draft PDF
-        uses: openjournals/openjournals-draft-action@master
-        with:
-          journal: joss
-          paper-path: paper/paper.md
+      # ... your existing steps that call openjournals/openjournals-draft-action
+      # and produce paper/paper.pdf ...
 
-      - name: Upload PDF
+      - name: Upload artifact (paper.pdf)
         uses: actions/upload-artifact@v4
         with:
           name: paper
           path: paper/paper.pdf
 
-      - name: Commit PDF to repository
-        uses: EndBug/add-and-commit@v9
+      # ⬇️ Replace EndBug/add-and-commit with these two steps ⬇️
+      - name: Create release (if not exists)
+        uses: softprops/action-gh-release@v2
         with:
-          message: '(auto) Paper PDF Draft'
-          add: 'paper/paper.pdf'
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload paper.pdf to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: paper/paper.pdf
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
