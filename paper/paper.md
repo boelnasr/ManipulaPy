@@ -86,7 +86,7 @@ These dependencies support multi-camera setups, object detection, and spatial cl
 
 ## Performance and Design Trade-offs
 
-- **Performance Constraints**: Consumer GPUs (8 GB) limit trajectory planning to approximately **50,000 points**. GPU acceleration provides tangible benefits primarily when **N > 1000** due to kernel-launch overhead. CPU-only control performance is constrained by Python’s GIL, limiting real-time execution to ~100 Hz.  
+- **Performance Constraints**: Consumer GPUs (8 GB) limit trajectory planning to approximately **50,000 points**. GPU acceleration provides tangible benefits primarily when N > 1000 due to kernel-launch overhead. CPU-only control performance is constrained by Python’s GIL, limiting real-time execution to ~100 Hz.  
 - **Integration Scope**: ManipulaPy operates independently of ROS middleware. While this ensures modularity, integration with ROS-based systems currently requires manual bridging.  
 - **Algorithmic Focus**: The current implementation focuses on potential-field and polynomial-interpolation methods. The framework is optimized for **serial kinematic chains**, and supporting parallel mechanisms would require architectural adaptation.  
 - **Intended Use**: Designed for **research and education**, ManipulaPy is not intended for industrial deployment. It does not include safety certifications or formal real-time verification mechanisms found in production systems.
