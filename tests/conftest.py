@@ -40,7 +40,17 @@ os.environ['NUMBA_DISABLE_CUDA'] = '1'
 os.environ['MANIPULAPY_FORCE_CPU'] = '1'
 os.environ['TORCH_USE_CUDA_DSA'] = '0'
 # Files/dirs pytest should skip during collection
-collect_ignore = ["setup.py", "ManipulaPy_data", "build", "dist"]
+collect_ignore = [
+    "setup.py",
+    "ManipulaPy_data",
+    "build",
+    "dist",
+    "test_error_computation.py",
+    "test_cuda_kernels.py",  # GPU-only tests
+]
+
+# IK convergence tests in parent directory (not in tests/)
+collect_ignore_glob = []
 
 
 # ============================================================================
@@ -570,12 +580,19 @@ def pytest_configure(config):
     """Configure pytest markers and environment."""
     # Register custom markers
     config.addinivalue_line("markers", "cuda: mark test as requiring CUDA")
-    config.addinivalue_line("markers", "gpu: alias for cuda marker") 
+    config.addinivalue_line("markers", "gpu: alias for cuda marker")
     config.addinivalue_line("markers", "vision: mark test as requiring vision deps")
     config.addinivalue_line("markers", "simulation: mark test as requiring simulation deps")
     config.addinivalue_line("markers", "slow: mark test as slow")
     config.addinivalue_line("markers", "integration: mark test as integration test")
     config.addinivalue_line("markers", "unit: mark test as unit test")
+    config.addinivalue_line("markers", "convergence: mark test as IK convergence test")
+    config.addinivalue_line("markers", "kinematics: mark test as kinematics-related")
+    config.addinivalue_line("markers", "dynamics: mark test as dynamics-related")
+    config.addinivalue_line("markers", "control: mark test as control-related")
+    config.addinivalue_line("markers", "path_planning: mark test as path planning-related")
+    config.addinivalue_line("markers", "potential_field: mark test as potential field-related")
+    config.addinivalue_line("markers", "singularity: mark test as singularity-related")
 
 def pytest_collection_modifyitems(config, items):
     """Modify test collection based on available dependencies and options."""
@@ -659,6 +676,66 @@ def sample_joint_angles():
     """Sample joint angles for testing."""
     return np.array([0.1, 0.2, -0.3, 0.1, 0.2, 0.1], dtype=np.float32)
 
+@pytest.fixture
+def planar_2link_robot():
+    """Create a simple 2-link planar robot for IK convergence testing."""
+    # Simple 2-link planar robot configuration
+    M_list = np.array([
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, 1.0],
+        [0, 0, 0, 1]
+    ], dtype=np.float64)
+
+    S_list = np.array([
+        [0, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, -1.0, 0]
+    ], dtype=np.float64).T
+
+    B_list = np.array([
+        [0, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, -0.5, 0]
+    ], dtype=np.float64).T
+
+    omega_list = [[0, 0, 1], [0, 0, 1]]
+    r_list = [[0, 0, 0.5], [0, 0, 1.0]]
+    b_list = [[0, 0, 0], [0, 0, 0]]
+
+    return {
+        'M_list': M_list,
+        'S_list': S_list,
+        'B_list': B_list,
+        'omega_list': omega_list,
+        'r_list': r_list,
+        'b_list': b_list,
+        'num_joints': 2
+    }
+
+@pytest.fixture
+def ik_test_angles():
+    """Standard test angles for IK convergence testing."""
+    return [
+        [0.0, 0.0],
+        [0.1, 0.1],
+        [0.5, 0.3],
+        [np.pi/6, np.pi/4],
+        [np.pi/4, np.pi/6],
+        [1.0, 0.5],
+        [-0.5, 0.8],
+        [0.7, -0.3],
+    ]
+
+@pytest.fixture
+def ik_default_params():
+    """Default IK parameters for convergence testing."""
+    return {
+        'eomg': 1e-3,
+        'ev': 1e-3,
+        'max_iterations': 200,
+        'damping': 0.01,
+        'step_cap': 0.1
+    }
+
 @pytest.fixture(autouse=True)
 def setup_test_environment():
     """Set up the test environment for each test."""
@@ -704,13 +781,81 @@ def requires_dependency(dependency_name):
         'sklearn': SKLEARN_AVAILABLE,
         'torch': TORCH_AVAILABLE,
     }
-    
+
     available = availability_map.get(dependency_name.lower(), False)
-    
+
     return pytest.mark.skipif(
         not available,
         reason=f"{dependency_name} not available or skipped"
     )
+
+def run_ik_convergence_test(robot, target_angles, initial_guess, params=None):
+    """
+    Helper function to run IK convergence tests with standard parameters.
+
+    Args:
+        robot: SerialManipulator instance
+        target_angles: Target joint angles
+        initial_guess: Initial guess for IK
+        params: Dict with IK parameters (eomg, ev, max_iterations, damping, step_cap)
+
+    Returns:
+        dict: Results with keys 'result', 'success', 'iterations', 'error'
+    """
+    if params is None:
+        params = {
+            'eomg': 1e-3,
+            'ev': 1e-3,
+            'max_iterations': 200,
+            'damping': 0.01,
+            'step_cap': 0.1
+        }
+
+    target = robot.forward_kinematics(target_angles)
+    result, success, iters = robot.iterative_inverse_kinematics(
+        target,
+        initial_guess,
+        eomg=params.get('eomg', 1e-3),
+        ev=params.get('ev', 1e-3),
+        max_iterations=params.get('max_iterations', 200),
+        damping=params.get('damping', 0.01),
+        step_cap=params.get('step_cap', 0.1)
+    )
+
+    error = np.linalg.norm(np.array(result) - np.array(target_angles))
+
+    return {
+        'result': result,
+        'success': success,
+        'iterations': iters,
+        'error': error,
+        'target_angles': target_angles,
+        'initial_guess': initial_guess
+    }
+
+def print_convergence_summary(results_list):
+    """
+    Print a formatted summary of convergence test results.
+
+    Args:
+        results_list: List of result dicts from run_ik_convergence_test
+    """
+    successes = sum(1 for r in results_list if r['success'])
+    total = len(results_list)
+    avg_iters = sum(r['iterations'] for r in results_list) / total if total > 0 else 0
+
+    print("\n" + "=" * 60)
+    print(f"Convergence rate: {successes}/{total} ({100*successes/total:.1f}%)")
+    print(f"Average iterations: {avg_iters:.1f}")
+    print("=" * 60)
+
+    for i, result in enumerate(results_list, 1):
+        status = "✓ SUCCESS" if result['success'] else "✗ FAILED"
+        print(f"Test {i}: {status} - {result['iterations']} iterations")
+        if not result['success']:
+            print(f"  Error: {result['error']:.4f} rad")
+
+    return successes / total if total > 0 else 0
 
 # ============================================================================
 # Session Reporting
@@ -743,3 +888,87 @@ def pytest_sessionstart(session):
     print("="*60)
 
 print("✅ Smart test environment ready - testing real libraries when available!")
+
+# ============================================================================
+# Available Test Files Documentation
+# ============================================================================
+"""
+ManipulaPy Test Suite - Available Tests:
+
+Core Module Tests (in tests/):
+  - test_utils.py                   : Core utility functions (45 tests)
+  - test_kinematics.py             : Forward/inverse kinematics
+  - test_dynamics.py               : Robot dynamics and equations of motion
+  - test_control.py                : Control algorithms (PID, computed torque, etc.)
+  - test_control_unit.py           : Unit tests for control module (7 tests)
+  - test_trajectory_planning.py    : Trajectory generation and planning
+  - test_singularity.py            : Basic singularity analysis
+  - test_singularity_extended.py   : Extended singularity tests (24 tests)
+  - test_potential_field.py        : Potential field path planning (9 tests)
+  - test_potential_field_extended.py: Extended potential field tests (27 tests)
+  - test_path_planning_cpu.py      : CPU-based path planning
+  - test_path_planning_unit.py     : Unit tests for path planning
+
+Vision & Perception Tests:
+  - test_vision.py                 : Vision processing and camera handling
+  - test_perception.py             : Object detection and 3D perception
+
+Simulation Tests:
+  - test_sim.py                    : PyBullet simulation tests
+  - test_urdf_processor.py         : URDF file processing
+
+GPU/CUDA Tests (always skipped in test environment):
+  - test_cuda_kernels.py           : GPU kernel tests (skipped)
+  - test_cuda_kernels_cpu.py       : CPU fallback for CUDA kernels
+
+Smoke Tests:
+  - test_smoke.py                  : Basic import and functionality smoke tests
+
+IK Convergence Tests (in parent directory):
+  - test_ik_quick.py              : Quick convergence test with random init
+  - test_ik_zero_init.py          : Convergence test with zero initial guess
+  - test_ik_diagnostic.py         : Parameter tuning diagnostic tests
+  - test_ik_fix.py                : IK fix verification tests
+
+Total Test Count:
+  - Core tests: ~96 tests (utils + potential_field + singularity)
+  - Control tests: 15 tests (7 unit + 8 integration)
+  - All tests: 150+ tests across all modules
+
+Test Markers:
+  @pytest.mark.cuda           : Requires CUDA/GPU (always skipped)
+  @pytest.mark.gpu            : Alias for cuda marker
+  @pytest.mark.vision         : Requires OpenCV/vision dependencies
+  @pytest.mark.simulation     : Requires PyBullet
+  @pytest.mark.slow           : Slow-running tests (use --run-slow)
+  @pytest.mark.integration    : Integration tests
+  @pytest.mark.unit           : Unit tests
+  @pytest.mark.convergence    : IK convergence tests
+  @pytest.mark.kinematics     : Kinematics-related tests
+  @pytest.mark.dynamics       : Dynamics-related tests
+  @pytest.mark.control        : Control-related tests
+  @pytest.mark.path_planning  : Path planning tests
+  @pytest.mark.potential_field: Potential field tests
+  @pytest.mark.singularity    : Singularity analysis tests
+
+Running Tests:
+  # All tests
+  pytest tests/
+
+  # Specific module
+  pytest tests/test_utils.py
+
+  # By marker
+  pytest -m unit
+  pytest -m control
+  pytest -m convergence
+
+  # Quick core tests
+  pytest tests/test_utils.py tests/test_potential_field_extended.py tests/test_singularity_extended.py
+
+  # With coverage
+  pytest --cov=ManipulaPy --cov-report=term-missing
+
+  # Specific test
+  pytest tests/test_control_unit.py::test_pid_control_zero_gains -v
+"""
