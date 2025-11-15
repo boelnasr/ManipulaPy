@@ -7,7 +7,6 @@ included with ManipulaPy.
 """
 
 import os
-import pkg_resources
 from typing import List, Dict, Optional
 
 # Get the path to this module

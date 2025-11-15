@@ -25,17 +25,29 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 import numpy as np
+from typing import Optional, List, Tuple, Union, Dict, Any
+from numpy.typing import NDArray
 from .kinematics import SerialManipulator
 from .utils import adjoint_transform as ad
 
 
 class ManipulatorDynamics(SerialManipulator):
-    def __init__(self, M_list, omega_list, r_list, b_list, S_list, B_list, Glist):
+    def __init__(
+        self,
+        M_list: NDArray[np.float64],
+        omega_list: Union[NDArray[np.float64], List[float]],
+        r_list: Union[NDArray[np.float64], List[float]],
+        b_list: Union[NDArray[np.float64], List[float]],
+        S_list: NDArray[np.float64],
+        B_list: NDArray[np.float64],
+        Glist: Union[List[NDArray[np.float64]], NDArray[np.float64]]
+    ) -> None:
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
         self.Glist = Glist
-        self._mass_matrix_cache = {}
+        self._mass_matrix_cache: Dict[Tuple[float, ...], NDArray[np.float64]] = {}
+        self._mass_matrix_derivative_cache: Dict[Tuple[Any, ...], NDArray[np.float64]] = {}
 
-    def mass_matrix(self, thetalist):
+    def mass_matrix(self, thetalist: Union[NDArray[np.float64], List[float]]) -> NDArray[np.float64]:
         thetalist_key = tuple(thetalist)
         if thetalist_key in self._mass_matrix_cache:
             return self._mass_matrix_cache[thetalist_key]
@@ -72,35 +84,79 @@ class ManipulatorDynamics(SerialManipulator):
         self._mass_matrix_cache[thetalist_key] = M
         return M
 
-    def partial_derivative(self, i, j, k, thetalist):
-        epsilon = 1e-6
-        thetalist_plus = np.array(thetalist)
-        thetalist_plus[k] += epsilon
-        M_plus = self.mass_matrix(thetalist_plus)
+    def _mass_matrix_derivatives(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        epsilon: float = 1e-6
+    ) -> NDArray[np.float64]:
+        """
+        Central finite-difference approximation of dM/dtheta_k for
+        every joint angle, cached so repeated calls avoid recomputing
+        full mass matrices inside tight loops.
+        """
+        theta_key = tuple(np.asarray(thetalist, dtype=np.float64))
+        cache_key = (theta_key, float(epsilon))
+        if cache_key in self._mass_matrix_derivative_cache:
+            return self._mass_matrix_derivative_cache[cache_key]
 
-        thetalist_minus = np.array(thetalist)
-        thetalist_minus[k] -= epsilon
-        M_minus = self.mass_matrix(thetalist_minus)
-
-        return (M_plus[i, j] - M_minus[i, j]) / (2 * epsilon)
-
-    def velocity_quadratic_forces(self, thetalist, dthetalist):
         n = len(thetalist)
-        c = np.zeros(n)
-        J = self.jacobian(thetalist)
+        derivatives = np.zeros((n, n, n), dtype=np.float64)
+        for k in range(n):
+            thetalist_plus = np.array(thetalist, dtype=np.float64)
+            thetalist_plus[k] += epsilon
+            thetalist_minus = np.array(thetalist, dtype=np.float64)
+            thetalist_minus[k] -= epsilon
+
+            M_plus = self.mass_matrix(thetalist_plus)
+            M_minus = self.mass_matrix(thetalist_minus)
+            derivatives[:, :, k] = (M_plus - M_minus) / (2.0 * epsilon)
+
+        self._mass_matrix_derivative_cache[cache_key] = derivatives
+        return derivatives
+
+    def partial_derivative(
+        self,
+        i: int,
+        j: int,
+        k: int,
+        thetalist: Union[NDArray[np.float64], List[float]]
+    ) -> float:
+        """
+        Keep public API but serve results from the cached tensor so a
+        single derivative never re-triggers mass matrix evaluation.
+        """
+        dM = self._mass_matrix_derivatives(thetalist)
+        return dM[i, j, k]
+
+    def velocity_quadratic_forces(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
+        n = len(thetalist)
+        dtheta = np.asarray(dthetalist, dtype=np.float64)
+        if np.allclose(dtheta, 0.0):
+            return np.zeros(n, dtype=np.float64)
+
+        dM = self._mass_matrix_derivatives(thetalist)
+        c = np.zeros(n, dtype=np.float64)
+
         for i in range(n):
-            c[i] = sum(
-                [
-                    self.partial_derivative(i, j, k, thetalist)
-                    * dthetalist[j]
-                    * dthetalist[k]
-                    for j in range(n)
-                    for k in range(n)
-                ]
-            )
+            accum = 0.0
+            for j in range(n):
+                for k in range(n):
+                    gamma = 0.5 * (
+                        dM[i, j, k] + dM[i, k, j] - dM[j, k, i]
+                    )
+                    accum += gamma * dtheta[j] * dtheta[k]
+            c[i] = accum
         return c
 
-    def gravity_forces(self, thetalist, g=[0, 0, -9.81]):
+    def gravity_forces(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]] = [0, 0, -9.81]
+    ) -> NDArray[np.float64]:
         n = len(thetalist)
         grav = np.zeros(n)
         G = np.array(g)
@@ -111,7 +167,14 @@ class ManipulatorDynamics(SerialManipulator):
             )
         return grav
 
-    def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
+    def inverse_dynamics(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        ddthetalist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+        Ftip: Union[NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         n = len(thetalist)
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
@@ -120,7 +183,14 @@ class ManipulatorDynamics(SerialManipulator):
         taulist = np.dot(M, ddthetalist) + c + g_forces + np.dot(J_transpose, Ftip)
         return taulist
 
-    def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+    def forward_dynamics(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        taulist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+        Ftip: Union[NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)

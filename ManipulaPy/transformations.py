@@ -34,11 +34,12 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 
 
 import numpy as np
+from numpy.typing import NDArray
 
 
 class Transformations:
     @staticmethod
-    def rotation_matrix_x(angle: float) -> np.ndarray:
+    def rotation_matrix_x(angle: float) -> NDArray[np.float64]:
         """Create a rotation matrix for a rotation around the X-axis."""
         return np.array(
             [
@@ -49,7 +50,7 @@ class Transformations:
         )
 
     @staticmethod
-    def rotation_matrix_y(angle: float) -> np.ndarray:
+    def rotation_matrix_y(angle: float) -> NDArray[np.float64]:
         """Create a rotation matrix for a rotation around the Y-axis."""
         return np.array(
             [
@@ -60,7 +61,7 @@ class Transformations:
         )
 
     @staticmethod
-    def rotation_matrix_z(angle: float) -> np.ndarray:
+    def rotation_matrix_z(angle: float) -> NDArray[np.float64]:
         """Create a rotation matrix for a rotation around the Z-axis."""
         return np.array(
             [
@@ -71,7 +72,7 @@ class Transformations:
         )
 
     @staticmethod
-    def vector_2_matrix(vector: np.ndarray) -> np.ndarray:
+    def vector_2_matrix(vector: NDArray[np.float64]) -> NDArray[np.float64]:
         """
         Calculate the pose from the position and Euler angles (ZYX order).
 
