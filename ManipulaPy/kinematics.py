@@ -28,6 +28,8 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import numpy as np
+from typing import Optional, List, Tuple, Union, Any
+from numpy.typing import NDArray
 from . import utils
 import matplotlib.pyplot as plt
 import torch
@@ -36,15 +38,15 @@ import torch
 class SerialManipulator:
     def __init__(
         self,
-        M_list,
-        omega_list,
-        r_list=None,
-        b_list=None,
-        S_list=None,
-        B_list=None,
-        G_list=None,
-        joint_limits=None,
-    ):
+        M_list: NDArray[np.float64],
+        omega_list: Union[NDArray[np.float64], List[float]],
+        r_list: Optional[Union[NDArray[np.float64], List[float]]] = None,
+        b_list: Optional[Union[NDArray[np.float64], List[float]]] = None,
+        S_list: Optional[NDArray[np.float64]] = None,
+        B_list: Optional[NDArray[np.float64]] = None,
+        G_list: Optional[Union[NDArray[np.float64], List[NDArray[np.float64]]]] = None,
+        joint_limits: Optional[List[Tuple[Optional[float], Optional[float]]]] = None,
+    ) -> None:
         """
         Initialize the class with the given parameters.
 
@@ -98,7 +100,11 @@ class SerialManipulator:
             
             self.joint_limits = [(None, None)] * n_joints
 
-    def update_state(self, joint_positions, joint_velocities=None):
+    def update_state(
+        self,
+        joint_positions: Union[NDArray[np.float64], List[float]],
+        joint_velocities: Optional[Union[NDArray[np.float64], List[float]]] = None
+    ) -> None:
         """
         Updates the internal state of the manipulator.
 
@@ -112,7 +118,11 @@ class SerialManipulator:
         else:
             self.joint_velocities = np.zeros_like(self.joint_positions)
 
-    def forward_kinematics(self, thetalist, frame="space"):
+    def forward_kinematics(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        frame: str = "space"
+    ) -> NDArray[np.float64]:
         """
         Compute the forward kinematics of a robotic arm using the product of exponentials method.
 
@@ -129,8 +139,9 @@ class SerialManipulator:
             T = np.eye(4)
             for i, theta in enumerate(thetalist):
                 T = T @ utils.transform_from_twist(self.S_list[:, i], theta)
-            # Multiply by home pose
-            T = T @ self.M_list
+            # Multiply by home pose (use end-effector pose if M_list is an array of poses)
+            M = self.M_list[-1] if isinstance(self.M_list, (list, np.ndarray)) and hasattr(self.M_list, '__len__') and len(np.asarray(self.M_list).shape) > 2 else self.M_list
+            T = T @ M
 
         elif frame == "body":
             # T(θ) = M * e^[B1θ1] e^[B2θ2] ... e^[Bnθn]
@@ -138,15 +149,21 @@ class SerialManipulator:
             # Build the product of exponentials from left to right
             for i, theta in enumerate(thetalist):
                 T = T @ utils.transform_from_twist(self.B_list[:, i], theta)
-            # Then multiply from the left by M
-            T = self.M_list @ T
+            # Then multiply from the left by M (use end-effector pose if M_list is an array of poses)
+            M = self.M_list[-1] if isinstance(self.M_list, (list, np.ndarray)) and hasattr(self.M_list, '__len__') and len(np.asarray(self.M_list).shape) > 2 else self.M_list
+            T = M @ T
 
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
 
         return T
 
-    def end_effector_velocity(self, thetalist, dthetalist, frame="space"):
+    def end_effector_velocity(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        frame: str = "space"
+    ) -> NDArray[np.float64]:
         """
         Calculate the end effector velocity given the joint angles and joint velocities.
 
@@ -166,7 +183,11 @@ class SerialManipulator:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return np.dot(J, dthetalist)
 
-    def jacobian(self, thetalist, frame="space"):
+    def jacobian(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        frame: str = "space"
+    ) -> NDArray[np.float64]:
         """
         Calculate the Jacobian matrix for the given joint angles.
 
@@ -204,52 +225,61 @@ class SerialManipulator:
     
     def iterative_inverse_kinematics(
         self,
-        T_desired,
-        thetalist0,
-        eomg=1e-6,
-        ev=1e-6,
-        max_iterations=5000,
-        plot_residuals=False,
-        damping=5e-2,            # λ for damped least-squares
-        step_cap=0.5,            # max ‖Δθ‖ per iteration (rad)
-        png_name="ik_residuals.png",
-    ):
+        T_desired: NDArray[np.float64],
+        thetalist0: Union[NDArray[np.float64], List[float]],
+        eomg: float = 1e-6,
+        ev: float = 1e-6,
+        max_iterations: int = 5000,
+        plot_residuals: bool = False,
+        damping: float = 5e-2,            # lambda for damped least-squares
+        step_cap: float = 0.1,            # max norm(delta_theta) per iteration (rad) - reduced from 0.5 for better convergence
+        png_name: str = "ik_residuals.png",
+    ) -> Tuple[NDArray[np.float64], bool, int]:
         """
         Damped-least-squares iterative IK with joint-limit projection and
         residual plot saved to file (no interactive window).
+
+        Uses the correct error computation: T_err = T_desired @ inv(T_curr)
+        to ensure proper convergence in SE(3).
         """
-        θ = np.array(thetalist0, dtype=float)
-        V_desired = utils.se3ToVec(utils.MatrixLog6(T_desired))
+        theta = np.array(thetalist0, dtype=float)
         residuals = []
 
         for k in range(max_iterations):
-            # Current pose & twist error
-            T_curr = self.forward_kinematics(θ, frame="space")
-            V_curr = utils.se3ToVec(utils.MatrixLog6(T_curr))
-            V_err  = V_desired - V_curr
-            rot_err, trans_err = np.linalg.norm(V_err[:3]), np.linalg.norm(V_err[3:])
+            # Current pose
+            T_curr = self.forward_kinematics(theta, frame="space")
+
+            # Compute error transformation (correct formulation for SE(3))
+            T_err = T_desired @ np.linalg.inv(T_curr)
+
+            # Extract error twist
+            V_err = utils.se3ToVec(utils.MatrixLog6(T_err))
+
+            # Compute error magnitudes
+            rot_err = np.linalg.norm(V_err[:3])
+            trans_err = np.linalg.norm(V_err[3:])
             residuals.append((trans_err, rot_err))
 
             if rot_err < eomg and trans_err < ev:
                 success = True
                 break
 
-            # Damped least-squares Δθ
-            J = self.jacobian(θ, frame="space")
-            JJt = J @ J.T
-            Δθ  = J.T @ np.linalg.inv(JJt + (damping ** 2) * np.eye(6)) @ V_err
+            # Damped least-squares update using pseudo-inverse (more robust)
+            J = self.jacobian(theta, frame="space")
+            J_pinv = np.linalg.pinv(J, rcond=damping)
+            delta_theta = J_pinv @ V_err
 
             # Cap step size
-            normΔ = np.linalg.norm(Δθ)
-            if normΔ > step_cap:
-                Δθ *= step_cap / normΔ
+            norm_delta = np.linalg.norm(delta_theta)
+            if norm_delta > step_cap:
+                delta_theta *= step_cap / norm_delta
 
-            θ += Δθ
+            theta += delta_theta
 
             # Project into joint limits
             for i, (mn, mx) in enumerate(self.joint_limits):
-                if mn is not None: θ[i] = max(θ[i], mn)
-                if mx is not None: θ[i] = min(θ[i], mx)
+                if mn is not None: theta[i] = max(theta[i], mn)
+                if mx is not None: theta[i] = min(theta[i], mx)
         else:
             success = False
             k += 1   # max_iterations reached
@@ -271,9 +301,14 @@ class SerialManipulator:
             plt.close()
             print(f"Residual plot saved to {png_name}")
 
-        return θ, success, k + 1
+        return theta, success, k + 1
 
-    def joint_velocity(self, thetalist, V_ee, frame="space"):
+    def joint_velocity(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        V_ee: Union[NDArray[np.float64], List[float]],
+        frame: str = "space"
+    ) -> NDArray[np.float64]:
         """
         Calculates the joint velocity given the joint positions, end-effector velocity, and frame type.
 
@@ -293,7 +328,10 @@ class SerialManipulator:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return np.linalg.pinv(J) @ V_ee
 
-    def end_effector_pose(self, thetalist):
+    def end_effector_pose(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         """
         Computes the end-effector's position and orientation given joint angles.
 

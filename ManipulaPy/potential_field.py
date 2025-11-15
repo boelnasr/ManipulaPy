@@ -69,12 +69,15 @@ class PotentialField:
         attractive_gradient = self.attractive_gain * (q - q_goal)
 
         # Compute repulsive gradient
+        # Derivative of: 10 * 2 * gain * (1/d - 1/d0)^2
+        # = 10 * 2 * gain * 2 * (1/d - 1/d0) * d(1/d)/dq
+        # = 40 * gain * (1/d - 1/d0) * (-(q-obs)/d^3)
         repulsive_gradient = np.zeros_like(q)
         for obstacle in obstacles:
             d = np.linalg.norm(q - obstacle)
             if d <= self.influence_distance:
                 repulsive_gradient += (
-                    5*self.repulsive_gain
+                    -40*self.repulsive_gain
                     * (1.0 / d - 1.0 / self.influence_distance)
                     * (1.0 / (d**3))
                     * (q - obstacle)

@@ -4,7 +4,12 @@
 Control Module - ManipulaPy
 
 This module provides various control algorithms for robotic manipulators including
-PID, computed torque, adaptive, and robust control methods with GPU acceleration.
+PID, computed torque, adaptive, and robust control methods.
+
+Note: All control methods use CPU-based NumPy computation to avoid GPU-CPU transfer
+overhead. Since the dynamics module operates on NumPy arrays, keeping everything on
+the CPU is significantly more efficient than repeated PCIe transfers between GPU and
+CPU memory spaces.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -26,6 +31,8 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 import cupy as cp
 import numpy as np
+from typing import Optional, List, Tuple, Union, Dict, Any
+from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 import logging
 
@@ -33,110 +40,148 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _to_numpy(arr):
+    """
+    Safely convert array to NumPy, handling both NumPy and CuPy arrays.
+
+    Args:
+        arr: Input array (can be NumPy array, CuPy array, or list)
+
+    Returns:
+        NumPy array
+
+    Note:
+        This is necessary because np.asarray() does not work with CuPy arrays.
+        CuPy raises "Implicit conversion to a NumPy array is not allowed"
+        to prevent accidental performance issues. We must explicitly call .get()
+        to transfer CuPy arrays from GPU to CPU.
+    """
+    try:
+        if isinstance(arr, cp.ndarray):
+            # CuPy array: explicitly transfer from GPU to CPU
+            return arr.get()
+    except TypeError:
+        # cp.ndarray may not be a real type when CuPy is mocked; treat as non-CuPy
+        pass
+
+    # NumPy array, list, or other: convert to NumPy
+    return np.asarray(arr)
+
+
 class ManipulatorController:
-    def __init__(self, dynamics):
+    def __init__(self, dynamics: Any) -> None:
         """
         Initialize the ManipulatorController with the dynamics of the manipulator.
+
+        Note: Control algorithms now use CPU (NumPy) to avoid GPU-CPU transfer
+        overhead, since the dynamics module operates on NumPy arrays.
 
         Parameters:
             dynamics (ManipulatorDynamics): An instance of ManipulatorDynamics.
         """
         self.dynamics = dynamics
-        self.eint = None
-        self.parameter_estimate = None
-        self.P = None
-        self.x_hat = None
+        self.eint: Optional[NDArray[np.float64]] = None
+        self.parameter_estimate: Optional[NDArray[np.float64]] = None
+        self.P: Optional[NDArray[np.float64]] = None
+        self.x_hat: Optional[NDArray[np.float64]] = None
 
     def computed_torque_control(
         self,
-        thetalistd,
-        dthetalistd,
-        ddthetalistd,
-        thetalist,
-        dthetalist,
-        g,
-        dt,
-        Kp,
-        Ki,
-        Kd,
-    ):
+        thetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        ddthetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dt: float,
+        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Ki: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+    ) -> NDArray[np.float64]:
         """
         Computed Torque Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+        The dynamics module operates on NumPy arrays, so keeping everything
+        on CPU is more efficient than repeated GPU↔CPU transfers.
+
         Parameters:
-            thetalistd (cp.ndarray): Desired joint angles.
-            dthetalistd (cp.ndarray): Desired joint velocities.
-            ddthetalistd (cp.ndarray): Desired joint accelerations.
-            thetalist (cp.ndarray): Current joint angles.
-            dthetalist (cp.ndarray): Current joint velocities.
-            g (cp.ndarray): Gravity vector.
-            dt (float): Time step.
-            Kp (cp.ndarray): Proportional gain.
-            Ki (cp.ndarray): Integral gain.
-            Kd (cp.ndarray): Derivative gain.
+            thetalistd: Desired joint angles.
+            dthetalistd: Desired joint velocities.
+            ddthetalistd: Desired joint accelerations.
+            thetalist: Current joint angles.
+            dthetalist: Current joint velocities.
+            g: Gravity vector.
+            dt: Time step.
+            Kp: Proportional gain.
+            Ki: Integral gain.
+            Kd: Derivative gain.
 
         Returns:
-            cp.ndarray: Torque command.
+            NDArray: Torque command (CPU-based NumPy array).
         """
-        thetalistd = cp.asarray(thetalistd)
-        dthetalistd = cp.asarray(dthetalistd)
-        ddthetalistd = cp.asarray(ddthetalistd)
-        thetalist = cp.asarray(thetalist)
-        dthetalist = cp.asarray(dthetalist)
-        g = cp.asarray(g)
-        Kp = cp.asarray(Kp)
-        Ki = cp.asarray(Ki)
-        Kd = cp.asarray(Kd)
+        # Convert to NumPy arrays (CPU) - avoid GPU↔CPU transfer bottleneck
+        # Use _to_numpy() to safely handle both NumPy and CuPy arrays
+        thetalistd = _to_numpy(thetalistd)
+        dthetalistd = _to_numpy(dthetalistd)
+        ddthetalistd = _to_numpy(ddthetalistd)
+        thetalist = _to_numpy(thetalist)
+        dthetalist = _to_numpy(dthetalist)
+        g = _to_numpy(g)
+        Kp = _to_numpy(Kp)
+        Ki = _to_numpy(Ki)
+        Kd = _to_numpy(Kd)
 
         if self.eint is None:
-            self.eint = cp.zeros_like(thetalist)
+            self.eint = np.zeros_like(thetalist)
 
         e = thetalistd - thetalist
         self.eint += e * dt
 
-        M = cp.asarray(self.dynamics.mass_matrix(thetalist.get()))
+        # Dynamics computations (no GPU↔CPU transfers)
+        M = self.dynamics.mass_matrix(thetalist)
         tau = M @ (Kp * e + Ki * self.eint + Kd * (dthetalistd - dthetalist))
-        tau += cp.asarray(
-            self.dynamics.inverse_dynamics(
-                thetalist.get(),
-                dthetalist.get(),
-                ddthetalistd.get(),
-                g.get(),
-                [0, 0, 0, 0, 0, 0],
-            )
+        tau += self.dynamics.inverse_dynamics(
+            thetalist,
+            dthetalist,
+            ddthetalistd,
+            g,
+            [0, 0, 0, 0, 0, 0],
         )
 
         return tau
 
     def pd_control(
         self,
-        desired_position,
-        desired_velocity,
-        current_position,
-        current_velocity,
-        Kp,
-        Kd,
-    ):
+        desired_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        desired_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        current_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        current_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+    ) -> NDArray[np.float64]:
         """
         PD Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            desired_position (cp.ndarray): Desired joint positions.
-            desired_velocity (cp.ndarray): Desired joint velocities.
-            current_position (cp.ndarray): Current joint positions.
-            current_velocity (cp.ndarray): Current joint velocities.
-            Kp (cp.ndarray): Proportional gain.
-            Kd (cp.ndarray): Derivative gain.
+            desired_position: Desired joint positions.
+            desired_velocity: Desired joint velocities.
+            current_position: Current joint positions.
+            current_velocity: Current joint velocities.
+            Kp: Proportional gain.
+            Kd: Derivative gain.
 
         Returns:
-            cp.ndarray: PD control signal.
+            NDArray: PD control signal (CPU-based NumPy array).
         """
-        desired_position = cp.asarray(desired_position)
-        desired_velocity = cp.asarray(desired_velocity)
-        current_position = cp.asarray(current_position)
-        current_velocity = cp.asarray(current_velocity)
-        Kp = cp.asarray(Kp)
-        Kd = cp.asarray(Kd)
+        desired_position = _to_numpy(desired_position)
+        desired_velocity = _to_numpy(desired_velocity)
+        current_position = _to_numpy(current_position)
+        current_velocity = _to_numpy(current_velocity)
+        Kp = _to_numpy(Kp)
+        Kd = _to_numpy(Kd)
 
         e = desired_position - current_position
         edot = desired_velocity - current_velocity
@@ -144,34 +189,44 @@ class ManipulatorController:
         return pd_signal
 
     def pid_control(
-        self, thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd
-    ):
+        self,
+        thetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dt: float,
+        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Ki: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         """
         PID Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            thetalistd (cp.ndarray): Desired joint angles.
-            dthetalistd (cp.ndarray): Desired joint velocities.
-            thetalist (cp.ndarray): Current joint angles.
-            dthetalist (cp.ndarray): Current joint velocities.
-            dt (float): Time step.
-            Kp (cp.ndarray): Proportional gain.
-            Ki (cp.ndarray): Integral gain.
-            Kd (cp.ndarray): Derivative gain.
+            thetalistd: Desired joint angles.
+            dthetalistd: Desired joint velocities.
+            thetalist: Current joint angles.
+            dthetalist: Current joint velocities.
+            dt: Time step.
+            Kp: Proportional gain.
+            Ki: Integral gain.
+            Kd: Derivative gain.
 
         Returns:
-            cp.ndarray: PID control signal.
+            NDArray: PID control signal (CPU-based NumPy array).
         """
-        thetalistd = cp.asarray(thetalistd)
-        dthetalistd = cp.asarray(dthetalistd)
-        thetalist = cp.asarray(thetalist)
-        dthetalist = cp.asarray(dthetalist)
-        Kp = cp.asarray(Kp)
-        Ki = cp.asarray(Ki)
-        Kd = cp.asarray(Kd)
+        thetalistd = _to_numpy(thetalistd)
+        dthetalistd = _to_numpy(dthetalistd)
+        thetalist = _to_numpy(thetalist)
+        dthetalist = _to_numpy(dthetalist)
+        Kp = _to_numpy(Kp)
+        Ki = _to_numpy(Ki)
+        Kd = _to_numpy(Kd)
 
         if self.eint is None:
-            self.eint = cp.zeros_like(thetalist)
+            self.eint = np.zeros_like(thetalist)
 
         e = thetalistd - thetalist
         self.eint += e * dt
@@ -182,42 +237,44 @@ class ManipulatorController:
 
     def robust_control(
         self,
-        thetalist,
-        dthetalist,
-        ddthetalist,
-        g,
-        Ftip,
-        disturbance_estimate,
-        adaptation_gain,
-    ):
+        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        ddthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        disturbance_estimate: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        adaptation_gain: float,
+    ) -> NDArray[np.float64]:
         """
         Robust Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            thetalist (cp.ndarray): Current joint angles.
-            dthetalist (cp.ndarray): Current joint velocities.
-            ddthetalist (cp.ndarray): Desired joint accelerations.
-            g (cp.ndarray): Gravity vector.
-            Ftip (cp.ndarray): External forces applied at the end effector.
-            disturbance_estimate (cp.ndarray): Estimate of disturbances.
-            adaptation_gain (float): Gain for the adaptation term.
+            thetalist: Current joint angles.
+            dthetalist: Current joint velocities.
+            ddthetalist: Desired joint accelerations.
+            g: Gravity vector.
+            Ftip: External forces applied at the end effector.
+            disturbance_estimate: Estimate of disturbances.
+            adaptation_gain: Gain for the adaptation term.
 
         Returns:
-            cp.ndarray: Robust control torque.
+            NDArray: Robust control torque (CPU-based NumPy array).
         """
-        thetalist = cp.asarray(thetalist)
-        dthetalist = cp.asarray(dthetalist)
-        ddthetalist = cp.asarray(ddthetalist)
-        g = cp.asarray(g)
-        Ftip = cp.asarray(Ftip)
-        disturbance_estimate = cp.asarray(disturbance_estimate)
+        # Convert to NumPy arrays (CPU) - avoid GPU↔CPU transfer bottleneck
+        thetalist = _to_numpy(thetalist)
+        dthetalist = _to_numpy(dthetalist)
+        ddthetalist = _to_numpy(ddthetalist)
+        g = _to_numpy(g)
+        Ftip = _to_numpy(Ftip)
+        disturbance_estimate = _to_numpy(disturbance_estimate)
 
-        M = cp.asarray(self.dynamics.mass_matrix(thetalist.get()))
-        c = cp.asarray(
-            self.dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get())
-        )
-        g_forces = cp.asarray(self.dynamics.gravity_forces(thetalist.get(), g.get()))
-        J_transpose = cp.asarray(self.dynamics.jacobian(thetalist.get()).T)
+        # Dynamics computations (no GPU↔CPU transfers)
+        M = self.dynamics.mass_matrix(thetalist)
+        c = self.dynamics.velocity_quadratic_forces(thetalist, dthetalist)
+        g_forces = self.dynamics.gravity_forces(thetalist, g)
+        J_transpose = self.dynamics.jacobian(thetalist).T
         tau = (
             M @ ddthetalist
             + c
@@ -229,236 +286,259 @@ class ManipulatorController:
 
     def adaptive_control(
         self,
-        thetalist,
-        dthetalist,
-        ddthetalist,
-        g,
-        Ftip,
-        measurement_error,
-        adaptation_gain,
-    ):
+        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        ddthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        measurement_error: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        adaptation_gain: float,
+    ) -> NDArray[np.float64]:
         """
         Adaptive Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            thetalist (cp.ndarray): Current joint angles.
-            dthetalist (cp.ndarray): Current joint velocities.
-            ddthetalist (cp.ndarray): Desired joint accelerations.
-            g (cp.ndarray): Gravity vector.
-            Ftip (cp.ndarray): External forces applied at the end effector.
-            measurement_error (cp.ndarray): Error in measurement.
-            adaptation_gain (float): Gain for the adaptation term.
+            thetalist: Current joint angles.
+            dthetalist: Current joint velocities.
+            ddthetalist: Desired joint accelerations.
+            g: Gravity vector.
+            Ftip: External forces applied at the end effector.
+            measurement_error: Error in measurement.
+            adaptation_gain: Gain for the adaptation term.
 
         Returns:
-            cp.ndarray: Adaptive control torque.
+            NDArray: Adaptive control torque (CPU-based NumPy array).
         """
-        thetalist = cp.asarray(thetalist)
-        dthetalist = cp.asarray(dthetalist)
-        ddthetalist = cp.asarray(ddthetalist)
-        g = cp.asarray(g)
-        Ftip = cp.asarray(Ftip)
-        measurement_error = cp.asarray(measurement_error)
+        # Convert to NumPy arrays (CPU) - avoid GPU↔CPU transfer bottleneck
+        thetalist = _to_numpy(thetalist)
+        dthetalist = _to_numpy(dthetalist)
+        ddthetalist = _to_numpy(ddthetalist)
+        g = _to_numpy(g)
+        Ftip = _to_numpy(Ftip)
+        measurement_error = _to_numpy(measurement_error)
 
         # ---- parameter update (make it 1-D, same length as joints) ----
         n = thetalist.size
         if getattr(self, "parameter_estimate", None) is None:
-            self.parameter_estimate = cp.zeros((n,), dtype=thetalist.dtype)
+            self.parameter_estimate = np.zeros((n,), dtype=thetalist.dtype)
 
-        err = cp.asarray(measurement_error).reshape(-1)        # (n,)
-        gamma = float(cp.asarray(adaptation_gain).ravel()[0])  # scalar
+        err = measurement_error.reshape(-1)        # (n,) - already NumPy from _to_numpy() above
+        # Handle both scalar and array adaptation_gain
+        gamma = float(np.atleast_1d(adaptation_gain).ravel()[0])
 
         # simple gradient-like update
         self.parameter_estimate = self.parameter_estimate + gamma * err
 
-        # ---- standard torque computation ----
-        M = cp.asarray(self.dynamics.mass_matrix(thetalist.get()))
-        c = cp.asarray(self.dynamics.velocity_quadratic_forces(thetalist.get(), dthetalist.get()))
-        g_forces = cp.asarray(self.dynamics.gravity_forces(thetalist.get(), g.get()))
-        J_transpose = cp.asarray(self.dynamics.jacobian(thetalist.get()).T)
+        # ---- standard torque computation (no GPU↔CPU transfers) ----
+        M = self.dynamics.mass_matrix(thetalist)
+        c = self.dynamics.velocity_quadratic_forces(thetalist, dthetalist)
+        g_forces = self.dynamics.gravity_forces(thetalist, g)
+        J_transpose = self.dynamics.jacobian(thetalist).T
 
         tau = M @ ddthetalist + c + g_forces + J_transpose @ Ftip + self.parameter_estimate
         return tau
 
 
-    def kalman_filter_predict(self, thetalist, dthetalist, taulist, g, Ftip, dt, Q):
+    def kalman_filter_predict(
+        self,
+        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        taulist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dt: float,
+        Q: Union[cp.ndarray, NDArray[np.float64]]
+    ) -> None:
         """
         Kalman Filter Prediction.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            thetalist (cp.ndarray): Current joint angles.
-            dthetalist (cp.ndarray): Current joint velocities.
-            taulist (cp.ndarray): Applied torques.
-            g (cp.ndarray): Gravity vector.
-            Ftip (cp.ndarray): External forces applied at the end effector.
-            dt (float): Time step.
-            Q (cp.ndarray): Process noise covariance.
+            thetalist: Current joint angles.
+            dthetalist: Current joint velocities.
+            taulist: Applied torques.
+            g: Gravity vector.
+            Ftip: External forces applied at the end effector.
+            dt: Time step.
+            Q: Process noise covariance.
 
         Returns:
             None
         """
-        thetalist = cp.asarray(thetalist)
-        dthetalist = cp.asarray(dthetalist)
-        taulist = cp.asarray(taulist)
-        g = cp.asarray(g)
-        Ftip = cp.asarray(Ftip)
-        Q = cp.asarray(Q)
+        thetalist = _to_numpy(thetalist)
+        dthetalist = _to_numpy(dthetalist)
+        taulist = _to_numpy(taulist)
+        g = _to_numpy(g)
+        Ftip = _to_numpy(Ftip)
+        Q = _to_numpy(Q)
 
         if self.x_hat is None:
-            self.x_hat = cp.concatenate((thetalist, dthetalist))
+            self.x_hat = np.concatenate((thetalist, dthetalist))
 
         thetalist_pred = (
             self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist):] * dt
         )
         dthetalist_pred = (
-            cp.asarray(
-                self.dynamics.forward_dynamics(
-                    self.x_hat[: len(thetalist)].get(),
-                    self.x_hat[len(thetalist):].get(),
-                    taulist.get(),
-                    g.get(),
-                    Ftip.get(),
-                )
+            self.dynamics.forward_dynamics(
+                self.x_hat[: len(thetalist)],
+                self.x_hat[len(thetalist):],
+                taulist,
+                g,
+                Ftip,
             )
             * dt
             + self.x_hat[len(thetalist):]
         )
-        x_hat_pred = cp.concatenate((thetalist_pred, dthetalist_pred))
+        x_hat_pred = np.concatenate((thetalist_pred, dthetalist_pred))
 
         if self.P is None:
-            self.P = cp.eye(len(x_hat_pred))
-        F = cp.eye(len(x_hat_pred))
+            self.P = np.eye(len(x_hat_pred))
+        F = np.eye(len(x_hat_pred))
         self.P = F @ self.P @ F.T + Q
 
         self.x_hat = x_hat_pred
 
-    def kalman_filter_update(self, z, R):
+    def kalman_filter_update(
+        self,
+        z: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        R: Union[cp.ndarray, NDArray[np.float64]]
+    ) -> None:
         """
         Kalman Filter Update.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            z (cp.ndarray): Measurement vector.
-            R (cp.ndarray): Measurement noise covariance.
+            z: Measurement vector.
+            R: Measurement noise covariance.
 
         Returns:
             None
         """
-        z = cp.asarray(z)
-        R = cp.asarray(R)
+        z = _to_numpy(z)
+        R = _to_numpy(R)
 
-        H = cp.eye(len(self.x_hat))
+        H = np.eye(len(self.x_hat))
         y = z - H @ self.x_hat
         S = H @ self.P @ H.T + R
-        K = self.P @ H.T @ cp.linalg.inv(S)
+        K = self.P @ H.T @ np.linalg.inv(S)
         self.x_hat += K @ y
-        self.P = (cp.eye(len(self.x_hat)) - K @ H) @ self.P
+        self.P = (np.eye(len(self.x_hat)) - K @ H) @ self.P
 
     def kalman_filter_control(
-        self, thetalistd, dthetalistd, thetalist, dthetalist, taulist, g, Ftip, dt, Q, R
-    ):
+        self,
+        thetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        taulist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dt: float,
+        Q: Union[cp.ndarray, NDArray[np.float64]],
+        R: Union[cp.ndarray, NDArray[np.float64]]
+    ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         """
         Kalman Filter Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            thetalistd (cp.ndarray): Desired joint angles.
-            dthetalistd (cp.ndarray): Desired joint velocities.
-            thetalist (cp.ndarray): Current joint angles.
-            dthetalist (cp.ndarray): Current joint velocities.
-            taulist (cp.ndarray): Applied torques.
-            g (cp.ndarray): Gravity vector.
-            Ftip (cp.ndarray): External forces applied at the end effector.
-            dt (float): Time step.
-            Q (cp.ndarray): Process noise covariance.
-            R (cp.ndarray): Measurement noise covariance.
+            thetalistd: Desired joint angles.
+            dthetalistd: Desired joint velocities.
+            thetalist: Current joint angles.
+            dthetalist: Current joint velocities.
+            taulist: Applied torques.
+            g: Gravity vector.
+            Ftip: External forces applied at the end effector.
+            dt: Time step.
+            Q: Process noise covariance.
+            R: Measurement noise covariance.
 
         Returns:
-            tuple: Estimated joint angles and velocities.
+            tuple: Estimated joint angles and velocities (CPU-based NumPy arrays).
         """
-        thetalistd = cp.asarray(thetalistd)
-        dthetalistd = cp.asarray(dthetalistd)
-        thetalist = cp.asarray(thetalist)
-        dthetalist = cp.asarray(dthetalist)
-        taulist = cp.asarray(taulist)
-        g = cp.asarray(g)
-        Ftip = cp.asarray(Ftip)
-        Q = cp.asarray(Q)
-        R = cp.asarray(R)
+        # Convert to NumPy (predictions and updates already handle this, but for consistency)
+        thetalist = _to_numpy(thetalist)
+        dthetalist = _to_numpy(dthetalist)
 
         self.kalman_filter_predict(thetalist, dthetalist, taulist, g, Ftip, dt, Q)
-        self.kalman_filter_update(cp.concatenate((thetalist, dthetalist)), R)
+        self.kalman_filter_update(np.concatenate((thetalist, dthetalist)), R)
         return self.x_hat[: len(thetalist)], self.x_hat[len(thetalist):]
 
     def feedforward_control(
-        self, desired_position, desired_velocity, desired_acceleration, g, Ftip
-    ):
+        self,
+        desired_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        desired_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        desired_acceleration: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         """
         Feedforward Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            desired_position (cp.ndarray): Desired joint positions.
-            desired_velocity (cp.ndarray): Desired joint velocities.
-            desired_acceleration (cp.ndarray): Desired joint accelerations.
-            g (cp.ndarray): Gravity vector.
-            Ftip (cp.ndarray): External forces applied at the end effector.
+            desired_position: Desired joint positions.
+            desired_velocity: Desired joint velocities.
+            desired_acceleration: Desired joint accelerations.
+            g: Gravity vector.
+            Ftip: External forces applied at the end effector.
 
         Returns:
-            cp.ndarray: Feedforward torque.
+            NDArray: Feedforward torque (CPU-based NumPy array).
         """
-        desired_position = cp.asarray(desired_position)
-        desired_velocity = cp.asarray(desired_velocity)
-        desired_acceleration = cp.asarray(desired_acceleration)
-        g = cp.asarray(g)
-        Ftip = cp.asarray(Ftip)
+        desired_position = _to_numpy(desired_position)
+        desired_velocity = _to_numpy(desired_velocity)
+        desired_acceleration = _to_numpy(desired_acceleration)
+        g = _to_numpy(g)
+        Ftip = _to_numpy(Ftip)
 
-        tau = cp.asarray(
-            self.dynamics.inverse_dynamics(
-                desired_position.get(),
-                desired_velocity.get(),
-                desired_acceleration.get(),
-                g.get(),
-                Ftip.get(),
-            )
+        tau = self.dynamics.inverse_dynamics(
+            desired_position,
+            desired_velocity,
+            desired_acceleration,
+            g,
+            Ftip,
         )
         return tau
 
     def pd_feedforward_control(
         self,
-        desired_position,
-        desired_velocity,
-        desired_acceleration,
-        current_position,
-        current_velocity,
-        Kp,
-        Kd,
-        g,
-        Ftip,
-    ):
+        desired_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        desired_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        desired_acceleration: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        current_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        current_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         """
         PD Feedforward Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            desired_position (cp.ndarray): Desired joint positions.
-            desired_velocity (cp.ndarray): Desired joint velocities.
-            desired_acceleration (cp.ndarray): Desired joint accelerations.
-            current_position (cp.ndarray): Current joint positions.
-            current_velocity (cp.ndarray): Current joint velocities.
-            Kp (cp.ndarray): Proportional gain.
-            Kd (cp.ndarray): Derivative gain.
-            g (cp.ndarray): Gravity vector.
-            Ftip (cp.ndarray): External forces applied at the end effector.
+            desired_position: Desired joint positions.
+            desired_velocity: Desired joint velocities.
+            desired_acceleration: Desired joint accelerations.
+            current_position: Current joint positions.
+            current_velocity: Current joint velocities.
+            Kp: Proportional gain.
+            Kd: Derivative gain.
+            g: Gravity vector.
+            Ftip: External forces applied at the end effector.
 
         Returns:
-            cp.ndarray: Control signal.
+            NDArray: Control signal (CPU-based NumPy array).
         """
-        desired_position = cp.asarray(desired_position)
-        desired_velocity = cp.asarray(desired_velocity)
-        desired_acceleration = cp.asarray(desired_acceleration)
-        current_position = cp.asarray(current_position)
-        current_velocity = cp.asarray(current_velocity)
-        Kp = cp.asarray(Kp)
-        Kd = cp.asarray(Kd)
-        g = cp.asarray(g)
-        Ftip = cp.asarray(Ftip)
-
+        # pd_control and feedforward_control now handle conversion internally
         pd_signal = self.pd_control(
             desired_position,
             desired_velocity,
@@ -474,28 +554,36 @@ class ManipulatorController:
         return control_signal
 
     @staticmethod
-    def enforce_limits(thetalist, dthetalist, tau, joint_limits, torque_limits):
+    def enforce_limits(
+        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        tau: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        joint_limits: Union[cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]],
+        torque_limits: Union[cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]]
+    ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         """
         Enforce joint and torque limits.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            thetalist (cp.ndarray): Joint angles.
-            dthetalist (cp.ndarray): Joint velocities.
-            tau (cp.ndarray): Torques.
-            joint_limits (cp.ndarray): Joint angle limits.
-            torque_limits (cp.ndarray): Torque limits.
+            thetalist: Joint angles.
+            dthetalist: Joint velocities.
+            tau: Torques.
+            joint_limits: Joint angle limits.
+            torque_limits: Torque limits.
 
         Returns:
-            tuple: Clipped joint angles, velocities, and torques.
+            tuple: Clipped joint angles, velocities, and torques (CPU-based NumPy arrays).
         """
-        thetalist = cp.asarray(thetalist)
-        dthetalist = cp.asarray(dthetalist)
-        tau = cp.asarray(tau)
-        joint_limits = cp.asarray(joint_limits)
-        torque_limits = cp.asarray(torque_limits)
+        thetalist = _to_numpy(thetalist)
+        dthetalist = _to_numpy(dthetalist)
+        tau = _to_numpy(tau)
+        joint_limits = _to_numpy(joint_limits)
+        torque_limits = _to_numpy(torque_limits)
 
-        thetalist = cp.clip(thetalist, joint_limits[:, 0], joint_limits[:, 1])
-        tau = cp.clip(tau, torque_limits[:, 0], torque_limits[:, 1])
+        thetalist = np.clip(thetalist, joint_limits[:, 0], joint_limits[:, 1])
+        tau = np.clip(tau, torque_limits[:, 0], torque_limits[:, 1])
         return thetalist, dthetalist, tau
 
     def plot_steady_state_response(
@@ -634,30 +722,32 @@ class ManipulatorController:
 
     def joint_space_control(
         self,
-        desired_joint_angles,
-        current_joint_angles,
-        current_joint_velocities,
-        Kp,
-        Kd,
-    ):
+        desired_joint_angles: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        current_joint_angles: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        current_joint_velocities: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         """
         Joint Space Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            desired_joint_angles (cp.ndarray): Desired joint angles.
-            current_joint_angles (cp.ndarray): Current joint angles.
-            current_joint_velocities (cp.ndarray): Current joint velocities.
-            Kp (cp.ndarray): Proportional gain.
-            Kd (cp.ndarray): Derivative gain.
+            desired_joint_angles: Desired joint angles.
+            current_joint_angles: Current joint angles.
+            current_joint_velocities: Current joint velocities.
+            Kp: Proportional gain.
+            Kd: Derivative gain.
 
         Returns:
-            cp.ndarray: Control torque.
+            NDArray: Control torque (CPU-based NumPy array).
         """
-        desired_joint_angles = cp.asarray(desired_joint_angles)
-        current_joint_angles = cp.asarray(current_joint_angles)
-        current_joint_velocities = cp.asarray(current_joint_velocities)
-        Kp = cp.asarray(Kp)
-        Kd = cp.asarray(Kd)
+        desired_joint_angles = _to_numpy(desired_joint_angles)
+        current_joint_angles = _to_numpy(current_joint_angles)
+        current_joint_velocities = _to_numpy(current_joint_velocities)
+        Kp = _to_numpy(Kp)
+        Kd = _to_numpy(Kd)
 
         e = desired_joint_angles - current_joint_angles
         edot = 0 - current_joint_velocities
@@ -666,43 +756,43 @@ class ManipulatorController:
 
     def cartesian_space_control(
         self,
-        desired_position,
-        current_joint_angles,
-        current_joint_velocities,
-        Kp,
-        Kd,
-    ):
+        desired_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        current_joint_angles: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        current_joint_velocities: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         """
         Cartesian Space Control.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            desired_position (cp.ndarray): Desired end-effector position.
-            current_joint_angles (cp.ndarray): Current joint angles.
-            current_joint_velocities (cp.ndarray): Current joint velocities.
-            Kp (cp.ndarray): Proportional gain.
-            Kd (cp.ndarray): Derivative gain.
+            desired_position: Desired end-effector position.
+            current_joint_angles: Current joint angles.
+            current_joint_velocities: Current joint velocities.
+            Kp: Proportional gain.
+            Kd: Derivative gain.
 
         Returns:
-            cp.ndarray: Control torque.
+            NDArray: Control torque (CPU-based NumPy array).
         """
-        desired_position = cp.asarray(desired_position)
-        current_joint_angles = cp.asarray(current_joint_angles)
-        current_joint_velocities = cp.asarray(current_joint_velocities)
-        Kp = cp.asarray(Kp)
-        Kd = cp.asarray(Kd)
+        desired_position = _to_numpy(desired_position)
+        current_joint_angles = _to_numpy(current_joint_angles)
+        current_joint_velocities = _to_numpy(current_joint_velocities)
+        Kp = _to_numpy(Kp)
+        Kd = _to_numpy(Kd)
 
-        current_position = cp.asarray(
-            self.dynamics.forward_kinematics(current_joint_angles.get())[:3, 3]
-        )
+        current_position = self.dynamics.forward_kinematics(current_joint_angles)[:3, 3]
         e = desired_position - current_position
         dthetalist = current_joint_velocities
-        J = cp.asarray(self.dynamics.jacobian(current_joint_angles.get()))
+        J = self.dynamics.jacobian(current_joint_angles)
         tau = J.T @ (Kp * e - Kd @ J @ dthetalist)
         return tau
 # ------------------------------------------------------------------------
     def ziegler_nichols_tuning(self, Ku, Tu, kind="PID"):
-        Ku = np.asarray(Ku, dtype=float)
-        Tu = np.asarray(Tu, dtype=float)
+        Ku = _to_numpy(Ku).astype(float)
+        Tu = _to_numpy(Tu).astype(float)
 
         kind = kind.upper()
         if kind == "P":
@@ -730,25 +820,33 @@ class ManipulatorController:
         logger.info(f"Tuned Z-N ({kind}) gains\n  Kp={Kp}\n  Ki={Ki}\n  Kd={Kd}")
         return Kp, Ki, Kd
     # ------------------------------------------------------------------------
-    def find_ultimate_gain_and_period(self, thetalist, desired_joint_angles, dt, max_steps=1000):
+    def find_ultimate_gain_and_period(
+        self,
+        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        desired_joint_angles: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        dt: float,
+        max_steps: int = 1000
+    ) -> Tuple[float, float, List[float], List[NDArray[np.float64]]]:
         """
         Find the ultimate gain and period using the Ziegler–Nichols method.
 
+        Uses CPU-based computation to avoid GPU-CPU transfer overhead.
+
         Parameters:
-            thetalist (cp.ndarray): Initial joint angles (shape [6]).
-            desired_joint_angles (cp.ndarray): Step target angles (shape [6]).
-            dt (float): Simulation time step.
-            max_steps (int): Number of integration steps to try.
+            thetalist: Initial joint angles (shape [6]).
+            desired_joint_angles: Step target angles (shape [6]).
+            dt: Simulation time step.
+            max_steps: Number of integration steps to try.
 
         Returns:
             tuple:
               - ultimate_gain (float)
               - ultimate_period (float)
               - gain_history (list of float)
-              - error_history (list of cp.ndarray)
+              - error_history (list of np.ndarray)
         """
-        thetalist = cp.asarray(thetalist)
-        desired_joint_angles = cp.asarray(desired_joint_angles)
+        thetalist = _to_numpy(thetalist)
+        desired_joint_angles = _to_numpy(desired_joint_angles)
 
         Kp = 0.01
         increase = 1.1
@@ -757,38 +855,38 @@ class ManipulatorController:
         error_history = []
 
         while not oscillation and Kp < 1000:
-            θ = thetalist.copy()
-            ω = cp.zeros_like(θ)
-            self.eint = cp.zeros_like(θ)
+            theta = thetalist.copy()
+            omega = np.zeros_like(theta)
+            self.eint = np.zeros_like(theta)
             errors = []
 
             for step in range(max_steps):
                 # pure-PD poke
-                τ = self.pd_control(
+                tau = self.pd_control(
                     desired_joint_angles,
-                    cp.zeros_like(θ),
-                    θ,
-                    ω,
+                    np.zeros_like(theta),
+                    theta,
+                    omega,
                     Kp,
                     0.0
                 )
-                # α = M⁻¹ (τ – C – G)
-                M  = cp.asarray(self.dynamics.mass_matrix(θ.get()))
-                C  = cp.asarray(self.dynamics.velocity_quadratic_forces(θ.get(), ω.get()))
-                Gf = cp.asarray(self.dynamics.gravity_forces(θ.get(), np.array([0,0,-9.81])))
-                α  = cp.linalg.solve(M, τ - C - Gf)
+                # alpha = M⁻¹ (tau – C – G)
+                M  = self.dynamics.mass_matrix(theta)
+                C  = self.dynamics.velocity_quadratic_forces(theta, omega)
+                Gf = self.dynamics.gravity_forces(theta, np.array([0, 0, -9.81]))
+                alpha  = np.linalg.solve(M, tau - C - Gf)
 
-                ω += α * dt
-                θ += ω * dt
+                omega += alpha * dt
+                theta += omega * dt
 
-                err = cp.linalg.norm(θ - desired_joint_angles)
+                err = np.linalg.norm(theta - desired_joint_angles)
                 errors.append(err)
                 # blow-up guard
                 if step > 10 and err > 1e10:
                     break
 
             gain_history.append(Kp)
-            error_history.append(cp.stack(errors))
+            error_history.append(np.array(errors))
 
             # look for the first upward slope after initial increase
             if len(errors) >= 2 and errors[-2] < errors[-1] < errors[-2] * 1.2:
@@ -798,7 +896,7 @@ class ManipulatorController:
 
         ultimate_gain   = float(Kp)
         ultimate_period = (max_steps * dt) / max(1,
-            cp.count_nonzero(cp.diff(cp.sign(error_history[-1])) ) // 2
+            np.count_nonzero(np.diff(np.sign(error_history[-1])) ) // 2
         )
 
         return ultimate_gain, ultimate_period, gain_history, error_history

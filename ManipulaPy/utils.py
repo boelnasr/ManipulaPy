@@ -264,16 +264,41 @@ def rotation_logm(R):
     Returns:
         tuple: A tuple containing the rotation vector and the angle.
     """
-    theta = np.arccos((np.trace(R) - 1) / 2)
-    if theta < 1e-6:
-        return np.zeros(3), theta
+    # Validate input shape
+    R = np.asarray(R)
+    if R.shape != (3, 3):
+        raise ValueError(
+            f"rotation_logm requires a 3x3 rotation matrix, got shape {R.shape}. "
+            f"Matrix:\n{R}"
+        )
+
+    # Ensure we're computing with scalar values
+    trace_val = np.trace(R)
+    # Clamp to [-1, 1] to avoid numerical issues with arccos
+    cos_theta = np.clip((trace_val - 1) / 2, -1.0, 1.0)
+    theta = np.arccos(cos_theta)
+
+    # Convert to Python scalar (handles numpy scalars, 0-d arrays, and 1-d arrays)
+    try:
+        theta_scalar = float(theta)
+    except (TypeError, ValueError):
+        # Handle cases where theta is an array
+        theta_arr = np.asarray(theta).flatten()
+        if theta_arr.size == 0:
+            theta_scalar = 0.0
+        else:
+            theta_scalar = float(theta_arr[0])
+
+    # Check if rotation is very small (identity or near-identity)
+    if theta_scalar < 1e-6:
+        return np.zeros(3), theta_scalar
     else:
         omega = (
             1
-            / (2 * np.sin(theta))
+            / (2 * np.sin(theta_scalar))
             * np.array([R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]])
         )
-        return omega, theta
+        return omega, theta_scalar
 
 
 def logm_to_twist(logm):
@@ -373,14 +398,17 @@ def MatrixLog6(T):
             (np.hstack((np.zeros((3, 3)), p.reshape(-1, 1))), [0, 0, 0, 0])
         )
     else:
+        # omega is unit vector, need to scale by theta for correct SE(3) logarithm
         omega_mat = skew_symmetric(omega)
+        # Scale the skew-symmetric matrix by theta
+        omega_mat_scaled = theta * omega_mat
         G_inv = (
             1 / theta * np.eye(3)
             - 0.5 * omega_mat
             + (1 / theta - 0.5 / np.tan(theta / 2)) * omega_mat @ omega_mat
         )
         v = G_inv @ p
-        return np.vstack((np.hstack((omega_mat, v.reshape(-1, 1))), [0, 0, 0, 0]))
+        return np.vstack((np.hstack((omega_mat_scaled, v.reshape(-1, 1))), [0, 0, 0, 0]))
 
 
 def MatrixExp6(se3mat):

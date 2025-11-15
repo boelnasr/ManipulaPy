@@ -6,6 +6,14 @@ Vision Module - ManipulaPy
 This module provides computer vision capabilities for robotic perception including
 stereo vision, object detection, and camera calibration with optional YOLO integration.
 
+Performance Note:
+    YOLO models are cached globally to avoid reinstantiation overhead. The first call to
+    detect_objects() will download and load the model (~200MB, 2-3 seconds), but subsequent
+    calls reuse the cached instance for real-time performance. Use clear_yolo_cache() to
+    free memory when needed.
+
+    For production use, the Vision class provides better model lifecycle management.
+
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 
@@ -29,6 +37,7 @@ import numpy as np
 import cv2
 import pybullet as pb
 import matplotlib.pyplot as plt
+from typing import Optional, Union, Dict, Any
 from .utils import euler_to_rotation_matrix
 from ultralytics import YOLO
 import warnings
@@ -56,35 +65,105 @@ except ImportError:
         ImportWarning
     )
 
-# Example of conditional functionality
-def detect_objects(image, model_path=None):
+# Global model cache to avoid reinstantiation
+_YOLO_MODEL_CACHE: Dict[str, Any] = {}
+
+def detect_objects(
+    image: Union[np.ndarray, str],
+    model_path: Optional[str] = None
+) -> Any:
     """
-    Detect objects in an image using YOLO.
-    
+    Detect objects in an image using YOLO with model caching.
+
+    Note: For real-time/repeated detection, use the Vision class instead,
+    which provides better model lifecycle management.
+
     Args:
-        image: Input image (numpy array or path)
-        model_path: Path to YOLO model (optional)
-    
+        image: Input image (numpy array or file path)
+        model_path: Path to YOLO model (optional, defaults to 'yolov8n.pt')
+
     Returns:
-        Detection results or None if ultralytics not available
+        Detection results from YOLO model
+
+    Raises:
+        ImportError: If ultralytics is not available
+
+    Performance Note:
+        This function caches the YOLO model globally. The first call will
+        download/load the model (~200MB, 2-3 seconds), but subsequent calls
+        with the same model_path will reuse the cached instance.
+
+    Example:
+        >>> import numpy as np
+        >>> from ManipulaPy.vision import detect_objects
+        >>>
+        >>> # First call: loads model (slow)
+        >>> image = np.random.randint(0, 255, (640, 480, 3), dtype=np.uint8)
+        >>> results1 = detect_objects(image)
+        >>>
+        >>> # Second call: reuses cached model (fast)
+        >>> results2 = detect_objects(image)
     """
     if not ULTRALYTICS_AVAILABLE:
         raise ImportError(
             "ultralytics is required for object detection. "
             "Install with: pip install ultralytics"
         )
-    
-    model = YOLO(model_path or 'yolov8n.pt')
+
+    # Use model caching to avoid reinstantiation bottleneck
+    model_key = model_path or 'yolov8n.pt'
+
+    if model_key not in _YOLO_MODEL_CACHE:
+        # First call: load and cache the model
+        _YOLO_MODEL_CACHE[model_key] = YOLO(model_key)
+
+    # Reuse cached model
+    model = _YOLO_MODEL_CACHE[model_key]
     results = model(image)
     return results
+
+def clear_yolo_cache(model_path: Optional[str] = None) -> int:
+    """
+    Clear cached YOLO models to free memory.
+
+    Args:
+        model_path: Specific model to clear, or None to clear all cached models
+
+    Returns:
+        Number of models cleared from cache
+
+    Example:
+        >>> from ManipulaPy.vision import detect_objects, clear_yolo_cache
+        >>>
+        >>> # Use model
+        >>> results = detect_objects(image)
+        >>>
+        >>> # Free memory when done
+        >>> count = clear_yolo_cache()
+        >>> print(f"Cleared {count} cached models")
+    """
+    global _YOLO_MODEL_CACHE
+
+    if model_path is None:
+        # Clear all cached models
+        count = len(_YOLO_MODEL_CACHE)
+        _YOLO_MODEL_CACHE.clear()
+        return count
+    else:
+        # Clear specific model
+        model_key = model_path
+        if model_key in _YOLO_MODEL_CACHE:
+            del _YOLO_MODEL_CACHE[model_key]
+            return 1
+        return 0
 
 def process_image(image):
     """
     Basic image processing function.
-    
+
     Args:
         image: Input image (numpy array)
-    
+
     Returns:
         Processed image
     """
@@ -96,14 +175,21 @@ def process_image(image):
                 "Install with: pip install opencv-python"
             )
         return image
-    
+
     # Use OpenCV if available
     if isinstance(image, str):
         return cv2.imread(image)
     return image
 
 # Add this to ensure the module can be imported even without dependencies
-__all__ = ['detect_objects', 'process_image', 'ULTRALYTICS_AVAILABLE', 'OPENCV_AVAILABLE']
+__all__ = [
+    'detect_objects',
+    'clear_yolo_cache',
+    'process_image',
+    'Vision',
+    'ULTRALYTICS_AVAILABLE',
+    'OPENCV_AVAILABLE'
+]
 def read_debug_parameters(dbg_params):
     """
     Utility to read current slider values from PyBullet debug interface.
