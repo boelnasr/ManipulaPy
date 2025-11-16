@@ -171,6 +171,7 @@ def __getattr__(name: str):
         'utils': 'utils',
         'transformations': 'transformations',
         'dynamics': 'dynamics',
+        'ik_helpers': 'ik_helpers',
 
         # Analysis modules
         'control': 'control',
@@ -214,7 +215,7 @@ def __dir__():
     # Core always available
     base = [
         '__version__', '__author__', '__license__',
-        'kinematics', 'utils', 'transformations', 'dynamics',
+        'kinematics', 'utils', 'transformations', 'dynamics', 'ik_helpers',
         'control', 'path_planning', 'singularity', 'potential_field',
 
         # Helper functions

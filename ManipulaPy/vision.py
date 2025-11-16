@@ -39,7 +39,6 @@ import pybullet as pb
 import matplotlib.pyplot as plt
 from typing import Optional, Union, Dict, Any
 from .utils import euler_to_rotation_matrix
-from ultralytics import YOLO
 import warnings
 
 # Optional imports - handle gracefully if not available
@@ -48,6 +47,7 @@ try:
     ULTRALYTICS_AVAILABLE = True
 except ImportError:
     ULTRALYTICS_AVAILABLE = False
+    YOLO = None  # Define YOLO as None when not available
     warnings.warn(
         "ultralytics not available. Vision features requiring YOLO will be disabled. "
         "Install with: pip install ultralytics",
@@ -266,15 +266,10 @@ class Vision:
         self.use_pybullet_debug = use_pybullet_debug
         self.show_plot = show_plot
 
-        # Load YOLO Model for Object Detection
-# Load YOLO (optional)
+        # YOLO Model (lazy loading - will be loaded on first use)
         self.yolo_model = None
-        if ULTRALYTICS_AVAILABLE:
-            try:
-                self.yolo_model = YOLO("yolov8m.pt")
-                self.logger.info("✅ YOLO model loaded successfully.")
-            except Exception as e:
-                self.logger.warning(f"YOLO load failed ({e}); continuing without it.")
+        self._yolo_model_path = "yolov8m.pt"  # Default model
+        self._yolo_load_attempted = False
 
 
         # Camera configuration (Monocular or Stereo)
@@ -543,6 +538,37 @@ class Vision:
         return view_mtx, proj_mtx, width, height
 
     # --------------------------------------------------------------------------
+    # YOLO Lazy Loading
+    # --------------------------------------------------------------------------
+    def _ensure_yolo_loaded(self):
+        """
+        Lazy load YOLO model on first use.
+
+        Returns:
+            bool: True if YOLO is loaded successfully, False otherwise
+        """
+        if self.yolo_model is not None:
+            return True
+
+        if self._yolo_load_attempted:
+            return False
+
+        self._yolo_load_attempted = True
+
+        if not ULTRALYTICS_AVAILABLE:
+            self.logger.warning("YOLO not available - ultralytics not installed.")
+            return False
+
+        try:
+            self.logger.info(f"Loading YOLO model ({self._yolo_model_path})...")
+            self.yolo_model = YOLO(self._yolo_model_path)
+            self.logger.info("✅ YOLO model loaded successfully.")
+            return True
+        except Exception as e:
+            self.logger.warning(f"YOLO load failed ({e}); continuing without it.")
+            return False
+
+    # --------------------------------------------------------------------------
     # Image Capture
     # --------------------------------------------------------------------------
     def capture_image(self, camera_index=0):
@@ -612,8 +638,9 @@ class Vision:
             self.logger.error(f"Camera index {camera_index} not found.")
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
-        if self.yolo_model is None:
-            self.logger.warning("⚠️ YOLO model is missing! Skipping object detection.")
+        # Lazy load YOLO on first use
+        if not self._ensure_yolo_loaded():
+            self.logger.warning("⚠️ YOLO model is not available! Skipping object detection.")
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
         # --------- YOLO inference (guarded) ----------
