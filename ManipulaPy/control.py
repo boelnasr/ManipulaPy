@@ -29,12 +29,19 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
-import cupy as cp
 import numpy as np
 from typing import Optional, List, Tuple, Union, Dict, Any
 from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 import logging
+
+# Optional CuPy import for defensive array handling
+try:
+    import cupy as cp
+    CUPY_AVAILABLE = True
+except ImportError:
+    cp = None
+    CUPY_AVAILABLE = False
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,13 +63,14 @@ def _to_numpy(arr):
         to prevent accidental performance issues. We must explicitly call .get()
         to transfer CuPy arrays from GPU to CPU.
     """
-    try:
-        if isinstance(arr, cp.ndarray):
-            # CuPy array: explicitly transfer from GPU to CPU
-            return arr.get()
-    except TypeError:
-        # cp.ndarray may not be a real type when CuPy is mocked; treat as non-CuPy
-        pass
+    if CUPY_AVAILABLE and cp is not None:
+        try:
+            if isinstance(arr, cp.ndarray):
+                # CuPy array: explicitly transfer from GPU to CPU
+                return arr.get()
+        except (TypeError, AttributeError):
+            # cp.ndarray may not be a real type when CuPy is mocked; treat as non-CuPy
+            pass
 
     # NumPy array, list, or other: convert to NumPy
     return np.asarray(arr)
@@ -87,16 +95,16 @@ class ManipulatorController:
 
     def computed_torque_control(
         self,
-        thetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        ddthetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalistd: Union[NDArray[np.float64], List[float]],
+        dthetalistd: Union[NDArray[np.float64], List[float]],
+        ddthetalistd: Union[NDArray[np.float64], List[float]],
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
         dt: float,
-        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Ki: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        Kp: Union[NDArray[np.float64], List[float]],
+        Ki: Union[NDArray[np.float64], List[float]],
+        Kd: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         """
         Computed Torque Control.
@@ -153,12 +161,12 @@ class ManipulatorController:
 
     def pd_control(
         self,
-        desired_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        desired_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        current_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        current_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        desired_position: Union[NDArray[np.float64], List[float]],
+        desired_velocity: Union[NDArray[np.float64], List[float]],
+        current_position: Union[NDArray[np.float64], List[float]],
+        current_velocity: Union[NDArray[np.float64], List[float]],
+        Kp: Union[NDArray[np.float64], List[float]],
+        Kd: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         """
         PD Control.
@@ -190,14 +198,14 @@ class ManipulatorController:
 
     def pid_control(
         self,
-        thetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalistd: Union[NDArray[np.float64], List[float]],
+        dthetalistd: Union[NDArray[np.float64], List[float]],
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
         dt: float,
-        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Ki: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]]
+        Kp: Union[NDArray[np.float64], List[float]],
+        Ki: Union[NDArray[np.float64], List[float]],
+        Kd: Union[NDArray[np.float64], List[float]]
     ) -> NDArray[np.float64]:
         """
         PID Control.
@@ -237,12 +245,12 @@ class ManipulatorController:
 
     def robust_control(
         self,
-        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        ddthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        disturbance_estimate: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        ddthetalist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+        Ftip: Union[NDArray[np.float64], List[float]],
+        disturbance_estimate: Union[NDArray[np.float64], List[float]],
         adaptation_gain: float,
     ) -> NDArray[np.float64]:
         """
@@ -286,12 +294,12 @@ class ManipulatorController:
 
     def adaptive_control(
         self,
-        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        ddthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        measurement_error: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        ddthetalist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+        Ftip: Union[NDArray[np.float64], List[float]],
+        measurement_error: Union[NDArray[np.float64], List[float]],
         adaptation_gain: float,
     ) -> NDArray[np.float64]:
         """
@@ -343,13 +351,13 @@ class ManipulatorController:
 
     def kalman_filter_predict(
         self,
-        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        taulist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        taulist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+        Ftip: Union[NDArray[np.float64], List[float]],
         dt: float,
-        Q: Union[cp.ndarray, NDArray[np.float64]]
+        Q: NDArray[np.float64]
     ) -> None:
         """
         Kalman Filter Prediction.
@@ -403,8 +411,8 @@ class ManipulatorController:
 
     def kalman_filter_update(
         self,
-        z: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        R: Union[cp.ndarray, NDArray[np.float64]]
+        z: Union[NDArray[np.float64], List[float]],
+        R: NDArray[np.float64]
     ) -> None:
         """
         Kalman Filter Update.
@@ -430,16 +438,16 @@ class ManipulatorController:
 
     def kalman_filter_control(
         self,
-        thetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalistd: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        taulist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalistd: Union[NDArray[np.float64], List[float]],
+        dthetalistd: Union[NDArray[np.float64], List[float]],
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        taulist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+        Ftip: Union[NDArray[np.float64], List[float]],
         dt: float,
-        Q: Union[cp.ndarray, NDArray[np.float64]],
-        R: Union[cp.ndarray, NDArray[np.float64]]
+        Q: NDArray[np.float64],
+        R: NDArray[np.float64]
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         """
         Kalman Filter Control.
@@ -471,11 +479,11 @@ class ManipulatorController:
 
     def feedforward_control(
         self,
-        desired_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        desired_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        desired_acceleration: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]]
+        desired_position: Union[NDArray[np.float64], List[float]],
+        desired_velocity: Union[NDArray[np.float64], List[float]],
+        desired_acceleration: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+        Ftip: Union[NDArray[np.float64], List[float]]
     ) -> NDArray[np.float64]:
         """
         Feedforward Control.
@@ -509,15 +517,15 @@ class ManipulatorController:
 
     def pd_feedforward_control(
         self,
-        desired_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        desired_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        desired_acceleration: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        current_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        current_velocity: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        g: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Ftip: Union[cp.ndarray, NDArray[np.float64], List[float]]
+        desired_position: Union[NDArray[np.float64], List[float]],
+        desired_velocity: Union[NDArray[np.float64], List[float]],
+        desired_acceleration: Union[NDArray[np.float64], List[float]],
+        current_position: Union[NDArray[np.float64], List[float]],
+        current_velocity: Union[NDArray[np.float64], List[float]],
+        Kp: Union[NDArray[np.float64], List[float]],
+        Kd: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+        Ftip: Union[NDArray[np.float64], List[float]]
     ) -> NDArray[np.float64]:
         """
         PD Feedforward Control.
@@ -555,9 +563,9 @@ class ManipulatorController:
 
     @staticmethod
     def enforce_limits(
-        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        dthetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        tau: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalist: Union[NDArray[np.float64], List[float]],
+        dthetalist: Union[NDArray[np.float64], List[float]],
+        tau: Union[NDArray[np.float64], List[float]],
         joint_limits: Union[cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]],
         torque_limits: Union[cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]]
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
@@ -593,16 +601,16 @@ class ManipulatorController:
         Plot the steady-state response of the controller.
 
         Parameters:
-            time (cp.ndarray): Array of time steps.
-            response (cp.ndarray): Array of response values.
+            time (np.ndarray): Array of time steps.
+            response (np.ndarray): Array of response values.
             set_point (float): Desired set point value.
             title (str, optional): Title of the plot.
 
         Returns:
             None
         """
-        time = cp.asnumpy(time)
-        response = cp.asnumpy(response)
+        time = _to_numpy(time)
+        response = _to_numpy(response)
 
         plt.figure(figsize=(10, 5))
         plt.plot(time, response, label="Response")
@@ -649,20 +657,20 @@ class ManipulatorController:
         Calculate the rise time.
 
         Parameters:
-            time (cp.ndarray): Array of time steps.
-            response (cp.ndarray): Array of response values.
+            time (np.ndarray): Array of time steps.
+            response (np.ndarray): Array of response values.
             set_point (float): Desired set point value.
 
         Returns:
             float: Rise time.
         """
-        time = cp.asnumpy(time)
-        response = cp.asnumpy(response)
+        time = _to_numpy(time)
+        response = _to_numpy(response)
 
         rise_start = 0.1 * set_point
         rise_end = 0.9 * set_point
-        start_idx = cp.where(response >= rise_start)[0][0]
-        end_idx = cp.where(response >= rise_end)[0][0]
+        start_idx = np.where(response >= rise_start)[0][0]
+        end_idx = np.where(response >= rise_end)[0][0]
         rise_time = time[end_idx] - time[start_idx]
         return rise_time
 
@@ -671,15 +679,15 @@ class ManipulatorController:
         Calculate the percent overshoot.
 
         Parameters:
-            response (cp.ndarray): Array of response values.
+            response (np.ndarray): Array of response values.
             set_point (float): Desired set point value.
 
         Returns:
             float: Percent overshoot.
         """
-        response = cp.asnumpy(response)
+        response = _to_numpy(response)
 
-        max_response = cp.max(response)
+        max_response = np.max(response)
         percent_overshoot = ((max_response - set_point) / set_point) * 100
         return percent_overshoot
 
@@ -688,19 +696,19 @@ class ManipulatorController:
         Calculate the settling time.
 
         Parameters:
-            time (cp.ndarray): Array of time steps.
-            response (cp.ndarray): Array of response values.
+            time (np.ndarray): Array of time steps.
+            response (np.ndarray): Array of response values.
             set_point (float): Desired set point value.
             tolerance (float): Tolerance for settling time calculation.
 
         Returns:
             float: Settling time.
         """
-        time = cp.asnumpy(time)
-        response = cp.asnumpy(response)
+        time = _to_numpy(time)
+        response = _to_numpy(response)
 
         settling_threshold = set_point * tolerance
-        settling_idx = cp.where(cp.abs(response - set_point) <= settling_threshold)[0]
+        settling_idx = np.where(np.abs(response - set_point) <= settling_threshold)[0]
         settling_time = time[settling_idx[-1]] if len(settling_idx) > 0 else time[-1]
         return settling_time
 
@@ -709,24 +717,24 @@ class ManipulatorController:
         Calculate the steady-state error.
 
         Parameters:
-            response (cp.ndarray): Array of response values.
+            response (np.ndarray): Array of response values.
             set_point (float): Desired set point value.
 
         Returns:
             float: Steady-state error.
         """
-        response = cp.asnumpy(response)
+        response = _to_numpy(response)
 
         steady_state_error = response[-1] - set_point
         return steady_state_error
 
     def joint_space_control(
         self,
-        desired_joint_angles: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        current_joint_angles: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        current_joint_velocities: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]]
+        desired_joint_angles: Union[NDArray[np.float64], List[float]],
+        current_joint_angles: Union[NDArray[np.float64], List[float]],
+        current_joint_velocities: Union[NDArray[np.float64], List[float]],
+        Kp: Union[NDArray[np.float64], List[float]],
+        Kd: Union[NDArray[np.float64], List[float]]
     ) -> NDArray[np.float64]:
         """
         Joint Space Control.
@@ -756,11 +764,11 @@ class ManipulatorController:
 
     def cartesian_space_control(
         self,
-        desired_position: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        current_joint_angles: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        current_joint_velocities: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kp: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        Kd: Union[cp.ndarray, NDArray[np.float64], List[float]]
+        desired_position: Union[NDArray[np.float64], List[float]],
+        current_joint_angles: Union[NDArray[np.float64], List[float]],
+        current_joint_velocities: Union[NDArray[np.float64], List[float]],
+        Kp: Union[NDArray[np.float64], List[float]],
+        Kd: Union[NDArray[np.float64], List[float]]
     ) -> NDArray[np.float64]:
         """
         Cartesian Space Control.
@@ -822,8 +830,8 @@ class ManipulatorController:
     # ------------------------------------------------------------------------
     def find_ultimate_gain_and_period(
         self,
-        thetalist: Union[cp.ndarray, NDArray[np.float64], List[float]],
-        desired_joint_angles: Union[cp.ndarray, NDArray[np.float64], List[float]],
+        thetalist: Union[NDArray[np.float64], List[float]],
+        desired_joint_angles: Union[NDArray[np.float64], List[float]],
         dt: float,
         max_steps: int = 1000
     ) -> Tuple[float, float, List[float], List[NDArray[np.float64]]]:
