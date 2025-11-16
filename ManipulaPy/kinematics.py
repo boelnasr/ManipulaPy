@@ -32,7 +32,6 @@ from typing import Optional, List, Tuple, Union, Any
 from numpy.typing import NDArray
 from . import utils
 import matplotlib.pyplot as plt
-import torch
 
 
 class SerialManipulator:
