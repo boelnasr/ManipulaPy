@@ -202,33 +202,22 @@ class KinematicsBasicDemo:
             print(f"\n🎯 Target: {config_name}")
             print(f"   Target position: [{target_position[0]:.4f}, {target_position[1]:.4f}, {target_position[2]:.4f}] m")
             
-            # Generate initial guess (perturbed from solution)
-            true_solution = fk_result['joint_angles']
-            initial_guess = true_solution + np.random.normal(0, 0.1, self.n_joints)
-            
-            # Ensure initial guess is within joint limits
-            initial_guess = np.clip(initial_guess, 
-                                  self.joint_limits[:, 0], 
-                                  self.joint_limits[:, 1])
-            
-            print(f"   Initial guess: {initial_guess}")
-            
-            # Solve inverse kinematics
+            # Use smart IK to pick an initial guess automatically
             start_time = time.time()
-            solution, success, iterations = self.robot.iterative_inverse_kinematics(
+            solution, success, iterations = self.robot.smart_inverse_kinematics(
                 T_desired=target_pose,
-                thetalist0=initial_guess,
-                eomg=1e-6,      # Orientation tolerance
-                ev=1e-6,        # Position tolerance
-                max_iterations=1000,
-                plot_residuals=False,  # We'll handle plotting separately
-                damping=1e-2,   # Damping for numerical stability
-                step_cap=0.3    # Maximum step size
+                strategy="workspace_heuristic",
+                eomg=1e-6,      # Orientation tolerance (rad)
+                ev=1e-6,        # Position tolerance (m)
+                max_iterations=5000,
+                plot_residuals=False,
+                damping=1e-2,   # Damping for numerical stability (5e-2 is default)
+                step_cap=0.3    # Maximum step size per iteration (rad)
             )
             ik_time = time.time() - start_time
             
             if success:
-                print(f"   ✅ IK converged in {iterations} iterations ({ik_time*1000:.1f} ms)")
+                print(f"   ✅ IK converged in {iterations} iterations ({ik_time*1000:.1f} ms) using smart IK")
                 print(f"   Solution: {solution}")
                 
                 # Verify the solution
@@ -240,20 +229,13 @@ class KinematicsBasicDemo:
                 print(f"     Position error: {position_error:.2e} m")
                 print(f"     Orientation error: {orientation_error:.2e} rad")
                 
-                # Compare with true solution
-                joint_error = np.linalg.norm(solution - true_solution)
-                print(f"     Joint space error: {joint_error:.4f} rad")
-                
                 self.ik_results[config_name] = {
                     'target_pose': target_pose,
-                    'initial_guess': initial_guess,
                     'solution': solution,
-                    'true_solution': true_solution,
                     'iterations': iterations,
                     'computation_time': ik_time,
                     'position_error': position_error,
                     'orientation_error': orientation_error,
-                    'joint_error': joint_error,
                     'success': True
                 }
                 
