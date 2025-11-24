@@ -393,22 +393,22 @@ def MatrixLog6(T):
     """
     R, p = TransToRp(T)
     omega, theta = rotation_logm(R)
-    if np.linalg.norm(omega) < 1e-6:
+
+    # Pure translation or extremely small rotation
+    if abs(theta) < 1e-6:
         return np.vstack(
             (np.hstack((np.zeros((3, 3)), p.reshape(-1, 1))), [0, 0, 0, 0])
         )
-    else:
-        # omega is unit vector, need to scale by theta for correct SE(3) logarithm
-        omega_mat = skew_symmetric(omega)
-        # Scale the skew-symmetric matrix by theta
-        omega_mat_scaled = theta * omega_mat
-        G_inv = (
-            1 / theta * np.eye(3)
-            - 0.5 * omega_mat
-            + (1 / theta - 0.5 / np.tan(theta / 2)) * omega_mat @ omega_mat
-        )
-        v = G_inv @ p
-        return np.vstack((np.hstack((omega_mat_scaled, v.reshape(-1, 1))), [0, 0, 0, 0]))
+
+    # Use the scaled so(3) log (omega_hat * theta) in the G^-1 computation.
+    omega_mat_scaled = theta * skew_symmetric(omega)
+    G_inv = (
+        np.eye(3)
+        - 0.5 * omega_mat_scaled
+        + (1 / theta - 0.5 / np.tan(theta / 2)) * (omega_mat_scaled @ omega_mat_scaled) / theta
+    )
+    v = G_inv @ p
+    return np.vstack((np.hstack((omega_mat_scaled, v.reshape(-1, 1))), [0, 0, 0, 0]))
 
 
 def MatrixExp6(se3mat):
@@ -424,27 +424,33 @@ def MatrixExp6(se3mat):
     if se3mat.shape != (4, 4):
         raise ValueError("Input matrix must be of shape (4, 4)")
 
-    omega = np.array([se3mat[2, 1], se3mat[0, 2], se3mat[1, 0]])
-    v = np.array([se3mat[0, 3], se3mat[1, 3], se3mat[2, 3]])
-    omega_magnitude = np.linalg.norm(omega)
+    # Extract rotation (so(3)) and translation components
+    omega_theta_vec = np.array([se3mat[2, 1], se3mat[0, 2], se3mat[1, 0]])
+    v = se3mat[0:3, 3]
+    theta = np.linalg.norm(omega_theta_vec)
 
-    if omega_magnitude < 1e-6:
-        return np.eye(4) + se3mat
+    # Pure translation case
+    if theta < 1e-6:
+        T = np.eye(4)
+        T[:3, 3] = v
+        return T
 
-    omega_skew = skew_symmetric(omega)
-    omega_exp = expm(omega_skew * omega_magnitude)
-    omega_skew_squared = np.dot(omega_skew, omega_skew)
-    v_term = (
-        np.eye(3) * omega_magnitude
-        + (1 - np.cos(omega_magnitude)) * omega_skew
-        + (omega_magnitude - np.sin(omega_magnitude)) * omega_skew_squared
-    ) / omega_magnitude**2
-    v_term = np.dot(v_term, v)
+    # Unit rotation axis hat matrix
+    omega_hat = se3mat[0:3, 0:3] / theta
+
+    # Rotation component
+    R = MatrixExp3(se3mat[0:3, 0:3])
+
+    # Compute the matrix G(theta) that maps body velocity to translation
+    G = (
+        np.eye(3) * theta
+        + (1 - np.cos(theta)) * omega_hat
+        + (theta - np.sin(theta)) * (omega_hat @ omega_hat)
+    )
 
     T = np.eye(4)
-    T[:3, :3] = omega_exp
-    T[:3, 3] = v_term
-
+    T[:3, :3] = R
+    T[:3, 3] = (G @ v) / theta
     return T
 
 
