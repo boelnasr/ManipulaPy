@@ -325,8 +325,26 @@ solution, success, iterations = robot.iterative_inverse_kinematics(
     thetalist0=joint_angles,
     eomg=1e-6, ev=1e-6,
     max_iterations=5000,
-    plot_residuals=True
+    plot_residuals=True,
+    # Optional solver knobs (new in 1.2.0):
+    weight_position=1.5,
+    weight_orientation=1.0,
+    adaptive_tuning=True,
+    backtracking=True,
 )
+
+# Smart IK with caching
+from ManipulaPy.ik_helpers import IKInitialGuessCache
+cache = IKInitialGuessCache(max_size=200)
+theta, success, iters = robot.smart_inverse_kinematics(
+    target_pose,
+    strategy="cached",
+    cache=cache,
+    weight_position=1.5,
+    weight_orientation=1.0,
+)
+if success:
+    cache.add(target_pose, theta)
 ```
 
 </details>
@@ -819,9 +837,11 @@ python quick_benchmark.py
 # Comprehensive GPU vs CPU analysis
 python performance_benchmark.py --gpu --plot --save-results
 
-# Validate numerical accuracy
-python accuracy_benchmark.py --tolerance 1e-8
+# Validate numerical accuracy (configurable tolerances/sample sizes and IK strategy)
+python accuracy_benchmark.py --tolerance 1e-4 --fk-tests 200 --ik-tests 50 --ik-strategy workspace_heuristic
 ```
+
+`accuracy_benchmark.py` also accepts `--jacobian-tests`, `--dynamics-tests`, and `--output-dir` to fine-tune the sweep and where artifacts are written.
 
 ---
 
@@ -945,7 +965,7 @@ If you use ManipulaPy in your research, please cite:
   author={Mohamed Aboelnasr},
   year={2025},
   url={https://github.com/boelnasr/ManipulaPy},
-  version={1.1.3},
+  version={1.2.0},
   license={AGPL-3.0-or-later},
 }
 ```
@@ -1028,7 +1048,7 @@ All dependencies are AGPL-3.0 compatible:
 
 <div align="center">
 
-**🤖 ManipulaPy v1.1.3: Professional robotics tools for the Python ecosystem**
+**🤖 ManipulaPy v1.2.0: Professional robotics tools for the Python ecosystem**
 
 [![GitHub stars](https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=social)](https://github.com/boelnasr/ManipulaPy)
 [![PyPI Downloads](https://static.pepy.tech/badge/manipulapy)](https://pepy.tech/projects/manipulapy)

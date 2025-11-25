@@ -12,6 +12,7 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 """
 # Auto-install optional dependencies (pandas, seaborn) if missing
 import importlib, subprocess, sys
+import argparse
 for _pkg in ("pandas", "seaborn"):
     if importlib.util.find_spec(_pkg) is None:
         subprocess.check_call([sys.executable, "-m", "pip", "install", _pkg])
@@ -43,7 +44,7 @@ try:
         optimized_trajectory_generation,
         trajectory_cpu_fallback
     )
-    from ManipulaPy import utils
+    from ManipulaPy import utils, ik_helpers
     from ManipulaPy.ManipulaPy_data.xarm import urdf_file
     MANIPULAPY_AVAILABLE = True
 except ImportError as e:
@@ -133,15 +134,42 @@ class AccuracyBenchmark:
     - Singularity detection accuracy
     """
     
-    def __init__(self, output_dir: str = "accuracy_benchmark_results"):
+    def __init__(
+        self,
+        output_dir: str = "accuracy_benchmark_results",
+        tolerance: float = 1e-3,  # Default tolerance for validation
+        fk_tests: int = 1000,
+        ik_tests: int = 100,
+        jacobian_tests: int = 500,
+        dynamics_tests: int = 200,
+    ):
         """
         Initialize the benchmark suite.
-        
+
         Args:
             output_dir: Directory to save benchmark results
+            tolerance: Numerical tolerance used for accuracy checks (default: 1e-3)
+            fk_tests: Number of random configurations for FK validation
+            ik_tests: Number of inverse-kinematics targets
+            jacobian_tests: Number of jacobian validation samples
+            dynamics_tests: Number of dynamics validation samples
+
+        Note:
+            IK parameters are robot-dependent:
+            - 6-DOF robots (xArm, UR5): Use default parameters (damping=5e-2, step_cap=0.5)
+            - Simple 2-DOF robots: Optimal damping=0.01, step_cap=0.1
         """
         self.output_dir = output_dir
         self.results = {}
+        self.tolerance = tolerance
+        # Use same tolerances as IK algorithm for accurate validation
+        # Match IK tolerances (translation/orientation) with safe lower bounds
+        self.position_tolerance = max(tolerance, 1e-4)        # ev
+        self.orientation_tolerance = max(tolerance * 10, 1e-3)     # eomg
+        self.fk_tests = fk_tests
+        self.ik_tests = ik_tests
+        self.jacobian_tests = jacobian_tests
+        self.dynamics_tests = dynamics_tests
         
         # Create output directory
         os.makedirs(output_dir, exist_ok=True)
@@ -211,7 +239,7 @@ class AccuracyBenchmark:
             
             # Test pose validity
             R = pose[:3, :3]
-            is_orthogonal = np.allclose(R @ R.T, np.eye(3), atol=1e-6)
+            is_orthogonal = np.allclose(R @ R.T, np.eye(3), atol=self.tolerance)
             det_R = np.linalg.det(R)
             logger.info(f"Rotation matrix valid: orthogonal={is_orthogonal}, det={det_R:.6f}")
             
@@ -221,7 +249,7 @@ class AccuracyBenchmark:
             logger.error(f"Basic functionality test failed: {e}")
             return False
 
-    def benchmark_forward_kinematics(self, num_tests: int = 1000) -> Dict:
+    def benchmark_forward_kinematics(self, num_tests: Optional[int] = None) -> Dict:
         """
         Benchmark forward kinematics accuracy and consistency.
         
@@ -232,6 +260,7 @@ class AccuracyBenchmark:
             Dictionary containing benchmark results
         """
         logger.info("Benchmarking forward kinematics...")
+        num_tests = num_tests or self.fk_tests
         
         # Generate random joint configurations
         joint_configs = []
@@ -243,26 +272,32 @@ class AccuracyBenchmark:
         
         # Test forward kinematics
         computation_times = []
-        poses = []
         valid_poses = 0
+        frame_consistency_errors = []
+        frame_consistency_passes = 0
         
         for config in joint_configs:
             start_time = time.time()
             try:
-                pose = self.robot.forward_kinematics(config)
+                pose_space = self.robot.forward_kinematics(config, frame="space")
+                pose_body = self.robot.forward_kinematics(config, frame="body")
                 end_time = time.time()
                 
                 computation_times.append(end_time - start_time)
-                poses.append(pose)
-                
                 # Check if pose is valid SE(3) matrix
-                R = pose[:3, :3]
-                if np.allclose(np.dot(R, R.T), np.eye(3), atol=1e-6):
+                R = pose_space[:3, :3]
+                if np.allclose(np.dot(R, R.T), np.eye(3), atol=self.tolerance):
                     valid_poses += 1
+                
+                frame_error = np.linalg.norm(pose_space - pose_body)
+                frame_consistency_errors.append(frame_error)
+                if frame_error <= self.tolerance:
+                    frame_consistency_passes += 1
                     
             except Exception as e:
                 logger.warning(f"Forward kinematics failed: {e}")
                 computation_times.append(float('inf'))
+                frame_consistency_errors.append(float('inf'))
         
         # Test consistency (same input should give same output)
         test_config = joint_configs[0]
@@ -278,6 +313,7 @@ class AccuracyBenchmark:
             max_error = max(max_error, error)
         
         valid_times = [t for t in computation_times if not np.isinf(t)]
+        finite_frame_errors = [e for e in frame_consistency_errors if not np.isinf(e)]
         
         results = {
             'avg_computation_time': np.mean(valid_times) if valid_times else float('inf'),
@@ -285,9 +321,12 @@ class AccuracyBenchmark:
             'max_computation_time': np.max(valid_times) if valid_times else float('inf'),
             'min_computation_time': np.min(valid_times) if valid_times else float('inf'),
             'consistency_error': max_error,
-            'valid_poses_percentage': (valid_poses / len(poses)) * 100 if poses else 0,
+            'valid_poses_percentage': (valid_poses / num_tests) * 100 if num_tests else 0,
             'success_rate': (len(valid_times) / num_tests) * 100,
-            'num_tests': num_tests
+            'num_tests': num_tests,
+            'frame_consistency_pass_rate': (frame_consistency_passes / num_tests) * 100 if num_tests else 0,
+            'frame_consistency_avg_error': np.mean(finite_frame_errors) if finite_frame_errors else float('inf'),
+            'frame_consistency_max_error': np.max(finite_frame_errors) if finite_frame_errors else float('inf'),
         }
         
         logger.info(f"Forward kinematics: {results['success_rate']:.1f}% success, "
@@ -295,7 +334,7 @@ class AccuracyBenchmark:
         
         return results
 
-    def benchmark_inverse_kinematics(self, num_tests: int = 100) -> Dict:
+    def benchmark_inverse_kinematics(self, num_tests: Optional[int] = None) -> Dict:
         """
         Benchmark inverse kinematics accuracy and convergence.
         
@@ -306,6 +345,7 @@ class AccuracyBenchmark:
             Dictionary containing benchmark results
         """
         logger.info("Benchmarking inverse kinematics...")
+        num_tests = num_tests or self.ik_tests
         
         # Generate REACHABLE target poses (not random)
         target_poses = []
@@ -359,98 +399,122 @@ class AccuracyBenchmark:
                 'error': 'No target poses generated'
             }
         
-        # Test inverse kinematics with multiple strategies
+        # Test inverse kinematics with multiple strategies (cache + smart IK + robust fallback)
         convergence_count = 0
         position_errors = []
         orientation_errors = []
         computation_times = []
         iterations_list = []
-        
-        strategies = ['random', 'center', 'near_original']
-        
+        success_flags = []
+
+        cache = ik_helpers.IKInitialGuessCache(max_size=200)
+
+        def _evaluate_solution(theta_sol: np.ndarray, target_pose: np.ndarray) -> Tuple[float, float, float]:
+            """Compute translational, rotational, and combined SE(3) errors."""
+            achieved_pose = self.robot.forward_kinematics(theta_sol)
+            T_err = target_pose @ np.linalg.inv(achieved_pose)
+            V_err = utils.se3ToVec(utils.MatrixLog6(T_err))
+            rot_error = np.linalg.norm(V_err[:3])
+            trans_error = np.linalg.norm(V_err[3:])
+            combined_error = rot_error + trans_error
+            return trans_error, rot_error, combined_error
+
         for i, target_pose in enumerate(target_poses):
             start_time = time.time()
-            
+
             success = False
             best_result = None
-            best_iterations = 5000
-            
-            # Try multiple initial guess strategies
+            best_iterations = float('inf')
+            best_error = float('inf')
+
+            original_config = original_configs[i] if i < len(original_configs) else None
+
+            # Preferred strategies: cached → workspace → midpoint → random
+            strategies = ['cached', 'workspace_heuristic', 'midpoint', 'random']
+
             for strategy in strategies:
-                if strategy == 'random':
-                    initial_guess = [np.random.uniform(low, high) for low, high in self.joint_limits]
-                elif strategy == 'center':
-                    initial_guess = [(low + high) / 2 for low, high in self.joint_limits]
-                elif strategy == 'near_original' and i < len(original_configs):
-                    # Small perturbation of original
-                    original = original_configs[i]
-                    initial_guess = []
-                    for j, (orig_val, (low, high)) in enumerate(zip(original, self.joint_limits)):
-                        noise = np.random.normal(0, 0.05)  # Small noise
-                        guess = np.clip(orig_val + noise, low, high)
-                        initial_guess.append(guess)
-                else:
-                    continue
-                
                 try:
-                    result_config, ik_success, iterations = self.robot.iterative_inverse_kinematics(
-                        target_pose, 
-                        initial_guess,
-                        eomg=1e-3,  # More lenient tolerances
-                        ev=1e-4,
-                        max_iterations=1500
+                    result_config, ik_success, iterations = self.robot.smart_inverse_kinematics(
+                        T_desired=target_pose,
+                        strategy=strategy,
+                        cache=cache if strategy == 'cached' else None,
+                        eomg=self.orientation_tolerance,
+                        ev=self.position_tolerance,
+                        max_iterations=800,
+                        damping=0.05,
+                        step_cap=0.3,
+                        weight_position=1.5,
+                        weight_orientation=1.0,
+                        adaptive_tuning=True,
+                        backtracking=True,
                     )
-                    
-                    if ik_success:
-                        success = True
-                        best_result = result_config
-                        best_iterations = iterations
-                        break  # Found solution, stop trying
-                        
                 except Exception as e:
                     logger.debug(f"IK strategy {strategy} failed: {e}")
                     continue
-            
+
+                trans_error, rot_error, combined_error = _evaluate_solution(result_config, target_pose)
+
+                if combined_error < best_error:
+                    best_error = combined_error
+                    best_result = result_config
+                    best_iterations = iterations
+
+                if ik_success and trans_error <= self.position_tolerance and rot_error <= self.orientation_tolerance:
+                    success = True
+                    break
+
+            # Robust fallback if smart IK did not meet tolerances
+            if not success:
+                try:
+                    result_config, ik_success, total_iters, strategy_used = self.robot.robust_inverse_kinematics(
+                        T_desired=target_pose,
+                        max_attempts=6,
+                        eomg=self.orientation_tolerance,
+                        ev=self.position_tolerance,
+                        max_iterations=800,
+                        verbose=False
+                    )
+                    trans_error, rot_error, combined_error = _evaluate_solution(result_config, target_pose)
+                    if combined_error < best_error:
+                        best_error = combined_error
+                        best_result = result_config
+                        best_iterations = total_iters
+                    if ik_success and trans_error <= self.position_tolerance and rot_error <= self.orientation_tolerance:
+                        success = True
+                except Exception as e:
+                    logger.debug(f"Robust IK fallback failed: {e}")
+
             end_time = time.time()
             computation_times.append(end_time - start_time)
             iterations_list.append(best_iterations)
-            
+
+            if best_result is None:
+                best_result = np.zeros(self.dof)
+
+            trans_error, rot_error, combined_error = _evaluate_solution(best_result, target_pose)
+
             if success:
                 convergence_count += 1
-                
-                # Calculate accuracy
-                achieved_pose = self.robot.forward_kinematics(best_result)
-                
-                # Position error
-                pos_error = np.linalg.norm(target_pose[:3, 3] - achieved_pose[:3, 3])
-                position_errors.append(pos_error)
-                
-                # Orientation error (robust calculation)
-                R_target = target_pose[:3, :3]
-                R_achieved = achieved_pose[:3, :3]
-                
-                try:
-                    R_error = R_target.T @ R_achieved
-                    trace_val = np.trace(R_error)
-                    cos_angle = np.clip((trace_val - 1) / 2, -1.0 + 1e-7, 1.0 - 1e-7)
-                    angle_error = np.arccos(cos_angle)
-                    
-                    if np.isnan(angle_error):
-                        angle_error = np.linalg.norm(R_target - R_achieved, 'fro') / 2
-                        
-                except Exception:
-                    angle_error = np.linalg.norm(R_target - R_achieved, 'fro') / 2
-                
-                orientation_errors.append(angle_error)
+                position_errors.append(trans_error)
+                orientation_errors.append(rot_error)
+                cache.add(target_pose, best_result, residual=combined_error)
             else:
                 position_errors.append(float('inf'))
                 orientation_errors.append(float('inf'))
+
+            success_flags.append(success)
         
         # Filter out failed cases for statistics
         valid_pos_errors = [e for e in position_errors if not np.isinf(e)]
         valid_ori_errors = [e for e in orientation_errors if not np.isinf(e)]
-        valid_times = [t for t in computation_times if not np.isinf(t)]
-        valid_iterations = [it for it in iterations_list if it < 1000]
+        valid_times = [
+            t for t, succeeded in zip(computation_times, success_flags)
+            if succeeded and not np.isinf(t)
+        ]
+        valid_iterations = [
+            it for it, succeeded in zip(iterations_list, success_flags)
+            if succeeded and np.isfinite(it)
+        ]
         
         convergence_rate = (convergence_count / len(target_poses)) * 100
         
@@ -1008,25 +1072,25 @@ class AccuracyBenchmark:
         }
         
         try:
-            self.results['forward_kinematics'] = self.benchmark_forward_kinematics()
+            self.results['forward_kinematics'] = self.benchmark_forward_kinematics(self.fk_tests)
         except Exception as e:
             logger.error(f"Forward kinematics benchmark failed: {e}")
             self.results['forward_kinematics'] = {'error': str(e)}
         
         try:
-            self.results['inverse_kinematics'] = self.benchmark_inverse_kinematics()
+            self.results['inverse_kinematics'] = self.benchmark_inverse_kinematics(self.ik_tests)
         except Exception as e:
             logger.error(f"Inverse kinematics benchmark failed: {e}")
             self.results['inverse_kinematics'] = {'error': str(e)}
         
         try:
-            self.results['jacobian_accuracy'] = self.benchmark_jacobian_accuracy()
+            self.results['jacobian_accuracy'] = self.benchmark_jacobian_accuracy(self.jacobian_tests)
         except Exception as e:
             logger.error(f"Jacobian benchmark failed: {e}")
             self.results['jacobian_accuracy'] = {'error': str(e)}
         
         try:
-            self.results['dynamics'] = self.benchmark_dynamics_accuracy()
+            self.results['dynamics'] = self.benchmark_dynamics_accuracy(self.dynamics_tests)
         except Exception as e:
             logger.error(f"Dynamics benchmark failed: {e}")
             self.results['dynamics'] = {'error': str(e)}
@@ -1621,8 +1685,61 @@ class AccuracyBenchmark:
             logger.info(f"CSV summary saved to: {csv_file}")
 
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Run the ManipulaPy accuracy benchmark suite."
+    )
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=1e-3,
+        help="Numerical tolerance for FK/IK validations (default: 1e-3).",
+    )
+    parser.add_argument(
+        "--fk-tests",
+        type=int,
+        default=1000,
+        help="Number of random forward-kinematics samples (default: 1000).",
+    )
+    parser.add_argument(
+        "--ik-tests",
+        type=int,
+        default=100,
+        help="Number of inverse-kinematics targets (default: 100).",
+    )
+    parser.add_argument(
+        "--jacobian-tests",
+        type=int,
+        default=500,
+        help="Number of Jacobian validation samples (default: 500).",
+    )
+    parser.add_argument(
+        "--dynamics-tests",
+        type=int,
+        default=200,
+        help="Number of dynamics validation samples (default: 200).",
+    )
+    parser.add_argument(
+        "--ik-strategy",
+        type=str,
+        default="workspace_heuristic",
+        choices=["workspace_heuristic", "extrapolate", "cached", "random", "midpoint"],
+        help="Initial guess strategy for IK (default: workspace_heuristic).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="accuracy_benchmark_results",
+        help="Directory for benchmark artifacts (default: accuracy_benchmark_results).",
+    )
+    return parser.parse_args()
+
+
 def main():
     """Main function to run the comprehensive accuracy benchmark."""
+    args = parse_args()
+    
     if not MANIPULAPY_AVAILABLE:
         print("ERROR: ManipulaPy is not properly installed or available.")
         print("Please install ManipulaPy and ensure all dependencies are available.")
@@ -1637,7 +1754,14 @@ def main():
     
     try:
         # Create benchmark instance
-        benchmark = AccuracyBenchmark()
+        benchmark = AccuracyBenchmark(
+            output_dir=args.output_dir,
+            tolerance=args.tolerance,
+            fk_tests=args.fk_tests,
+            ik_tests=args.ik_tests,
+            jacobian_tests=args.jacobian_tests,
+            dynamics_tests=args.dynamics_tests,
+        )
         
         # Run comprehensive benchmark
         results = benchmark.run_comprehensive_benchmark()

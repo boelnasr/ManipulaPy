@@ -40,6 +40,7 @@ The ManipulaPy Benchmarking Suite provides essential tools to evaluate performan
 |------|-------------|----------|
 | **`performance_benchmark.py`** | Comprehensive performance analysis suite | Full system performance evaluation |
 | **`accuracy_benchmark.py`** | Numerical accuracy validation between backends | Computational precision verification |
+| **`ik_benchmark.py`** | Inverse kinematics performance and convergence analysis | IK algorithm comparison and validation |
 | **`quick_benchmark.py`** | Fast performance check for CI/CD pipelines | Continuous integration testing |
 
 ---
@@ -67,6 +68,9 @@ python performance_benchmark.py
 
 # Validate computational accuracy
 python accuracy_benchmark.py
+
+# Benchmark inverse kinematics performance
+python ik_benchmark.py --num-tests 30 --save-results --plot
 
 # Quick performance check
 python quick_benchmark.py
@@ -432,7 +436,115 @@ Memory Usage:
   Peak CPU:        89 MB
   Transfer:        12 MB/s
 ```
-### 3. Quick Benchmark (`quick_benchmark.py`)
+### 3. Inverse Kinematics Benchmark (`ik_benchmark.py`)
+
+Comprehensive evaluation of inverse kinematics algorithms with detailed convergence analysis:
+
+```python
+# Example output sections:
+✅ iterative_inverse_kinematics Performance
+✅ smart_inverse_kinematics (workspace_heuristic)
+✅ smart_inverse_kinematics (extrapolate)
+✅ smart_inverse_kinematics (random)
+✅ smart_inverse_kinematics (midpoint)
+✅ Convergence Rate Comparison
+✅ Full 6D Error Analysis (Position + Orientation)
+✅ Computational Time Profiling
+```
+
+**Key Metrics:**
+- Convergence success rate (%)
+- Average iterations to convergence
+- Computation time per IK solution
+- Position error (mm)
+- Orientation error (mrad)
+- Total 6D pose error
+
+**Output Example:**
+```
+IK Benchmark Results
+====================
+Method                                Success Rate    Avg Iters    Avg Time
+iterative_inverse_kinematics            30.0%            55.7         24.1 ms
+smart_inverse_kinematics(workspace)     30.0%            93.7        121.2 ms
+smart_inverse_kinematics(extrapolate)   25.0%            33.6         46.5 ms
+
+Full 6D Error Analysis:
+  Average position error:     0.739 mm
+  Average orientation error:  0.800 mrad
+  Position within tolerance:  100.0%
+  Orientation within tolerance: 100.0%
+
+🏆 Best convergence rate: iterative_inverse_kinematics (30%)
+⚡ Fastest method: iterative_inverse_kinematics (24.1 ms avg)
+```
+
+**Features:**
+- Tests both iterative and smart IK algorithms
+- Full 6D pose error reporting (position + orientation)
+- Multiple initial guess strategies
+- Convergence rate analysis
+- Automatic visualization generation
+- JSON results export
+
+**Usage:**
+```bash
+# Run with defaults (30 tests, all strategies)
+python ik_benchmark.py --save-results --plot
+
+# Custom configuration
+python ik_benchmark.py --num-tests 50 --tolerance 1e-4
+
+# Test specific strategies
+python ik_benchmark.py --strategies workspace_heuristic extrapolate
+
+# High precision validation
+python ik_benchmark.py --tolerance-pos 1e-6 --tolerance-ori 1e-6 --max-iterations 2000
+
+# Verbose output for debugging
+python ik_benchmark.py --verbose --save-results
+```
+
+**Command Line Options:**
+```bash
+python ik_benchmark.py [options]
+
+Options:
+  --num-tests N          Number of IK test cases (default: 30)
+  --tolerance TOL        IK tolerance for both pos/ori (default: 1e-3)
+  --tolerance-pos TOL    Position tolerance in meters
+  --tolerance-ori TOL    Orientation tolerance in radians
+  --max-iterations N     Maximum IK iterations (default: 1000)
+  --strategies S1 S2     Strategies to test (default: all)
+                        [workspace_heuristic, extrapolate, random, midpoint]
+  --output-dir DIR       Output directory (default: ik_benchmark_results)
+  --save-results         Save results to JSON
+  --plot                 Generate visualization plots
+  --verbose, -v          Enable verbose logging
+```
+
+**Generated Outputs:**
+```
+ik_benchmark_results/
+├── ik_benchmark_results.json    # Complete numerical results
+└── ik_benchmark_plots.png       # 6-panel visualization
+    ├── Success Rate
+    ├── Average Iterations
+    ├── Computation Time
+    ├── Position Error
+    ├── Orientation Error
+    └── Combined 6D Error
+```
+
+**Key Findings:**
+- **Iterative IK** typically achieves best convergence rates (25-35%)
+- **Smart IK (workspace_heuristic)** trades speed for better initial guesses
+- **Smart IK (extrapolate)** good balance for incremental motion
+- **Full 6D validation**: Both position AND orientation errors checked
+- **6-DOF robots**: Require good initial guesses (narrow convergence basin)
+- **Default parameters**: Work well for 6-DOF robots (damping=5e-2, step_cap=0.5)
+
+### 4. Quick Benchmark (`quick_benchmark.py`)
 
 Fast validation suitable for continuous integration and development workflows:
 

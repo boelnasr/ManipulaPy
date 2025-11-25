@@ -233,6 +233,10 @@ class SerialManipulator:
         damping: float = 2e-2,            # lambda for damped least-squares (optimized: 2e-2 for 6-DOF, 1e-2 for 2-DOF)
         step_cap: float = 0.3,            # max norm(delta_theta) per iteration (rad). Optimized: 0.3 for 6-DOF stability, 0.1 for 2-DOF
         png_name: str = "ik_residuals.png",
+        weight_orientation: float = 1.0,  # scale for rotational error in solve step
+        weight_position: float = 1.0,     # scale for translational error in solve step
+        adaptive_tuning: bool = False,
+        backtracking: bool = False,
     ) -> Tuple[NDArray[np.float64], bool, int]:
         """
         Damped-least-squares iterative IK with joint-limit projection and
@@ -240,6 +244,11 @@ class SerialManipulator:
         """
         theta = np.array(thetalist0, dtype=float)
         residuals = []
+        damping_local = damping
+        step_cap_local = step_cap
+        prev_metric = None
+        min_damping, max_damping = 1e-5, 2e-1
+        min_step_cap = 0.01
 
         for k in range(max_iterations):
             # Current pose & twist error (body twist)
@@ -249,6 +258,21 @@ class SerialManipulator:
             rot_err, trans_err = np.linalg.norm(V_err[:3]), np.linalg.norm(V_err[3:])
             residuals.append((trans_err, rot_err))
 
+            # Weighted metric for adaptive tuning
+            metric = np.linalg.norm(
+                np.hstack((weight_orientation * V_err[:3], weight_position * V_err[3:]))
+            )
+
+            if adaptive_tuning and prev_metric is not None:
+                # If improving nicely, ease damping slightly; if stalled, increase damping and shrink step
+                if metric < prev_metric * 0.7:
+                    damping_local = max(min_damping, damping_local * 0.7)
+                    step_cap_local = min(step_cap, step_cap_local * 1.1)
+                elif metric > prev_metric * 0.95:
+                    damping_local = min(max_damping, damping_local * 1.5)
+                    step_cap_local = max(min_step_cap, step_cap_local * 0.7)
+            prev_metric = metric
+
             if rot_err < eomg and trans_err < ev:
                 success = True
                 break
@@ -256,21 +280,67 @@ class SerialManipulator:
             # Convert body-frame error twist to space frame and apply DLS update
             J_space = self.jacobian(theta, frame="space")
             V_err_space = utils.adjoint_transform(T_curr) @ V_err
+            V_weighted = V_err_space.copy()
+            V_weighted[:3] *= weight_orientation
+            V_weighted[3:] *= weight_position
             JTJ = J_space.T @ J_space
-            lambda_I = (damping ** 2) * np.eye(JTJ.shape[0])
-            delta_theta = np.linalg.solve(JTJ + lambda_I, J_space.T @ V_err_space)
+            lambda_I = (damping_local ** 2) * np.eye(JTJ.shape[0])
+            delta_theta = np.linalg.solve(JTJ + lambda_I, J_space.T @ V_weighted)
 
             # Cap step size
             norm_delta = np.linalg.norm(delta_theta)
-            if norm_delta > step_cap:
-                delta_theta *= step_cap / norm_delta
+            if norm_delta > step_cap_local:
+                delta_theta *= step_cap_local / norm_delta
 
-            theta += delta_theta
-
-            # Project into joint limits
-            for i, (mn, mx) in enumerate(self.joint_limits):
-                if mn is not None: theta[i] = max(theta[i], mn)
-                if mx is not None: theta[i] = min(theta[i], mx)
+            # Simple backtracking: try scaled steps and pick the one with lowest weighted metric
+            if backtracking:
+                best_theta = theta
+                best_rot_err, best_trans_err = rot_err, trans_err
+                best_metric = metric
+                for scale in (1.0, 0.5, 0.25):
+                    candidate = theta + scale * delta_theta
+                    # Project into joint limits
+                    for i, (mn, mx) in enumerate(self.joint_limits):
+                        if mn is not None:
+                            candidate[i] = max(candidate[i], mn)
+                        if mx is not None:
+                            candidate[i] = min(candidate[i], mx)
+                    T_try = self.forward_kinematics(candidate, frame="space")
+                    T_err_try = np.linalg.inv(T_try) @ T_desired
+                    V_err_try = utils.se3ToVec(utils.MatrixLog6(T_err_try))
+                    rot_try, trans_try = np.linalg.norm(V_err_try[:3]), np.linalg.norm(V_err_try[3:])
+                    metric_try = np.linalg.norm(
+                        np.hstack((weight_orientation * V_err_try[:3], weight_position * V_err_try[3:]))
+                    )
+                    if metric_try < best_metric:
+                        best_metric = metric_try
+                        best_theta = candidate
+                        best_rot_err, best_trans_err = rot_try, trans_try
+                # If no candidate improved, take the full capped step
+                if best_theta is theta:
+                    fallback = theta + delta_theta
+                    for i, (mn, mx) in enumerate(self.joint_limits):
+                        if mn is not None:
+                            fallback[i] = max(fallback[i], mn)
+                        if mx is not None:
+                            fallback[i] = min(fallback[i], mx)
+                    best_theta = fallback
+                    T_fallback = self.forward_kinematics(best_theta, frame="space")
+                    T_err_fb = np.linalg.inv(T_fallback) @ T_desired
+                    V_err_fb = utils.se3ToVec(utils.MatrixLog6(T_err_fb))
+                    best_rot_err, best_trans_err = np.linalg.norm(V_err_fb[:3]), np.linalg.norm(V_err_fb[3:])
+                    best_metric = np.linalg.norm(
+                        np.hstack((weight_orientation * V_err_fb[:3], weight_position * V_err_fb[3:]))
+                    )
+                theta = best_theta
+                residuals[-1] = (best_trans_err, best_rot_err)
+                prev_metric = best_metric
+            else:
+                theta += delta_theta
+                # Project into joint limits
+                for i, (mn, mx) in enumerate(self.joint_limits):
+                    if mn is not None: theta[i] = max(theta[i], mn)
+                    if mx is not None: theta[i] = min(theta[i], mx)
         else:
             success = False
             k += 1   # max_iterations reached
@@ -308,6 +378,10 @@ class SerialManipulator:
         damping: float = 2e-2,
         step_cap: float = 0.3,
         png_name: str = "ik_residuals.png",
+        weight_orientation: float = 1.0,
+        weight_position: float = 1.0,
+        adaptive_tuning: bool = True,
+        backtracking: bool = True,
     ) -> Tuple[NDArray[np.float64], bool, int]:
         """
         Smart inverse kinematics with intelligent initial guess strategies.
@@ -328,6 +402,10 @@ class SerialManipulator:
             cache: IKInitialGuessCache instance (required for 'cached')
             eomg, ev, max_iterations, plot_residuals, damping, step_cap, png_name:
                 Same as iterative_inverse_kinematics()
+            weight_orientation, weight_position:
+                Scale rotational vs translational error inside the solver
+            adaptive_tuning: Enable adaptive damping/step sizing
+            backtracking: Enable simple backtracking line search
 
         Returns:
             Tuple of (theta, success, iterations) same as iterative_inverse_kinematics()
@@ -405,7 +483,8 @@ class SerialManipulator:
         # Call standard IK with smart initial guess
         return self.iterative_inverse_kinematics(
             T_desired, theta0, eomg, ev, max_iterations,
-            plot_residuals, damping, step_cap, png_name
+            plot_residuals, damping, step_cap, png_name,
+            weight_orientation, weight_position, adaptive_tuning, backtracking
         )
 
     def robust_inverse_kinematics(

@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="ManipulaPy",
-    version="1.1.3",  
+    version="1.2.0",  
     author="Mohamed Aboelnasr",
     author_email="aboelnasr1997@gmail.com",
     description="A comprehensive, GPU-accelerated Python framework for robotic manipulation, perception, and control",

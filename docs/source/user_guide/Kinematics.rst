@@ -377,8 +377,42 @@ Advanced IK Options
        eomg=1e-6,
        ev=1e-6,
        max_iterations=1000,
-       plot_residuals=True    # Save convergence plot
+       plot_residuals=True,    # Save convergence plot
+       # New solver knobs (optional; off by default on iterative_inverse_kinematics)
+       weight_position=1.5,    # emphasis on translational error in the solve step
+       weight_orientation=1.0, # emphasis on rotational error
+       adaptive_tuning=True,   # adapt damping/step size when error stalls
+       backtracking=True,      # simple line search over scaled steps
    )
+
+Key IK tuning parameters:
+
+- **damping**: Damped least-squares regularization (stability near singularities).
+- **step_cap**: Maximum norm of :math:`\Delta\theta` per iteration.
+- **weight_position / weight_orientation**: Scale translational vs rotational error in the solve.
+- **adaptive_tuning**: Adjusts damping/step_cap on the fly when progress is slow.
+- **backtracking**: Tries scaled steps (1.0, 0.5, 0.25) to pick the best error reduction.
+
+`smart_inverse_kinematics` enables adaptive/backtracking by default and accepts the same weighting knobs. You can also supply a cache to reuse good solutions:
+
+.. code-block:: python
+
+   from ManipulaPy.ik_helpers import IKInitialGuessCache
+
+   cache = IKInitialGuessCache(max_size=200)
+   T_target = np.eye(4)
+   T_target[:3, 3] = [0.6, 0.1, 0.0]
+
+   theta, success, iters = robot.smart_inverse_kinematics(
+       T_target,
+       strategy="cached",   # try cache first, then fall back to workspace guess
+       cache=cache,
+       weight_position=1.5,
+       weight_orientation=1.0,
+   )
+
+   if success:
+       cache.add(T_target, theta)  # store solution with residuals for future queries
 
 Multiple IK Solutions
 ~~~~~~~~~~~~~~~~~~~~~

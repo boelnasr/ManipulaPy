@@ -245,18 +245,26 @@ class IKInitialGuessCache:
         Args:
             max_size: Maximum number of solutions to cache (FIFO eviction)
         """
-        self.cache: List[Tuple[NDArray[np.float64], NDArray[np.float64]]] = []
+        # Store tuples of (pose, solution, residual/quality)
+        self.cache: List[Tuple[NDArray[np.float64], NDArray[np.float64], Optional[float]]] = []
         self.max_size = max_size
 
-    def add(self, T: NDArray[np.float64], theta: NDArray[np.float64]) -> None:
+    def add(
+        self,
+        T: NDArray[np.float64],
+        theta: NDArray[np.float64],
+        residual: Optional[float] = None
+    ) -> None:
         """
         Add successful solution to cache.
 
         Args:
             T: Transformation matrix
             theta: Corresponding joint angles
+            residual: Optional error metric for this solution (lower is better)
         """
-        self.cache.append((T.copy(), theta.copy()))
+        res_val = float(residual) if residual is not None else None
+        self.cache.append((T.copy(), theta.copy(), res_val))
 
         # FIFO eviction
         if len(self.cache) > self.max_size:
@@ -287,22 +295,38 @@ class IKInitialGuessCache:
         if len(self.cache) == 0:
             return None
 
-        # Compute distances to all cached poses
-        distances = []
-        for T_cached, theta_cached in self.cache:
+        # Compute distances to all cached poses, prefer low-residual entries
+        scored = []
+        quality_weight = 0.2
+        for T_cached, theta_cached, res_cached in self.cache:
             dist = self._pose_distance(T_desired, T_cached)
-            distances.append((dist, theta_cached))
+            quality = res_cached if res_cached is not None else 0.0
+            score = dist + quality_weight * quality
+            scored.append((score, dist, quality, theta_cached))
 
-        # Sort by distance and take k nearest
-        distances.sort(key=lambda x: x[0])
-        k_nearest = distances[:min(k, len(distances))]
+        # Sort by composite score and take k nearest
+        scored.sort(key=lambda x: x[0])
+        k_nearest = scored[:min(k, len(scored))]
 
-        # Average the joint angles
-        theta_avg = np.mean([theta for _, theta in k_nearest], axis=0)
+        # If the best cached solution is already very good, return it directly
+        best_score, _, best_quality, best_theta = k_nearest[0]
+        if best_quality is not None and best_quality < 1e-3:
+            theta_avg = best_theta.copy()
+        else:
+            # Average the joint angles of the top-k candidates
+            theta_avg = np.mean([entry[3] for entry in k_nearest], axis=0)
+
+        # Also keep the single best candidate as a fallback if averaging leaves limits
+        best_theta = best_theta.copy()
 
         # Clip to limits if provided
         if joint_limits is not None:
             theta_avg = _clip_to_limits(theta_avg, joint_limits)
+            best_theta = _clip_to_limits(best_theta, joint_limits)
+
+        # Prefer the averaged guess unless the best candidate is closer to limits
+        avg_dist = np.linalg.norm(theta_avg - best_theta)
+        return best_theta if avg_dist < 1e-6 else theta_avg
 
         return theta_avg
 
