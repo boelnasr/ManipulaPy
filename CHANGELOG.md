@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- (placeholder)
+
+### Fixed
+- (placeholder)
+
+## [1.2.0] - 2025-11-13
+
 > **Changes since commit `d7b1a93` (workflow update) on 2025-11-13**
 >
 > **Summary:** This release focuses on critical bug fixes, major performance improvements, and code quality enhancements. All critical bottlenecks have been resolved: lazy loading (625-1562x faster imports), GPU-CPU transfer elimination (2-3x control speedup), YOLO caching (50-100x vision speedup), and IK convergence improvements (0% → 70%). Test suite now has 100% pass rate with comprehensive fixtures.
@@ -29,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Recommended version:** `1.2.0` (minor bump for new features, all backward compatible)
 
 ### Added
+- **IK solver tuning knobs and smarter caching (December 2025)**
+  - **Files:** `ManipulaPy/kinematics.py`, `ManipulaPy/ik_helpers.py`, docs
+  - Added optional error weighting (`weight_position`, `weight_orientation`), adaptive damping/step tuning, and backtracking in IK; smart IK now uses cache-quality scoring and supports the same knobs. Documentation updated with usage examples.
+- **Benchmark alignment with smart/robust IK**
+  - **File:** `Benchmark/accuracy_benchmark.py`
+  - Inverse-kinematics benchmark now exercises cached/workspace/midpoint/random smart IK and falls back to robust IK; caches residuals for reuse.
 - **PERFORMANCE:** Lazy loading system for 625-1562x faster imports (November 15, 2025)
   - **File:** `ManipulaPy/__init__.py` (complete rewrite, +328 lines, -247 lines removed)
   - **Implementation:** Module-level `__getattr__` for on-demand module loading
@@ -111,6 +125,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Issue:** Damped IK mixed body-frame error with space Jacobian; `MatrixLog6`/`MatrixExp6` were not inverses for generic motions.
   - **Fix:** Map body twist error to space via `Adj(T)` before the DLS solve, and rework SE(3) log/exp to the standard Modern Robotics formulation.
   - **Impact:** 100% convergence on IK diagnostics/quick/zero-init/benchmark suites; accurate `exp(log(T)) == T` reconstruction for arbitrary poses.
+- **Path planning parity and logging safety**
+  - **Files:** `ManipulaPy/path_planning.py`
+  - CPU batch trajectories now clip to joint limits (matching GPU path); removed global `logging.basicConfig` side effect so host apps control logging configuration.
 - **CRITICAL:** Inverse kinematics algorithm now uses correct SE(3) error computation (`kinematics.py`)
   - **File:** `ManipulaPy/kinematics.py` (lines 250-254)
   - **Before:** Used incorrect `V_err = V_desired - V_curr` (non-linear log subtraction)
@@ -258,7 +275,7 @@ Previous changelog entries would go here if they existed.
 
 ## Upgrade Guide
 
-### From 1.1.3 to Unreleased (1.2.0)
+### From 1.1.3 to 1.2.0
 
 #### Breaking Changes
 **None** - All fixes are backward compatible.
@@ -481,5 +498,6 @@ When making changes, add entries under `[Unreleased]` in the appropriate categor
 
 ---
 
-[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.1.3...v1.2.0
 [1.1.3]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/releases/tag/v1.1.3

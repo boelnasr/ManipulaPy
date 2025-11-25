@@ -20,7 +20,7 @@ import os
 from typing import Dict, List, Optional, Any
 
 # Package metadata (always available, no imports)
-__version__ = "1.1.3"
+__version__ = "1.2.0"
 __author__  = "Mohamed Aboelnasr"
 __license__ = "AGPL-3.0-or-later"
 

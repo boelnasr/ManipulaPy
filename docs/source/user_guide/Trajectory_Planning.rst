@@ -6,7 +6,7 @@ This guide covers the trajectory planning capabilities in ManipulaPy, including 
 Introduction
 ----------------
 
-The TrajectoryPlanning class provides comprehensive trajectory generation and execution capabilities for robotic manipulators. It combines kinematic trajectory planning with dynamic analysis and collision avoidance to generate feasible, smooth robot motions.
+The OptimizedTrajectoryPlanning class provides comprehensive trajectory generation and execution capabilities for robotic manipulators. It combines kinematic trajectory planning with dynamic analysis and collision avoidance to generate feasible, smooth robot motions with optional CUDA acceleration.
 
 **Key Features:**
 
@@ -154,7 +154,7 @@ Setting Up Trajectory Planning
 
 .. code-block:: python
 
-   from ManipulaPy.path_planning import TrajectoryPlanning
+   from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
    from ManipulaPy.urdf_processor import URDFToSerialManipulator
    
    # Load robot model
@@ -167,7 +167,7 @@ Setting Up Trajectory Planning
    torque_limits = [(-50, 50)] * 6       # ±50 N⋅m per joint
    
    # Create trajectory planner
-   planner = TrajectoryPlanning(
+   planner = OptimizedTrajectoryPlanning(
        serial_manipulator=robot,
        urdf_path="robot.urdf",
        dynamics=dynamics,
@@ -198,6 +198,7 @@ Simple Joint Trajectory
    
    print(f"Generated trajectory with {N} points")
    print(f"Position shape: {trajectory['positions'].shape}")
+   # Note: CPU and GPU paths both enforce joint limits; collision hooks run when a checker is available.
    print(f"Velocity shape: {trajectory['velocities'].shape}")
    print(f"Acceleration shape: {trajectory['accelerations'].shape}")
    

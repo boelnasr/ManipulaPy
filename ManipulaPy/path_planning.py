@@ -111,12 +111,7 @@ else:
 from .potential_field import CollisionChecker, PotentialField
 import logging
 
-# Set up logging and silence noisy CUDA driver logs
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+# Module-level logger; leave handler configuration to the host application
 logger = logging.getLogger(__name__)
 logging.getLogger("numba.cuda.cudadrv.driver").setLevel(logging.WARNING)
 
@@ -700,6 +695,15 @@ class OptimizedTrajectoryPlanning:
             traj_pos_batch[i] = traj_pos
             traj_vel_batch[i] = traj_vel
             traj_acc_batch[i] = traj_acc
+
+        # Enforce joint limits for all trajectories (parity with GPU path)
+        for batch_idx in range(batch_size):
+            for j in range(num_joints):
+                traj_pos_batch[batch_idx, :, j] = np.clip(
+                    traj_pos_batch[batch_idx, :, j],
+                    self.joint_limits[j, 0],
+                    self.joint_limits[j, 1],
+                )
 
         elapsed = time.time() - start_time
         self.performance_stats['cpu_calls'] += 1

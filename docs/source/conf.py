@@ -52,7 +52,7 @@ sys.path.insert(0, PROJECT_ROOT)          # so `import ManipulaPy` works
 project   = "ManipulaPy"
 author    = "Mohamed Aboelnar"
 copyright = f"{datetime.datetime.now().year}, {author}"
-version = release = "1.1.3"
+version = release = "1.2.0"
 
 # ── Core Extensions (always available) ──────────────────
 extensions = [

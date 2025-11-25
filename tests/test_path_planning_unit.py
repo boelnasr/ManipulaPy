@@ -70,6 +70,19 @@ def test_batch_joint_trajectory_cpu(planner: OptimizedTrajectoryPlanning):
     assert np.allclose(pos[0], expected)
 
 
+def test_batch_joint_trajectory_clips_limits():
+    joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]
+    planner = OptimizedTrajectoryPlanning(
+        StubManipulator(), "nonexistent.urdf", MockDynamics(n=2), joint_limits, use_cuda=False
+    )
+    start_batch = np.array([[0.0, 0.0]], dtype=np.float32)
+    end_batch = np.array([[5.0, -5.0]], dtype=np.float32)  # intentionally outside limits
+    res = planner.batch_joint_trajectory(start_batch, end_batch, Tf=1.0, N=4, method=3)
+    pos = res["positions"]
+    assert np.all(pos <= 1.0 + 1e-6)
+    assert np.all(pos >= -1.0 - 1e-6)
+
+
 def test_inverse_dynamics_cpu_clips_to_limits():
     joint_limits = [(-1.0, 1.0)]
     torque_limits = [(-0.2, 0.2)]
@@ -111,3 +124,60 @@ def test_cartesian_trajectory_cpu(planner: OptimizedTrajectoryPlanning):
     # Shapes check
     assert velocities.shape == (5, 3)
     assert accelerations.shape == (5, 3)
+
+
+def test_collision_avoidance_cpu_hook_runs():
+    class StubCollisionChecker:
+        def __init__(self):
+            self.calls = 0
+        def check_collision(self, _):
+            self.calls += 1
+            return self.calls == 1  # collide on first check only
+
+    class StubPotentialField:
+        def compute_gradient(self, step, q_goal, obstacles):
+            return np.zeros_like(step)
+
+    joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]
+    planner = OptimizedTrajectoryPlanning(
+        StubManipulator(), "nonexistent.urdf", MockDynamics(n=2), joint_limits, use_cuda=False
+    )
+    planner.collision_checker = StubCollisionChecker()
+    planner.potential_field = StubPotentialField()
+
+    traj = np.array([[0.2, -0.2]], dtype=np.float32)
+    adjusted = planner._apply_collision_avoidance_cpu(traj.copy(), np.array([0.0, 0.0], dtype=np.float32))
+
+    # Collision hook was invoked and output shape preserved
+    assert planner.collision_checker.calls >= 1
+    assert adjusted.shape == traj.shape
+
+
+def test_joint_trajectory_collision_hook_runs():
+    class StubCollisionChecker:
+        def __init__(self):
+            self.calls = 0
+        def check_collision(self, step):
+            self.calls += 1
+            return self.calls == 1  # only first point collides
+
+    class StubPotentialField:
+        def compute_gradient(self, step, q_goal, obstacles):
+            return np.zeros_like(step)
+
+    joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]
+    planner = OptimizedTrajectoryPlanning(
+        StubManipulator(), "nonexistent.urdf", MockDynamics(n=2), joint_limits, use_cuda=False
+    )
+    planner.collision_checker = StubCollisionChecker()
+    planner.potential_field = StubPotentialField()
+
+    res = planner.joint_trajectory(
+        thetastart=[0.0, 0.0],
+        thetaend=[0.5, -0.5],
+        Tf=1.0,
+        N=3,
+        method=3,
+    )
+    assert planner.collision_checker.calls >= 1
+    assert res["positions"].shape == (3, 2)

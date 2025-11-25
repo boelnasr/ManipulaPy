@@ -12,6 +12,8 @@ from ManipulaPy import utils
 import tempfile
 import os
 
+from ManipulaPy.ik_helpers import IKInitialGuessCache, adaptive_multi_start_ik
+
 
 class TestKinematics(unittest.TestCase):
     """
@@ -427,6 +429,68 @@ class TestKinematics(unittest.TestCase):
             self.assertLess(error_high, 0.01)
             self.assertLess(error_low, 0.01)
 
+    def test_smart_inverse_kinematics_workspace(self):
+        """Smart IK using workspace heuristic should converge near home pose."""
+        target_pose = np.copy(self.M)
+        theta, success, _ = self.robot.smart_inverse_kinematics(
+            target_pose,
+            strategy="workspace_heuristic",
+            max_iterations=800,
+            eomg=1e-4,
+            ev=1e-4,
+            damping=0.01,
+            step_cap=0.3,
+        )
+        final_pose = self.robot.forward_kinematics(theta)
+        pos_err = np.linalg.norm(final_pose[:3, 3] - target_pose[:3, 3])
+        self.assertLess(pos_err, 0.1)
+        self.assertTrue(success or pos_err < 0.05)
+
+    def test_smart_inverse_kinematics_cached(self):
+        """Smart IK should leverage cache when provided."""
+        cache = IKInitialGuessCache(max_size=3)
+        target_pose = np.copy(self.M)
+        cached_theta = np.zeros(6)
+        cache.add(target_pose, cached_theta)
+
+        theta, success, _ = self.robot.smart_inverse_kinematics(
+            target_pose,
+            strategy="cached",
+            cache=cache,
+            max_iterations=200,
+            damping=0.01,
+            step_cap=0.3,
+        )
+        self.assertTrue(success)
+        self.assertLess(np.linalg.norm(theta - cached_theta), 0.2)
+
+    def test_smart_inverse_kinematics_extrapolate(self):
+        """Smart IK extrapolation should converge for a nearby target."""
+        theta_current = np.zeros(6)
+        T_current = self.robot.forward_kinematics(theta_current)
+        target_pose = np.copy(T_current)
+        target_pose[0, 3] += 0.05  # small displacement
+
+        theta, success, _ = self.robot.smart_inverse_kinematics(
+            target_pose,
+            strategy="extrapolate",
+            theta_current=theta_current,
+            T_current=T_current,
+            max_iterations=800,
+            eomg=1e-4,
+            ev=1e-4,
+            damping=0.01,
+            step_cap=0.1,
+        )
+        final_pose = self.robot.forward_kinematics(theta)
+        pos_err = np.linalg.norm(final_pose[:3, 3] - target_pose[:3, 3])
+        self.assertLess(pos_err, 0.1)
+        self.assertTrue(success or pos_err < 0.05)
+
+    def test_smart_inverse_kinematics_invalid_strategy(self):
+        with self.assertRaises(ValueError):
+            self.robot.smart_inverse_kinematics(self.M, strategy="unknown")
+
     def test_velocity_consistency(self):
         """Test consistency between forward kinematics and velocity calculations."""
         # Use small time step for numerical differentiation
@@ -543,6 +607,52 @@ class TestKinematics(unittest.TestCase):
         
         # Position should match
         np.testing.assert_array_almost_equal(T[:3, 3], pose[:3])
+
+    def test_robust_inverse_kinematics_success(self):
+        target_pose = np.copy(self.M)
+
+        theta, success, total_iters, strategy = self.robot.robust_inverse_kinematics(
+            target_pose,
+            max_attempts=3,
+            eomg=1e-4,
+            ev=1e-4,
+            max_iterations=400,
+            verbose=False,
+        )
+
+        self.assertTrue(success, "Robust IK failed to converge near home pose")
+        self.assertEqual(theta.shape, (6,))
+        self.assertGreater(total_iters, 0)
+        self.assertIn(strategy, {'workspace_heuristic', 'midpoint', 'random'})
+
+        final_pose = self.robot.forward_kinematics(theta)
+        self.assertLess(np.linalg.norm(final_pose[:3, 3] - target_pose[:3, 3]), 5e-2)
+
+    def test_adaptive_multi_start_ik_sequence(self):
+        call_order = []
+
+        def fake_solver(T_desired, strategy, **kwargs):
+            call_order.append(strategy)
+            if strategy == 'random':
+                return np.ones(6), True, 4
+            return np.zeros(6), False, 3
+
+        theta, success, total_iters, winning_strategy = adaptive_multi_start_ik(
+            ik_solver_func=fake_solver,
+            T_desired=np.eye(4),
+            max_attempts=3,
+            eomg=1e-4,
+            ev=1e-4,
+            max_iterations=20,
+            verbose=False,
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(winning_strategy, 'random')
+        self.assertGreaterEqual(len(call_order), 3)
+        self.assertEqual(call_order[:3], ['workspace_heuristic', 'midpoint', 'random'])
+        self.assertGreater(total_iters, 3)
+        np.testing.assert_array_almost_equal(theta, np.ones(6))
 
     def tearDown(self):
         """Clean up after tests."""

@@ -727,7 +727,21 @@ def ik_test_angles():
 
 @pytest.fixture
 def ik_default_params():
-    """Default IK parameters for convergence testing."""
+    """
+    Optimal IK parameters for 2-DOF planar robots.
+
+    These parameters were tuned for simple 2-DOF robots and provide ~70% convergence
+    rate with zero initial guess. For 6-DOF robots (xArm, UR5), use the kinematics
+    module defaults: damping=5e-2, step_cap=0.5
+
+    Returns:
+        dict: IK parameters optimized for 2-DOF robots
+            - eomg: 1e-3 (orientation tolerance in rad)
+            - ev: 1e-3 (translation tolerance in m)
+            - max_iterations: 200 (sufficient for 2-DOF, use 1000+ for 6-DOF)
+            - damping: 0.01 (optimal for 2-DOF, use 5e-2 for 6-DOF)
+            - step_cap: 0.1 (optimal for 2-DOF, use 0.5 for 6-DOF)
+    """
     return {
         'eomg': 1e-3,
         'ev': 1e-3,
