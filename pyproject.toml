@@ -15,7 +15,7 @@ authors = [
 ]
 description = "A comprehensive Python package for robotic manipulator analysis and control"
 readme = "README.md"
-license = { text = "AGPL-3.0-or-later" }
+license = "AGPL-3.0-or-later"
 requires-python = ">=3.8"
 
 classifiers = [
@@ -164,7 +164,6 @@ packages = [
     "ManipulaPy.urdf.geometry",
     "ManipulaPy.urdf.visualization",
     "ManipulaPy.ManipulaPy_data",
-    "ManipulaPy.ManipulaPy_data.ur5",
     "ManipulaPy.ManipulaPy_data.xarm",
 ]
 include-package-data = true
@@ -188,8 +187,6 @@ include-package-data = true
     "ManipulaPy_data/*/*/*",
     "ManipulaPy_data/*/*/*/*",
     "ManipulaPy_data/*/*/*/*/*",
-    "ManipulaPy_data/ur5/ur5.urdf",
-    "ManipulaPy_data/ur5/visual/*.dae",
     "ManipulaPy_data/xarm/xarm6_robot.urdf",
     "ManipulaPy_data/xarm/visual/*.dae"
 ]
@@ -197,22 +194,12 @@ include-package-data = true
 "ManipulaPy.ManipulaPy_data.xarm" = [
     "*.urdf",
     "*.stl",
-    "*.dae", 
+    "*.dae",
     "*.obj",
     "*.yml",
     "*.yaml",
     "xarm_description/**/*",
     "xarm_gripper/**/*",
-]
-"ManipulaPy.ManipulaPy_data.ur5" = [
-    "*.urdf",
-    "*.stl",
-    "*.dae",
-    "*.obj", 
-    "*.yml",
-    "*.yaml",
-    "collision/**/*",
-    "visual/**/*",
 ]
 
 [tool.setuptools.package-dir]
