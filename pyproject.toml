@@ -156,15 +156,12 @@ Repository = "https://github.com/boelnasr/ManipulaPy.git"
 "Funding" = "https://github.com/sponsors/boelnasr"
 
 # ------------------------------------------------------------------
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ManipulaPy*"]
+exclude = ["ManipulaPy.ManipulaPy_data._source*"]
+
 [tool.setuptools]
-packages = [
-    "ManipulaPy",
-    "ManipulaPy.urdf",
-    "ManipulaPy.urdf.geometry",
-    "ManipulaPy.urdf.visualization",
-    "ManipulaPy.ManipulaPy_data",
-    "ManipulaPy.ManipulaPy_data.xarm",
-]
 include-package-data = true
 
 [tool.setuptools.dynamic]
@@ -177,29 +174,31 @@ include-package-data = true
     "*.yaml",
     "*.json",
     "*.urdf",
-    "*.stl",
-    "*.dae",
-    "*.obj",
-    "py.typed",  # PEP 561 compliance for type checking
-    "ManipulaPy_data/*",
-    "ManipulaPy_data/*/*",
-    "ManipulaPy_data/*/*/*",
-    "ManipulaPy_data/*/*/*/*",
-    "ManipulaPy_data/*/*/*/*/*",
-    "ManipulaPy_data/xarm/xarm6_robot.urdf",
-    "ManipulaPy_data/xarm/visual/*.dae"
+    "py.typed",
 ]
-"ManipulaPy.ManipulaPy_data" = ["*"]
-"ManipulaPy.ManipulaPy_data.xarm" = [
-    "*.urdf",
-    "*.stl",
-    "*.dae",
-    "*.obj",
-    "*.yml",
-    "*.yaml",
-    "xarm_description/**/*",
-    "xarm_gripper/**/*",
-]
+# Include URDF files from all robot directories (NOT mesh files - too large)
+"ManipulaPy.ManipulaPy_data" = ["*.md", "*.urdf", "*.yaml", "*.json"]
+"ManipulaPy.ManipulaPy_data.abb" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.fanuc" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.fanuc_crx" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.franka_panda" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.kinova" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.kinova.gen3" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.kinova.jaco" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.kuka_iiwa" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.kuka_iiwa.iiwa7" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.kuka_iiwa.iiwa14" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.robotiq" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.universal_robots" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.universal_robots.ur3" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.universal_robots.ur5" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.universal_robots.ur10" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.universal_robots.ur3e" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.universal_robots.ur5e" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.universal_robots.ur10e" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.universal_robots.ur16e" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.xarm" = ["*.urdf"]
+"ManipulaPy.ManipulaPy_data.ur5" = ["*.py"]
 
 [tool.setuptools.package-dir]
 "" = "."
