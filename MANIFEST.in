@@ -1,44 +1,41 @@
 # Include the README and license files
 include README.md
-include LICENSE  
+include LICENSE
 include CHANGELOG.md
 include CODE_OF_CONDUCT.md
+include STATUS.md
 
 # Include all Python files in the main package
 recursive-include ManipulaPy *.py
 
-# Include ALL files in ManipulaPy_data directory (most important!)
-recursive-include ManipulaPy/ManipulaPy_data *
-
-# Specifically include URDF and mesh files
+# Include URDF files only (NOT mesh files - too large for PyPI)
 recursive-include ManipulaPy/ManipulaPy_data *.urdf
-recursive-include ManipulaPy/ManipulaPy_data *.dae  
-recursive-include ManipulaPy/ManipulaPy_data *.stl
-recursive-include ManipulaPy/ManipulaPy_data *.obj
-recursive-include ManipulaPy/ManipulaPy_data *.mesh
-recursive-include ManipulaPy/ManipulaPy_data *.xml
+recursive-include ManipulaPy/ManipulaPy_data *.md
 recursive-include ManipulaPy/ManipulaPy_data *.yaml
 recursive-include ManipulaPy/ManipulaPy_data *.json
 
 # Include configuration files
 recursive-include ManipulaPy *.yaml *.json *.xml *.cfg *.ini
 
-# Include documentation assets
-recursive-include ManipulaPy/docs *
-recursive-include docs *
-
-# Include benchmark scripts
-recursive-include ManipulaPy/Benchmark *.py *.md
-
-# Include examples
-recursive-include Examples *.py *.md *.urdf
-
 # Include tests
 recursive-include tests *.py
 
+# ============================================================
+# EXCLUDE large files to keep package under PyPI size limits
+# ============================================================
+
+# Exclude mesh files (users can download separately if needed)
+global-exclude *.stl
+global-exclude *.dae
+global-exclude *.obj
+global-exclude *.mesh
+
+# Exclude _source directory (xacro development files)
+recursive-exclude ManipulaPy/ManipulaPy_data/_source *
+
 # Exclude unwanted files
 global-exclude *.pyc
-global-exclude *.pyo  
+global-exclude *.pyo
 global-exclude *~
 global-exclude *.tmp
 global-exclude .DS_Store
@@ -52,3 +49,8 @@ exclude .pre-commit-config.yaml
 exclude tox.ini
 exclude .travis.yml
 exclude .github
+
+# Exclude docs and examples from package (available on GitHub)
+recursive-exclude docs *
+recursive-exclude Examples *
+recursive-exclude Benchmark *
