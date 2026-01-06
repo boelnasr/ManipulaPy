@@ -1,0 +1,82 @@
+<?xml version="1.0"?>
+<!-- Robot with floating base for testing floating joint handling -->
+<robot name="floating_base_robot">
+  <link name="world"/>
+
+  <link name="floating_body">
+    <visual>
+      <geometry>
+        <box size="0.4 0.3 0.2"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 0.5 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.4 0.3 0.2"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="20.0"/>
+      <inertia ixx="0.5" ixy="0" ixz="0" iyy="0.7" iyz="0" izz="0.8"/>
+    </inertial>
+  </link>
+
+  <link name="arm1">
+    <visual>
+      <geometry>
+        <cylinder radius="0.03" length="0.3"/>
+      </geometry>
+      <origin xyz="0 0 0.15" rpy="0 0 0"/>
+      <material name="red">
+        <color rgba="1 0 0 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="1.0"/>
+      <origin xyz="0 0 0.15" rpy="0 0 0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <link name="arm2">
+    <visual>
+      <geometry>
+        <cylinder radius="0.025" length="0.25"/>
+      </geometry>
+      <origin xyz="0 0 0.125" rpy="0 0 0"/>
+      <material name="green">
+        <color rgba="0 1 0 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0.125" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0" ixz="0" iyy="0.005" iyz="0" izz="0.0005"/>
+    </inertial>
+  </link>
+
+  <!-- Floating joint gives 6-DOF freedom (x, y, z, roll, pitch, yaw) -->
+  <joint name="floating_joint" type="floating">
+    <parent link="world"/>
+    <child link="floating_body"/>
+    <origin xyz="0 0 0.5" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="shoulder" type="revolute">
+    <parent link="floating_body"/>
+    <child link="arm1"/>
+    <origin xyz="0.2 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="50" velocity="2"/>
+  </joint>
+
+  <joint name="elbow" type="revolute">
+    <parent link="arm1"/>
+    <child link="arm2"/>
+    <origin xyz="0 0 0.3" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.0" upper="2.0" effort="30" velocity="2"/>
+  </joint>
+</robot>

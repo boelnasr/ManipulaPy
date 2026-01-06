@@ -1,0 +1,218 @@
+<?xml version="1.0"?>
+<!-- Fanuc CRX-10iA - URDF with meshes for ManipulaPy -->
+<!-- Payload: 10 kg, Reach: 1249 mm -->
+<!-- Copyright (c) 2025 FANUC CORPORATION - Meshes licensed under Apache-2.0 -->
+<robot name="crx10ia">
+  
+  <!-- Base Link -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/visual/base.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/collision/base.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="4.517"/>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.02"/>
+    </inertial>
+  </link>
+  
+  <!-- Link 1 -->
+  <link name="link_1">
+    <visual>
+      <origin xyz="0 0 -0.245" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/visual/j1.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 -0.245" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/collision/j1.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="10.673"/>
+      <origin xyz="0 0 0.1" rpy="0 0 0"/>
+      <inertia ixx="0.05" ixy="0" ixz="0" iyy="0.05" iyz="0" izz="0.08"/>
+    </inertial>
+  </link>
+  
+  <!-- Link 2 -->
+  <link name="link_2">
+    <visual>
+      <origin xyz="-0.0 0 -0.245" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/visual/j2.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.0 0 -0.245" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/collision/j2.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="10.892"/>
+      <origin xyz="0 0 0.27" rpy="0 0 0"/>
+      <inertia ixx="0.5" ixy="0" ixz="0" iyy="0.5" iyz="0" izz="0.05"/>
+    </inertial>
+  </link>
+  
+  <!-- Link 3 -->
+  <link name="link_3">
+    <visual>
+      <origin xyz="-0.0 0 -0.785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/visual/j3.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.0 0 -0.785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/collision/j3.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="4.162"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.02"/>
+    </inertial>
+  </link>
+  
+  <!-- Link 4 -->
+  <link name="link_4">
+    <visual>
+      <origin xyz="-0.0 0 -0.785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/visual/j4.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.0 0 -0.785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/collision/j4.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="3.969"/>
+      <origin xyz="0.27 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.08" iyz="0" izz="0.08"/>
+    </inertial>
+  </link>
+  
+  <!-- Link 5 -->
+  <link name="link_5">
+    <visual>
+      <origin xyz="-0.54 0 -0.785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/visual/j5.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.54 0 -0.785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/collision/j5.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="2.509"/>
+      <origin xyz="0 -0.075 0" rpy="0 0 0"/>
+      <inertia ixx="0.005" ixy="0" ixz="0" iyy="0.004" iyz="0" izz="0.006"/>
+    </inertial>
+  </link>
+  
+  <!-- Link 6 -->
+  <link name="link_6">
+    <visual>
+      <origin xyz="-0.54 0.15 -0.785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/visual/j6.dae"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="-0.54 0.15 -0.785" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="meshes/crx10ia/collision/j6.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="1.305"/>
+      <origin xyz="0.08 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+  
+  <!-- Flange (end-effector mounting point) -->
+  <link name="flange"/>
+  
+  <!-- Joint 1: Rotation about Z-axis -->
+  <joint name="joint_1" type="revolute">
+    <origin xyz="0 0 0.245" rpy="0 0 0"/>
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.316126" upper="3.316126" effort="400" velocity="2.094395"/>
+  </joint>
+  
+  <!-- Joint 2: Rotation about Y-axis -->
+  <joint name="joint_2" type="revolute">
+    <origin xyz="0.0 0 0" rpy="0 0 0"/>
+    <parent link="link_1"/>
+    <child link="link_2"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-3.141593" upper="3.141593" effort="400" velocity="2.094395"/>
+  </joint>
+  
+  <!-- Joint 3: Rotation about -Y-axis -->
+  <joint name="joint_3" type="revolute">
+    <origin xyz="0 0 0.54" rpy="0 0 0"/>
+    <parent link="link_2"/>
+    <child link="link_3"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-1.239184" upper="4.380776" effort="200" velocity="3.141593"/>
+  </joint>
+  
+  <!-- Joint 4: Rotation about -X-axis -->
+  <joint name="joint_4" type="revolute">
+    <origin xyz="0 0 0.0" rpy="0 0 0"/>
+    <parent link="link_3"/>
+    <child link="link_4"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-3.316126" upper="3.316126" effort="60" velocity="3.141593"/>
+  </joint>
+  
+  <!-- Joint 5: Rotation about -Y-axis -->
+  <joint name="joint_5" type="revolute">
+    <origin xyz="0.54 0 0" rpy="0 0 0"/>
+    <parent link="link_4"/>
+    <child link="link_5"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="-3.141593" upper="3.141593" effort="60" velocity="3.141593"/>
+  </joint>
+  
+  <!-- Joint 6: Rotation about -X-axis -->
+  <joint name="joint_6" type="revolute">
+    <origin xyz="0 -0.15 0" rpy="0 0 0"/>
+    <parent link="link_5"/>
+    <child link="link_6"/>
+    <axis xyz="-1 0 0"/>
+    <limit lower="-3.926991" upper="3.926991" effort="60" velocity="3.141593"/>
+  </joint>
+  
+  <!-- Flange joint (fixed) -->
+  <joint name="joint_6_flange" type="fixed">
+    <origin xyz="0.16 0 0" rpy="0 0 0"/>
+    <parent link="link_6"/>
+    <child link="flange"/>
+  </joint>
+  
+</robot>

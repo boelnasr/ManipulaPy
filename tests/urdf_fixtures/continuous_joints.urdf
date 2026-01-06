@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<!-- Robot with continuous (unlimited rotation) joints for testing -->
+<robot name="continuous_joints_robot">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.15 0.15 0.05"/>
+      </geometry>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="2.0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.015"/>
+    </inertial>
+  </link>
+
+  <!-- Wheel links -->
+  <link name="wheel1">
+    <visual>
+      <geometry>
+        <cylinder radius="0.08" length="0.04"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.08" length="0.04"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <link name="wheel2">
+    <visual>
+      <geometry>
+        <cylinder radius="0.08" length="0.04"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.08" length="0.04"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Continuous joints (no limits) -->
+  <joint name="wheel1_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="wheel1"/>
+    <origin xyz="0 0.1 -0.025" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.01" friction="0.001"/>
+  </joint>
+
+  <joint name="wheel2_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="wheel2"/>
+    <origin xyz="0 -0.1 -0.025" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.01" friction="0.001"/>
+  </joint>
+</robot>

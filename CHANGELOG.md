@@ -13,6 +13,143 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - (placeholder)
 
+## [1.3.0] - 2026-01-05
+
+> **Summary:** This release introduces a comprehensive native URDF parser with NumPy 2.0+ compatibility, enhanced URDF processor backbone, improved robot data organization, and comprehensive documentation. The native parser provides zero external URDF dependencies, batch forward kinematics (50x+ speedup), multi-robot scene management, and programmatic URDF modification for calibration and payload simulation. The ManipulaPy_data folder has been cleaned up with automated validation ensuring all 25 robot models are accessible and parseable.
+>
+> **Impact:**
+> - ✅ NumPy 2.0+ compatible URDF parsing (no urchin dependency required)
+> - ✅ Batch FK: 50x+ faster than individual calls for trajectory analysis
+> - ✅ Multi-robot scenes: Manage multiple robots in shared workspace
+> - ✅ URDF modification: Programmatic calibration and payload simulation
+> - ✅ Enhanced URDFToSerialManipulator with new convenience methods
+> - ✅ PyBullet now optional for urdf_processor (graceful degradation)
+> - ✅ Cleaned robot data folder (6.7 MB space saved)
+> - ✅ Comprehensive robot catalog documentation (382-line MANIFEST.md)
+> - ✅ Automated validation for all 25 robots
+> - ✅ Clear separation of production URDFs vs source packages
+
+### Added
+- **Native URDF Parser** (`ManipulaPy/urdf/`)
+  - **Core parser** (`core.py`, `parser.py`, `types.py`): Complete URDF parsing with NumPy 2.0+ support
+  - **Batch FK** (`link_fk_batch()`): Vectorized forward kinematics, 50x+ faster for multiple configurations
+  - **Multi-robot scenes** (`scene.py`): `Scene` class for managing multiple robots with world-frame transforms
+  - **URDF modifiers** (`modifiers.py`): `URDFModifier` class for calibration offsets, payload simulation, mass scaling
+  - **Package resolver** (`resolver.py`): Resolve `package://` URIs from ROS packages
+  - **Validation** (`validation.py`): `validate_urdf()` for structure validation with cycle/multi-root detection
+  - **Xacro support** (`xacro.py`): Automatic macro expansion for `.xacro` files
+  - **Geometry handling** (`geometry/`): Primitives (Box, Cylinder, Sphere) and mesh loading (STL, OBJ, DAE)
+  - **Visualization** (`visualization/`): Trimesh and PyBullet visualization backends (lazy-loaded)
+  - All URDF joint types supported: revolute, continuous, prismatic, fixed, planar, floating
+  - Mimic joints with automatic master-slave coupling
+  - Transmission and actuator parsing
+
+- **Enhanced `URDFToSerialManipulator`** (`urdf_processor.py`)
+  - New `forward_kinematics()` method for direct FK computation
+  - New `link_fk()` method for all-link transforms via native parser
+  - New `batch_forward_kinematics()` for vectorized FK (50x+ speedup)
+  - New `get_end_effector_transforms()` convenience method
+  - New `jacobian()` method for Jacobian computation
+  - New `inverse_kinematics()` with "robust", "smart", "iterative" methods
+  - New `get_transform()` for transforms between arbitrary frames
+  - New `create_modifier()` for URDF calibration/payload modification
+  - New `validate()` method for URDF structure validation
+  - Properties: `num_dofs`, `joint_names`, `link_names`, `end_effector_name`, `joint_limits_array`
+  - `__repr__()` for informative string representation
+
+- **Convenience functions** (`urdf_processor.py`)
+  - `load_robot()`: Quick robot loading from URDF
+  - `create_multi_robot_scene()`: Create Scene for multi-robot management
+
+- **Documentation**
+  - `ManipulaPy/urdf/README.md`: Comprehensive URDF parser documentation
+  - `ManipulaPy/urdf/TROUBLESHOOTING.md`: 8-section troubleshooting guide
+  - `Examples/notebooks/urdf_parser_tutorial.ipynb`: Interactive Jupyter notebook tutorial
+  - `Examples/intermediate_examples/urdf_calibration_example.py`: Robot calibration workflows
+  - `Examples/intermediate_examples/urdf_payload_simulation_example.py`: Payload simulation examples
+  - `urdf_parser_plan.md`: Implementation status and architecture documentation
+
+- **Robot Data Validation** (`scripts/validate_manipulapy_data.py`)
+  - Automated validation script for all robots in database
+  - Checks URDF file accessibility and parseability
+  - Optional mesh loading validation
+  - Database statistics reporting
+  - CI/CD integration ready with exit codes
+  - Usage: `python scripts/validate_manipulapy_data.py [--check-meshes] [--stats-only]`
+
+- **Comprehensive Robot Catalog Documentation**
+  - **MANIFEST.md** (382 lines): Complete robot catalog with specifications
+    - Directory structure explanation (Production vs Source packages)
+    - All 25 robots documented with DOF, payload, reach specs
+    - Usage examples for common workflows
+    - Mesh path resolution guide
+    - Troubleshooting section for common issues
+    - Best practices for loading and using robots
+  - **MANIPULAPY_DATA_STATUS.md**: Detailed analysis and recommendations
+  - **MANIPULAPY_DATA_CLEANUP_SUMMARY.md**: Complete cleanup summary
+  - **IMPLEMENTATION_STATUS.md**: Unified implementation status tracker
+
+### Changed
+- **URDF Processor improvements** (`urdf_processor.py`)
+  - PyBullet now optional - graceful degradation if not installed
+  - Default `use_pybullet_limits=False` (use URDF limits directly)
+  - New `load_meshes` parameter for optional mesh loading
+  - New `validate` parameter for optional URDF validation
+  - Better type hints with `Union[str, Path]` for file paths
+  - Improved docstrings with usage examples
+
+- **Package initialization** (`__init__.py`)
+  - Updated `urdf_processor` to not require simulation features
+  - URDF module exports updated with new classes
+
+- **ManipulaPy_data Organization**
+  - Removed duplicate `ur5/` folder (6.7 MB) - using `universal_robots/ur5/` instead
+  - Removed empty `ur/` folder (12 KB)
+  - Reorganized documentation to clearly separate production URDFs from source packages
+  - Updated folder structure to be more intuitive and consistent
+  - Total size reduced from ~150 MB to ~143 MB
+
+- **Robot Database** (`ManipulaPy_data/__init__.py`)
+  - All 25 robots verified and accessible
+  - Clean API: `get_robot_urdf()`, `list_robots()`, `get_robot_info()`
+  - Manufacturer and DOF filtering functions
+  - Backward compatibility maintained
+
+### Fixed
+- **PyBullet optional dependency** - `urdf_processor.py` no longer crashes if PyBullet not installed
+- **Joint limit extraction** - Now handles prismatic joints in PyBullet limit extraction
+- **Memory management** - Added try/finally for PyBullet disconnect in `_get_joint_limits_from_pybullet()`
+- **Data Organization Issues**
+  - Removed confusing duplicate folders
+  - Clarified purpose of `*_description` source packages
+  - Fixed inconsistent folder hierarchy
+
+### Validation Results
+- ✅ All 25 robots accessible via database API
+- ✅ All 25 robots parse successfully with native URDF parser
+- ✅ 8 manufacturers, 68 URDF/xacro files validated
+- ✅ DOF distribution: 2 (1-DOF), 18 (6-DOF), 5 (7-DOF)
+
+### Statistics
+| Metric | Value |
+|--------|-------|
+| **Total Robots** | 25 models |
+| **Manufacturers** | 8 (Universal Robots, Fanuc, KUKA, Kinova, Franka, UFactory, Robotiq, ABB) |
+| **URDF Files** | 68 files |
+| **Total Size** | ~143 MB |
+| **Space Saved** | 6.7 MB |
+| **Documentation** | 4 new comprehensive guides |
+
+### Dependencies
+- **Required:** `numpy>=1.19.2` (including NumPy 2.0+)
+- **Optional (lazy-loaded):**
+  - `trimesh` - Mesh loading and visualization
+  - `pybullet` - Alternative backend and visualization
+  - `scipy` - Rotation utilities
+  - `pyyaml` - YAML calibration files
+
+---
+
 ## [1.2.0] - 2025-11-13
 
 > **Changes since commit `d7b1a93` (workflow update) on 2025-11-13**
@@ -498,6 +635,7 @@ When making changes, add entries under `[Unreleased]` in the appropriate categor
 
 ---
 
-[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.1.3...v1.2.0
 [1.1.3]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/releases/tag/v1.1.3

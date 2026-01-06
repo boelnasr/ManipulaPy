@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!-- Invalid URDF: cyclic structure for testing cycle detection -->
+<robot name="cyclic_robot">
+  <link name="link_a">
+    <inertial>
+      <mass value="1.0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+  </link>
+
+  <link name="link_b">
+    <inertial>
+      <mass value="1.0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+  </link>
+
+  <link name="link_c">
+    <inertial>
+      <mass value="1.0"/>
+      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+    </inertial>
+  </link>
+
+  <!-- This creates a cycle: A -> B -> C -> A -->
+  <joint name="joint_ab" type="revolute">
+    <parent link="link_a"/>
+    <child link="link_b"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1" upper="1" effort="1" velocity="1"/>
+  </joint>
+
+  <joint name="joint_bc" type="revolute">
+    <parent link="link_b"/>
+    <child link="link_c"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1" upper="1" effort="1" velocity="1"/>
+  </joint>
+
+  <!-- This joint creates the cycle back to A -->
+  <joint name="joint_ca" type="revolute">
+    <parent link="link_c"/>
+    <child link="link_a"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1" upper="1" effort="1" velocity="1"/>
+  </joint>
+</robot>
