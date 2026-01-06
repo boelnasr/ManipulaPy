@@ -22,6 +22,19 @@
 
 ManipulaPy is a modern, comprehensive framework that bridges the gap between basic robotics libraries and sophisticated research tools. It provides seamless integration of kinematics, dynamics, control, and perception systems with optional CUDA acceleration for real-time applications.
 
+### What's New in 1.3.0
+- **Native URDF Parser**: NumPy 2.0+ compatible URDF parsing with zero external dependencies
+- **Batch Forward Kinematics**: 50x+ faster FK for trajectory analysis via `link_fk_batch()`
+- **Multi-Robot Scenes**: Manage multiple robots in shared workspace with world-frame transforms
+- **URDF Modification**: Programmatic calibration offsets and payload simulation via `URDFModifier`
+- **Enhanced urdf_processor**: New convenience methods (`batch_forward_kinematics`, `jacobian`, `inverse_kinematics`)
+- **PyBullet Optional**: urdf_processor works without PyBullet for lightweight deployments
+- **Robot Data Organization**: Cleaned up robot data folder, removed duplicates (6.7 MB saved)
+- **Comprehensive Robot Catalog**: 382-line MANIFEST.md documenting all 25 robots with specs
+- **Automated Validation**: New validation script ensures all robots are accessible and parseable
+- **Better Documentation**: Clear separation of production URDFs vs source packages
+- **All Robots Tested**: 25 robot models from 8 manufacturers validated and ready to use
+
 ### Why ManipulaPy?
 
 **🔧 Unified Framework**: Complete integration from low-level kinematics to high-level perception  
@@ -71,7 +84,7 @@ ManipulaPy automatically enables features based on available dependencies. Here'
 | **Kinematics** | Excellent | numpy, scipy | Forward/inverse kinematics, Jacobians |
 | **Basic Dynamics** | Good | numpy, scipy | Mass matrix, Coriolis, gravity |
 | **Control Systems** | Excellent | numpy, scipy | PID, computed torque, adaptive |
-| **URDF Processing** | Fast | pybullet, urchin | Robot model conversion |
+| **URDF Processing** | Fast | numpy only (native) | Robot model conversion, NumPy 2.0+ |
 | **Small Trajectories** | Good | numba | N < 1000 points, auto-optimized |
 
 ### GPU-Accelerated Features (Optional)
@@ -251,6 +264,37 @@ except ImportError:
 - Vision features: OpenCV, system graphics libraries (libGL.so.1)
 - Object detection: YOLO models (auto-downloaded on first use)
 - Stereo processing: Camera calibration data
+
+---
+
+### 🤖 Included Robot Models
+
+ManipulaPy comes with **25 pre-configured robot models** from 8 manufacturers, ready to use out of the box:
+
+**Universal Robots** (7 models): UR3, UR5, UR10, UR3e, UR5e, UR10e, UR16e
+**Fanuc** (7 models): LRMate 200iB, M-16iB, CRX-5iA, CRX-10iA, CRX-10iA/L, CRX-20iA/L, CRX-30iA
+**KUKA** (2 models): iiwa7, iiwa14
+**Kinova** (3 models): Gen3, Jaco 6-DOF, Jaco 7-DOF
+**Franka Emika** (1 model): Panda
+**UFactory** (2 models): xArm6, xArm6 with gripper
+**Robotiq** (2 models): 2F-85, 2F-140 grippers
+**ABB** (1 model): IRB 2400
+
+```python
+from ManipulaPy.ManipulaPy_data import get_robot_urdf, list_robots, print_robot_catalog
+
+# List all available robots
+print(list_robots())  # ['ur5', 'panda', 'iiwa14', 'gen3', ...]
+
+# Load a robot
+urdf_path = get_robot_urdf('ur5')  # or 'panda', 'iiwa14', etc.
+robot = URDFToSerialManipulator(urdf_path)
+
+# Print comprehensive catalog
+print_robot_catalog()  # Shows all robots with specs
+```
+
+See [MANIFEST.md](ManipulaPy/ManipulaPy_data/MANIFEST.md) for complete robot specifications and usage guide.
 
 ---
 
@@ -965,7 +1009,7 @@ If you use ManipulaPy in your research, please cite:
   author={Mohamed Aboelnasr},
   year={2025},
   url={https://github.com/boelnasr/ManipulaPy},
-  version={1.2.0},
+  version={1.3.0},
   license={AGPL-3.0-or-later},
 }
 ```
@@ -1048,7 +1092,7 @@ All dependencies are AGPL-3.0 compatible:
 
 <div align="center">
 
-**🤖 ManipulaPy v1.2.0: Professional robotics tools for the Python ecosystem**
+**🤖 ManipulaPy v1.3.0: Professional robotics tools for the Python ecosystem**
 
 [![GitHub stars](https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=social)](https://github.com/boelnasr/ManipulaPy)
 [![PyPI Downloads](https://static.pepy.tech/badge/manipulapy)](https://pepy.tech/projects/manipulapy)

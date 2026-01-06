@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!-- Gripper with mimic joints for testing mimic joint handling -->
+<robot name="gripper_with_mimic">
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.1 0.1 0.02"/>
+      </geometry>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <link name="left_finger">
+    <visual>
+      <geometry>
+        <box size="0.01 0.02 0.06"/>
+      </geometry>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.05"/>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <link name="right_finger">
+    <visual>
+      <geometry>
+        <box size="0.01 0.02 0.06"/>
+      </geometry>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <material name="blue">
+        <color rgba="0 0 1 1"/>
+      </material>
+    </visual>
+    <inertial>
+      <mass value="0.05"/>
+      <origin xyz="0 0 0.03" rpy="0 0 0"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <!-- Main finger joint (actuated) -->
+  <joint name="left_finger_joint" type="prismatic">
+    <parent link="base_link"/>
+    <child link="left_finger"/>
+    <origin xyz="0.02 0 0.01" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="0" upper="0.04" effort="10" velocity="0.5"/>
+  </joint>
+
+  <!-- Mimic joint (mirrors left finger) -->
+  <joint name="right_finger_joint" type="prismatic">
+    <parent link="base_link"/>
+    <child link="right_finger"/>
+    <origin xyz="-0.02 0 0.01" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <limit lower="-0.04" upper="0" effort="10" velocity="0.5"/>
+    <mimic joint="left_finger_joint" multiplier="-1" offset="0"/>
+  </joint>
+</robot>

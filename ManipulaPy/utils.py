@@ -400,13 +400,17 @@ def MatrixLog6(T):
             (np.hstack((np.zeros((3, 3)), p.reshape(-1, 1))), [0, 0, 0, 0])
         )
 
-    # Use the scaled so(3) log (omega_hat * theta) in the G^-1 computation.
-    omega_mat_scaled = theta * skew_symmetric(omega)
+    # Use the standard G^{-1}(theta) from Modern Robotics (Eq. 3.88):
+    # G_inv = I/theta - 0.5*w_hat + (1/theta - 0.5*cot(theta/2)) * w_hat^2
+    w_hat = skew_symmetric(omega)
     G_inv = (
-        np.eye(3)
-        - 0.5 * omega_mat_scaled
-        + (1 / theta - 0.5 / np.tan(theta / 2)) * (omega_mat_scaled @ omega_mat_scaled) / theta
+        (np.eye(3) / theta)
+        - 0.5 * w_hat
+        + (1 / theta - 0.5 / np.tan(theta / 2)) * (w_hat @ w_hat)
     )
+
+    # se(3) log has w_hat*theta in the rotation block
+    omega_mat_scaled = theta * w_hat
     v = G_inv @ p
     return np.vstack((np.hstack((omega_mat_scaled, v.reshape(-1, 1))), [0, 0, 0, 0]))
 
