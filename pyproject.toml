@@ -15,7 +15,7 @@ authors = [
 ]
 description = "A comprehensive Python package for robotic manipulator analysis and control"
 readme = "README.md"
-license = "AGPL-3.0-or-later"
+license = {text = "AGPL-3.0-or-later"}
 requires-python = ">=3.8"
 
 classifiers = [
