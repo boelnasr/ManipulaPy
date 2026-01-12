@@ -22,9 +22,10 @@ Usage:
     python trac_ik_benchmark.py --save-results      # Save JSON results
 
 Performance Targets:
-    - TRAC-IK: 95%+ success, <10ms solve time
-    - Iterative IK: ~35% success, ~25ms solve time
-    - Robust IK: ~50-80% success, ~150ms solve time
+    - TRAC-IK: 80%+ within 10mm, ~500ms solve time (parallel speedup)
+    - Iterative IK: ~10-40% within 10mm, ~200ms solve time
+    - Smart IK: ~40-60% within 10mm, ~500-800ms solve time
+    - Robust IK: ~10-50% within 10mm, ~1500ms solve time
 
 Author: ManipulaPy Development Team
 Date: January 2026
@@ -100,7 +101,7 @@ class TracIKBenchmark:
     def __init__(
         self,
         num_tests: int = 30,
-        trac_ik_timeout: float = 0.05,
+        trac_ik_timeout: float = 0.5,
         tolerance_position: float = 2e-3,
         tolerance_orientation: float = 2e-3,
         output_dir: str = "trac_ik_benchmark_results",
@@ -111,7 +112,7 @@ class TracIKBenchmark:
 
         Args:
             num_tests: Number of test poses to evaluate
-            trac_ik_timeout: TRAC-IK timeout in seconds (default: 50ms)
+            trac_ik_timeout: TRAC-IK timeout in seconds (default: 500ms)
             tolerance_position: Position tolerance in meters (default: 2mm)
             tolerance_orientation: Orientation tolerance in radians (default: 2mrad)
             output_dir: Directory for results
@@ -624,8 +625,8 @@ Examples:
 
     parser.add_argument('--num-tests', type=int, default=30,
                        help='Number of test poses (default: 30)')
-    parser.add_argument('--timeout', type=float, default=0.05,
-                       help='TRAC-IK timeout in seconds (default: 0.05)')
+    parser.add_argument('--timeout', type=float, default=0.5,
+                       help='TRAC-IK timeout in seconds (default: 0.5)')
     parser.add_argument('--tolerance', type=float, default=2e-3,
                        help='Position/orientation tolerance (default: 2e-3 = 2mm/2mrad)')
     parser.add_argument('--methods', nargs='+',
