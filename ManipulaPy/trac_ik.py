@@ -36,7 +36,7 @@ from typing import Optional, List, Tuple, Callable, Any
 from numpy.typing import NDArray
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 from scipy.optimize import minimize
 
 
@@ -174,6 +174,8 @@ class TracIKSolver:
                     ))
 
                 # Collect results as they complete (handle timeout gracefully)
+                # Note: Different Python versions/platforms raise different timeout exceptions
+                # We catch ALL exceptions here and handle gracefully
                 try:
                     for future in as_completed(futures, timeout=timeout):
                         try:
@@ -184,16 +186,19 @@ class TracIKSolver:
                                 break
                         except Exception:
                             continue
-                except TimeoutError:
-                    # Timeout reached - stop all threads and collect any results
-                    stop_event.set()
-                    for future in futures:
-                        if future.done():
-                            try:
-                                theta, success, error = future.result(timeout=0.001)
-                                update_result(theta, success, error)
-                            except Exception:
-                                continue
+                except:
+                    # Timeout or other exception - this is expected behavior
+                    pass
+
+                # Always stop threads and collect any completed results
+                stop_event.set()
+                for future in futures:
+                    if future.done():
+                        try:
+                            theta, success, error = future.result(timeout=0.001)
+                            update_result(theta, success, error)
+                        except Exception:
+                            continue
         else:
             # Sequential execution (for debugging)
             for guess in initial_guesses:
