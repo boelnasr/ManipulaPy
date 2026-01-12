@@ -172,6 +172,7 @@ def __getattr__(name: str):
         'transformations': 'transformations',
         'dynamics': 'dynamics',
         'ik_helpers': 'ik_helpers',
+        'trac_ik': 'trac_ik',
 
         # Analysis modules
         'control': 'control',
@@ -191,6 +192,7 @@ def __getattr__(name: str):
         'ManipulatorDynamics': ('dynamics', 'ManipulatorDynamics'),
         'ManipulatorController': ('control', 'ManipulatorController'),
         'Vision': ('vision', 'Vision'),
+        'TracIKSolver': ('trac_ik', 'TracIKSolver'),
     }
 
     if name in module_map:
@@ -215,7 +217,7 @@ def __dir__():
     # Core always available
     base = [
         '__version__', '__author__', '__license__',
-        'kinematics', 'utils', 'transformations', 'dynamics', 'ik_helpers',
+        'kinematics', 'utils', 'transformations', 'dynamics', 'ik_helpers', 'trac_ik',
         'control', 'path_planning', 'singularity', 'potential_field',
 
         # Helper functions
@@ -223,7 +225,7 @@ def __dir__():
         'require_feature', 'get_installation_command', 'test_installation',
 
         # Common classes
-        'SerialManipulator', 'ManipulatorDynamics', 'ManipulatorController',
+        'SerialManipulator', 'ManipulatorDynamics', 'ManipulatorController', 'TracIKSolver',
     ]
 
     # Add conditionally available modules
