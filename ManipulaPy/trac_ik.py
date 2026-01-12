@@ -156,6 +156,9 @@ class TracIKSolver:
 
         if use_parallel:
             # Run solvers in parallel
+            # Use shorter internal timeout to ensure futures complete before collection
+            internal_timeout = timeout * 0.85  # Leave 15% buffer for result collection
+
             with ThreadPoolExecutor(max_workers=2 * num_restarts) as executor:
                 futures = []
 
@@ -163,14 +166,14 @@ class TracIKSolver:
                 for guess in initial_guesses:
                     futures.append(executor.submit(
                         self._dls_solver,
-                        T_desired, guess, eomg, ev, timeout, stop_event
+                        T_desired, guess, eomg, ev, internal_timeout, stop_event
                     ))
 
                 # Submit SQP tasks
                 for guess in initial_guesses:
                     futures.append(executor.submit(
                         self._sqp_solver,
-                        T_desired, guess, eomg, ev, timeout, stop_event
+                        T_desired, guess, eomg, ev, internal_timeout, stop_event
                     ))
 
                 # Collect results as they complete (handle timeout gracefully)
@@ -179,7 +182,7 @@ class TracIKSolver:
                 try:
                     for future in as_completed(futures, timeout=timeout):
                         try:
-                            theta, success, error = future.result(timeout=0.001)
+                            theta, success, error = future.result(timeout=0.1)
                             update_result(theta, success, error)
                             if best_result['success']:
                                 stop_event.set()
@@ -190,15 +193,18 @@ class TracIKSolver:
                     # Timeout or other exception - this is expected behavior
                     pass
 
-                # Always stop threads and collect any completed results
-                stop_event.set()
+                # Collect results from all completed futures BEFORE signaling stop
+                # This ensures we don't miss results from solvers that just finished
                 for future in futures:
                     if future.done():
                         try:
-                            theta, success, error = future.result(timeout=0.001)
+                            theta, success, error = future.result(timeout=0.1)
                             update_result(theta, success, error)
                         except Exception:
                             continue
+
+                # Now signal threads to stop (for any still running)
+                stop_event.set()
         else:
             # Sequential execution (for debugging)
             for guess in initial_guesses:
@@ -458,6 +464,9 @@ class TracIKSolver:
 
         Returns:
             Tuple of (error_vector, rotation_error, translation_error)
+            - error_vector: Space-frame twist for Jacobian-based updates
+            - rotation_error: Body-frame rotation error magnitude (for tolerance check)
+            - translation_error: Body-frame translation error magnitude (for tolerance check)
         """
         # Import utils for matrix logarithm
         from . import utils
@@ -466,11 +475,13 @@ class TracIKSolver:
         T_err = np.linalg.inv(T_current) @ T_desired
         V_err = utils.se3ToVec(utils.MatrixLog6(T_err))
 
+        # Use body-frame error magnitudes for tolerance checking
+        # This matches the convention in iterative_inverse_kinematics
+        rot_err = np.linalg.norm(V_err[:3])
+        trans_err = np.linalg.norm(V_err[3:])
+
         # Transform to space frame for Jacobian compatibility
         V_err_space = utils.adjoint_transform(T_current) @ V_err
-
-        rot_err = np.linalg.norm(V_err_space[:3])
-        trans_err = np.linalg.norm(V_err_space[3:])
 
         return V_err_space, rot_err, trans_err
 

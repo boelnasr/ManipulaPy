@@ -167,18 +167,19 @@ class TracIKBenchmark:
     def generate_test_poses(self) -> int:
         """
         Generate reachable test poses using FK on random configurations.
+        Avoids singular configurations by checking Jacobian condition number.
 
         Returns:
             Number of valid test poses generated
         """
-        logger.info(f"Generating {self.num_tests} test poses...")
+        logger.info(f"Generating {self.num_tests} test poses (avoiding singularities)...")
 
         self.test_poses = []
         self.test_configs = []
 
         # Generate poses from random valid configurations
         attempts = 0
-        max_attempts = self.num_tests * 10
+        max_attempts = self.num_tests * 20
 
         while len(self.test_poses) < self.num_tests and attempts < max_attempts:
             attempts += 1
@@ -186,11 +187,24 @@ class TracIKBenchmark:
             # Random configuration within joint limits (with margin)
             config = []
             for low, high in self.joint_limits:
-                margin = (high - low) * 0.1  # 10% margin from limits
+                margin = (high - low) * 0.15  # 15% margin from limits
                 config.append(np.random.uniform(low + margin, high - margin))
             config = np.array(config)
 
             try:
+                # Check for singularity using Jacobian condition number
+                J = self.robot.jacobian(config, frame="space")
+                cond = np.linalg.cond(J)
+
+                # Skip if near singularity (condition number > 100)
+                if cond > 100:
+                    continue
+
+                # Check Jacobian rank
+                rank = np.linalg.matrix_rank(J)
+                if rank < self.dof:
+                    continue
+
                 T = self.robot.forward_kinematics(config, frame="space")
 
                 # Verify it's a valid transformation
@@ -203,7 +217,8 @@ class TracIKBenchmark:
             except Exception:
                 continue
 
-        logger.info(f"Generated {len(self.test_poses)} valid test poses")
+        logger.info(f"Generated {len(self.test_poses)} valid non-singular test poses "
+                   f"(checked {attempts} configurations)")
         return len(self.test_poses)
 
     def compute_error(
