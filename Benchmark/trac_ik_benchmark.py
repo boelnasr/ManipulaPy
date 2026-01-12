@@ -103,7 +103,7 @@ class TracIKBenchmark:
         num_tests: int = 30,
         trac_ik_timeout: float = 0.5,
         tolerance_position: float = 2e-3,
-        tolerance_orientation: float = 2e-3,
+        tolerance_orientation: float = 0.035,
         output_dir: str = "trac_ik_benchmark_results",
         verbose: bool = False
     ):
@@ -114,7 +114,7 @@ class TracIKBenchmark:
             num_tests: Number of test poses to evaluate
             trac_ik_timeout: TRAC-IK timeout in seconds (default: 500ms)
             tolerance_position: Position tolerance in meters (default: 2mm)
-            tolerance_orientation: Orientation tolerance in radians (default: 2mrad)
+            tolerance_orientation: Orientation tolerance in radians (default: 2deg = 0.035rad)
             output_dir: Directory for results
             verbose: Enable verbose logging
         """

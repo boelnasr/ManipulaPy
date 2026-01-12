@@ -242,21 +242,26 @@ class TracIKSolver:
         stop_event: threading.Event
     ) -> Tuple[NDArray[np.float64], bool, float]:
         """
-        Damped Least-Squares solver (Newton-Raphson variant).
+        Damped Least-Squares solver with adaptive damping.
 
-        Fast iterative solver, good for well-conditioned problems.
-        Uses optimized parameters from ManipulaPy benchmark.
+        Uses adaptive damping for improved convergence:
+        - Reduces damping when making good progress (allows fine convergence)
+        - Increases damping when stalling (prevents oscillation)
         """
         theta = theta0.copy()
-        damping = 0.02  # Optimized: 2e-2 for 6-DOF
-        step_cap = 0.3  # Optimized step cap
-        max_iters = 500
+        damping = 0.05  # Start with moderate damping
+        min_damping = 1e-6
+        max_damping = 0.5
+        step_cap = 0.3
+        max_iters = 1000
         start_time = time.perf_counter()
 
         best_theta = theta.copy()
         best_error = float('inf')
+        prev_error = float('inf')
+        stall_count = 0
 
-        for _ in range(max_iters):
+        for iteration in range(max_iters):
             # Check termination conditions
             if stop_event.is_set():
                 break
@@ -272,10 +277,31 @@ class TracIKSolver:
             if current_error < best_error:
                 best_error = current_error
                 best_theta = theta.copy()
+                stall_count = 0
+            else:
+                stall_count += 1
 
             # Check convergence
             if rot_err < eomg and trans_err < ev:
                 return theta, True, current_error
+
+            # Adaptive damping
+            if current_error < prev_error * 0.8:
+                # Good progress - reduce damping for finer steps
+                damping = max(min_damping, damping * 0.7)
+            elif current_error > prev_error * 0.99:
+                # Stalling - increase damping
+                damping = min(max_damping, damping * 1.5)
+
+            # If stuck for too long, try a larger damping reset
+            if stall_count > 20:
+                damping = min(max_damping, damping * 2)
+                stall_count = 0
+
+            prev_error = current_error
+
+            # Adaptive step cap - smaller steps when close to solution
+            adaptive_step_cap = min(step_cap, max(0.01, current_error * 2))
 
             # DLS update
             J = self.jacobian_func(theta)
@@ -285,14 +311,14 @@ class TracIKSolver:
             try:
                 delta_theta = np.linalg.solve(JTJ + lambda_I, J.T @ V_err)
             except np.linalg.LinAlgError:
-                # Singular matrix - increase damping
-                damping *= 2
+                # Singular matrix - increase damping significantly
+                damping = min(max_damping, damping * 3)
                 continue
 
-            # Step size limiting
+            # Step size limiting with adaptive cap
             norm_delta = np.linalg.norm(delta_theta)
-            if norm_delta > step_cap:
-                delta_theta *= step_cap / norm_delta
+            if norm_delta > adaptive_step_cap:
+                delta_theta *= adaptive_step_cap / norm_delta
 
             # Update and clip to limits
             theta = theta + delta_theta
@@ -460,28 +486,34 @@ class TracIKSolver:
         T_desired: NDArray[np.float64]
     ) -> Tuple[NDArray[np.float64], float, float]:
         """
-        Default error function using SE(3) logarithm.
+        Default error function using SE(3) logarithm for Jacobian update,
+        but Cartesian errors for tolerance checking.
 
         Returns:
             Tuple of (error_vector, rotation_error, translation_error)
             - error_vector: Space-frame twist for Jacobian-based updates
-            - rotation_error: Body-frame rotation error magnitude (for tolerance check)
-            - translation_error: Body-frame translation error magnitude (for tolerance check)
+            - rotation_error: Actual rotation error in radians (axis-angle magnitude)
+            - translation_error: Actual Cartesian position error in meters
         """
         # Import utils for matrix logarithm
         from . import utils
 
-        # Body-frame error twist
+        # Body-frame error twist (for Jacobian update)
         T_err = np.linalg.inv(T_current) @ T_desired
         V_err = utils.se3ToVec(utils.MatrixLog6(T_err))
 
-        # Use body-frame error magnitudes for tolerance checking
-        # This matches the convention in iterative_inverse_kinematics
-        rot_err = np.linalg.norm(V_err[:3])
-        trans_err = np.linalg.norm(V_err[3:])
-
         # Transform to space frame for Jacobian compatibility
         V_err_space = utils.adjoint_transform(T_current) @ V_err
+
+        # Use ACTUAL Cartesian errors for tolerance checking
+        # This gives intuitive tolerance values (meters for position, radians for orientation)
+        trans_err = np.linalg.norm(T_current[:3, 3] - T_desired[:3, 3])
+
+        # Rotation error: axis-angle magnitude from rotation matrix difference
+        R_err = T_current[:3, :3].T @ T_desired[:3, :3]
+        # Use matrix logarithm to get rotation angle
+        trace_val = np.clip((np.trace(R_err) - 1) / 2, -1, 1)
+        rot_err = np.arccos(trace_val)  # Rotation angle in radians
 
         return V_err_space, rot_err, trans_err
 
