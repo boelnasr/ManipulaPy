@@ -241,14 +241,30 @@ class SerialManipulator:
         """
         Damped-least-squares iterative IK with joint-limit projection and
         residual plot saved to file (no interactive window).
+
+        Features:
+        - Levenberg-Marquardt style adaptive damping
+        - SVD-robust Jacobian solve for near-singular configs
+        - Stagnation detection with perturbation recovery
+        - Improved line search with multiple scales
+        - Best solution tracking
         """
         theta = np.array(thetalist0, dtype=float)
         residuals = []
         damping_local = damping
         step_cap_local = step_cap
-        prev_metric = None
-        min_damping, max_damping = 1e-5, 2e-1
+        prev_error = float('inf')
+        min_damping, max_damping = 1e-6, 5e-1
         min_step_cap = 0.01
+        nu = 2.0  # LM damping adjustment factor
+
+        # Best solution tracking
+        best_theta = theta.copy()
+        best_error = float('inf')
+
+        # Stagnation detection
+        stall_count = 0
+        max_stall = 20
 
         def compute_geometric_error(T_curr, T_target):
             """Compute geometric error without adjoint amplification."""
@@ -272,9 +288,9 @@ class SerialManipulator:
                                       R_err[1, 0] - R_err[0, 1]]) / 2
             elif abs(angle - np.pi) < 1e-6:
                 diag = np.diag(R_err)
-                k = np.argmax(diag)
+                idx = np.argmax(diag)
                 axis = np.zeros(3)
-                axis[k] = 1.0
+                axis[idx] = 1.0
                 omega_err = angle * axis
             else:
                 axis = np.array([R_err[2, 1] - R_err[1, 2],
@@ -289,98 +305,128 @@ class SerialManipulator:
             V_err = np.concatenate([omega_err_space, pos_err])
             return V_err, rot_err, trans_err
 
+        def svd_robust_solve(J, V_err, damping_val):
+            """SVD-based damped least squares for near-singular Jacobians."""
+            try:
+                U, s, Vt = np.linalg.svd(J, full_matrices=False)
+                # Damped pseudo-inverse: σ / (σ² + λ²)
+                s_damped = s / (s ** 2 + damping_val ** 2 + 1e-12)
+                return Vt.T @ (s_damped * (U.T @ V_err))
+            except np.linalg.LinAlgError:
+                # Fallback to standard solve
+                JTJ = J.T @ J
+                lambda_I = (damping_val ** 2) * np.eye(JTJ.shape[0])
+                return np.linalg.solve(JTJ + lambda_I, J.T @ V_err)
+
+        def clip_to_limits(th):
+            """Clip joint angles to limits."""
+            th_clipped = th.copy()
+            for i, (mn, mx) in enumerate(self.joint_limits):
+                if mn is not None:
+                    th_clipped[i] = max(th_clipped[i], mn)
+                if mx is not None:
+                    th_clipped[i] = min(th_clipped[i], mx)
+            return th_clipped
+
         for k in range(max_iterations):
             # Current pose & geometric error
             T_curr = self.forward_kinematics(theta, frame="space")
             V_err, rot_err, trans_err = compute_geometric_error(T_curr, T_desired)
+            current_error = rot_err + trans_err
             residuals.append((trans_err, rot_err))
 
-            # Weighted metric for adaptive tuning
-            metric = np.linalg.norm(
-                np.hstack((weight_orientation * V_err[:3], weight_position * V_err[3:]))
-            )
-
-            if adaptive_tuning and prev_metric is not None:
-                # If improving nicely, ease damping slightly; if stalled, increase damping and shrink step
-                if metric < prev_metric * 0.7:
-                    damping_local = max(min_damping, damping_local * 0.7)
-                    step_cap_local = min(step_cap, step_cap_local * 1.1)
-                elif metric > prev_metric * 0.95:
-                    damping_local = min(max_damping, damping_local * 1.5)
-                    step_cap_local = max(min_step_cap, step_cap_local * 0.7)
-            prev_metric = metric
-
+            # Check convergence
             if rot_err < eomg and trans_err < ev:
                 success = True
                 break
 
-            # Apply DLS update with space-frame Jacobian
+            # Track best solution
+            if current_error < best_error:
+                best_error = current_error
+                best_theta = theta.copy()
+                stall_count = 0
+            else:
+                stall_count += 1
+
+            # Stagnation recovery: perturb if stuck
+            if stall_count > max_stall:
+                # Add small random perturbation to escape local minimum
+                perturbation = 0.1 * np.random.randn(len(theta))
+                theta = clip_to_limits(best_theta + perturbation)
+                damping_local = damping  # Reset damping
+                stall_count = 0
+                nu = 2.0
+                continue
+
+            # Levenberg-Marquardt adaptive damping
+            if adaptive_tuning and k > 0:
+                if current_error < prev_error * 0.75:
+                    # Good progress - reduce damping (more Newton-like)
+                    damping_local = max(min_damping, damping_local / 3)
+                    step_cap_local = min(step_cap * 1.5, step_cap_local * 1.2)
+                    nu = 2.0
+                elif current_error < prev_error * 0.95:
+                    # Modest progress - slightly reduce damping
+                    damping_local = max(min_damping, damping_local / 1.5)
+                elif current_error > prev_error:
+                    # Got worse - increase damping (more gradient-like)
+                    damping_local = min(max_damping, damping_local * nu)
+                    nu = min(nu * 1.5, 8)
+                    step_cap_local = max(min_step_cap, step_cap_local * 0.7)
+
+            prev_error = current_error
+
+            # Compute Jacobian and weighted error
             J_space = self.jacobian(theta, frame="space")
             V_weighted = V_err.copy()
             V_weighted[:3] *= weight_orientation
             V_weighted[3:] *= weight_position
-            JTJ = J_space.T @ J_space
-            lambda_I = (damping_local ** 2) * np.eye(JTJ.shape[0])
-            delta_theta = np.linalg.solve(JTJ + lambda_I, J_space.T @ V_weighted)
+
+            # SVD-robust solve
+            delta_theta = svd_robust_solve(J_space, V_weighted, damping_local)
 
             # Cap step size
             norm_delta = np.linalg.norm(delta_theta)
             if norm_delta > step_cap_local:
                 delta_theta *= step_cap_local / norm_delta
 
-            # Simple backtracking: try scaled steps and pick the one with lowest weighted metric
+            # Line search with multiple scales
             if backtracking:
-                best_theta = theta
-                best_rot_err, best_trans_err = rot_err, trans_err
-                best_metric = metric
-                for scale in (1.0, 0.5, 0.25):
-                    candidate = theta + scale * delta_theta
-                    # Project into joint limits
-                    for i, (mn, mx) in enumerate(self.joint_limits):
-                        if mn is not None:
-                            candidate[i] = max(candidate[i], mn)
-                        if mx is not None:
-                            candidate[i] = min(candidate[i], mx)
+                best_scale_theta = theta
+                best_scale_error = current_error
+                scales = [1.0, 0.5, 0.25, 0.125, 0.75]  # More scales for better search
+
+                for scale in scales:
+                    candidate = clip_to_limits(theta + scale * delta_theta)
                     T_try = self.forward_kinematics(candidate, frame="space")
                     _, rot_try, trans_try = compute_geometric_error(T_try, T_desired)
-                    V_try, _, _ = compute_geometric_error(T_try, T_desired)
-                    metric_try = np.linalg.norm(
-                        np.hstack((weight_orientation * V_try[:3], weight_position * V_try[3:]))
-                    )
-                    if metric_try < best_metric:
-                        best_metric = metric_try
-                        best_theta = candidate
-                        best_rot_err, best_trans_err = rot_try, trans_try
-                # If no candidate improved, take the full capped step
-                if best_theta is theta:
-                    fallback = theta + delta_theta
-                    for i, (mn, mx) in enumerate(self.joint_limits):
-                        if mn is not None:
-                            fallback[i] = max(fallback[i], mn)
-                        if mx is not None:
-                            fallback[i] = min(fallback[i], mx)
-                    best_theta = fallback
-                    _, best_rot_err, best_trans_err = compute_geometric_error(
-                        self.forward_kinematics(best_theta, frame="space"), T_desired
-                    )
-                    V_fb, _, _ = compute_geometric_error(
-                        self.forward_kinematics(best_theta, frame="space"), T_desired
-                    )
-                    best_metric = np.linalg.norm(
-                        np.hstack((weight_orientation * V_fb[:3], weight_position * V_fb[3:]))
-                    )
-                theta = best_theta
-                residuals[-1] = (best_trans_err, best_rot_err)
-                prev_metric = best_metric
+                    error_try = rot_try + trans_try
+
+                    if error_try < best_scale_error:
+                        best_scale_error = error_try
+                        best_scale_theta = candidate
+
+                # Accept best step (even if worse, to avoid getting stuck)
+                if best_scale_error < current_error * 1.1:  # Allow slight increase
+                    theta = best_scale_theta
+                else:
+                    # All scales failed - take small step anyway
+                    theta = clip_to_limits(theta + 0.1 * delta_theta)
             else:
-                theta += delta_theta
-                # Project into joint limits
-                for i, (mn, mx) in enumerate(self.joint_limits):
-                    if mn is not None: theta[i] = max(theta[i], mn)
-                    if mx is not None: theta[i] = min(theta[i], mx)
+                theta = clip_to_limits(theta + delta_theta)
+
         else:
             success = False
             k += 1   # max_iterations reached
+
+        # Return best solution found if current isn't converged
+        if not success and best_error < current_error:
+            theta = best_theta
+            T_curr = self.forward_kinematics(theta, frame="space")
+            _, rot_err, trans_err = compute_geometric_error(T_curr, T_desired)
+            # Check if best solution meets tolerance
+            if rot_err < eomg and trans_err < ev:
+                success = True
 
         # Optional residual plot (non-interactive)
         if plot_residuals:
