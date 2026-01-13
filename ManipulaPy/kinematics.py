@@ -250,12 +250,49 @@ class SerialManipulator:
         min_damping, max_damping = 1e-5, 2e-1
         min_step_cap = 0.01
 
+        def compute_geometric_error(T_curr, T_target):
+            """Compute geometric error without adjoint amplification."""
+            # Position error
+            pos_err = T_target[:3, 3] - T_curr[:3, 3]
+            trans_err = np.linalg.norm(pos_err)
+
+            # Rotation error using axis-angle
+            R_curr = T_curr[:3, :3]
+            R_target = T_target[:3, :3]
+            R_err = R_curr.T @ R_target
+
+            trace_val = np.clip((np.trace(R_err) - 1) / 2, -1, 1)
+            angle = np.arccos(trace_val)
+            rot_err = abs(angle)
+
+            # Extract rotation axis
+            if angle < 1e-6:
+                omega_err = np.array([R_err[2, 1] - R_err[1, 2],
+                                      R_err[0, 2] - R_err[2, 0],
+                                      R_err[1, 0] - R_err[0, 1]]) / 2
+            elif abs(angle - np.pi) < 1e-6:
+                diag = np.diag(R_err)
+                k = np.argmax(diag)
+                axis = np.zeros(3)
+                axis[k] = 1.0
+                omega_err = angle * axis
+            else:
+                axis = np.array([R_err[2, 1] - R_err[1, 2],
+                                 R_err[0, 2] - R_err[2, 0],
+                                 R_err[1, 0] - R_err[0, 1]]) / (2 * np.sin(angle) + 1e-10)
+                omega_err = angle * axis
+
+            # Transform to space frame
+            omega_err_space = R_curr @ omega_err
+
+            # 6D error [angular, linear]
+            V_err = np.concatenate([omega_err_space, pos_err])
+            return V_err, rot_err, trans_err
+
         for k in range(max_iterations):
-            # Current pose & twist error (body twist)
+            # Current pose & geometric error
             T_curr = self.forward_kinematics(theta, frame="space")
-            T_err = np.linalg.inv(T_curr) @ T_desired
-            V_err = utils.se3ToVec(utils.MatrixLog6(T_err))
-            rot_err, trans_err = np.linalg.norm(V_err[:3]), np.linalg.norm(V_err[3:])
+            V_err, rot_err, trans_err = compute_geometric_error(T_curr, T_desired)
             residuals.append((trans_err, rot_err))
 
             # Weighted metric for adaptive tuning
@@ -277,10 +314,9 @@ class SerialManipulator:
                 success = True
                 break
 
-            # Convert body-frame error twist to space frame and apply DLS update
+            # Apply DLS update with space-frame Jacobian
             J_space = self.jacobian(theta, frame="space")
-            V_err_space = utils.adjoint_transform(T_curr) @ V_err
-            V_weighted = V_err_space.copy()
+            V_weighted = V_err.copy()
             V_weighted[:3] *= weight_orientation
             V_weighted[3:] *= weight_position
             JTJ = J_space.T @ J_space
@@ -306,11 +342,10 @@ class SerialManipulator:
                         if mx is not None:
                             candidate[i] = min(candidate[i], mx)
                     T_try = self.forward_kinematics(candidate, frame="space")
-                    T_err_try = np.linalg.inv(T_try) @ T_desired
-                    V_err_try = utils.se3ToVec(utils.MatrixLog6(T_err_try))
-                    rot_try, trans_try = np.linalg.norm(V_err_try[:3]), np.linalg.norm(V_err_try[3:])
+                    _, rot_try, trans_try = compute_geometric_error(T_try, T_desired)
+                    V_try, _, _ = compute_geometric_error(T_try, T_desired)
                     metric_try = np.linalg.norm(
-                        np.hstack((weight_orientation * V_err_try[:3], weight_position * V_err_try[3:]))
+                        np.hstack((weight_orientation * V_try[:3], weight_position * V_try[3:]))
                     )
                     if metric_try < best_metric:
                         best_metric = metric_try
@@ -325,12 +360,14 @@ class SerialManipulator:
                         if mx is not None:
                             fallback[i] = min(fallback[i], mx)
                     best_theta = fallback
-                    T_fallback = self.forward_kinematics(best_theta, frame="space")
-                    T_err_fb = np.linalg.inv(T_fallback) @ T_desired
-                    V_err_fb = utils.se3ToVec(utils.MatrixLog6(T_err_fb))
-                    best_rot_err, best_trans_err = np.linalg.norm(V_err_fb[:3]), np.linalg.norm(V_err_fb[3:])
+                    _, best_rot_err, best_trans_err = compute_geometric_error(
+                        self.forward_kinematics(best_theta, frame="space"), T_desired
+                    )
+                    V_fb, _, _ = compute_geometric_error(
+                        self.forward_kinematics(best_theta, frame="space"), T_desired
+                    )
                     best_metric = np.linalg.norm(
-                        np.hstack((weight_orientation * V_err_fb[:3], weight_position * V_err_fb[3:]))
+                        np.hstack((weight_orientation * V_fb[:3], weight_position * V_fb[3:]))
                     )
                 theta = best_theta
                 residuals[-1] = (best_trans_err, best_rot_err)
