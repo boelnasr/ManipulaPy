@@ -9,9 +9,13 @@ in parallel and returns the first successful result.
 
 Key Features:
 - Dual solver: DLS (Damped Least-Squares) + SQP (Sequential Quadratic Programming)
+- Levenberg-Marquardt style adaptive damping with trust region
+- Singularity-robust Jacobian using SVD filtering
+- Stagnation and oscillation detection with recovery strategies
+- Gradient descent fallback for difficult cases
 - Parallel execution using threading
 - Timeout-based termination (not iteration count)
-- Random restarts for improved success rate
+- Random restarts with error-based selection
 - 95-99% success rate, 5-20x faster than sequential multi-start
 
 Algorithm:
@@ -19,8 +23,8 @@ Algorithm:
     │                 TRAC-IK                      │
     │  ┌─────────────┐     ┌─────────────┐        │
     │  │    DLS      │     │    SQP      │        │
-    │  │ (Newton-    │     │ (Constrained│        │
-    │  │  Raphson)   │     │  Optimizer) │        │
+    │  │ (Levenberg- │     │ (Constrained│        │
+    │  │  Marquardt) │     │  Optimizer) │        │
     │  └──────┬──────┘     └──────┬──────┘        │
     │         │                   │               │
     │         └───── First ───────┘               │
@@ -36,6 +40,7 @@ from typing import Optional, List, Tuple, Callable, Any
 from numpy.typing import NDArray
 import threading
 import time
+from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 from scipy.optimize import minimize
 
@@ -134,8 +139,8 @@ class TracIKSolver:
         """
         start_time = time.perf_counter()
 
-        # Generate initial guesses
-        initial_guesses = self._generate_initial_guesses(T_desired, theta0, num_restarts)
+        # Generate initial guesses - keep it simple for better performance
+        initial_guesses = self._generate_initial_guesses_simple(T_desired, theta0, num_restarts)
 
         # Result storage (thread-safe)
         result_lock = threading.Lock()
@@ -143,14 +148,17 @@ class TracIKSolver:
         stop_event = threading.Event()
 
         def update_result(theta, success, error):
-            """Thread-safe result update."""
+            """Thread-safe result update with error-based selection."""
             with result_lock:
-                if success and not best_result['success']:
-                    best_result['theta'] = theta
-                    best_result['success'] = True
-                    best_result['error'] = error
-                    stop_event.set()  # Signal other threads to stop
+                if success:
+                    # For successful solutions, prefer lower error
+                    if not best_result['success'] or error < best_result['error']:
+                        best_result['theta'] = theta
+                        best_result['success'] = True
+                        best_result['error'] = error
+                        stop_event.set()  # Signal other threads to stop
                 elif error < best_result['error'] and not best_result['success']:
+                    # Track best unsuccessful attempt
                     best_result['theta'] = theta
                     best_result['error'] = error
 
@@ -211,14 +219,14 @@ class TracIKSolver:
                 if stop_event.is_set():
                     break
 
-                # Try DLS
+                # Try DLS first (usually faster)
                 theta, success, error = self._dls_solver(
                     T_desired, guess, eomg, ev, timeout, stop_event
                 )
                 update_result(theta, success, error)
 
                 if not stop_event.is_set():
-                    # Try SQP
+                    # Try SQP (better for constrained problems)
                     theta, success, error = self._sqp_solver(
                         T_desired, guess, eomg, ev, timeout, stop_event
                     )
@@ -232,6 +240,131 @@ class TracIKSolver:
 
         return best_result['theta'], best_result['success'], solve_time
 
+    def _generate_initial_guesses_simple(
+        self,
+        T_desired: NDArray[np.float64],
+        theta0: Optional[NDArray[np.float64]],
+        num_restarts: int
+    ) -> List[NDArray[np.float64]]:
+        """Generate simple diverse initial guesses without expensive ranking."""
+        guesses = []
+
+        # Use provided guess or workspace heuristic
+        if theta0 is not None:
+            guesses.append(theta0.copy())
+        else:
+            guesses.append(self._workspace_heuristic(T_desired))
+
+        # Add midpoint
+        guesses.append(self._midpoint_guess())
+
+        # Add random guesses
+        for _ in range(max(0, num_restarts - 2)):
+            guesses.append(self._random_guess())
+
+        return guesses
+
+    def _svd_robust_jacobian_solve(
+        self,
+        J: NDArray[np.float64],
+        V_err: NDArray[np.float64],
+        damping: float,
+        svd_threshold: float = 1e-3
+    ) -> Tuple[NDArray[np.float64], float]:
+        """
+        Singularity-robust Jacobian pseudo-inverse using SVD filtering.
+
+        Filters out small singular values to handle near-singular configurations
+        gracefully. Returns both the step and a manipulability measure.
+
+        Args:
+            J: Jacobian matrix (6 x n_joints)
+            V_err: Error twist vector (6,)
+            damping: Damping factor for regularization
+            svd_threshold: Threshold for filtering small singular values
+
+        Returns:
+            Tuple of (delta_theta, manipulability)
+            - delta_theta: Joint space step
+            - manipulability: Condition number indicator (0 = singular, 1 = well-conditioned)
+        """
+        try:
+            U, s, Vt = np.linalg.svd(J, full_matrices=False)
+        except np.linalg.LinAlgError:
+            # SVD failed - return zero step
+            return np.zeros(J.shape[1]), 0.0
+
+        # Compute manipulability (ratio of smallest to largest singular value)
+        s_max = s[0] if len(s) > 0 else 1.0
+        s_min = s[-1] if len(s) > 0 else 0.0
+        manipulability = s_min / s_max if s_max > 1e-10 else 0.0
+
+        # Filter singular values with damping
+        # Using damped least squares in SVD form: σ_i / (σ_i² + λ²)
+        s_damped = np.zeros_like(s)
+        for i, sigma in enumerate(s):
+            if sigma > svd_threshold * s_max:
+                # Well-conditioned direction - use damped inverse
+                s_damped[i] = sigma / (sigma ** 2 + damping ** 2)
+            else:
+                # Near-singular direction - heavily damped
+                s_damped[i] = sigma / (sigma ** 2 + (10 * damping) ** 2)
+
+        # Compute step: V @ diag(s_damped) @ U.T @ V_err
+        delta_theta = Vt.T @ (s_damped * (U.T @ V_err))
+
+        return delta_theta, manipulability
+
+    def _detect_oscillation(
+        self,
+        error_history: deque,
+        theta_history: deque,
+        window_size: int = 5
+    ) -> Tuple[bool, bool]:
+        """
+        Detect stagnation and oscillation in the optimization trajectory.
+
+        Returns:
+            Tuple of (is_stagnating, is_oscillating)
+        """
+        if len(error_history) < window_size:
+            return False, False
+
+        recent_errors = list(error_history)[-window_size:]
+
+        # Stagnation detection: error not improving significantly
+        error_std = np.std(recent_errors)
+        error_mean = np.mean(recent_errors)
+        is_stagnating = error_std < 1e-6 * error_mean if error_mean > 1e-10 else error_std < 1e-10
+
+        # Oscillation detection: alternating increases and decreases
+        if len(error_history) >= window_size:
+            diffs = np.diff(recent_errors)
+            sign_changes = np.sum(np.abs(np.diff(np.sign(diffs))) > 0)
+            is_oscillating = sign_changes >= window_size - 2  # Most steps alternate
+
+        else:
+            is_oscillating = False
+
+        return is_stagnating, is_oscillating
+
+    def _gradient_descent_step(
+        self,
+        J: NDArray[np.float64],
+        V_err: NDArray[np.float64],
+        step_size: float = 0.1
+    ) -> NDArray[np.float64]:
+        """
+        Simple gradient descent step as fallback for difficult cases.
+
+        Gradient of ||V_err||² w.r.t. theta is 2 * J.T @ V_err
+        """
+        gradient = J.T @ V_err
+        grad_norm = np.linalg.norm(gradient)
+        if grad_norm > 1e-10:
+            return step_size * gradient / grad_norm
+        return np.zeros(J.shape[1])
+
     def _dls_solver(
         self,
         T_desired: NDArray[np.float64],
@@ -242,24 +375,43 @@ class TracIKSolver:
         stop_event: threading.Event
     ) -> Tuple[NDArray[np.float64], bool, float]:
         """
-        Damped Least-Squares solver with adaptive damping.
+        Advanced Damped Least-Squares solver with Levenberg-Marquardt style damping.
 
-        Uses adaptive damping for improved convergence:
-        - Reduces damping when making good progress (allows fine convergence)
-        - Increases damping when stalling (prevents oscillation)
+        Features:
+        - Levenberg-Marquardt style adaptive damping based on error improvement
+        - Singularity-robust Jacobian using SVD filtering
+        - Trust region method for step size control
+        - Stagnation and oscillation detection with recovery
+        - Gradient descent fallback for difficult cases
         """
         theta = theta0.copy()
-        damping = 0.05  # Start with moderate damping
-        min_damping = 1e-6
+
+        # Adaptive damping parameters (LM-style)
+        damping = 0.05  # Initial damping (λ)
+        min_damping = 1e-7
         max_damping = 0.5
+        nu = 2.0  # Damping adjustment multiplier
+
+        # Trust region / step cap
         step_cap = 0.3
+        min_step_cap = 0.01
+
+        # Algorithm parameters
         max_iters = 1000
+        svd_threshold = 1e-3
         start_time = time.perf_counter()
 
+        # State tracking
         best_theta = theta.copy()
         best_error = float('inf')
+        error_history = deque(maxlen=10)
+        theta_history = deque(maxlen=10)
         prev_error = float('inf')
+
+        # Recovery counters
         stall_count = 0
+        gradient_descent_count = 0
+        max_gradient_steps = 5
 
         for iteration in range(max_iters):
             # Check termination conditions
@@ -268,10 +420,14 @@ class TracIKSolver:
             if time.perf_counter() - start_time > timeout:
                 break
 
-            # Compute error
+            # Compute current error
             T_curr = self.fk_func(theta)
             V_err, rot_err, trans_err = self.error_func(T_curr, T_desired)
             current_error = rot_err + trans_err
+
+            # Check convergence
+            if rot_err < eomg and trans_err < ev:
+                return theta, True, current_error
 
             # Track best solution
             if current_error < best_error:
@@ -281,48 +437,86 @@ class TracIKSolver:
             else:
                 stall_count += 1
 
-            # Check convergence
-            if rot_err < eomg and trans_err < ev:
-                return theta, True, current_error
+            # Update history for oscillation detection
+            error_history.append(current_error)
+            theta_history.append(theta.copy())
 
-            # Adaptive damping
-            if current_error < prev_error * 0.8:
-                # Good progress - reduce damping for finer steps
-                damping = max(min_damping, damping * 0.7)
-            elif current_error > prev_error * 0.99:
-                # Stalling - increase damping
-                damping = min(max_damping, damping * 1.5)
+            # Detect stagnation and oscillation
+            is_stagnating, is_oscillating = self._detect_oscillation(
+                error_history, theta_history
+            )
 
-            # If stuck for too long, try a larger damping reset
-            if stall_count > 20:
-                damping = min(max_damping, damping * 2)
-                stall_count = 0
+            # Get Jacobian
+            J = self.jacobian_func(theta)
+
+            # Levenberg-Marquardt style damping adjustment
+            if iteration > 0:
+                if current_error < prev_error * 0.75:
+                    # Significant improvement - reduce damping (Newton-like)
+                    damping = max(min_damping, damping / 3)
+                    step_cap = min(0.5, step_cap * 1.3)
+                    nu = 2.0
+                elif current_error < prev_error * 0.99:
+                    # Modest improvement - slightly reduce damping
+                    damping = max(min_damping, damping / 1.5)
+                else:
+                    # No improvement - increase damping (gradient-like)
+                    damping = min(max_damping, damping * nu)
+                    nu = min(nu * 1.3, 8)
+                    step_cap = max(min_step_cap, step_cap * 0.7)
 
             prev_error = current_error
 
-            # Adaptive step cap - smaller steps when close to solution
-            adaptive_step_cap = min(step_cap, max(0.01, current_error * 2))
+            # Recovery strategies for difficult cases
+            use_gradient_descent = False
 
-            # DLS update
-            J = self.jacobian_func(theta)
-            JTJ = J.T @ J
-            lambda_I = (damping ** 2) * np.eye(JTJ.shape[0])
+            if is_oscillating:
+                # Oscillation detected - increase damping significantly
+                damping = min(max_damping, damping * 4)
+                step_cap = max(min_step_cap, step_cap * 0.5)
+                gradient_descent_count = 0
 
-            try:
-                delta_theta = np.linalg.solve(JTJ + lambda_I, J.T @ V_err)
-            except np.linalg.LinAlgError:
-                # Singular matrix - increase damping significantly
-                damping = min(max_damping, damping * 3)
-                continue
+            elif is_stagnating:
+                if stall_count > 15 and gradient_descent_count < max_gradient_steps:
+                    # Try gradient descent as escape mechanism
+                    use_gradient_descent = True
+                    gradient_descent_count += 1
+                    stall_count = 0
+                elif stall_count > 25:
+                    # Reset to midpoint damping
+                    damping = 0.1
+                    stall_count = 0
 
-            # Step size limiting with adaptive cap
-            norm_delta = np.linalg.norm(delta_theta)
-            if norm_delta > adaptive_step_cap:
-                delta_theta *= adaptive_step_cap / norm_delta
+            # Compute step
+            if use_gradient_descent:
+                # Gradient descent fallback
+                delta_theta = self._gradient_descent_step(J, V_err, step_size=step_cap)
+            else:
+                # Standard damped least squares with SVD fallback for singularities
+                JTJ = J.T @ J
+                lambda_I = (damping ** 2) * np.eye(JTJ.shape[0])
 
-            # Update and clip to limits
-            theta = theta + delta_theta
-            theta = self._clip_to_limits(theta)
+                try:
+                    delta_theta = np.linalg.solve(JTJ + lambda_I, J.T @ V_err)
+                except np.linalg.LinAlgError:
+                    # Singular matrix - use SVD-robust fallback
+                    delta_theta, _ = self._svd_robust_jacobian_solve(
+                        J, V_err, damping * 2, svd_threshold
+                    )
+
+            # Step size limiting
+            step_norm = np.linalg.norm(delta_theta)
+            if step_norm > step_cap:
+                delta_theta *= step_cap / step_norm
+
+            # Adaptive step size near convergence
+            if current_error < 0.1:
+                adaptive_cap = max(0.01, current_error * 2)
+                if step_norm > adaptive_cap:
+                    delta_theta *= adaptive_cap / step_norm
+
+            # Update and clip to joint limits
+            theta = self._clip_to_limits(theta + delta_theta)
 
         # Return best found
         T_curr = self.fk_func(best_theta)
@@ -404,23 +598,101 @@ class TracIKSolver:
         theta0: Optional[NDArray[np.float64]],
         num_restarts: int
     ) -> List[NDArray[np.float64]]:
-        """Generate diverse initial guesses."""
+        """
+        Generate diverse initial guesses with error-based prioritization.
+
+        Uses multiple strategies to ensure good coverage of the configuration space:
+        1. User-provided or workspace heuristic (highest priority)
+        2. Perturbed versions of the best guess (local exploration)
+        3. Midpoint of joint limits (neutral position)
+        4. Strategic random samples (global exploration)
+        """
         guesses = []
 
-        # Use provided guess or workspace heuristic
+        # Primary guess: user-provided or workspace heuristic
         if theta0 is not None:
-            guesses.append(theta0.copy())
+            primary_guess = theta0.copy()
         else:
-            guesses.append(self._workspace_heuristic(T_desired))
+            primary_guess = self._workspace_heuristic(T_desired)
+        guesses.append(primary_guess)
+
+        # Evaluate primary guess error for adaptive perturbation
+        T_curr = self.fk_func(primary_guess)
+        _, _, trans_err = self.error_func(T_curr, T_desired)
+
+        # Determine perturbation scale based on initial error
+        if trans_err < 0.01:  # Close - small perturbations
+            perturb_scale = 0.1
+        elif trans_err < 0.1:  # Medium - moderate perturbations
+            perturb_scale = 0.3
+        else:  # Far - large perturbations
+            perturb_scale = 0.5
+
+        # Add perturbed versions of primary guess (local exploration)
+        for _ in range(min(2, num_restarts - 1)):
+            perturbed = primary_guess + perturb_scale * np.random.randn(self.n_joints)
+            guesses.append(self._clip_to_limits(perturbed))
 
         # Add midpoint
-        guesses.append(self._midpoint_guess())
+        if len(guesses) < num_restarts:
+            guesses.append(self._midpoint_guess())
 
-        # Add random guesses
-        for _ in range(max(0, num_restarts - 2)):
-            guesses.append(self._random_guess())
+        # Add strategically distributed random guesses
+        remaining = num_restarts - len(guesses)
+        if remaining > 0:
+            # Use Latin hypercube-like sampling for better coverage
+            guesses.extend(self._stratified_random_guesses(remaining))
+
+        return guesses[:num_restarts]
+
+    def _stratified_random_guesses(self, num_samples: int) -> List[NDArray[np.float64]]:
+        """
+        Generate stratified random guesses for better configuration space coverage.
+
+        Uses a simple stratified sampling approach where each sample covers
+        a different region of the joint space.
+        """
+        guesses = []
+        n_joints = self.n_joints
+
+        for i in range(num_samples):
+            theta = np.zeros(n_joints)
+            for j, (mn, mx) in enumerate(self.joint_limits):
+                lb = mn if mn is not None else -np.pi
+                ub = mx if mx is not None else np.pi
+
+                # Stratified sampling: divide range into num_samples segments
+                segment_size = (ub - lb) / max(num_samples, 1)
+                segment_start = lb + i * segment_size
+                segment_end = min(segment_start + segment_size, ub)
+
+                # Random sample within segment
+                theta[j] = np.random.uniform(segment_start, segment_end)
+
+            guesses.append(theta)
 
         return guesses
+
+    def _rank_guesses_by_error(
+        self,
+        guesses: List[NDArray[np.float64]],
+        T_desired: NDArray[np.float64]
+    ) -> List[Tuple[NDArray[np.float64], float]]:
+        """
+        Rank initial guesses by their initial error (best first).
+
+        Returns list of (guess, error) tuples sorted by error.
+        """
+        ranked = []
+        for guess in guesses:
+            T_curr = self.fk_func(guess)
+            _, rot_err, trans_err = self.error_func(T_curr, T_desired)
+            error = rot_err + trans_err
+            ranked.append((guess, error))
+
+        # Sort by error (lowest first)
+        ranked.sort(key=lambda x: x[1])
+        return ranked
 
     def _workspace_heuristic(self, T_desired: NDArray[np.float64]) -> NDArray[np.float64]:
         """Generate initial guess using geometric heuristic."""
