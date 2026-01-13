@@ -228,7 +228,7 @@ class SerialManipulator:
         thetalist0: Union[NDArray[np.float64], List[float]],
         eomg: float = 1e-6,
         ev: float = 1e-6,
-        max_iterations: int = 5000,
+        max_iterations: int = 10000,
         plot_residuals: bool = False,
         damping: float = 2e-2,            # lambda for damped least-squares (optimized: 2e-2 for 6-DOF, 1e-2 for 2-DOF)
         step_cap: float = 0.3,            # max norm(delta_theta) per iteration (rad). Optimized: 0.3 for 6-DOF stability, 0.1 for 2-DOF
@@ -456,7 +456,7 @@ class SerialManipulator:
         cache: Optional[Any] = None,  # IKInitialGuessCache instance
         eomg: float = 1e-6,
         ev: float = 1e-6,
-        max_iterations: int = 5000,
+        max_iterations: int = 10000,
         plot_residuals: bool = False,
         damping: float = 2e-2,
         step_cap: float = 0.3,
