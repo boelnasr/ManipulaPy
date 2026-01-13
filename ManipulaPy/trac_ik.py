@@ -758,36 +758,71 @@ class TracIKSolver:
         T_desired: NDArray[np.float64]
     ) -> Tuple[NDArray[np.float64], float, float]:
         """
-        Default error function using SE(3) logarithm for Jacobian update,
-        but Cartesian errors for tolerance checking.
+        Default error function using geometric error for stable convergence.
 
         Returns:
             Tuple of (error_vector, rotation_error, translation_error)
-            - error_vector: Space-frame twist for Jacobian-based updates
-            - rotation_error: Actual rotation error in radians (axis-angle magnitude)
+            - error_vector: 6D error for Jacobian-based updates [omega, v]
+            - rotation_error: Actual rotation error in radians
             - translation_error: Actual Cartesian position error in meters
         """
-        # Import utils for matrix logarithm
         from . import utils
 
-        # Body-frame error twist (for Jacobian update)
-        T_err = np.linalg.inv(T_current) @ T_desired
-        V_err = utils.se3ToVec(utils.MatrixLog6(T_err))
+        # Position error - simple Cartesian difference
+        p_current = T_current[:3, 3]
+        p_desired = T_desired[:3, 3]
+        pos_error = p_desired - p_current
+        trans_err = np.linalg.norm(pos_error)
 
-        # Transform to space frame for Jacobian compatibility
-        V_err_space = utils.adjoint_transform(T_current) @ V_err
+        # Rotation error using axis-angle representation
+        R_current = T_current[:3, :3]
+        R_desired = T_desired[:3, :3]
+        R_err = R_current.T @ R_desired  # Rotation from current to desired
 
-        # Use ACTUAL Cartesian errors for tolerance checking
-        # This gives intuitive tolerance values (meters for position, radians for orientation)
-        trans_err = np.linalg.norm(T_current[:3, 3] - T_desired[:3, 3])
-
-        # Rotation error: axis-angle magnitude from rotation matrix difference
-        R_err = T_current[:3, :3].T @ T_desired[:3, :3]
-        # Use matrix logarithm to get rotation angle
+        # Extract axis-angle from rotation matrix
         trace_val = np.clip((np.trace(R_err) - 1) / 2, -1, 1)
-        rot_err = np.arccos(trace_val)  # Rotation angle in radians
+        angle = np.arccos(trace_val)
+        rot_err = abs(angle)
 
-        return V_err_space, rot_err, trans_err
+        # Compute rotation axis (avoid singularity at angle=0 or pi)
+        if angle < 1e-6:
+            # Nearly aligned - small angle approximation
+            omega_err = np.array([R_err[2, 1] - R_err[1, 2],
+                                   R_err[0, 2] - R_err[2, 0],
+                                   R_err[1, 0] - R_err[0, 1]]) / 2
+        elif abs(angle - np.pi) < 1e-6:
+            # Near 180 degrees - use diagonal elements
+            diag = np.diag(R_err)
+            k = np.argmax(diag)
+            axis = np.zeros(3)
+            axis[k] = 1.0
+            # Refine axis from off-diagonal elements
+            if k == 0:
+                axis[1] = R_err[0, 1] / (1 + R_err[0, 0]) if abs(1 + R_err[0, 0]) > 1e-6 else 0
+                axis[2] = R_err[0, 2] / (1 + R_err[0, 0]) if abs(1 + R_err[0, 0]) > 1e-6 else 0
+            elif k == 1:
+                axis[0] = R_err[1, 0] / (1 + R_err[1, 1]) if abs(1 + R_err[1, 1]) > 1e-6 else 0
+                axis[2] = R_err[1, 2] / (1 + R_err[1, 1]) if abs(1 + R_err[1, 1]) > 1e-6 else 0
+            else:
+                axis[0] = R_err[2, 0] / (1 + R_err[2, 2]) if abs(1 + R_err[2, 2]) > 1e-6 else 0
+                axis[1] = R_err[2, 1] / (1 + R_err[2, 2]) if abs(1 + R_err[2, 2]) > 1e-6 else 0
+            axis = axis / (np.linalg.norm(axis) + 1e-10)
+            omega_err = angle * axis
+        else:
+            # General case - extract axis from skew-symmetric part
+            axis = np.array([R_err[2, 1] - R_err[1, 2],
+                             R_err[0, 2] - R_err[2, 0],
+                             R_err[1, 0] - R_err[0, 1]]) / (2 * np.sin(angle) + 1e-10)
+            omega_err = angle * axis
+
+        # Transform orientation error to space frame
+        omega_err_space = R_current @ omega_err
+
+        # Build 6D error vector [angular, linear] in space frame
+        # Using simple geometric errors (no adjoint amplification)
+        V_err = np.concatenate([omega_err_space, pos_error])
+
+        return V_err, rot_err, trans_err
 
 
 def trac_ik_solve(
