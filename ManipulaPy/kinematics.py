@@ -465,12 +465,13 @@ class SerialManipulator:
         weight_position: float = 1.0,
         adaptive_tuning: bool = True,
         backtracking: bool = True,
+        auto_fallback: bool = True,
     ) -> Tuple[NDArray[np.float64], bool, int]:
         """
         Smart inverse kinematics with intelligent initial guess strategies.
 
         Automatically selects initial guess using various strategies for improved
-        convergence (50-90% fewer iterations, 85-95% success rate vs 60-70% baseline).
+        convergence. With auto_fallback=True, tries multiple strategies if first fails.
 
         Args:
             T_desired: Target 4x4 transformation matrix
@@ -483,92 +484,101 @@ class SerialManipulator:
             theta_current: Current joint angles (required for 'extrapolate')
             T_current: Current end-effector pose (required for 'extrapolate')
             cache: IKInitialGuessCache instance (required for 'cached')
-            eomg, ev, max_iterations, plot_residuals, damping, step_cap, png_name:
-                Same as iterative_inverse_kinematics()
-            weight_orientation, weight_position:
-                Scale rotational vs translational error inside the solver
-            adaptive_tuning: Enable adaptive damping/step sizing
-            backtracking: Enable simple backtracking line search
+            auto_fallback: If True, try other strategies if primary fails (default: True)
+            Other args same as iterative_inverse_kinematics()
 
         Returns:
-            Tuple of (theta, success, iterations) same as iterative_inverse_kinematics()
-
-        Performance:
-            - workspace_heuristic: 85-95% success, 20-50 iters (vs 200-500 baseline)
-            - extrapolate: 95-99% success, 5-15 iters (best for trajectories)
-            - cached: 90-98% success, 10-30 iters (best for repeated tasks)
-            - midpoint: 70-80% success, 100-200 iters (simple fallback)
-
-        Example:
-            >>> # Workspace heuristic (default)
-            >>> theta, success, iters = robot.smart_inverse_kinematics(T_target)
-            >>>
-            >>> # For trajectory tracking
-            >>> theta, success, iters = robot.smart_inverse_kinematics(
-            ...     T_target,
-            ...     strategy='extrapolate',
-            ...     theta_current=current_angles,
-            ...     T_current=robot.forward_kinematics(current_angles)
-            ... )
-            >>>
-            >>> # With caching
-            >>> from ManipulaPy.ik_helpers import IKInitialGuessCache
-            >>> cache = IKInitialGuessCache(max_size=100)
-            >>> theta, success, iters = robot.smart_inverse_kinematics(
-            ...     T_target, strategy='cached', cache=cache
-            ... )
-            >>> cache.add(T_target, theta)  # Save successful solution
+            Tuple of (theta, success, iterations)
         """
         from . import ik_helpers
 
         n_joints = len(self.joint_limits)
 
-        # Generate initial guess based on strategy
-        if strategy == "workspace_heuristic":
-            theta0 = ik_helpers.workspace_heuristic_guess(
-                T_desired, n_joints, self.joint_limits
+        valid_strategies = ["workspace_heuristic", "extrapolate", "cached", "random", "midpoint"]
+        if strategy not in valid_strategies:
+            raise ValueError(
+                f"Unknown strategy '{strategy}'. Choose from: {valid_strategies}"
             )
 
-        elif strategy == "extrapolate":
-            if theta_current is None or T_current is None:
-                raise ValueError(
-                    "strategy='extrapolate' requires theta_current and T_current"
-                )
-            theta0 = ik_helpers.extrapolate_from_current(
-                theta_current, T_current, T_desired,
-                lambda th: self.jacobian(th, frame="space"),
-                self.joint_limits,
-                alpha=0.5
-            )
-
-        elif strategy == "cached":
-            if cache is None:
-                raise ValueError("strategy='cached' requires cache parameter")
-            theta0 = cache.get_nearest(T_desired, k=3, joint_limits=self.joint_limits)
-            if theta0 is None:
-                # Cache empty, fall back to workspace heuristic
-                theta0 = ik_helpers.workspace_heuristic_guess(
+        def get_initial_guess(strat):
+            """Generate initial guess for given strategy."""
+            if strat == "workspace_heuristic":
+                return ik_helpers.workspace_heuristic_guess(
                     T_desired, n_joints, self.joint_limits
                 )
+            elif strat == "extrapolate":
+                if theta_current is None or T_current is None:
+                    return None
+                return ik_helpers.extrapolate_from_current(
+                    theta_current, T_current, T_desired,
+                    lambda th: self.jacobian(th, frame="space"),
+                    self.joint_limits, alpha=0.5
+                )
+            elif strat == "cached":
+                if cache is None:
+                    return None
+                return cache.get_nearest(T_desired, k=3, joint_limits=self.joint_limits)
+            elif strat == "random":
+                return ik_helpers.random_in_limits(self.joint_limits)
+            elif strat == "midpoint":
+                return ik_helpers.midpoint_of_limits(self.joint_limits)
+            else:
+                return None
 
-        elif strategy == "random":
-            theta0 = ik_helpers.random_in_limits(self.joint_limits)
-
-        elif strategy == "midpoint":
-            theta0 = ik_helpers.midpoint_of_limits(self.joint_limits)
-
-        else:
-            raise ValueError(
-                f"Unknown strategy '{strategy}'. Choose from: "
-                "'workspace_heuristic', 'extrapolate', 'cached', 'random', 'midpoint'"
+        def try_ik(theta0):
+            """Try IK with given initial guess."""
+            return self.iterative_inverse_kinematics(
+                T_desired, theta0, eomg, ev, max_iterations,
+                plot_residuals, damping, step_cap, png_name,
+                weight_orientation, weight_position, adaptive_tuning, backtracking
             )
 
-        # Call standard IK with smart initial guess
-        return self.iterative_inverse_kinematics(
-            T_desired, theta0, eomg, ev, max_iterations,
-            plot_residuals, damping, step_cap, png_name,
-            weight_orientation, weight_position, adaptive_tuning, backtracking
-        )
+        # Primary strategy
+        theta0 = get_initial_guess(strategy)
+        if theta0 is None:
+            theta0 = ik_helpers.workspace_heuristic_guess(T_desired, n_joints, self.joint_limits)
+
+        theta, success, iters = try_ik(theta0)
+
+        if success or not auto_fallback:
+            return theta, success, iters
+
+        # Fallback strategies if primary failed
+        fallback_strategies = ["midpoint", "random", "random", "random"]
+        total_iters = iters
+        best_theta = theta
+        best_error = float('inf')
+
+        # Evaluate initial result
+        T_curr = self.forward_kinematics(theta, frame="space")
+        pos_err = np.linalg.norm(T_curr[:3, 3] - T_desired[:3, 3])
+        R_err = T_curr[:3, :3].T @ T_desired[:3, :3]
+        rot_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
+        best_error = pos_err + rot_err
+
+        for fallback in fallback_strategies:
+            theta0 = get_initial_guess(fallback)
+            if theta0 is None:
+                continue
+
+            theta_try, success_try, iters_try = try_ik(theta0)
+            total_iters += iters_try
+
+            if success_try:
+                return theta_try, True, total_iters
+
+            # Track best solution
+            T_curr = self.forward_kinematics(theta_try, frame="space")
+            pos_err = np.linalg.norm(T_curr[:3, 3] - T_desired[:3, 3])
+            R_err = T_curr[:3, :3].T @ T_desired[:3, :3]
+            rot_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
+            error = pos_err + rot_err
+
+            if error < best_error:
+                best_error = error
+                best_theta = theta_try
+
+        return best_theta, False, total_iters
 
     def robust_inverse_kinematics(
         self,
@@ -576,78 +586,104 @@ class SerialManipulator:
         max_attempts: int = 10,
         eomg: float = 2e-3,
         ev: float = 2e-3,
-        max_iterations: int = 1500,
+        max_iterations: int = 5000,
         verbose: bool = False
     ) -> Tuple[NDArray[np.float64], bool, int, str]:
         """
         Robust inverse kinematics with adaptive multi-start strategy.
 
-        Automatically tries multiple IK strategies and parameters to maximize
-        success rate. Achieves 50-80%+ success compared to 10-20% for single-start.
-
-        This is the RECOMMENDED IK method for production use when high reliability
-        is required and computational cost is acceptable (~3-5x single-start).
+        Tries multiple initial guesses and parameter combinations to maximize
+        success rate. Tracks best solution across all attempts.
 
         Args:
             T_desired: Target 4x4 transformation matrix
             max_attempts: Maximum IK attempts (default: 10)
-                - 3-5 attempts: 40-60% success (fast)
-                - 10 attempts: 50-80% success (recommended)
-                - 15+ attempts: 60-90% success (thorough)
             eomg: Orientation tolerance in radians (default: 2e-3 = 2mrad)
             ev: Position tolerance in meters (default: 2e-3 = 2mm)
-            max_iterations: Max iterations per attempt (default: 1500, balanced for multi-start)
+            max_iterations: Max iterations per attempt (default: 5000)
             verbose: Print detailed progress (default: False)
 
         Returns:
             Tuple of (theta, success, total_iterations, winning_strategy)
-            - theta: Best joint configuration found
-            - success: True if solution within tolerances
-            - total_iterations: Total iterations across all attempts
-            - winning_strategy: Name of strategy that succeeded
-
-        Performance Comparison (with optimized parameters):
-            - iterative_inverse_kinematics: 10-20% success, ~50 iters, ~25ms
-            - smart_inverse_kinematics: 10-20% success, ~50 iters, ~25ms
-            - robust_inverse_kinematics: 50-80% success, ~300 iters, ~150ms
-
-        Example:
-            >>> # Simple usage (recommended)
-            >>> theta, success, iters, strategy = robot.robust_inverse_kinematics(T_target)
-            >>> if success:
-            ...     print(f"Solution found using {strategy}")
-            >>> else:
-            ...     print("No solution found")
-            >>>
-            >>> # With custom parameters
-            >>> theta, success, iters, strategy = robot.robust_inverse_kinematics(
-            ...     T_target,
-            ...     max_attempts=5,   # Faster, ~60-70% success
-            ...     verbose=True      # Show progress
-            ... )
-            >>>
-            >>> # For trajectory generation (batch processing)
-            >>> waypoints = [T1, T2, T3, T4, T5]
-            >>> solutions = []
-            >>> for T in waypoints:
-            ...     theta, success, _, _ = robot.robust_inverse_kinematics(T)
-            ...     if success:
-            ...         solutions.append(theta)
-            ...     else:
-            ...         print(f"Warning: Failed to reach waypoint")
         """
         from . import ik_helpers
 
-        # Use the adaptive multi-start function from ik_helpers
-        return ik_helpers.adaptive_multi_start_ik(
-            ik_solver_func=self.smart_inverse_kinematics,
-            T_desired=T_desired,
-            max_attempts=max_attempts,
-            eomg=eomg,
-            ev=ev,
-            max_iterations=max_iterations,
-            verbose=verbose
-        )
+        n_joints = len(self.joint_limits)
+
+        # Strategy configurations: (name, damping, step_cap)
+        strategies = [
+            ("workspace_heuristic", 0.02, 0.3),
+            ("midpoint", 0.02, 0.3),
+            ("workspace_heuristic", 0.01, 0.4),
+            ("random", 0.02, 0.3),
+            ("random", 0.03, 0.25),
+            ("midpoint", 0.01, 0.4),
+            ("random", 0.015, 0.35),
+            ("random", 0.025, 0.3),
+            ("workspace_heuristic", 0.03, 0.25),
+            ("random", 0.02, 0.35),
+        ]
+
+        best_theta = None
+        best_error = float('inf')
+        total_iterations = 0
+        winning_strategy = "none"
+
+        for attempt in range(min(max_attempts, len(strategies))):
+            strategy_name, damping, step_cap = strategies[attempt]
+
+            if verbose:
+                print(f"Attempt {attempt + 1}/{max_attempts}: {strategy_name}, "
+                      f"damping={damping}, step_cap={step_cap}")
+
+            # Generate initial guess
+            if strategy_name == "workspace_heuristic":
+                theta0 = ik_helpers.workspace_heuristic_guess(
+                    T_desired, n_joints, self.joint_limits
+                )
+            elif strategy_name == "midpoint":
+                theta0 = ik_helpers.midpoint_of_limits(self.joint_limits)
+            else:  # random
+                theta0 = ik_helpers.random_in_limits(self.joint_limits)
+
+            try:
+                theta, success, iters = self.iterative_inverse_kinematics(
+                    T_desired, theta0, eomg, ev, max_iterations,
+                    damping=damping, step_cap=step_cap,
+                    adaptive_tuning=True, backtracking=True
+                )
+                total_iterations += iters
+
+                if success:
+                    if verbose:
+                        print(f"  ✓ SUCCESS in {iters} iterations")
+                    return theta, True, total_iterations, strategy_name
+
+                # Evaluate error for tracking best
+                T_curr = self.forward_kinematics(theta, frame="space")
+                pos_err = np.linalg.norm(T_curr[:3, 3] - T_desired[:3, 3])
+                R_err = T_curr[:3, :3].T @ T_desired[:3, :3]
+                rot_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
+                error = pos_err + rot_err
+
+                if verbose:
+                    print(f"  ✗ Failed (pos_err={pos_err*1000:.2f}mm, rot_err={np.degrees(rot_err):.2f}°)")
+
+                if error < best_error:
+                    best_error = error
+                    best_theta = theta.copy()
+                    winning_strategy = strategy_name
+
+            except Exception as e:
+                if verbose:
+                    print(f"  ✗ Exception: {e}")
+                continue
+
+        # Return best solution found
+        if best_theta is None:
+            best_theta = ik_helpers.midpoint_of_limits(self.joint_limits)
+
+        return best_theta, False, total_iterations, winning_strategy
 
     def joint_velocity(
         self,
