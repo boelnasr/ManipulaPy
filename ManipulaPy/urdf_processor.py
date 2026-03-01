@@ -32,24 +32,26 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import Optional, List, Tuple, Dict, Union
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+
 import numpy as np
 
 # PyBullet is optional - only needed for PyBullet-based joint limits
 try:
     import pybullet as p
     import pybullet_data
+
     PYBULLET_AVAILABLE = True
 except ImportError:
     PYBULLET_AVAILABLE = False
     p = None
     pybullet_data = None
 
-from .urdf import URDF, URDFModifier, Scene, validate_urdf
-from .kinematics import SerialManipulator
-from .dynamics import ManipulatorDynamics
 from . import utils
+from .dynamics import ManipulatorDynamics
+from .kinematics import SerialManipulator
+from .urdf import URDF, Scene, URDFModifier, validate_urdf
 
 
 class URDFToSerialManipulator:
@@ -106,6 +108,7 @@ class URDFToSerialManipulator:
             result = validate_urdf(self.robot)
             if not result.valid:
                 import warnings
+
                 warnings.warn(
                     f"URDF validation issues: {[str(i) for i in result.issues]}",
                     UserWarning,
@@ -118,6 +121,7 @@ class URDFToSerialManipulator:
         if use_pybullet_limits:
             if not PYBULLET_AVAILABLE:
                 import warnings
+
                 warnings.warn(
                     "PyBullet not available, using URDF joint limits instead.",
                     UserWarning,
@@ -204,6 +208,7 @@ class URDFToSerialManipulator:
             dict: Robot kinematic/dynamic parameters
         """
         import warnings
+
         warnings.warn(
             "load_urdf() is deprecated. Use _extract_robot_data() instead.",
             DeprecationWarning,
@@ -455,9 +460,7 @@ class URDFToSerialManipulator:
 
         return batch_fk
 
-    def get_end_effector_transforms(
-        self, cfgs: np.ndarray
-    ) -> np.ndarray:
+    def get_end_effector_transforms(self, cfgs: np.ndarray) -> np.ndarray:
         """
         Get end-effector transforms for multiple configurations.
 
@@ -512,14 +515,12 @@ class URDFToSerialManipulator:
             initial_guess = np.zeros(self.robot.num_dofs)
 
         if method == "robust":
-            theta, success, iters, _ = self.serial_manipulator.robust_inverse_kinematics(
-                T_desired, **kwargs
+            theta, success, iters, _ = (
+                self.serial_manipulator.robust_inverse_kinematics(T_desired, **kwargs)
             )
             return theta, success, iters
         elif method == "smart":
-            return self.serial_manipulator.smart_inverse_kinematics(
-                T_desired, **kwargs
-            )
+            return self.serial_manipulator.smart_inverse_kinematics(T_desired, **kwargs)
         else:  # iterative
             return self.serial_manipulator.iterative_inverse_kinematics(
                 T_desired, initial_guess, **kwargs

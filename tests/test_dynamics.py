@@ -12,8 +12,10 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 """
 
 import unittest
-import numpy as np
 from math import pi
+
+import numpy as np
+
 from ManipulaPy.dynamics import ManipulatorDynamics
 
 

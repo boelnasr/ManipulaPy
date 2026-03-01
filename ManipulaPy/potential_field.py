@@ -29,7 +29,6 @@ from scipy.spatial import ConvexHull
 
 from .urdf import URDF  # Use native parser
 
-
 # Import CUDA kernel functions (assuming these are defined in cuda_kernels.py)
 
 
@@ -60,7 +59,7 @@ class PotentialField:
                     * self.repulsive_gain
                     * (1.0 / d - 1.0 / self.influence_distance) ** 2
                 )
-        return 10*repulsive_potential
+        return 10 * repulsive_potential
 
     def compute_gradient(self, q, q_goal, obstacles):
         """
@@ -78,7 +77,8 @@ class PotentialField:
             d = np.linalg.norm(q - obstacle)
             if d <= self.influence_distance:
                 repulsive_gradient += (
-                    -40*self.repulsive_gain
+                    -40
+                    * self.repulsive_gain
                     * (1.0 / d - 1.0 / self.influence_distance)
                     * (1.0 / (d**3))
                     * (q - obstacle)
@@ -130,7 +130,7 @@ class CollisionChecker:
                     geom = visual.geometry
 
                     # Check if it's a mesh with loaded vertices
-                    if hasattr(geom, 'mesh_data') and geom.mesh_data is not None:
+                    if hasattr(geom, "mesh_data") and geom.mesh_data is not None:
                         vertices = geom.mesh_data.vertices
                         if vertices is not None and len(vertices) >= 4:
                             try:
@@ -140,7 +140,7 @@ class CollisionChecker:
                                 # Skip if convex hull fails (degenerate geometry)
                                 pass
                     # Fallback for legacy mesh attribute
-                    elif hasattr(geom, 'mesh') and geom.mesh is not None:
+                    elif hasattr(geom, "mesh") and geom.mesh is not None:
                         mesh = geom.mesh
                         if hasattr(mesh, "vertices") and mesh.vertices is not None:
                             vertices = np.array(mesh.vertices)
@@ -196,7 +196,9 @@ class CollisionChecker:
                             self.convex_hulls[other_link_name], other_transform
                         )
                         # Check intersection using convex hull overlap
-                        if self._hulls_intersect(transformed_hull, other_transformed_hull):
+                        if self._hulls_intersect(
+                            transformed_hull, other_transformed_hull
+                        ):
                             return True
         return False
 

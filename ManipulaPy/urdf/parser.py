@@ -9,34 +9,35 @@ yourdfpy, urchin, and urdfpy. Handles malformed XML gracefully.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
+import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Optional, Dict, List, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
+
 import numpy as np
-import logging
 
 from .types import (
-    Link,
-    Joint,
-    JointType,
-    Origin,
-    Inertial,
-    Visual,
-    Collision,
-    Material,
+    Actuator,
     Box,
+    Collision,
     Cylinder,
-    Sphere,
-    Mesh,
-    JointLimit,
-    JointDynamics,
-    JointMimic,
-    SafetyController,
-    JointCalibration,
     Geometry,
+    Inertial,
+    Joint,
+    JointCalibration,
+    JointDynamics,
+    JointLimit,
+    JointMimic,
+    JointType,
+    Link,
+    Material,
+    Mesh,
+    Origin,
+    SafetyController,
+    Sphere,
     Transmission,
     TransmissionJoint,
-    Actuator,
+    Visual,
 )
 
 if TYPE_CHECKING:
@@ -463,7 +464,9 @@ class URDFParser:
             for c in elem.findall("collision")
         ]
 
-        return Link(name=name, inertial=inertial, visuals=visuals, collisions=collisions)
+        return Link(
+            name=name, inertial=inertial, visuals=visuals, collisions=collisions
+        )
 
     @classmethod
     def _parse_joint_limit(cls, elem: Optional[ET.Element]) -> Optional[JointLimit]:
@@ -618,10 +621,12 @@ class URDFParser:
             if hw_elem is not None and hw_elem.text:
                 hw_interface = hw_elem.text.strip()
 
-            joints.append(TransmissionJoint(
-                name=joint_name,
-                hardware_interface=hw_interface,
-            ))
+            joints.append(
+                TransmissionJoint(
+                    name=joint_name,
+                    hardware_interface=hw_interface,
+                )
+            )
 
         # Parse actuators within transmission
         actuators: List[Actuator] = []
@@ -645,11 +650,13 @@ class URDFParser:
             if hw_elem is not None and hw_elem.text:
                 hw_interface = hw_elem.text.strip()
 
-            actuators.append(Actuator(
-                name=act_name,
-                mechanical_reduction=mech_red,
-                hardware_interface=hw_interface,
-            ))
+            actuators.append(
+                Actuator(
+                    name=act_name,
+                    mechanical_reduction=mech_red,
+                    hardware_interface=hw_interface,
+                )
+            )
 
         return Transmission(
             name=name,

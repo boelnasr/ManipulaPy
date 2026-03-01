@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-import unittest
 import os
-from ManipulaPy.urdf_processor import URDFToSerialManipulator
+import unittest
+
 from ManipulaPy.ManipulaPy_data.ur5 import urdf_file as xarm_urdf_file
+from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 
 class TestURDFProcessor(unittest.TestCase):
@@ -41,7 +42,7 @@ class TestURDFProcessor(unittest.TestCase):
             self.assertTrue(hasattr(processor.serial_manipulator, "M_list"))
             self.assertTrue(hasattr(processor.serial_manipulator, "S_list"))
             self.assertTrue(hasattr(processor.serial_manipulator, "B_list"))
-            
+
         except ValueError as e:
             if "shapes" in str(e) and "not aligned" in str(e):
                 # This is the matrix multiplication error due to empty joints
@@ -63,7 +64,7 @@ class TestURDFProcessor(unittest.TestCase):
             self.assertTrue(hasattr(processor.dynamics, "Glist"))
             self.assertTrue(hasattr(processor.dynamics, "M_list"))
             self.assertTrue(hasattr(processor.dynamics, "S_list"))
-            
+
         except ValueError as e:
             if "shapes" in str(e) and "not aligned" in str(e):
                 # This is the matrix multiplication error due to empty joints
@@ -79,51 +80,56 @@ class TestURDFProcessor(unittest.TestCase):
         try:
             # Just check that the class can be instantiated
             processor = URDFToSerialManipulator(self.urdf_path)
-            
+
             # Basic checks that don't depend on joint structure
             self.assertIsNotNone(processor.urdf_name)
             self.assertEqual(processor.urdf_name, self.urdf_path)
             self.assertIsNotNone(processor.robot)
-            
+
             print("✅ URDFToSerialManipulator instantiation successful")
-            
+
         except ValueError as e:
             if "shapes" in str(e) and "not aligned" in str(e):
                 print(f"⚠️ URDF parsing issue (likely no actuated joints): {e}")
                 # Create a minimal test to verify the class structure
-                self.assertTrue(hasattr(URDFToSerialManipulator, '__init__'))
-                self.assertTrue(hasattr(URDFToSerialManipulator, 'load_urdf'))
+                self.assertTrue(hasattr(URDFToSerialManipulator, "__init__"))
+                self.assertTrue(hasattr(URDFToSerialManipulator, "load_urdf"))
                 print("✅ URDFToSerialManipulator class structure is correct")
             else:
                 self.fail(f"Unexpected ValueError: {e}")
         except Exception as e:
             # For other exceptions, we still want to test the class structure
             print(f"⚠️ Exception during URDF processing: {e}")
-            self.assertTrue(hasattr(URDFToSerialManipulator, '__init__'))
-            self.assertTrue(hasattr(URDFToSerialManipulator, 'load_urdf'))
+            self.assertTrue(hasattr(URDFToSerialManipulator, "__init__"))
+            self.assertTrue(hasattr(URDFToSerialManipulator, "load_urdf"))
             print("✅ URDFToSerialManipulator class structure is correct")
 
     def test_urdf_file_exists(self):
         """Test that the URDF file actually exists."""
-        self.assertTrue(os.path.exists(self.urdf_path), 
-                       f"URDF file does not exist at {self.urdf_path}")
-        self.assertTrue(os.path.isfile(self.urdf_path), 
-                       f"Path exists but is not a file: {self.urdf_path}")
-        
+        self.assertTrue(
+            os.path.exists(self.urdf_path),
+            f"URDF file does not exist at {self.urdf_path}",
+        )
+        self.assertTrue(
+            os.path.isfile(self.urdf_path),
+            f"Path exists but is not a file: {self.urdf_path}",
+        )
+
         # Check file is not empty
         file_size = os.path.getsize(self.urdf_path)
         self.assertGreater(file_size, 0, "URDF file is empty")
-        
+
         # Try to read the file content
         try:
-            with open(self.urdf_path, 'r') as f:
+            with open(self.urdf_path, "r") as f:
                 content = f.read()
-                self.assertIn('<robot', content.lower(), "File doesn't appear to be a valid URDF")
+                self.assertIn(
+                    "<robot", content.lower(), "File doesn't appear to be a valid URDF"
+                )
         except Exception as e:
             self.fail(f"Could not read URDF file: {e}")
-            
+
         print(f"✅ URDF file validation passed: {self.urdf_path}")
-        
 
 
 if __name__ == "__main__":

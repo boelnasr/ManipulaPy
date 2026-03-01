@@ -10,9 +10,9 @@ Copyright (c) 2025 Mohamed Aboelnasr
 """
 
 import logging
-from typing import List, Set, Dict, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 class ValidationSeverity(Enum):
     """Severity levels for validation issues."""
 
-    ERROR = "error"      # Invalid URDF, will fail to use
+    ERROR = "error"  # Invalid URDF, will fail to use
     WARNING = "warning"  # May cause unexpected behavior
-    INFO = "info"        # Informational, not an issue
+    INFO = "info"  # Informational, not an issue
 
 
 @dataclass
@@ -35,7 +35,11 @@ class ValidationIssue:
     element_name: str = ""  # Name of the problematic element
 
     def __str__(self) -> str:
-        location = f" in {self.element_type} '{self.element_name}'" if self.element_name else ""
+        location = (
+            f" in {self.element_type} '{self.element_name}'"
+            if self.element_name
+            else ""
+        )
         return f"[{self.severity.value.upper()}]{location}: {self.message}"
 
 
@@ -79,7 +83,9 @@ class ValidationResult:
         if not self.issues:
             return "URDF is valid"
 
-        lines = [f"URDF validation {'FAILED' if not self.valid else 'passed with warnings'}:"]
+        lines = [
+            f"URDF validation {'FAILED' if not self.valid else 'passed with warnings'}:"
+        ]
         for issue in self.issues:
             lines.append(f"  {issue}")
         return "\n".join(lines)
@@ -272,10 +278,11 @@ class URDFValidator:
         result: ValidationResult,
     ) -> None:
         """Validate individual joint."""
-        from .types import JointType
-
         # Check axis normalization
         import numpy as np
+
+        from .types import JointType
+
         axis_norm = np.linalg.norm(joint.axis)
         if abs(axis_norm - 1.0) > 1e-6:
             result.add_issue(
@@ -361,5 +368,5 @@ def validate_urdf(urdf) -> ValidationResult:
     return validator.validate(
         links=urdf._links,
         joints=urdf._joints,
-        transmissions=getattr(urdf, '_transmissions', None),
+        transmissions=getattr(urdf, "_transmissions", None),
     )

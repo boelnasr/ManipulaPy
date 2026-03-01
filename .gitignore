@@ -122,3 +122,13 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+*.zip
+
+.claude/
+
+.vscode/
+
+ik_new_branch/
+
+ik_test_branch_2/

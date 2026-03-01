@@ -8,12 +8,13 @@ Load mesh files (STL, OBJ, DAE) with optional trimesh fallback.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
+import logging
+import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional, Tuple
+
 import numpy as np
-import struct
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -194,9 +195,11 @@ def _load_with_trimesh(path: Path) -> Optional[MeshData]:
         return MeshData(
             vertices=np.array(mesh.vertices, dtype=np.float64),
             faces=np.array(mesh.faces, dtype=np.int64),
-            normals=np.array(mesh.vertex_normals, dtype=np.float64)
-            if hasattr(mesh, "vertex_normals")
-            else None,
+            normals=(
+                np.array(mesh.vertex_normals, dtype=np.float64)
+                if hasattr(mesh, "vertex_normals")
+                else None
+            ),
         )
 
     except ImportError:

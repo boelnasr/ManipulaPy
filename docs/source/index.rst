@@ -24,10 +24,10 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
             <a href="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa">
                <img src="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg?style=for-the-badge" alt="JOSS Paper">
             </a>
-            <a href="https://github.com/boelnar/ManipulaPy/blob/main/LICENSE">
+            <a href="https://github.com/boelnasr/ManipulaPy/blob/main/LICENSE">
                <img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=for-the-badge" alt="License">
             </a>
-            <a href="https://github.com/boelnar/ManipulaPy/actions">
+            <a href="https://github.com/boelnasr/ManipulaPy/actions">
                <img src="https://img.shields.io/github/actions/workflow/status/boelnasr/ManipulaPy/test.yml?branch=main&style=for-the-badge&logo=github&label=CI" alt="CI Status">
             </a>
             <a href="https://pypi.org/project/manipulapy/">
@@ -407,7 +407,7 @@ What's New
 .. raw:: html
 
    <div class="whats-new">
-      <h4>🎉 Latest in v1.1.0</h4>
+      <h4>🎉 Latest in v1.3.1</h4>
       <ul>
          <li><strong>New:</strong> CUDA-accelerated trajectory planning</li>
          <li><strong>New:</strong> Computer vision and perception modules</li>
@@ -480,7 +480,7 @@ If you use ManipulaPy in your research, please cite:
      author={Mohamed Aboelnar},
      year={2024},
      url={https://github.com/boelnasr/ManipulaPy},
-     version={1.1.0}
+     version={1.3.1}
    }
 
 License

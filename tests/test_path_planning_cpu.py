@@ -7,7 +7,7 @@ These exercise the numba-jitted CPU trajectory generator without requiring CUDA.
 import numpy as np
 import pytest
 
-from ManipulaPy.path_planning import _trajectory_cpu_fallback, _traj_cpu_njit
+from ManipulaPy.path_planning import _traj_cpu_njit, _trajectory_cpu_fallback
 
 
 def test_trajectory_cpu_fallback_cubic_endpoints():

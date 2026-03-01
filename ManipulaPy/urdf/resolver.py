@@ -10,11 +10,11 @@ package maps.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-import os
 import json
 import logging
+import os
 from pathlib import Path
-from typing import Optional, Dict, List, Callable, Union
+from typing import Callable, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 

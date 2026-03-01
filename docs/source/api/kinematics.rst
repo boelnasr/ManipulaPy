@@ -17,9 +17,9 @@ Quick Navigation
    :local:
    :depth: 2
 
-------------
+-----------------------
 SerialManipulator Class
-------------
+-----------------------
 
 .. currentmodule:: ManipulaPy.kinematics
 
@@ -163,27 +163,6 @@ SerialManipulator Class
 
       **Convergence:** ||V_trans|| < ev AND ||V_rot|| < eomg
 
-   .. automethod:: hybrid_inverse_kinematics
-
-      **Parameters:**
-
-        - **T_desired** (*numpy.ndarray*) -- Desired 4×4 transformation matrix
-        - **neural_network** (*torch.nn.Module*) -- Trained neural network model
-        - **scaler_X** (*sklearn.preprocessing.StandardScaler*) -- Input feature scaler
-        - **scaler_y** (*sklearn.preprocessing.StandardScaler*) -- Output feature scaler
-        - **device** (*torch.device*) -- PyTorch device for neural network
-        - **thetalist0** (*array_like*, optional) -- Initial guess (if None, use neural network)
-        - **eomg** (*float*) -- Rotational error tolerance (default: 1e-6)
-        - **ev** (*float*) -- Translational error tolerance (default: 1e-6)
-        - **max_iterations** (*int*) -- Maximum iterations (default: 500)
-
-      **Returns:**
-
-        - **thetalist** (*numpy.ndarray*) -- Solution joint angles
-        - **success** (*bool*) -- Convergence status
-        - **num_iterations** (*int*) -- Iterations used
-
-      **Strategy:** Neural network initial guess + iterative refinement
 
 -------------
 Usage Examples
@@ -256,26 +235,6 @@ Usage Examples
    else:
        print("IK failed to converge")
 
-**Hybrid Neural Network IK**::
-
-   import torch
-   from sklearn.preprocessing import StandardScaler
-   
-   # Load trained model and scalers
-   model = torch.load("ik_model.pth")
-   scaler_X = StandardScaler()  # Load fitted scaler
-   scaler_y = StandardScaler()  # Load fitted scaler
-   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-   
-   # Solve with neural network initialization
-   solution, success, iterations = robot.hybrid_inverse_kinematics(
-       T_desired=T_target,
-       neural_network=model,
-       scaler_X=scaler_X,
-       scaler_y=scaler_y,
-       device=device
-   )
-
 **State Management**::
 
    # Update robot state
@@ -303,9 +262,9 @@ Usage Examples
    
    # Limits are enforced during IK solving
 
--------------
+------------
 Key Features
--------------
+------------
 
 - **Product of Exponentials** formulation for robust kinematics
 
@@ -315,17 +274,15 @@ Key Features
 
 - **Damped least squares** IK with singularity handling
 
-- **Neural network integration** for improved IK initialization
-
 - **Joint limit enforcement** during inverse kinematics
 
 - **Comprehensive velocity** kinematics with pseudoinverse
 
 - **Convergence visualization** for debugging IK problems
 
------------------
+-----------------------
 Mathematical Background
------------------
+-----------------------
 
 **Screw Theory Foundation:**
 
@@ -345,9 +302,9 @@ Mathematical Background
   - Separate convergence criteria for translation and rotation
   - Adaptive step size for stability (α = 0.058)
 
------------------
+--------
 See Also
------------------
+--------
 
 - :doc:`dynamics` -- Dynamics computations building on kinematics
 - :doc:`control` -- Controllers using kinematic models

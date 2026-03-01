@@ -6,9 +6,10 @@ PyBullet-based URDF Visualization
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-from typing import TYPE_CHECKING, Optional, Dict, Union
-import numpy as np
 import time
+from typing import TYPE_CHECKING, Dict, Optional, Union
+
+import numpy as np
 
 if TYPE_CHECKING:
     from ..core import URDF

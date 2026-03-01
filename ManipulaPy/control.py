@@ -29,15 +29,17 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
-import numpy as np
-from typing import Optional, List, Tuple, Union, Dict, Any
-from numpy.typing import NDArray
-import matplotlib.pyplot as plt
 import logging
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import matplotlib.pyplot as plt
+import numpy as np
+from numpy.typing import NDArray
 
 # Optional CuPy import for defensive array handling
 try:
     import cupy as cp
+
     CUPY_AVAILABLE = True
 except ImportError:
     cp = None
@@ -205,7 +207,7 @@ class ManipulatorController:
         dt: float,
         Kp: Union[NDArray[np.float64], List[float]],
         Ki: Union[NDArray[np.float64], List[float]],
-        Kd: Union[NDArray[np.float64], List[float]]
+        Kd: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         """
         PID Control.
@@ -332,7 +334,9 @@ class ManipulatorController:
         if getattr(self, "parameter_estimate", None) is None:
             self.parameter_estimate = np.zeros((n,), dtype=thetalist.dtype)
 
-        err = measurement_error.reshape(-1)        # (n,) - already NumPy from _to_numpy() above
+        err = measurement_error.reshape(
+            -1
+        )  # (n,) - already NumPy from _to_numpy() above
         # Handle both scalar and array adaptation_gain
         gamma = float(np.atleast_1d(adaptation_gain).ravel()[0])
 
@@ -345,9 +349,14 @@ class ManipulatorController:
         g_forces = self.dynamics.gravity_forces(thetalist, g)
         J_transpose = self.dynamics.jacobian(thetalist).T
 
-        tau = M @ ddthetalist + c + g_forces + J_transpose @ Ftip + self.parameter_estimate
+        tau = (
+            M @ ddthetalist
+            + c
+            + g_forces
+            + J_transpose @ Ftip
+            + self.parameter_estimate
+        )
         return tau
-
 
     def kalman_filter_predict(
         self,
@@ -357,7 +366,7 @@ class ManipulatorController:
         g: Union[NDArray[np.float64], List[float]],
         Ftip: Union[NDArray[np.float64], List[float]],
         dt: float,
-        Q: NDArray[np.float64]
+        Q: NDArray[np.float64],
     ) -> None:
         """
         Kalman Filter Prediction.
@@ -387,18 +396,18 @@ class ManipulatorController:
             self.x_hat = np.concatenate((thetalist, dthetalist))
 
         thetalist_pred = (
-            self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist):] * dt
+            self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist) :] * dt
         )
         dthetalist_pred = (
             self.dynamics.forward_dynamics(
                 self.x_hat[: len(thetalist)],
-                self.x_hat[len(thetalist):],
+                self.x_hat[len(thetalist) :],
                 taulist,
                 g,
                 Ftip,
             )
             * dt
-            + self.x_hat[len(thetalist):]
+            + self.x_hat[len(thetalist) :]
         )
         x_hat_pred = np.concatenate((thetalist_pred, dthetalist_pred))
 
@@ -410,9 +419,7 @@ class ManipulatorController:
         self.x_hat = x_hat_pred
 
     def kalman_filter_update(
-        self,
-        z: Union[NDArray[np.float64], List[float]],
-        R: NDArray[np.float64]
+        self, z: Union[NDArray[np.float64], List[float]], R: NDArray[np.float64]
     ) -> None:
         """
         Kalman Filter Update.
@@ -447,7 +454,7 @@ class ManipulatorController:
         Ftip: Union[NDArray[np.float64], List[float]],
         dt: float,
         Q: NDArray[np.float64],
-        R: NDArray[np.float64]
+        R: NDArray[np.float64],
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
         """
         Kalman Filter Control.
@@ -475,7 +482,7 @@ class ManipulatorController:
 
         self.kalman_filter_predict(thetalist, dthetalist, taulist, g, Ftip, dt, Q)
         self.kalman_filter_update(np.concatenate((thetalist, dthetalist)), R)
-        return self.x_hat[: len(thetalist)], self.x_hat[len(thetalist):]
+        return self.x_hat[: len(thetalist)], self.x_hat[len(thetalist) :]
 
     def feedforward_control(
         self,
@@ -483,7 +490,7 @@ class ManipulatorController:
         desired_velocity: Union[NDArray[np.float64], List[float]],
         desired_acceleration: Union[NDArray[np.float64], List[float]],
         g: Union[NDArray[np.float64], List[float]],
-        Ftip: Union[NDArray[np.float64], List[float]]
+        Ftip: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         """
         Feedforward Control.
@@ -525,7 +532,7 @@ class ManipulatorController:
         Kp: Union[NDArray[np.float64], List[float]],
         Kd: Union[NDArray[np.float64], List[float]],
         g: Union[NDArray[np.float64], List[float]],
-        Ftip: Union[NDArray[np.float64], List[float]]
+        Ftip: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         """
         PD Feedforward Control.
@@ -567,7 +574,9 @@ class ManipulatorController:
         dthetalist: Union[NDArray[np.float64], List[float]],
         tau: Union[NDArray[np.float64], List[float]],
         joint_limits: Union[cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]],
-        torque_limits: Union[cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]]
+        torque_limits: Union[
+            cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]
+        ],
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         """
         Enforce joint and torque limits.
@@ -734,7 +743,7 @@ class ManipulatorController:
         current_joint_angles: Union[NDArray[np.float64], List[float]],
         current_joint_velocities: Union[NDArray[np.float64], List[float]],
         Kp: Union[NDArray[np.float64], List[float]],
-        Kd: Union[NDArray[np.float64], List[float]]
+        Kd: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         """
         Joint Space Control.
@@ -768,7 +777,7 @@ class ManipulatorController:
         current_joint_angles: Union[NDArray[np.float64], List[float]],
         current_joint_velocities: Union[NDArray[np.float64], List[float]],
         Kp: Union[NDArray[np.float64], List[float]],
-        Kd: Union[NDArray[np.float64], List[float]]
+        Kd: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         """
         Cartesian Space Control.
@@ -797,7 +806,8 @@ class ManipulatorController:
         J = self.dynamics.jacobian(current_joint_angles)
         tau = J.T @ (Kp * e - Kd @ J @ dthetalist)
         return tau
-# ------------------------------------------------------------------------
+
+    # ------------------------------------------------------------------------
     def ziegler_nichols_tuning(self, Ku, Tu, kind="PID"):
         Ku = _to_numpy(Ku).astype(float)
         Tu = _to_numpy(Tu).astype(float)
@@ -827,13 +837,14 @@ class ManipulatorController:
         Kp, Ki, Kd = self.ziegler_nichols_tuning(Ku, Tu, kind)
         logger.info(f"Tuned Z-N ({kind}) gains\n  Kp={Kp}\n  Ki={Ki}\n  Kd={Kd}")
         return Kp, Ki, Kd
+
     # ------------------------------------------------------------------------
     def find_ultimate_gain_and_period(
         self,
         thetalist: Union[NDArray[np.float64], List[float]],
         desired_joint_angles: Union[NDArray[np.float64], List[float]],
         dt: float,
-        max_steps: int = 1000
+        max_steps: int = 1000,
     ) -> Tuple[float, float, List[float], List[NDArray[np.float64]]]:
         """
         Find the ultimate gain and period using the Ziegler–Nichols method.
@@ -871,18 +882,13 @@ class ManipulatorController:
             for step in range(max_steps):
                 # pure-PD poke
                 tau = self.pd_control(
-                    desired_joint_angles,
-                    np.zeros_like(theta),
-                    theta,
-                    omega,
-                    Kp,
-                    0.0
+                    desired_joint_angles, np.zeros_like(theta), theta, omega, Kp, 0.0
                 )
                 # alpha = M⁻¹ (tau – C – G)
-                M  = self.dynamics.mass_matrix(theta)
-                C  = self.dynamics.velocity_quadratic_forces(theta, omega)
+                M = self.dynamics.mass_matrix(theta)
+                C = self.dynamics.velocity_quadratic_forces(theta, omega)
                 Gf = self.dynamics.gravity_forces(theta, np.array([0, 0, -9.81]))
-                alpha  = np.linalg.solve(M, tau - C - Gf)
+                alpha = np.linalg.solve(M, tau - C - Gf)
 
                 omega += alpha * dt
                 theta += omega * dt
@@ -902,9 +908,9 @@ class ManipulatorController:
             else:
                 Kp *= increase
 
-        ultimate_gain   = float(Kp)
-        ultimate_period = (max_steps * dt) / max(1,
-            np.count_nonzero(np.diff(np.sign(error_history[-1])) ) // 2
+        ultimate_gain = float(Kp)
+        ultimate_period = (max_steps * dt) / max(
+            1, np.count_nonzero(np.diff(np.sign(error_history[-1]))) // 2
         )
 
         return ultimate_gain, ultimate_period, gain_history, error_history

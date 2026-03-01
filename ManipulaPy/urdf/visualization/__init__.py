@@ -8,7 +8,8 @@ Lazy-loaded visualization using trimesh or PyBullet.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-from typing import TYPE_CHECKING, Optional, Dict, Union
+from typing import TYPE_CHECKING, Dict, Optional, Union
+
 import numpy as np
 
 if TYPE_CHECKING:

@@ -13,6 +13,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - (placeholder)
 
+## [1.3.1] - 2026-03-01
+
+> **Summary:** Major overhaul of all inverse kinematics solvers, dramatically improving convergence rates from ~70% to 96%+. Introduces the TRAC-IK module — a high-performance solver using Damped Least Squares (DLS) with SQP fallback, achieving 96% success rate at the default 200ms timeout.
+>
+> **Impact:**
+> - IK convergence: 70% → 96% success rate across all solvers
+> - New TRAC-IK solver: 96% at 200ms (DLS-first strategy with SQP fallback)
+> - Redesigned `iterative_inverse_kinematics` with geometric error model
+> - Improved `smart_inverse_kinematics` with automatic fallback
+> - Rewritten `robust_inverse_kinematics` with 10 direct strategy configurations
+
+### Added
+- **TRAC-IK Module** (`ManipulaPy/trac_ik.py`) — 96% success rate at 200ms default timeout
+  - `TracIKSolver` class with DLS-first strategy and SQP fallback
+  - `trac_ik_solve()` convenience function for quick IK solving
+  - SVD-robust Jacobian solve as primary path (not fallback) — handles near-singular configurations
+  - Levenberg-Marquardt adaptive damping with trust region adjustment
+  - Perturbation-based stagnation recovery with mode-specific limits (replaces gradient descent)
+  - Backtracking line search (2 scales) for step acceptance
+  - Diverse initial guesses: workspace heuristic, midpoint, zero config, flipped midpoint, random
+  - Timeout-based termination with `threading.Event` stop signaling
+  - Oscillation detection via `collections.deque` history tracking
+  - SQP solver (SLSQP) with analytical Jacobian as fallback when DLS fails
+  - Joint limit enforcement and configurable tolerances
+  - Sequential mode (default): DLS-first with per-guess time budgeting — avoids Python GIL contention
+  - Parallel mode (optional): 3-worker `ThreadPoolExecutor` with concurrent DLS tasks and SQP fallback
+- **`trac_ik()` method** on `SerialManipulator` for direct TRAC-IK access with `use_parallel` parameter
+- **`auto_fallback` parameter** on `smart_inverse_kinematics` — automatically falls back to `robust_inverse_kinematics` on failure
+- **Lazy loading** for `trac_ik` module and `TracIKSolver` class in `__init__.py`
+
+### Changed
+- **`iterative_inverse_kinematics()`** — Complete redesign:
+  - Geometric error model (position + orientation error) replacing twist-based error
+  - SVD-robust Jacobian pseudoinverse with condition-number-based damping
+  - Stagnation detection with random perturbation recovery
+  - Levenberg-Marquardt adaptive damping (lambda auto-adjustment)
+  - Best-solution tracking — returns best solution found even on timeout
+  - 5 backtracking line-search scales for step acceptance
+  - Default `max_iterations` increased to 10000
+- **`smart_inverse_kinematics()`** — Enhanced with `auto_fallback=True`:
+  - When enabled, automatically tries `robust_inverse_kinematics` if the initial strategy fails
+  - Preserves all existing strategy options (cached, workspace_heuristic, midpoint, etc.)
+- **`robust_inverse_kinematics()`** — Rewritten multi-start solver:
+  - 10 direct strategy configurations (up from previous implementation)
+  - Strategies include: workspace heuristic, midpoint, small random, zero config, flipped midpoint, quarter range, three-quarter range, large random, negated midpoint, extreme random
+  - Each strategy generates an initial guess and runs `iterative_inverse_kinematics`
+  - Returns on first successful solve for efficiency
+
+### Fixed
+- **IK convergence failures** for targets requiring large joint rotations
+- **Jacobian singularity handling** — SVD-based solve prevents NaN/Inf in near-singular configurations
+- **Solver stagnation** — automatic perturbation breaks out of local minima
+
 ## [1.3.0] - 2026-01-05
 
 > **Summary:** This release introduces a comprehensive native URDF parser with NumPy 2.0+ compatibility, enhanced URDF processor backbone, improved robot data organization, and comprehensive documentation. The native parser provides zero external URDF dependencies, batch forward kinematics (50x+ speedup), multi-robot scene management, and programmatic URDF modification for calibration and payload simulation. The ManipulaPy_data folder has been cleaned up with automated validation ensuring all 25 robot models are accessible and parseable.
@@ -412,6 +465,45 @@ Previous changelog entries would go here if they existed.
 
 ## Upgrade Guide
 
+### From 1.3.0 to 1.3.1
+
+#### Breaking Changes
+**None** — All IK API signatures are backward compatible. Existing code works without changes.
+
+#### IK Solver Improvements
+All IK solvers have been redesigned for dramatically better convergence:
+
+```python
+# Before (1.3.0): ~70% success rate, may need retry loops
+theta, success, iters = robot.iterative_inverse_kinematics(target, guess)
+
+# After (1.3.1): 90-100% success rate, same API
+theta, success, iters = robot.iterative_inverse_kinematics(target, guess)
+```
+
+#### New: auto_fallback in smart_inverse_kinematics
+```python
+# Automatically tries robust_ik if initial strategy fails
+theta, success, iters = robot.smart_inverse_kinematics(
+    target, strategy="workspace_heuristic", auto_fallback=True
+)
+```
+
+#### New: TRAC-IK Module (96% success rate)
+```python
+# Via SerialManipulator method (recommended)
+theta, success, solve_time = robot.trac_ik(target_pose, timeout=0.2)
+
+# Or use the convenience function directly
+from ManipulaPy.trac_ik import trac_ik_solve
+theta, success, solve_time = trac_ik_solve(robot, target_pose)
+
+# For maximum throughput, enable parallel mode (DLS + SQP simultaneously)
+theta, success, solve_time = robot.trac_ik(target_pose, use_parallel=True)
+```
+
+---
+
 ### From 1.1.3 to 1.2.0
 
 #### Breaking Changes
@@ -635,7 +727,8 @@ When making changes, add entries under `[Unreleased]` in the appropriate categor
 
 ---
 
-[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.1.3...v1.2.0
 [1.1.3]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/releases/tag/v1.1.3

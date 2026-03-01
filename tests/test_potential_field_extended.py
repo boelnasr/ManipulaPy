@@ -15,8 +15,10 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 """
 
 import unittest
-import numpy as np
 from unittest.mock import MagicMock, patch
+
+import numpy as np
+
 from ManipulaPy.potential_field import PotentialField
 
 
@@ -25,7 +27,9 @@ class TestPotentialFieldAttractive(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.pf = PotentialField(attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5)
+        self.pf = PotentialField(
+            attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
+        )
 
     def test_attractive_potential_at_goal(self):
         """Test attractive potential is zero at goal."""
@@ -80,7 +84,9 @@ class TestPotentialFieldRepulsive(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.pf = PotentialField(attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5)
+        self.pf = PotentialField(
+            attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
+        )
 
     def test_repulsive_potential_no_obstacles(self):
         """Test repulsive potential is zero with no obstacles."""
@@ -116,8 +122,8 @@ class TestPotentialFieldRepulsive(unittest.TestCase):
         obstacle = np.array([1.0, 0.0, 0.0])
         obstacles = [obstacle]
 
-        q_far = np.array([0.6, 0.0, 0.0])    # Distance = 0.4
-        q_near = np.array([0.8, 0.0, 0.0])   # Distance = 0.2
+        q_far = np.array([0.6, 0.0, 0.0])  # Distance = 0.4
+        q_near = np.array([0.8, 0.0, 0.0])  # Distance = 0.2
 
         U_far = self.pf.compute_repulsive_potential(q_far, obstacles)
         U_near = self.pf.compute_repulsive_potential(q_near, obstacles)
@@ -161,7 +167,9 @@ class TestPotentialFieldGradient(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.pf = PotentialField(attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5)
+        self.pf = PotentialField(
+            attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
+        )
 
     def test_gradient_at_goal_no_obstacles(self):
         """Test gradient is zero at goal with no obstacles."""
@@ -235,7 +243,9 @@ class TestPotentialFieldEdgeCases(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.pf = PotentialField(attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5)
+        self.pf = PotentialField(
+            attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
+        )
 
     def test_zero_influence_distance(self):
         """Test behavior with zero influence distance."""
@@ -304,7 +314,9 @@ class TestPotentialFieldProperties(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.pf = PotentialField(attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5)
+        self.pf = PotentialField(
+            attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
+        )
 
     def test_attractive_potential_positive(self):
         """Test attractive potential is always non-negative."""
@@ -387,12 +399,12 @@ class TestCollisionChecker(unittest.TestCase):
         from ManipulaPy.potential_field import CollisionChecker
 
         # Test that the class can be imported and has expected methods
-        self.assertTrue(hasattr(CollisionChecker, '__init__'))
-        self.assertTrue(hasattr(CollisionChecker, 'check_collision'))
-        self.assertTrue(hasattr(CollisionChecker, '_create_convex_hulls'))
-        self.assertTrue(hasattr(CollisionChecker, '_transform_convex_hull'))
+        self.assertTrue(hasattr(CollisionChecker, "__init__"))
+        self.assertTrue(hasattr(CollisionChecker, "check_collision"))
+        self.assertTrue(hasattr(CollisionChecker, "_create_convex_hulls"))
+        self.assertTrue(hasattr(CollisionChecker, "_transform_convex_hull"))
 
-    @patch('ManipulaPy.potential_field.URDF')
+    @patch("ManipulaPy.potential_field.URDF")
     def test_collision_checker_with_mock_urdf(self, mock_urdf):
         """Test CollisionChecker with mocked URDF."""
         from ManipulaPy.potential_field import CollisionChecker
@@ -411,7 +423,7 @@ class TestCollisionChecker(unittest.TestCase):
             # If it fails, make sure it's not a critical error
             self.assertIn("URDF", str(e))
 
-    @patch('ManipulaPy.potential_field.URDF')
+    @patch("ManipulaPy.potential_field.URDF")
     def test_collision_checker_create_convex_hulls(self, mock_urdf):
         """Test convex hull creation."""
         from ManipulaPy.potential_field import CollisionChecker
@@ -431,16 +443,20 @@ class TestCollisionChecker(unittest.TestCase):
 
     def test_collision_checker_methods_exist(self):
         """Test that CollisionChecker has all required methods."""
-        from ManipulaPy.potential_field import CollisionChecker
         import inspect
 
+        from ManipulaPy.potential_field import CollisionChecker
+
         # Get all methods
-        methods = [method for method in dir(CollisionChecker)
-                  if not method.startswith('_') or method.startswith('__')]
+        methods = [
+            method
+            for method in dir(CollisionChecker)
+            if not method.startswith("_") or method.startswith("__")
+        ]
 
         # Should have check_collision method
-        self.assertTrue('check_collision' in dir(CollisionChecker))
+        self.assertTrue("check_collision" in dir(CollisionChecker))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ from ManipulaPy.control import ManipulatorController
 
 class MockDynamics:
     """Minimal dynamics model with deterministic outputs for testing."""
+
     def __init__(self, n=2):
         self.n = n
         self.M_const = np.diag([2.0] * n)
@@ -61,7 +62,9 @@ def test_pid_control_zero_gains(controller: ManipulatorController):
     Ki = np.zeros(2)
     Kd = np.zeros(2)
 
-    tau = controller.pid_control(thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd)
+    tau = controller.pid_control(
+        thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd
+    )
     assert np.allclose(tau, 0.0)
 
 
@@ -75,8 +78,12 @@ def test_pid_control_integral_accumulates(controller: ManipulatorController):
     Ki = np.ones(2) * 2.0
     Kd = np.zeros(2)
 
-    tau_1 = controller.pid_control(thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd)
-    tau_2 = controller.pid_control(thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd)
+    tau_1 = controller.pid_control(
+        thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd
+    )
+    tau_2 = controller.pid_control(
+        thetalistd, dthetalistd, thetalist, dthetalist, dt, Kp, Ki, Kd
+    )
     # Integral term should double after second call
     assert np.allclose(tau_2, 2 * tau_1)
 
@@ -90,7 +97,9 @@ def test_pd_control_matches_formula(controller: ManipulatorController):
     Kd = np.array([0.5, 0.5])
 
     expected = Kp * (desired_pos - current_pos) + Kd * (desired_vel - current_vel)
-    tau = controller.pd_control(desired_pos, desired_vel, current_pos, current_vel, Kp, Kd)
+    tau = controller.pd_control(
+        desired_pos, desired_vel, current_pos, current_vel, Kp, Kd
+    )
     assert np.allclose(tau, expected)
 
 
@@ -108,15 +117,16 @@ def test_computed_torque_control_combines_terms(controller: ManipulatorControlle
     Kd = np.ones(n) * 0.7
 
     tau = controller.computed_torque_control(
-        thetalistd, dthetalistd, ddthetalistd,
-        thetalist, dthetalist, g, dt, Kp, Ki, Kd
+        thetalistd, dthetalistd, ddthetalistd, thetalist, dthetalist, g, dt, Kp, Ki, Kd
     )
 
     # Expected: M@(Kp*e + Ki*eint + Kd*edot) + inverse_dynamics(...)
     e = thetalistd - thetalist
     edot = dthetalistd - dthetalist
     M = controller.dynamics.M_const
-    inv_dyn = controller.dynamics.inverse_dynamics(thetalist, dthetalist, ddthetalistd, g, [0]*6)
+    inv_dyn = controller.dynamics.inverse_dynamics(
+        thetalist, dthetalist, ddthetalistd, g, [0] * 6
+    )
     expected = M @ (Kp * e + Kd * edot) + inv_dyn
     assert np.allclose(tau, expected)
 
@@ -131,7 +141,9 @@ def test_robust_control_includes_adaptation_term(controller: ManipulatorControll
     disturbance = np.ones(n) * 0.2
     adaptation_gain = 0.5
 
-    tau = controller.robust_control(thetalist, dthetalist, ddthetalist, g, Ftip, disturbance, adaptation_gain)
+    tau = controller.robust_control(
+        thetalist, dthetalist, ddthetalist, g, Ftip, disturbance, adaptation_gain
+    )
     # base torque from dynamics + adaptation term
     M = controller.dynamics.M_const
     c = controller.dynamics.C_const
@@ -171,8 +183,12 @@ def test_feedforward_controls_use_inverse_dynamics(controller: ManipulatorContro
     desired_accel = np.ones(n) * 0.05
     g = np.array([0, 0, -9.81])
     Ftip = np.zeros(6)
-    tau_ff = controller.feedforward_control(desired_position, desired_velocity, desired_accel, g, Ftip)
-    expected = controller.dynamics.inverse_dynamics(desired_position, desired_velocity, desired_accel, g, Ftip)
+    tau_ff = controller.feedforward_control(
+        desired_position, desired_velocity, desired_accel, g, Ftip
+    )
+    expected = controller.dynamics.inverse_dynamics(
+        desired_position, desired_velocity, desired_accel, g, Ftip
+    )
     assert np.allclose(tau_ff, expected)
 
     current_position = np.array([0.0, 0.0])
@@ -180,9 +196,18 @@ def test_feedforward_controls_use_inverse_dynamics(controller: ManipulatorContro
     Kp = np.ones(n) * 2.0
     Kd = np.ones(n) * 0.1
     tau_pd_ff = controller.pd_feedforward_control(
-        desired_position, desired_velocity, desired_accel,
-        current_position, current_velocity, Kp, Kd, g, Ftip
+        desired_position,
+        desired_velocity,
+        desired_accel,
+        current_position,
+        current_velocity,
+        Kp,
+        Kd,
+        g,
+        Ftip,
     )
     # PD term
-    pd_term = Kp * (desired_position - current_position) + Kd * (desired_velocity - current_velocity)
+    pd_term = Kp * (desired_position - current_position) + Kd * (
+        desired_velocity - current_velocity
+    )
     assert np.allclose(tau_pd_ff, expected + pd_term)

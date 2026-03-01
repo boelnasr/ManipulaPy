@@ -11,18 +11,24 @@ import pytest
 from ManipulaPy.potential_field import PotentialField
 
 
-def finite_difference_gradient(pf: PotentialField, q: np.ndarray, q_goal: np.ndarray, obstacles):
+def finite_difference_gradient(
+    pf: PotentialField, q: np.ndarray, q_goal: np.ndarray, obstacles
+):
     """Numerical gradient of total potential (attractive + repulsive) via central difference."""
     eps = 1e-6
     grad = np.zeros_like(q, dtype=float)
 
     def total_potential(x):
-        return pf.compute_attractive_potential(x, q_goal) + pf.compute_repulsive_potential(x, obstacles)
+        return pf.compute_attractive_potential(
+            x, q_goal
+        ) + pf.compute_repulsive_potential(x, obstacles)
 
     for i in range(q.size):
         e_i = np.zeros_like(q)
         e_i[i] = 1.0
-        grad[i] = (total_potential(q + eps * e_i) - total_potential(q - eps * e_i)) / (2 * eps)
+        grad[i] = (total_potential(q + eps * e_i) - total_potential(q - eps * e_i)) / (
+            2 * eps
+        )
     return grad
 
 
@@ -55,7 +61,9 @@ def test_repulsive_potential_positive_inside_influence():
     obstacles = [np.array([0.5, 0.0])]
     d = np.linalg.norm(q - obstacles[0])
     # From compute_repulsive_potential: 10 * (2 * gain * (1/d - 1/d0)^2)
-    expected = 10 * (2 * pf.repulsive_gain * (1.0 / d - 1.0 / pf.influence_distance) ** 2)
+    expected = 10 * (
+        2 * pf.repulsive_gain * (1.0 / d - 1.0 / pf.influence_distance) ** 2
+    )
     assert pf.compute_repulsive_potential(q, obstacles) == pytest.approx(expected)
 
 

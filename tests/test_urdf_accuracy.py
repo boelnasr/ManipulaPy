@@ -9,21 +9,25 @@ to verify numerical accuracy of FK, dynamics, and properties.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-import pytest
-import numpy as np
-from pathlib import Path
 import json
 import time
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # Test fixtures directory
 FIXTURES_DIR = Path(__file__).parent / "urdf_fixtures"
-UR5_URDF = Path(__file__).parent.parent / "ManipulaPy" / "ManipulaPy_data" / "ur5" / "ur5.urdf"
+UR5_URDF = (
+    Path(__file__).parent.parent / "ManipulaPy" / "ManipulaPy_data" / "ur5" / "ur5.urdf"
+)
 
 
 def has_pybullet():
     """Check if pybullet is available."""
     try:
         import pybullet
+
         return True
     except ImportError:
         return False
@@ -45,7 +49,7 @@ class PyBulletReference:
             str(urdf_path),
             basePosition=[0, 0, 0],
             baseOrientation=[0, 0, 0, 1],
-            useFixedBase=True
+            useFixedBase=True,
         )
 
         # Get joint info
@@ -55,16 +59,16 @@ class PyBulletReference:
 
         for i in range(self.num_joints):
             info = p.getJointInfo(self.robot_id, i)
-            joint_name = info[1].decode('utf-8')
+            joint_name = info[1].decode("utf-8")
             joint_type = info[2]
-            link_name = info[12].decode('utf-8')
+            link_name = info[12].decode("utf-8")
 
             self.joint_info[i] = {
-                'name': joint_name,
-                'type': joint_type,
-                'link_name': link_name,
-                'lower_limit': info[8],
-                'upper_limit': info[9],
+                "name": joint_name,
+                "type": joint_type,
+                "link_name": link_name,
+                "lower_limit": info[8],
+                "upper_limit": info[9],
             }
 
             # Types: REVOLUTE=0, PRISMATIC=1, SPHERICAL=2, PLANAR=3, FIXED=4
@@ -95,7 +99,7 @@ class PyBulletReference:
             T[:3, :3] = R
             T[:3, 3] = pos
 
-            link_name = self.joint_info[i]['link_name']
+            link_name = self.joint_info[i]["link_name"]
             poses[link_name] = T
 
         return poses
@@ -105,7 +109,7 @@ class PyBulletReference:
         poses = self.get_link_poses(config)
         # Return last link's pose
         last_joint_idx = self.num_joints - 1
-        last_link_name = self.joint_info[last_joint_idx]['link_name']
+        last_link_name = self.joint_info[last_joint_idx]["link_name"]
         return poses.get(last_link_name)
 
     def get_mass_matrix(self, config):
@@ -118,21 +122,35 @@ class PyBulletReference:
         """Get dynamics info for a link."""
         info = self.p.getDynamicsInfo(self.robot_id, link_idx)
         return {
-            'mass': info[0],
-            'local_inertia_diagonal': np.array(info[2]),
-            'local_inertia_pos': np.array(info[3]),
-            'local_inertia_orn': np.array(info[4]),
+            "mass": info[0],
+            "local_inertia_diagonal": np.array(info[2]),
+            "local_inertia_pos": np.array(info[3]),
+            "local_inertia_orn": np.array(info[4]),
         }
 
     def _quat_to_rot(self, quat):
         """Convert quaternion (xyzw) to rotation matrix."""
         x, y, z, w = quat
 
-        R = np.array([
-            [1 - 2*y*y - 2*z*z, 2*x*y - 2*z*w, 2*x*z + 2*y*w],
-            [2*x*y + 2*z*w, 1 - 2*x*x - 2*z*z, 2*y*z - 2*x*w],
-            [2*x*z - 2*y*w, 2*y*z + 2*x*w, 1 - 2*x*x - 2*y*y]
-        ])
+        R = np.array(
+            [
+                [
+                    1 - 2 * y * y - 2 * z * z,
+                    2 * x * y - 2 * z * w,
+                    2 * x * z + 2 * y * w,
+                ],
+                [
+                    2 * x * y + 2 * z * w,
+                    1 - 2 * x * x - 2 * z * z,
+                    2 * y * z - 2 * x * w,
+                ],
+                [
+                    2 * x * z - 2 * y * w,
+                    2 * y * z + 2 * x * w,
+                    1 - 2 * x * x - 2 * y * y,
+                ],
+            ]
+        )
 
         return R
 
@@ -198,16 +216,18 @@ class TestFKAccuracy:
                 # Rotation error (Frobenius norm)
                 rot_error = np.linalg.norm(native_T[:3, :3] - pybullet_T[:3, :3])
 
-                errors.append({
-                    'link': link_name,
-                    'pos_error': pos_error,
-                    'rot_error': rot_error
-                })
+                errors.append(
+                    {"link": link_name, "pos_error": pos_error, "rot_error": rot_error}
+                )
 
         # Check all errors are small
         for err in errors:
-            assert err['pos_error'] < 1e-6, f"Position error for {err['link']}: {err['pos_error']}"
-            assert err['rot_error'] < 1e-6, f"Rotation error for {err['link']}: {err['rot_error']}"
+            assert (
+                err["pos_error"] < 1e-6
+            ), f"Position error for {err['link']}: {err['pos_error']}"
+            assert (
+                err["rot_error"] < 1e-6
+            ), f"Rotation error for {err['link']}: {err['rot_error']}"
 
     def test_simple_arm_random_configs(self, simple_arm_comparison):
         """Test FK at random configurations."""
@@ -291,16 +311,14 @@ class TestFKAccuracy:
                 pos_error = np.linalg.norm(native_ee[:3, 3] - pybullet_ee[:3, 3])
                 rot_error = np.linalg.norm(native_ee[:3, :3] - pybullet_ee[:3, :3])
 
-                errors.append({
-                    'config': i,
-                    'pos_error': pos_error,
-                    'rot_error': rot_error
-                })
+                errors.append(
+                    {"config": i, "pos_error": pos_error, "rot_error": rot_error}
+                )
 
-        max_pos = max(e['pos_error'] for e in errors)
-        max_rot = max(e['rot_error'] for e in errors)
-        avg_pos = np.mean([e['pos_error'] for e in errors])
-        avg_rot = np.mean([e['rot_error'] for e in errors])
+        max_pos = max(e["pos_error"] for e in errors)
+        max_rot = max(e["rot_error"] for e in errors)
+        avg_pos = np.mean([e["pos_error"] for e in errors])
+        avg_rot = np.mean([e["rot_error"] for e in errors])
 
         print(f"\nUR5 FK Accuracy (100 random configs):")
         print(f"  Position - Max: {max_pos:.2e}, Avg: {avg_pos:.2e}")
@@ -355,7 +373,9 @@ class TestDynamicsAccuracy:
         # We compare the submatrix corresponding to actuated joints
         n = native.num_dofs
 
-        print(f"\nMass matrix shapes - Native: {M_native.shape}, PyBullet: {M_pybullet.shape}")
+        print(
+            f"\nMass matrix shapes - Native: {M_native.shape}, PyBullet: {M_pybullet.shape}"
+        )
 
         assert M_native.shape == (n, n), f"Native shape: {M_native.shape}"
 
@@ -372,7 +392,9 @@ class TestDynamicsAccuracy:
             M = dynamics.mass_matrix(config)
 
             eigenvalues = np.linalg.eigvalsh(M)
-            assert np.all(eigenvalues > 0), f"Mass matrix not positive definite: {eigenvalues}"
+            assert np.all(
+                eigenvalues > 0
+            ), f"Mass matrix not positive definite: {eigenvalues}"
 
     def test_mass_matrix_symmetry(self, simple_arm_dynamics):
         """Test mass matrix is symmetric."""
@@ -387,7 +409,9 @@ class TestDynamicsAccuracy:
             M = dynamics.mass_matrix(config)
 
             symmetry_error = np.linalg.norm(M - M.T)
-            assert symmetry_error < 1e-10, f"Mass matrix not symmetric: {symmetry_error}"
+            assert (
+                symmetry_error < 1e-10
+            ), f"Mass matrix not symmetric: {symmetry_error}"
 
 
 @pytest.mark.skipif(not has_pybullet(), reason="pybullet not installed")
@@ -430,22 +454,26 @@ class TestJointPropertiesAccuracy:
             zip(pybullet_ref.actuated_joints, native_limits)
         ):
             pb_info = pybullet_ref.joint_info[joint_idx]
-            pb_lower = pb_info['lower_limit']
-            pb_upper = pb_info['upper_limit']
+            pb_lower = pb_info["lower_limit"]
+            pb_upper = pb_info["upper_limit"]
 
             # Handle continuous joints (PyBullet may have 0, 0 or -1, 1)
             if pb_lower == 0 and pb_upper == 0:
                 # Continuous joint in PyBullet
                 continue
 
-            print(f"  Joint {i}: Native [{native_lower:.4f}, {native_upper:.4f}], "
-                  f"PyBullet [{pb_lower:.4f}, {pb_upper:.4f}]")
+            print(
+                f"  Joint {i}: Native [{native_lower:.4f}, {native_upper:.4f}], "
+                f"PyBullet [{pb_lower:.4f}, {pb_upper:.4f}]"
+            )
 
             # Allow some tolerance
-            assert abs(native_lower - pb_lower) < 0.01, \
-                f"Lower limit mismatch for joint {i}"
-            assert abs(native_upper - pb_upper) < 0.01, \
-                f"Upper limit mismatch for joint {i}"
+            assert (
+                abs(native_lower - pb_lower) < 0.01
+            ), f"Lower limit mismatch for joint {i}"
+            assert (
+                abs(native_upper - pb_upper) < 0.01
+            ), f"Upper limit mismatch for joint {i}"
 
 
 class TestSerialManipulatorAccuracy:
@@ -475,10 +503,10 @@ class TestSerialManipulatorAccuracy:
             pos_error = np.linalg.norm(urdf_ee[:3, 3] - sm_ee[:3, 3])
             rot_error = np.linalg.norm(urdf_ee[:3, :3] - sm_ee[:3, :3])
 
-            errors.append({'pos': pos_error, 'rot': rot_error})
+            errors.append({"pos": pos_error, "rot": rot_error})
 
-        max_pos = max(e['pos'] for e in errors)
-        max_rot = max(e['rot'] for e in errors)
+        max_pos = max(e["pos"] for e in errors)
+        max_rot = max(e["rot"] for e in errors)
 
         print(f"\nSerialManipulator FK accuracy:")
         print(f"  Max position error: {max_pos:.2e}")
@@ -495,9 +523,9 @@ class TestSerialManipulatorAccuracy:
         robot = URDF.load(UR5_URDF)
         screws = robot.extract_screw_axes()
 
-        M = screws['M']
-        S_list = screws['S_list']
-        B_list = screws['B_list']
+        M = screws["M"]
+        S_list = screws["S_list"]
+        B_list = screws["B_list"]
 
         print(f"\nUR5 Screw axes:")
         print(f"  M shape: {M.shape}")
@@ -538,7 +566,7 @@ class TestPrismaticJointAccuracy:
             fk = robot.link_fk(config, use_names=True)
 
             # x_slide should move in X direction
-            x_slide_T = fk['x_slide']
+            x_slide_T = fk["x_slide"]
             expected_x = x  # Joint at 0.045 Z, motion in X
 
             # Position should be [x, 0, 0.045]
@@ -552,7 +580,7 @@ class TestPrismaticJointAccuracy:
         config = np.array([0.05, 0.03, 0.1])
         fk = robot.link_fk(config, use_names=True)
 
-        z_slide_T = fk['z_slide']
+        z_slide_T = fk["z_slide"]
 
         # Expected position:
         # base at origin
@@ -566,8 +594,10 @@ class TestPrismaticJointAccuracy:
         actual_pos = z_slide_T[:3, 3]
 
         np.testing.assert_allclose(
-            actual_pos, expected_pos, atol=1e-10,
-            err_msg=f"Cascaded prismatic FK incorrect"
+            actual_pos,
+            expected_pos,
+            atol=1e-10,
+            err_msg=f"Cascaded prismatic FK incorrect",
         )
 
 
@@ -597,8 +627,10 @@ class TestBatchFKAccuracy:
                     indiv_T = individual_fk[link_name]
 
                     np.testing.assert_allclose(
-                        batch_T, indiv_T, atol=1e-12,
-                        err_msg=f"Batch/individual mismatch at config {i}, link {link_name}"
+                        batch_T,
+                        indiv_T,
+                        atol=1e-12,
+                        err_msg=f"Batch/individual mismatch at config {i}, link {link_name}",
                     )
 
 
@@ -610,10 +642,7 @@ def run_accuracy_report():
     print("ManipulaPy URDF Parser Accuracy Report")
     print("=" * 60)
 
-    results = {
-        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-        'tests': []
-    }
+    results = {"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "tests": []}
 
     # Test 1: Simple arm FK consistency
     print("\n1. Simple Arm FK Consistency Test")
@@ -634,11 +663,13 @@ def run_accuracy_report():
         max_diff = max(max_diff, diff)
 
     print(f"  Determinism check: {max_diff:.2e} (should be 0)")
-    results['tests'].append({
-        'name': 'FK Determinism',
-        'max_error': float(max_diff),
-        'passed': max_diff < 1e-15
-    })
+    results["tests"].append(
+        {
+            "name": "FK Determinism",
+            "max_error": float(max_diff),
+            "passed": max_diff < 1e-15,
+        }
+    )
 
     # Test 2: SerialManipulator consistency
     print("\n2. SerialManipulator FK Consistency")
@@ -658,12 +689,14 @@ def run_accuracy_report():
     print(f"  Mean error: {np.mean(errors):.2e}")
     print(f"  Std error: {np.std(errors):.2e}")
 
-    results['tests'].append({
-        'name': 'SerialManipulator Consistency',
-        'max_error': float(max(errors)),
-        'mean_error': float(np.mean(errors)),
-        'passed': max(errors) < 1e-10
-    })
+    results["tests"].append(
+        {
+            "name": "SerialManipulator Consistency",
+            "max_error": float(max(errors)),
+            "mean_error": float(np.mean(errors)),
+            "passed": max(errors) < 1e-10,
+        }
+    )
 
     # Test 3: Batch FK consistency
     print("\n3. Batch FK Consistency")
@@ -682,11 +715,13 @@ def run_accuracy_report():
     print(f"  Max error: {max(errors):.2e}")
     print(f"  Mean error: {np.mean(errors):.2e}")
 
-    results['tests'].append({
-        'name': 'Batch FK Consistency',
-        'max_error': float(max(errors)),
-        'passed': max(errors) < 1e-12
-    })
+    results["tests"].append(
+        {
+            "name": "Batch FK Consistency",
+            "max_error": float(max(errors)),
+            "passed": max(errors) < 1e-12,
+        }
+    )
 
     # Test 4: SE(3) validity
     print("\n4. SE(3) Validity Check")
@@ -705,12 +740,14 @@ def run_accuracy_report():
     print(f"  Max orthogonality error: {max(rot_errors):.2e}")
     print(f"  Max determinant error: {max(det_errors):.2e}")
 
-    results['tests'].append({
-        'name': 'SE(3) Validity',
-        'max_orthogonality_error': float(max(rot_errors)),
-        'max_determinant_error': float(max(det_errors)),
-        'passed': max(rot_errors) < 1e-10 and max(det_errors) < 1e-10
-    })
+    results["tests"].append(
+        {
+            "name": "SE(3) Validity",
+            "max_orthogonality_error": float(max(rot_errors)),
+            "max_determinant_error": float(max(det_errors)),
+            "passed": max(rot_errors) < 1e-10 and max(det_errors) < 1e-10,
+        }
+    )
 
     # Test 5: Dynamics validity
     print("\n5. Dynamics Validity Check")
@@ -730,25 +767,27 @@ def run_accuracy_report():
     print(f"  Positive definite: {all(pd_check)}")
     print(f"  Max symmetry error: {max(sym_check):.2e}")
 
-    results['tests'].append({
-        'name': 'Mass Matrix Validity',
-        'all_positive_definite': all(pd_check),
-        'max_symmetry_error': float(max(sym_check)),
-        'passed': all(pd_check) and max(sym_check) < 1e-10
-    })
+    results["tests"].append(
+        {
+            "name": "Mass Matrix Validity",
+            "all_positive_definite": all(pd_check),
+            "max_symmetry_error": float(max(sym_check)),
+            "passed": all(pd_check) and max(sym_check) < 1e-10,
+        }
+    )
 
     # Summary
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)
 
-    passed = sum(1 for t in results['tests'] if t['passed'])
-    total = len(results['tests'])
+    passed = sum(1 for t in results["tests"] if t["passed"])
+    total = len(results["tests"])
 
     print(f"Tests passed: {passed}/{total}")
 
-    for test in results['tests']:
-        status = "PASS" if test['passed'] else "FAIL"
+    for test in results["tests"]:
+        status = "PASS" if test["passed"] else "FAIL"
         print(f"  [{status}] {test['name']}")
 
     # PyBullet comparison if available
@@ -773,12 +812,14 @@ def run_accuracy_report():
         print(f"  Max FK difference: {max(errors):.2e}")
         print(f"  Mean FK difference: {np.mean(errors):.2e}")
 
-        results['tests'].append({
-            'name': 'PyBullet Comparison',
-            'max_error': float(max(errors)),
-            'mean_error': float(np.mean(errors)),
-            'passed': max(errors) < 1e-5
-        })
+        results["tests"].append(
+            {
+                "name": "PyBullet Comparison",
+                "max_error": float(max(errors)),
+                "mean_error": float(np.mean(errors)),
+                "passed": max(errors) < 1e-5,
+            }
+        )
     else:
         print("\n6. PyBullet Comparison: SKIPPED (not installed)")
 
@@ -810,7 +851,7 @@ if __name__ == "__main__":
 
     # Save results
     output_path = Path(__file__).parent.parent / "accuracy_test_results.json"
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
 
     print(f"\nResults saved to: {output_path}")

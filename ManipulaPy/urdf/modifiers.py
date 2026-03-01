@@ -9,16 +9,15 @@ including calibration, payload simulation, and parameter adjustment.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-import numpy as np
-from copy import deepcopy
-from typing import Dict, List, Optional, Union
-from pathlib import Path
 import json
 import logging
+from copy import deepcopy
+from pathlib import Path
+from typing import Dict, List, Optional, Union
 
-from .types import (
-    Link, Joint, JointType, Origin, Inertial, JointLimit,
-)
+import numpy as np
+
+from .types import Inertial, Joint, JointLimit, JointType, Link, Origin
 
 logger = logging.getLogger(__name__)
 
@@ -188,10 +187,10 @@ class URDFModifier:
 
             # Create rotation offset around joint axis
             R_offset = Rotation.from_rotvec(offset * joint.axis)
-            R_current = Rotation.from_euler('xyz', current_rpy)
+            R_current = Rotation.from_euler("xyz", current_rpy)
             R_new = R_offset * R_current
 
-            joint.origin.rpy = R_new.as_euler('xyz')
+            joint.origin.rpy = R_new.as_euler("xyz")
             joint.origin._matrix_cache = None
 
         elif joint.joint_type == JointType.PRISMATIC:
@@ -494,8 +493,7 @@ class URDFModifier:
             self._urdf._root_link_name = new_name
         if self._urdf._end_link_names:
             self._urdf._end_link_names = [
-                new_name if n == old_name else n
-                for n in self._urdf._end_link_names
+                new_name if n == old_name else n for n in self._urdf._end_link_names
             ]
 
         return self
@@ -518,8 +516,7 @@ class URDFModifier:
             mat_elem = ET.SubElement(root, "material", name=mat.name)
             if mat.color is not None:
                 ET.SubElement(
-                    mat_elem, "color",
-                    rgba=" ".join(f"{x:.6g}" for x in mat.color)
+                    mat_elem, "color", rgba=" ".join(f"{x:.6g}" for x in mat.color)
                 )
             if mat.texture is not None:
                 ET.SubElement(mat_elem, "texture", filename=mat.texture)
@@ -532,15 +529,17 @@ class URDFModifier:
             if link.inertial is not None:
                 inertial_elem = ET.SubElement(link_elem, "inertial")
                 self._export_origin(inertial_elem, link.inertial.origin)
-                ET.SubElement(
-                    inertial_elem, "mass",
-                    value=f"{link.inertial.mass:.6g}"
-                )
+                ET.SubElement(inertial_elem, "mass", value=f"{link.inertial.mass:.6g}")
                 I = link.inertial.inertia
                 ET.SubElement(
-                    inertial_elem, "inertia",
-                    ixx=f"{I[0,0]:.6g}", ixy=f"{I[0,1]:.6g}", ixz=f"{I[0,2]:.6g}",
-                    iyy=f"{I[1,1]:.6g}", iyz=f"{I[1,2]:.6g}", izz=f"{I[2,2]:.6g}"
+                    inertial_elem,
+                    "inertia",
+                    ixx=f"{I[0,0]:.6g}",
+                    ixy=f"{I[0,1]:.6g}",
+                    ixz=f"{I[0,2]:.6g}",
+                    iyy=f"{I[1,1]:.6g}",
+                    iyz=f"{I[1,2]:.6g}",
+                    izz=f"{I[2,2]:.6g}",
                 )
 
             # Visuals
@@ -554,16 +553,13 @@ class URDFModifier:
         # Export joints
         for joint in self._urdf._joints.values():
             joint_elem = ET.SubElement(
-                root, "joint",
-                name=joint.name,
-                type=joint.joint_type.value
+                root, "joint", name=joint.name, type=joint.joint_type.value
             )
             self._export_origin(joint_elem, joint.origin)
             ET.SubElement(joint_elem, "parent", link=joint.parent)
             ET.SubElement(joint_elem, "child", link=joint.child)
             ET.SubElement(
-                joint_elem, "axis",
-                xyz=" ".join(f"{x:.6g}" for x in joint.axis)
+                joint_elem, "axis", xyz=" ".join(f"{x:.6g}" for x in joint.axis)
             )
 
             if joint.limit is not None:
@@ -579,17 +575,19 @@ class URDFModifier:
 
             if joint.dynamics is not None:
                 ET.SubElement(
-                    joint_elem, "dynamics",
+                    joint_elem,
+                    "dynamics",
                     damping=f"{joint.dynamics.damping:.6g}",
-                    friction=f"{joint.dynamics.friction:.6g}"
+                    friction=f"{joint.dynamics.friction:.6g}",
                 )
 
             if joint.mimic is not None:
                 ET.SubElement(
-                    joint_elem, "mimic",
+                    joint_elem,
+                    "mimic",
                     joint=joint.mimic.joint,
                     multiplier=f"{joint.mimic.multiplier:.6g}",
-                    offset=f"{joint.mimic.offset:.6g}"
+                    offset=f"{joint.mimic.offset:.6g}",
                 )
 
         # Export transmissions
@@ -629,7 +627,8 @@ class URDFModifier:
     def _export_visual(self, parent, visual) -> None:
         """Export visual element."""
         import xml.etree.ElementTree as ET
-        from .types import Box, Cylinder, Sphere, Mesh
+
+        from .types import Box, Cylinder, Mesh, Sphere
 
         vis_elem = ET.SubElement(parent, "visual")
         if visual.name:
@@ -662,18 +661,19 @@ class URDFModifier:
     def _export_geometry(self, parent, geometry) -> None:
         """Export geometry element."""
         import xml.etree.ElementTree as ET
-        from .types import Box, Cylinder, Sphere, Mesh
+
+        from .types import Box, Cylinder, Mesh, Sphere
 
         if isinstance(geometry, Box):
             ET.SubElement(
-                parent, "box",
-                size=" ".join(f"{x:.6g}" for x in geometry.size)
+                parent, "box", size=" ".join(f"{x:.6g}" for x in geometry.size)
             )
         elif isinstance(geometry, Cylinder):
             ET.SubElement(
-                parent, "cylinder",
+                parent,
+                "cylinder",
                 radius=f"{geometry.radius:.6g}",
-                length=f"{geometry.length:.6g}"
+                length=f"{geometry.length:.6g}",
             )
         elif isinstance(geometry, Sphere):
             ET.SubElement(parent, "sphere", radius=f"{geometry.radius:.6g}")
@@ -706,7 +706,7 @@ class URDFModifier:
         Args:
             filename: Output file path
         """
-        with open(filename, 'w') as f:
+        with open(filename, "w") as f:
             f.write(self.to_urdf_string())
 
 
@@ -736,20 +736,23 @@ def load_calibration(filename: Union[str, Path]) -> Dict[str, Dict[str, float]]:
     """
     path = Path(filename)
 
-    if path.suffix in ('.yaml', '.yml'):
+    if path.suffix in (".yaml", ".yml"):
         try:
             import yaml
+
             with open(path) as f:
                 data = yaml.safe_load(f)
         except ImportError:
-            raise ImportError("PyYAML required for YAML calibration files: pip install pyyaml")
-    elif path.suffix == '.json':
+            raise ImportError(
+                "PyYAML required for YAML calibration files: pip install pyyaml"
+            )
+    elif path.suffix == ".json":
         with open(path) as f:
             data = json.load(f)
     else:
         raise ValueError(f"Unknown calibration file format: {path.suffix}")
 
-    return data.get('joints', data)
+    return data.get("joints", data)
 
 
 def save_calibration(
@@ -764,17 +767,20 @@ def save_calibration(
         filename: Output file path
     """
     path = Path(filename)
-    data = {'joints': calibration}
+    data = {"joints": calibration}
 
-    if path.suffix in ('.yaml', '.yml'):
+    if path.suffix in (".yaml", ".yml"):
         try:
             import yaml
-            with open(path, 'w') as f:
+
+            with open(path, "w") as f:
                 yaml.dump(data, f, default_flow_style=False)
         except ImportError:
-            raise ImportError("PyYAML required for YAML calibration files: pip install pyyaml")
-    elif path.suffix == '.json':
-        with open(path, 'w') as f:
+            raise ImportError(
+                "PyYAML required for YAML calibration files: pip install pyyaml"
+            )
+    elif path.suffix == ".json":
+        with open(path, "w") as f:
             json.dump(data, f, indent=2)
     else:
         raise ValueError(f"Unknown calibration file format: {path.suffix}")
