@@ -77,6 +77,7 @@ def extract_omega_list(Slist):
     """
     return np.array(Slist)[:, :3]
 
+
 def extract_screw_list(omega_list, r_list):
     """
     Build a 6xn screw-axis matrix from (3xn) angular velocities 'omega_list'
@@ -93,7 +94,7 @@ def extract_screw_list(omega_list, r_list):
     # Convert to numpy arrays if not already
     omega_list = np.asarray(omega_list)
     r_list = np.asarray(r_list)
-    
+
     # Handle case where r_list is empty or 1D
     if r_list.size == 0:
         # Create a default r_list with zeros
@@ -119,7 +120,9 @@ def extract_screw_list(omega_list, r_list):
                 n_positions = r_list.size // 3
                 r_list = r_list.reshape(3, n_positions)
             else:
-                raise ValueError(f"Cannot reshape r_list of size {r_list.size} into (3, n) format")
+                raise ValueError(
+                    f"Cannot reshape r_list of size {r_list.size} into (3, n) format"
+                )
 
     # Ensure omega_list is also 2D
     if omega_list.ndim == 1:
@@ -127,11 +130,13 @@ def extract_screw_list(omega_list, r_list):
             n_joints = omega_list.size // 3
             omega_list = omega_list.reshape(3, n_joints)
         else:
-            raise ValueError(f"Cannot reshape omega_list of size {omega_list.size} into (3, n) format")
+            raise ValueError(
+                f"Cannot reshape omega_list of size {omega_list.size} into (3, n) format"
+            )
 
     w_rows, w_cols = omega_list.shape
     r_rows, r_cols = r_list.shape
-    
+
     if w_rows != 3 or r_rows != 3:
         raise ValueError("omega_list and r_list must each have 3 rows.")
     if w_cols != r_cols:
@@ -143,7 +148,9 @@ def extract_screw_list(omega_list, r_list):
             omega_list = np.tile(omega_list, (1, r_cols))
             w_cols = r_cols
         else:
-            raise ValueError(f"omega_list and r_list must have the same number of columns. Got {w_cols} and {r_cols}.")
+            raise ValueError(
+                f"omega_list and r_list must have the same number of columns. Got {w_cols} and {r_cols}."
+            )
 
     S = np.zeros((6, w_cols), dtype=float)
     for i in range(w_cols):

@@ -8,8 +8,12 @@ Mesh loading and primitive geometry handling.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-from .primitives import create_box_vertices, create_cylinder_vertices, create_sphere_vertices
-from .mesh_loader import load_mesh, MeshData
+from .mesh_loader import MeshData, load_mesh
+from .primitives import (
+    create_box_vertices,
+    create_cylinder_vertices,
+    create_sphere_vertices,
+)
 
 __all__ = [
     "create_box_vertices",

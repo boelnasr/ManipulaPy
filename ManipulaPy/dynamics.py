@@ -24,9 +24,11 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import numpy as np
-from typing import Optional, List, Tuple, Union, Dict, Any
 from numpy.typing import NDArray
+
 from .kinematics import SerialManipulator
 from .utils import adjoint_transform as ad
 
@@ -40,14 +42,18 @@ class ManipulatorDynamics(SerialManipulator):
         b_list: Union[NDArray[np.float64], List[float]],
         S_list: NDArray[np.float64],
         B_list: NDArray[np.float64],
-        Glist: Union[List[NDArray[np.float64]], NDArray[np.float64]]
+        Glist: Union[List[NDArray[np.float64]], NDArray[np.float64]],
     ) -> None:
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
         self.Glist = Glist
         self._mass_matrix_cache: Dict[Tuple[float, ...], NDArray[np.float64]] = {}
-        self._mass_matrix_derivative_cache: Dict[Tuple[Any, ...], NDArray[np.float64]] = {}
+        self._mass_matrix_derivative_cache: Dict[
+            Tuple[Any, ...], NDArray[np.float64]
+        ] = {}
 
-    def mass_matrix(self, thetalist: Union[NDArray[np.float64], List[float]]) -> NDArray[np.float64]:
+    def mass_matrix(
+        self, thetalist: Union[NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         thetalist_key = tuple(thetalist)
         if thetalist_key in self._mass_matrix_cache:
             return self._mass_matrix_cache[thetalist_key]
@@ -59,7 +65,7 @@ class ManipulatorDynamics(SerialManipulator):
         AdT = np.zeros((6, 6, n + 1))
         AdT[:, :, 0] = np.eye(6)
         for j in range(n):
-            T = self.forward_kinematics(thetalist[:j + 1], frame="space")
+            T = self.forward_kinematics(thetalist[: j + 1], frame="space")
             AdT[:, :, j + 1] = ad(T)
 
         # Full space Jacobian at the end-effector
@@ -71,11 +77,11 @@ class ManipulatorDynamics(SerialManipulator):
             for j in range(n):
                 # Transform the i-th link's inertia into the base frame
                 Ii_base = AdT[:, :, i + 1].T @ self.Glist[i] @ AdT[:, :, i + 1]
-                
+
                 # Get the spatial Jacobian columns for joints i and j
                 Ji = J_full[:, i]  # i-th column of Jacobian
                 Jj = J_full[:, j]  # j-th column of Jacobian
-                
+
                 # Accumulate M[i,j] = Jᵢᵀ I_i Jⱼ for each link
                 M[i, j] += Ji.T @ Ii_base @ Jj
 
@@ -85,9 +91,7 @@ class ManipulatorDynamics(SerialManipulator):
         return M
 
     def _mass_matrix_derivatives(
-        self,
-        thetalist: Union[NDArray[np.float64], List[float]],
-        epsilon: float = 1e-6
+        self, thetalist: Union[NDArray[np.float64], List[float]], epsilon: float = 1e-6
     ) -> NDArray[np.float64]:
         """
         Central finite-difference approximation of dM/dtheta_k for
@@ -115,11 +119,7 @@ class ManipulatorDynamics(SerialManipulator):
         return derivatives
 
     def partial_derivative(
-        self,
-        i: int,
-        j: int,
-        k: int,
-        thetalist: Union[NDArray[np.float64], List[float]]
+        self, i: int, j: int, k: int, thetalist: Union[NDArray[np.float64], List[float]]
     ) -> float:
         """
         Keep public API but serve results from the cached tensor so a
@@ -131,7 +131,7 @@ class ManipulatorDynamics(SerialManipulator):
     def velocity_quadratic_forces(
         self,
         thetalist: Union[NDArray[np.float64], List[float]],
-        dthetalist: Union[NDArray[np.float64], List[float]]
+        dthetalist: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         n = len(thetalist)
         dtheta = np.asarray(dthetalist, dtype=np.float64)
@@ -145,9 +145,7 @@ class ManipulatorDynamics(SerialManipulator):
             accum = 0.0
             for j in range(n):
                 for k in range(n):
-                    gamma = 0.5 * (
-                        dM[i, j, k] + dM[i, k, j] - dM[j, k, i]
-                    )
+                    gamma = 0.5 * (dM[i, j, k] + dM[i, k, j] - dM[j, k, i])
                     accum += gamma * dtheta[j] * dtheta[k]
             c[i] = accum
         return c
@@ -155,7 +153,7 @@ class ManipulatorDynamics(SerialManipulator):
     def gravity_forces(
         self,
         thetalist: Union[NDArray[np.float64], List[float]],
-        g: Union[NDArray[np.float64], List[float]] = [0, 0, -9.81]
+        g: Union[NDArray[np.float64], List[float]] = [0, 0, -9.81],
     ) -> NDArray[np.float64]:
         n = len(thetalist)
         grav = np.zeros(n)
@@ -173,7 +171,7 @@ class ManipulatorDynamics(SerialManipulator):
         dthetalist: Union[NDArray[np.float64], List[float]],
         ddthetalist: Union[NDArray[np.float64], List[float]],
         g: Union[NDArray[np.float64], List[float]],
-        Ftip: Union[NDArray[np.float64], List[float]]
+        Ftip: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         n = len(thetalist)
         M = self.mass_matrix(thetalist)
@@ -189,7 +187,7 @@ class ManipulatorDynamics(SerialManipulator):
         dthetalist: Union[NDArray[np.float64], List[float]],
         taulist: Union[NDArray[np.float64], List[float]],
         g: Union[NDArray[np.float64], List[float]],
-        Ftip: Union[NDArray[np.float64], List[float]]
+        Ftip: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)

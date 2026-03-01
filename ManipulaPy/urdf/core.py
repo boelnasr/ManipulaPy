@@ -9,12 +9,13 @@ and visualization capabilities.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-from typing import Optional, Dict, List, Union, Callable, Tuple
-from pathlib import Path
 from collections import OrderedDict
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 
-from .types import Link, Joint, JointType, Material, Transmission
+from .types import Joint, JointType, Link, Material, Transmission
 
 
 class URDF:
@@ -76,12 +77,16 @@ class URDF:
         if transmissions:
             for transmission in transmissions:
                 if transmission.name in self._transmissions:
-                    raise ValueError(f"Duplicate transmission name: {transmission.name}")
+                    raise ValueError(
+                        f"Duplicate transmission name: {transmission.name}"
+                    )
                 self._transmissions[transmission.name] = transmission
 
         # Cached computations
         self._kinematic_chain: Optional[List[Joint]] = None
-        self._root_link_name: Optional[str] = None  # primary root (for backward compatibility)
+        self._root_link_name: Optional[str] = (
+            None  # primary root (for backward compatibility)
+        )
         self._root_link_names: Optional[List[str]] = None  # all roots
         self._end_link_names: Optional[List[str]] = None
         self._cfg: Dict[str, float] = {}
@@ -118,13 +123,17 @@ class URDF:
             - "pybullet": PyBullet-based parser (requires pybullet package)
         """
         if backend == "builtin":
-            return cls._load_builtin(filename, load_meshes=load_meshes, mesh_dir=mesh_dir)
+            return cls._load_builtin(
+                filename, load_meshes=load_meshes, mesh_dir=mesh_dir
+            )
         elif backend == "urchin":
             return cls._load_urchin(filename)
         elif backend == "pybullet":
             return cls._load_pybullet(filename)
         else:
-            raise ValueError(f"Unknown backend: {backend}. Use 'builtin', 'urchin', or 'pybullet'")
+            raise ValueError(
+                f"Unknown backend: {backend}. Use 'builtin', 'urchin', or 'pybullet'"
+            )
 
     @classmethod
     def _load_builtin(
@@ -137,7 +146,9 @@ class URDF:
         from .parser import URDFParser
 
         mesh_path = Path(mesh_dir) if mesh_dir else None
-        return URDFParser.parse_file(filename, load_meshes=load_meshes, mesh_dir=mesh_path)
+        return URDFParser.parse_file(
+            filename, load_meshes=load_meshes, mesh_dir=mesh_path
+        )
 
     @classmethod
     def _load_urchin(cls, filename: Union[str, Path]) -> "URDF":
@@ -157,6 +168,7 @@ class URDF:
             )
 
         import warnings
+
         warnings.warn(
             "Using urchin backend which is not compatible with NumPy 2.0+. "
             "Consider using backend='builtin' for better compatibility.",
@@ -174,8 +186,21 @@ class URDF:
     def _convert_from_urchin(cls, urchin_robot) -> "URDF":
         """Convert urchin URDF to native URDF."""
         from .types import (
-            Link, Joint, JointType, Origin, Inertial, Visual, Collision,
-            JointLimit, JointDynamics, JointMimic, Material, Box, Cylinder, Sphere, Mesh,
+            Box,
+            Collision,
+            Cylinder,
+            Inertial,
+            Joint,
+            JointDynamics,
+            JointLimit,
+            JointMimic,
+            JointType,
+            Link,
+            Material,
+            Mesh,
+            Origin,
+            Sphere,
+            Visual,
         )
 
         # Convert links
@@ -185,53 +210,75 @@ class URDF:
             inertial = None
             if ulink.inertial is not None:
                 origin = Origin(
-                    xyz=np.array(ulink.inertial.origin.xyz) if ulink.inertial.origin else np.zeros(3),
-                    rpy=np.array(ulink.inertial.origin.rpy) if ulink.inertial.origin else np.zeros(3),
+                    xyz=(
+                        np.array(ulink.inertial.origin.xyz)
+                        if ulink.inertial.origin
+                        else np.zeros(3)
+                    ),
+                    rpy=(
+                        np.array(ulink.inertial.origin.rpy)
+                        if ulink.inertial.origin
+                        else np.zeros(3)
+                    ),
                 )
                 inertial = Inertial(
                     mass=ulink.inertial.mass,
-                    inertia=ulink.inertial.inertia if hasattr(ulink.inertial, 'inertia') else np.eye(3),
+                    inertia=(
+                        ulink.inertial.inertia
+                        if hasattr(ulink.inertial, "inertia")
+                        else np.eye(3)
+                    ),
                     origin=origin,
                 )
 
             # Convert visuals
             visuals = []
-            for uvis in (ulink.visuals or []):
+            for uvis in ulink.visuals or []:
                 vis_origin = Origin(
                     xyz=np.array(uvis.origin.xyz) if uvis.origin else np.zeros(3),
                     rpy=np.array(uvis.origin.rpy) if uvis.origin else np.zeros(3),
                 )
-                geometry = cls._convert_urchin_geometry(uvis.geometry) if uvis.geometry else None
+                geometry = (
+                    cls._convert_urchin_geometry(uvis.geometry)
+                    if uvis.geometry
+                    else None
+                )
                 visuals.append(Visual(origin=vis_origin, geometry=geometry))
 
             # Convert collisions
             collisions = []
-            for ucol in (ulink.collisions or []):
+            for ucol in ulink.collisions or []:
                 col_origin = Origin(
                     xyz=np.array(ucol.origin.xyz) if ucol.origin else np.zeros(3),
                     rpy=np.array(ucol.origin.rpy) if ucol.origin else np.zeros(3),
                 )
-                geometry = cls._convert_urchin_geometry(ucol.geometry) if ucol.geometry else None
+                geometry = (
+                    cls._convert_urchin_geometry(ucol.geometry)
+                    if ucol.geometry
+                    else None
+                )
                 collisions.append(Collision(origin=col_origin, geometry=geometry))
 
-            links.append(Link(
-                name=ulink.name,
-                inertial=inertial,
-                visuals=visuals,
-                collisions=collisions,
-            ))
+            links.append(
+                Link(
+                    name=ulink.name,
+                    inertial=inertial,
+                    visuals=visuals,
+                    collisions=collisions,
+                )
+            )
 
         # Convert joints
         joints = []
         for ujoint in urchin_robot.joints:
             # Map joint type
             jtype_map = {
-                'revolute': JointType.REVOLUTE,
-                'continuous': JointType.CONTINUOUS,
-                'prismatic': JointType.PRISMATIC,
-                'fixed': JointType.FIXED,
-                'floating': JointType.FLOATING,
-                'planar': JointType.PLANAR,
+                "revolute": JointType.REVOLUTE,
+                "continuous": JointType.CONTINUOUS,
+                "prismatic": JointType.PRISMATIC,
+                "fixed": JointType.FIXED,
+                "floating": JointType.FLOATING,
+                "planar": JointType.PLANAR,
             }
             joint_type = jtype_map.get(ujoint.joint_type, JointType.FIXED)
 
@@ -240,24 +287,28 @@ class URDF:
                 rpy=np.array(ujoint.origin.rpy) if ujoint.origin else np.zeros(3),
             )
 
-            axis = np.array(ujoint.axis) if ujoint.axis is not None else np.array([0, 0, 1])
+            axis = (
+                np.array(ujoint.axis)
+                if ujoint.axis is not None
+                else np.array([0, 0, 1])
+            )
 
             # Convert limit
             limit = None
             if ujoint.limit is not None:
                 limit = JointLimit(
-                    lower=ujoint.limit.lower if hasattr(ujoint.limit, 'lower') else 0.0,
-                    upper=ujoint.limit.upper if hasattr(ujoint.limit, 'upper') else 0.0,
-                    velocity=getattr(ujoint.limit, 'velocity', None),
-                    effort=getattr(ujoint.limit, 'effort', None),
+                    lower=ujoint.limit.lower if hasattr(ujoint.limit, "lower") else 0.0,
+                    upper=ujoint.limit.upper if hasattr(ujoint.limit, "upper") else 0.0,
+                    velocity=getattr(ujoint.limit, "velocity", None),
+                    effort=getattr(ujoint.limit, "effort", None),
                 )
 
             # Convert dynamics
             dynamics = None
             if ujoint.dynamics is not None:
                 dynamics = JointDynamics(
-                    damping=getattr(ujoint.dynamics, 'damping', 0.0),
-                    friction=getattr(ujoint.dynamics, 'friction', 0.0),
+                    damping=getattr(ujoint.dynamics, "damping", 0.0),
+                    friction=getattr(ujoint.dynamics, "friction", 0.0),
                 )
 
             # Convert mimic
@@ -265,21 +316,23 @@ class URDF:
             if ujoint.mimic is not None:
                 mimic = JointMimic(
                     joint=ujoint.mimic.joint,
-                    multiplier=getattr(ujoint.mimic, 'multiplier', 1.0),
-                    offset=getattr(ujoint.mimic, 'offset', 0.0),
+                    multiplier=getattr(ujoint.mimic, "multiplier", 1.0),
+                    offset=getattr(ujoint.mimic, "offset", 0.0),
                 )
 
-            joints.append(Joint(
-                name=ujoint.name,
-                joint_type=joint_type,
-                parent=ujoint.parent,
-                child=ujoint.child,
-                origin=origin,
-                axis=axis,
-                limit=limit,
-                dynamics=dynamics,
-                mimic=mimic,
-            ))
+            joints.append(
+                Joint(
+                    name=ujoint.name,
+                    joint_type=joint_type,
+                    parent=ujoint.parent,
+                    child=ujoint.child,
+                    origin=origin,
+                    axis=axis,
+                    limit=limit,
+                    dynamics=dynamics,
+                    mimic=mimic,
+                )
+            )
 
         return cls(
             name=urchin_robot.name or "robot",
@@ -290,17 +343,17 @@ class URDF:
     @classmethod
     def _convert_urchin_geometry(cls, ugeom):
         """Convert urchin geometry to native geometry."""
-        from .types import Box, Cylinder, Sphere, Mesh
+        from .types import Box, Cylinder, Mesh, Sphere
 
         geom_type = type(ugeom).__name__.lower()
 
-        if geom_type == 'box':
+        if geom_type == "box":
             return Box(size=np.array(ugeom.size))
-        elif geom_type == 'cylinder':
+        elif geom_type == "cylinder":
             return Cylinder(radius=ugeom.radius, length=ugeom.length)
-        elif geom_type == 'sphere':
+        elif geom_type == "sphere":
             return Sphere(radius=ugeom.radius)
-        elif geom_type == 'mesh':
+        elif geom_type == "mesh":
             scale = np.array(ugeom.scale) if ugeom.scale is not None else np.ones(3)
             return Mesh(filename=ugeom.filename, scale=scale)
 
@@ -321,9 +374,7 @@ class URDF:
                 "pybullet package not installed. Install with: pip install pybullet"
             )
 
-        from .types import (
-            Link, Joint, JointType, Origin, Inertial, JointLimit,
-        )
+        from .types import Inertial, Joint, JointLimit, JointType, Link, Origin
 
         # Connect to PyBullet in DIRECT mode (no GUI)
         physics_client = p.connect(p.DIRECT)
@@ -340,15 +391,19 @@ class URDF:
             joints = []
 
             # Add base link
-            base_name = p.getBodyInfo(robot_id)[0].decode('utf-8')
+            base_name = p.getBodyInfo(robot_id)[0].decode("utf-8")
             # Get base dynamics info
             base_dynamics = p.getDynamicsInfo(robot_id, -1)
             base_mass = base_dynamics[0]
             base_inertia_diag = base_dynamics[2]
-            base_inertial = Inertial(
-                mass=base_mass,
-                inertia=np.diag(base_inertia_diag),
-            ) if base_mass > 0 else None
+            base_inertial = (
+                Inertial(
+                    mass=base_mass,
+                    inertia=np.diag(base_inertia_diag),
+                )
+                if base_mass > 0
+                else None
+            )
 
             links.append(Link(name=base_name, inertial=base_inertial))
 
@@ -364,11 +419,15 @@ class URDF:
             for i in range(num_joints):
                 joint_info = p.getJointInfo(robot_id, i)
 
-                joint_name = joint_info[1].decode('utf-8')
+                joint_name = joint_info[1].decode("utf-8")
                 joint_type_pb = joint_info[2]
-                link_name = joint_info[12].decode('utf-8')
+                link_name = joint_info[12].decode("utf-8")
                 parent_idx = joint_info[16]
-                parent_name = base_name if parent_idx == -1 else p.getJointInfo(robot_id, parent_idx)[12].decode('utf-8')
+                parent_name = (
+                    base_name
+                    if parent_idx == -1
+                    else p.getJointInfo(robot_id, parent_idx)[12].decode("utf-8")
+                )
 
                 # Joint position/orientation in parent frame
                 joint_pos = np.array(joint_info[14])
@@ -393,32 +452,44 @@ class URDF:
                 inertia_diag = dynamics[2]
                 local_inertial_pos = np.array(dynamics[3])
                 local_inertial_orn = dynamics[4]
-                local_inertial_rpy = np.array(p.getEulerFromQuaternion(local_inertial_orn))
+                local_inertial_rpy = np.array(
+                    p.getEulerFromQuaternion(local_inertial_orn)
+                )
 
-                inertial = Inertial(
-                    mass=mass,
-                    inertia=np.diag(inertia_diag),
-                    origin=Origin(xyz=local_inertial_pos, rpy=local_inertial_rpy),
-                ) if mass > 0 else None
+                inertial = (
+                    Inertial(
+                        mass=mass,
+                        inertia=np.diag(inertia_diag),
+                        origin=Origin(xyz=local_inertial_pos, rpy=local_inertial_rpy),
+                    )
+                    if mass > 0
+                    else None
+                )
 
                 links.append(Link(name=link_name, inertial=inertial))
 
-                limit = JointLimit(
-                    lower=lower_limit,
-                    upper=upper_limit,
-                    velocity=max_velocity if max_velocity > 0 else None,
-                    effort=max_force if max_force > 0 else None,
-                ) if joint_type != JointType.FIXED else None
+                limit = (
+                    JointLimit(
+                        lower=lower_limit,
+                        upper=upper_limit,
+                        velocity=max_velocity if max_velocity > 0 else None,
+                        effort=max_force if max_force > 0 else None,
+                    )
+                    if joint_type != JointType.FIXED
+                    else None
+                )
 
-                joints.append(Joint(
-                    name=joint_name,
-                    joint_type=joint_type,
-                    parent=parent_name,
-                    child=link_name,
-                    origin=Origin(xyz=joint_pos, rpy=rpy),
-                    axis=axis,
-                    limit=limit,
-                ))
+                joints.append(
+                    Joint(
+                        name=joint_name,
+                        joint_type=joint_type,
+                        parent=parent_name,
+                        child=link_name,
+                        origin=Origin(xyz=joint_pos, rpy=rpy),
+                        axis=axis,
+                        limit=limit,
+                    )
+                )
 
         finally:
             p.disconnect(physics_client)
@@ -576,6 +647,7 @@ class URDF:
         self._root_link_name = self._root_link_names[0]
         if len(self._root_link_names) > 1:
             import warnings
+
             warnings.warn(
                 f"URDF has multiple roots: {self._root_link_names}. "
                 "Using the first as primary; all roots will be included in FK.",
@@ -737,9 +809,7 @@ class URDF:
         }
 
         for joint in self._kinematic_chain:
-            parent_T = transforms.get(
-                joint.parent, np.tile(np.eye(4), (n_cfgs, 1, 1))
-            )
+            parent_T = transforms.get(joint.parent, np.tile(np.eye(4), (n_cfgs, 1, 1)))
 
             # Get configuration for this joint
             if joint.mimic:
@@ -794,7 +864,9 @@ class URDF:
 
     # ==================== ManipulaPy Integration ====================
 
-    def extract_screw_axes(self, tip_link: Optional[str] = None) -> Dict[str, np.ndarray]:
+    def extract_screw_axes(
+        self, tip_link: Optional[str] = None
+    ) -> Dict[str, np.ndarray]:
         """
         Extract screw axis parameters for ManipulaPy.
 
@@ -882,7 +954,9 @@ class URDF:
             "joint_limits": self.joint_limits,
         }
 
-    def to_serial_manipulator(self, tip_link: Optional[str] = None) -> "SerialManipulator":
+    def to_serial_manipulator(
+        self, tip_link: Optional[str] = None
+    ) -> "SerialManipulator":
         """
         Convert to ManipulaPy SerialManipulator.
 

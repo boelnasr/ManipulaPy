@@ -26,6 +26,7 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import logging
+
 import numpy as np
 from sklearn.cluster import DBSCAN
 

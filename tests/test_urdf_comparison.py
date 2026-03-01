@@ -11,10 +11,11 @@ Phase 7: Final Integration Testing
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-import pytest
-import numpy as np
-from pathlib import Path
 import warnings
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # Test fixtures directory
 FIXTURES_DIR = Path(__file__).parent / "urdf_fixtures"
@@ -24,6 +25,7 @@ def has_urchin():
     """Check if urchin is available."""
     try:
         import urchin
+
         return True
     except ImportError:
         return False
@@ -78,7 +80,7 @@ class TestURDFComparison:
                     fk_native[link.name],
                     fk_urchin[link.name],
                     atol=1e-10,
-                    err_msg=f"FK mismatch for {link.name} at zero config"
+                    err_msg=f"FK mismatch for {link.name} at zero config",
                 )
 
     def test_fk_matches_random_configs(self, load_both):
@@ -97,7 +99,7 @@ class TestURDFComparison:
                         fk_native[link.name],
                         fk_urchin[link.name],
                         atol=1e-8,
-                        err_msg=f"FK mismatch for {link.name} at random config"
+                        err_msg=f"FK mismatch for {link.name} at random config",
                     )
 
 
@@ -189,8 +191,10 @@ class TestNativeParserStandalone:
             sm_ee = manipulator.forward_kinematics(cfg)
 
             np.testing.assert_allclose(
-                urdf_ee, sm_ee, atol=1e-10,
-                err_msg="URDF FK doesn't match SerialManipulator FK"
+                urdf_ee,
+                sm_ee,
+                atol=1e-10,
+                err_msg="URDF FK doesn't match SerialManipulator FK",
             )
 
 
@@ -200,6 +204,7 @@ class TestPerformanceBenchmarks:
     def test_load_time_reasonable(self):
         """Test URDF loading time is reasonable."""
         import time
+
         from ManipulaPy.urdf import URDF
 
         times = []
@@ -215,6 +220,7 @@ class TestPerformanceBenchmarks:
     def test_fk_time_reasonable(self):
         """Test FK computation time is reasonable."""
         import time
+
         from ManipulaPy.urdf import URDF
 
         robot = URDF.load(FIXTURES_DIR / "simple_arm.urdf")
@@ -237,6 +243,7 @@ class TestPerformanceBenchmarks:
     def test_batch_fk_faster_than_loop(self):
         """Test batch FK is faster than individual FK calls."""
         import time
+
         from ManipulaPy.urdf import URDF
 
         robot = URDF.load(FIXTURES_DIR / "simple_arm.urdf")
@@ -256,9 +263,10 @@ class TestPerformanceBenchmarks:
 
         # Batch should be at least as fast (ideally faster)
         # Allow some tolerance since batch has overhead
-        assert batch_time < individual_time * 2, \
-            f"Batch FK ({batch_time*1000:.2f}ms) should be faster than " \
+        assert batch_time < individual_time * 2, (
+            f"Batch FK ({batch_time*1000:.2f}ms) should be faster than "
             f"individual ({individual_time*1000:.2f}ms)"
+        )
 
 
 class TestRobustness:
@@ -306,7 +314,7 @@ class TestRobustness:
                 np.testing.assert_allclose(
                     results[0][link_name],
                     result[link_name],
-                    err_msg="FK results inconsistent across calls"
+                    err_msg="FK results inconsistent across calls",
                 )
 
 

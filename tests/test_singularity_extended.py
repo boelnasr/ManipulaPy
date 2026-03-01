@@ -14,8 +14,10 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 """
 
 import unittest
-import numpy as np
 from unittest.mock import MagicMock, patch
+
+import numpy as np
+
 from ManipulaPy.singularity import Singularity
 
 
@@ -93,7 +95,7 @@ class TestSingularityDetection(unittest.TestCase):
         singular_configs = [
             np.zeros(6),
             np.array([np.pi, 0, 0, 0, 0, 0]),
-            np.array([0, np.pi/2, 0, 0, 0, 0])
+            np.array([0, np.pi / 2, 0, 0, 0, 0]),
         ]
         robot = MockSerialManipulator(singular_configs=singular_configs)
         singularity = Singularity(robot)
@@ -199,7 +201,9 @@ class TestNearSingularityDetection(unittest.TestCase):
         self.assertTrue(is_near_high)
 
         # With very low threshold, might not detect
-        is_near_low = self.singularity.near_singularity_detection(theta, threshold=1e-10)
+        is_near_low = self.singularity.near_singularity_detection(
+            theta, threshold=1e-10
+        )
         # Depends on actual condition number, but should be consistent
         self.assertIsInstance(is_near_low, (bool, np.bool_))
 
@@ -219,7 +223,7 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
         self.robot = MockSerialManipulator()
         self.singularity = Singularity(self.robot)
 
-    @patch('matplotlib.pyplot.show')
+    @patch("matplotlib.pyplot.show")
     def test_manipulability_ellipsoid_without_axis(self, mock_show):
         """Test manipulability ellipsoid generation without provided axis."""
         theta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
@@ -230,7 +234,7 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
         except Exception as e:
             self.fail(f"manipulability_ellipsoid raised exception: {e}")
 
-    @patch('matplotlib.pyplot.show')
+    @patch("matplotlib.pyplot.show")
     def test_manipulability_ellipsoid_at_different_configurations(self, mock_show):
         """Test manipulability ellipsoid at various configurations."""
         test_configs = [
@@ -247,11 +251,11 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
 
     def test_manipulability_ellipsoid_with_custom_axis(self):
         """Test manipulability ellipsoid with custom matplotlib axis."""
-        from mpl_toolkits.mplot3d import Axes3D
         import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
 
         fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
+        ax = fig.add_subplot(111, projection="3d")
 
         theta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
 
@@ -263,7 +267,7 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
             plt.close(fig)
             self.fail(f"manipulability_ellipsoid with custom ax raised exception: {e}")
 
-    @patch('matplotlib.pyplot.show')
+    @patch("matplotlib.pyplot.show")
     def test_manipulability_ellipsoid_calls_show(self, mock_show):
         """Test manipulability ellipsoid calls plt.show when ax=None."""
         theta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
@@ -358,15 +362,21 @@ class TestWorkspaceGeneration(unittest.TestCase):
 
             if not CUDA_AVAILABLE:
                 # Should raise an error or skip
-                with self.assertRaises((RuntimeError, ImportError, AttributeError, IndexError)):
-                    self.singularity.plot_workspace_monte_carlo(joint_limits, num_samples=10)
+                with self.assertRaises(
+                    (RuntimeError, ImportError, AttributeError, IndexError)
+                ):
+                    self.singularity.plot_workspace_monte_carlo(
+                        joint_limits, num_samples=10
+                    )
             else:
                 # If CUDA available, the function may fail due to degenerate workspace
                 # from mock robot (all points on same plane)
                 # This is expected behavior
-                with patch('matplotlib.pyplot.show'):
+                with patch("matplotlib.pyplot.show"):
                     try:
-                        self.singularity.plot_workspace_monte_carlo(joint_limits, num_samples=10)
+                        self.singularity.plot_workspace_monte_carlo(
+                            joint_limits, num_samples=10
+                        )
                     except (IndexError, Exception) as e:
                         # Expected errors with mock robot:
                         # - QhullError (degenerate workspace)
@@ -374,12 +384,12 @@ class TestWorkspaceGeneration(unittest.TestCase):
                         # - Any other workspace-related error
                         error_msg = str(e)
                         self.assertTrue(
-                            "Qhull" in error_msg or
-                            "workspace" in error_msg.lower() or
-                            "convex" in error_msg.lower() or
-                            "index" in error_msg.lower() or
-                            isinstance(e, IndexError),
-                            f"Unexpected error: {error_msg}"
+                            "Qhull" in error_msg
+                            or "workspace" in error_msg.lower()
+                            or "convex" in error_msg.lower()
+                            or "index" in error_msg.lower()
+                            or isinstance(e, IndexError),
+                            f"Unexpected error: {error_msg}",
                         )
         except ImportError:
             # If ManipulaPy.cuda_kernels can't be imported, that's fine
@@ -390,25 +400,31 @@ class TestWorkspaceGeneration(unittest.TestCase):
         # Test that function accepts different joint limit configurations
         test_configs = [
             [(-1, 1), (-1, 1), (-1, 1)],  # 3-DOF
-            [(-np.pi, np.pi)] * 6,         # 6-DOF full range
-            [(-0.5, 0.5), (-0.5, 0.5)],   # 2-DOF limited range
+            [(-np.pi, np.pi)] * 6,  # 6-DOF full range
+            [(-0.5, 0.5), (-0.5, 0.5)],  # 2-DOF limited range
         ]
 
         for joint_limits in test_configs:
             # Just verify the function signature is correct
             # Actual execution requires CUDA
             try:
-                with patch('matplotlib.pyplot.show'):
+                with patch("matplotlib.pyplot.show"):
                     # This will likely fail without CUDA or with degenerate workspace
                     try:
-                        self.singularity.plot_workspace_monte_carlo(joint_limits, num_samples=10)
+                        self.singularity.plot_workspace_monte_carlo(
+                            joint_limits, num_samples=10
+                        )
                     except (RuntimeError, ImportError, AttributeError, IndexError):
                         # Expected if CUDA not available or workspace is degenerate
                         pass
             except Exception as e:
                 # Any other error is a problem with the test setup
                 error_msg = str(e).lower()
-                if "cuda" not in error_msg and "qhull" not in error_msg and "convex" not in error_msg:
+                if (
+                    "cuda" not in error_msg
+                    and "qhull" not in error_msg
+                    and "convex" not in error_msg
+                ):
                     raise
 
 
@@ -417,6 +433,7 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
 
     def test_3dof_robot(self):
         """Test singularity analysis requires square Jacobian."""
+
         class Mock3DOFRobot:
             def jacobian(self, thetalist, frame="space"):
                 # 6x3 Jacobian for 3-DOF robot
@@ -443,6 +460,7 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
 
     def test_7dof_robot(self):
         """Test singularity analysis requires square Jacobian."""
+
         class Mock7DOFRobot:
             def jacobian(self, thetalist, frame="space"):
                 # 6x7 Jacobian for 7-DOF robot (redundant)
@@ -471,5 +489,5 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
             singularity.singularity_analysis(theta)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

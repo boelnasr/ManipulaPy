@@ -33,17 +33,20 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 import logging
-import numpy as np
-import cv2
-import pybullet as pb
-import matplotlib.pyplot as plt
-from typing import Optional, Union, Dict, Any
-from .utils import euler_to_rotation_matrix
 import warnings
+from typing import Any, Dict, Optional, Union
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import pybullet as pb
+
+from .utils import euler_to_rotation_matrix
 
 # Optional imports - handle gracefully if not available
 try:
     from ultralytics import YOLO
+
     ULTRALYTICS_AVAILABLE = True
 except ImportError:
     ULTRALYTICS_AVAILABLE = False
@@ -51,26 +54,27 @@ except ImportError:
     warnings.warn(
         "ultralytics not available. Vision features requiring YOLO will be disabled. "
         "Install with: pip install ultralytics",
-        ImportWarning
+        ImportWarning,
     )
 
 try:
     import cv2
+
     OPENCV_AVAILABLE = True
 except ImportError:
     OPENCV_AVAILABLE = False
     warnings.warn(
         "OpenCV not available. Some vision features will be disabled. "
         "Install with: pip install opencv-python",
-        ImportWarning
+        ImportWarning,
     )
 
 # Global model cache to avoid reinstantiation
 _YOLO_MODEL_CACHE: Dict[str, Any] = {}
 
+
 def detect_objects(
-    image: Union[np.ndarray, str],
-    model_path: Optional[str] = None
+    image: Union[np.ndarray, str], model_path: Optional[str] = None
 ) -> Any:
     """
     Detect objects in an image using YOLO with model caching.
@@ -111,7 +115,7 @@ def detect_objects(
         )
 
     # Use model caching to avoid reinstantiation bottleneck
-    model_key = model_path or 'yolov8n.pt'
+    model_key = model_path or "yolov8n.pt"
 
     if model_key not in _YOLO_MODEL_CACHE:
         # First call: load and cache the model
@@ -121,6 +125,7 @@ def detect_objects(
     model = _YOLO_MODEL_CACHE[model_key]
     results = model(image)
     return results
+
 
 def clear_yolo_cache(model_path: Optional[str] = None) -> int:
     """
@@ -157,6 +162,7 @@ def clear_yolo_cache(model_path: Optional[str] = None) -> int:
             return 1
         return 0
 
+
 def process_image(image):
     """
     Basic image processing function.
@@ -181,15 +187,18 @@ def process_image(image):
         return cv2.imread(image)
     return image
 
+
 # Add this to ensure the module can be imported even without dependencies
 __all__ = [
-    'detect_objects',
-    'clear_yolo_cache',
-    'process_image',
-    'Vision',
-    'ULTRALYTICS_AVAILABLE',
-    'OPENCV_AVAILABLE'
+    "detect_objects",
+    "clear_yolo_cache",
+    "process_image",
+    "Vision",
+    "ULTRALYTICS_AVAILABLE",
+    "OPENCV_AVAILABLE",
 ]
+
+
 def read_debug_parameters(dbg_params):
     """
     Utility to read current slider values from PyBullet debug interface.
@@ -270,7 +279,6 @@ class Vision:
         self.yolo_model = None
         self._yolo_model_path = "yolov8m.pt"  # Default model
         self._yolo_load_attempted = False
-
 
         # Camera configuration (Monocular or Stereo)
         self.cameras = {}
@@ -640,7 +648,9 @@ class Vision:
 
         # Lazy load YOLO on first use
         if not self._ensure_yolo_loaded():
-            self.logger.warning("⚠️ YOLO model is not available! Skipping object detection.")
+            self.logger.warning(
+                "⚠️ YOLO model is not available! Skipping object detection."
+            )
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
         # --------- YOLO inference (guarded) ----------
@@ -650,7 +660,11 @@ class Vision:
             self.logger.warning(f"YOLO inference failed ({e}); returning empty.")
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
-        if not results or getattr(results[0], "boxes", None) is None or len(results[0].boxes) == 0:
+        if (
+            not results
+            or getattr(results[0], "boxes", None) is None
+            or len(results[0].boxes) == 0
+        ):
             self.logger.info("No objects detected by YOLO.")
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
@@ -700,7 +714,9 @@ class Vision:
             self.logger.info("No obstacles kept after depth filtering.")
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
-        return np.asarray(positions, dtype=np.float32), np.asarray(orientations, dtype=np.float32)
+        return np.asarray(positions, dtype=np.float32), np.asarray(
+            orientations, dtype=np.float32
+        )
 
     # --------------------------------------------------------------------------
     # Stereo Methods
@@ -847,7 +863,7 @@ class Vision:
             self.logger.info(f"Released OpenCV camera {idx}.")
         self.capture_devices.clear()
 
-# Replace the __del__ method in ManipulaPy/vision.py (around line 648)
+    # Replace the __del__ method in ManipulaPy/vision.py (around line 648)
 
     def __del__(self):
         """
@@ -855,17 +871,19 @@ class Vision:
         """
         try:
             # Only attempt logging if we have a valid logger with open handlers
-            if (hasattr(self, 'logger') and 
-                self.logger and 
-                hasattr(self.logger, 'handlers')):
-                
+            if (
+                hasattr(self, "logger")
+                and self.logger
+                and hasattr(self.logger, "handlers")
+            ):
+
                 # Check if any handlers are still valid (not closed)
                 has_valid_handler = False
                 for handler in self.logger.handlers:
                     try:
                         # Check if handler has a stream and if it's open
-                        if hasattr(handler, 'stream'):
-                            if hasattr(handler.stream, 'closed'):
+                        if hasattr(handler, "stream"):
+                            if hasattr(handler.stream, "closed"):
                                 if not handler.stream.closed:
                                     has_valid_handler = True
                                     break
@@ -880,20 +898,22 @@ class Vision:
                     except (AttributeError, ValueError):
                         # Skip this handler if we can't determine its state
                         continue
-                
+
                 # Only log if we found at least one valid handler
                 if has_valid_handler:
                     try:
-                        self.logger.debug("Vision destructor called; releasing resources.")
+                        self.logger.debug(
+                            "Vision destructor called; releasing resources."
+                        )
                     except (ValueError, OSError):
                         # Even if we thought the handler was valid, it might have closed
                         # between our check and the log call. Just ignore it.
                         pass
-            
+
             # Always attempt to release resources, regardless of logging success
-            if hasattr(self, 'release'):
+            if hasattr(self, "release"):
                 self.release()
-                
+
         except Exception:
             # Silently ignore ALL exceptions during destruction
             # The destructor should never raise exceptions

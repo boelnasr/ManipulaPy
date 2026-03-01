@@ -8,11 +8,11 @@ Processes Xacro files (XML macros) to generate standard URDF XML.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-from pathlib import Path
-from typing import Optional, Dict
+import logging
 import subprocess
 import tempfile
-import logging
+from pathlib import Path
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -121,8 +121,8 @@ class XacroProcessor:
         - Property substitutions
         - Conditionals
         """
-        import xml.etree.ElementTree as ET
         import re
+        import xml.etree.ElementTree as ET
 
         content = filename.read_text(encoding="utf-8")
 
@@ -149,9 +149,7 @@ class XacroProcessor:
                 # Strip XML declaration from included file
                 include_content = re.sub(r"<\?xml[^?]*\?>", "", include_content)
                 # Strip root robot tags
-                include_content = re.sub(
-                    r"<robot[^>]*>|</robot>", "", include_content
-                )
+                include_content = re.sub(r"<robot[^>]*>|</robot>", "", include_content)
                 return include_content
             else:
                 logger.warning(f"Include file not found: {include_file}")
@@ -170,7 +168,4 @@ class XacroProcessor:
     def is_xacro_file(cls, filename: Path) -> bool:
         """Check if file is a xacro file."""
         filename = Path(filename)
-        return (
-            filename.suffix.lower() == ".xacro"
-            or ".xacro" in filename.name.lower()
-        )
+        return filename.suffix.lower() == ".xacro" or ".xacro" in filename.name.lower()

@@ -11,6 +11,7 @@ from ManipulaPy.path_planning import OptimizedTrajectoryPlanning, _traj_cpu_njit
 
 class StubManipulator:
     """Placeholder serial manipulator (not used in tested code paths)."""
+
     pass
 
 
@@ -34,7 +35,11 @@ class MockDynamics:
 def planner():
     joint_limits = [(-1.0, 1.0), (-2.0, 2.0)]
     return OptimizedTrajectoryPlanning(
-        StubManipulator(), "nonexistent.urdf", MockDynamics(n=2), joint_limits, use_cuda=False
+        StubManipulator(),
+        "nonexistent.urdf",
+        MockDynamics(n=2),
+        joint_limits,
+        use_cuda=False,
     )
 
 
@@ -73,10 +78,16 @@ def test_batch_joint_trajectory_cpu(planner: OptimizedTrajectoryPlanning):
 def test_batch_joint_trajectory_clips_limits():
     joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]
     planner = OptimizedTrajectoryPlanning(
-        StubManipulator(), "nonexistent.urdf", MockDynamics(n=2), joint_limits, use_cuda=False
+        StubManipulator(),
+        "nonexistent.urdf",
+        MockDynamics(n=2),
+        joint_limits,
+        use_cuda=False,
     )
     start_batch = np.array([[0.0, 0.0]], dtype=np.float32)
-    end_batch = np.array([[5.0, -5.0]], dtype=np.float32)  # intentionally outside limits
+    end_batch = np.array(
+        [[5.0, -5.0]], dtype=np.float32
+    )  # intentionally outside limits
     res = planner.batch_joint_trajectory(start_batch, end_batch, Tf=1.0, N=4, method=3)
     pos = res["positions"]
     assert np.all(pos <= 1.0 + 1e-6)
@@ -87,7 +98,12 @@ def test_inverse_dynamics_cpu_clips_to_limits():
     joint_limits = [(-1.0, 1.0)]
     torque_limits = [(-0.2, 0.2)]
     planner = OptimizedTrajectoryPlanning(
-        StubManipulator(), "nonexistent.urdf", MockDynamics(n=1), joint_limits, torque_limits, use_cuda=False
+        StubManipulator(),
+        "nonexistent.urdf",
+        MockDynamics(n=1),
+        joint_limits,
+        torque_limits,
+        use_cuda=False,
     )
     q = np.zeros((2, 1), dtype=np.float32)
     dq = np.zeros_like(q)
@@ -104,7 +120,9 @@ def test_forward_dynamics_cpu(planner: OptimizedTrajectoryPlanning):
     g = np.array([0, 0, -9.81], dtype=np.float32)
     Ftip = np.zeros((3, 6), dtype=np.float32)
 
-    res = planner.forward_dynamics_trajectory(thetalist, dthetalist, taumat, g, Ftip, dt=0.1, intRes=1)
+    res = planner.forward_dynamics_trajectory(
+        thetalist, dthetalist, taumat, g, Ftip, dt=0.1, intRes=1
+    )
     assert res["positions"].shape == (3, 2)
     assert res["velocities"].shape == (3, 2)
     assert res["accelerations"].shape == (3, 2)
@@ -130,6 +148,7 @@ def test_collision_avoidance_cpu_hook_runs():
     class StubCollisionChecker:
         def __init__(self):
             self.calls = 0
+
         def check_collision(self, _):
             self.calls += 1
             return self.calls == 1  # collide on first check only
@@ -140,13 +159,19 @@ def test_collision_avoidance_cpu_hook_runs():
 
     joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]
     planner = OptimizedTrajectoryPlanning(
-        StubManipulator(), "nonexistent.urdf", MockDynamics(n=2), joint_limits, use_cuda=False
+        StubManipulator(),
+        "nonexistent.urdf",
+        MockDynamics(n=2),
+        joint_limits,
+        use_cuda=False,
     )
     planner.collision_checker = StubCollisionChecker()
     planner.potential_field = StubPotentialField()
 
     traj = np.array([[0.2, -0.2]], dtype=np.float32)
-    adjusted = planner._apply_collision_avoidance_cpu(traj.copy(), np.array([0.0, 0.0], dtype=np.float32))
+    adjusted = planner._apply_collision_avoidance_cpu(
+        traj.copy(), np.array([0.0, 0.0], dtype=np.float32)
+    )
 
     # Collision hook was invoked and output shape preserved
     assert planner.collision_checker.calls >= 1
@@ -157,6 +182,7 @@ def test_joint_trajectory_collision_hook_runs():
     class StubCollisionChecker:
         def __init__(self):
             self.calls = 0
+
         def check_collision(self, step):
             self.calls += 1
             return self.calls == 1  # only first point collides
@@ -167,7 +193,11 @@ def test_joint_trajectory_collision_hook_runs():
 
     joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]
     planner = OptimizedTrajectoryPlanning(
-        StubManipulator(), "nonexistent.urdf", MockDynamics(n=2), joint_limits, use_cuda=False
+        StubManipulator(),
+        "nonexistent.urdf",
+        MockDynamics(n=2),
+        joint_limits,
+        use_cuda=False,
     )
     planner.collision_checker = StubCollisionChecker()
     planner.potential_field = StubPotentialField()

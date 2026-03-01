@@ -4,20 +4,24 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 import unittest
-import numpy as np
+from unittest.mock import MagicMock, patch
+
 import cupy as cp
 import matplotlib.pyplot as plt
-from unittest.mock import patch, MagicMock
+import numpy as np
+
 from ManipulaPy.control import ManipulatorController
-from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file
+from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 
 def is_module_available(module_name):
     """Check if a module is available and not mocked."""
     try:
         module = __import__(module_name)
-        return not hasattr(module, '_name') or module._name != f"MockModule({module_name})"
+        return (
+            not hasattr(module, "_name") or module._name != f"MockModule({module_name})"
+        )
     except ImportError:
         return False
 
@@ -25,12 +29,12 @@ def is_module_available(module_name):
 class TestManipulatorController(unittest.TestCase):
     def setUp(self):
         # Determine backend
-        if is_module_available('cupy'):
-            self.backend = 'cupy'
+        if is_module_available("cupy"):
+            self.backend = "cupy"
             self.cp = cp
             print("Using cupy backend for testing")
         else:
-            self.backend = 'numpy'
+            self.backend = "numpy"
             self.cp = np
             print("Using numpy backend for testing")
 
@@ -54,7 +58,9 @@ class TestManipulatorController(unittest.TestCase):
             self.ddthetalist = np.zeros(num_joints, dtype=np.float32)
 
             # Default joint and torque limits if not available
-            self.joint_limits = np.array([[-np.pi, np.pi]] * num_joints, dtype=np.float32)
+            self.joint_limits = np.array(
+                [[-np.pi, np.pi]] * num_joints, dtype=np.float32
+            )
             self.torque_limits = np.array([[-10, 10]] * num_joints, dtype=np.float32)
 
         except Exception as e:
@@ -68,9 +74,7 @@ class TestManipulatorController(unittest.TestCase):
         class MockDynamics:
             def __init__(self):
                 self.Glist = np.array([np.eye(6), np.eye(6)])
-                self.S_list = np.array(
-                    [[0, 0, 1, 0, 0, 0], [0, 0, 1, 0, 0.1, 0]]
-                ).T
+                self.S_list = np.array([[0, 0, 1, 0, 0, 0], [0, 0, 1, 0, 0.1, 0]]).T
                 self.M_list = np.eye(4)
 
             def mass_matrix(self, thetalist):
@@ -106,7 +110,7 @@ class TestManipulatorController(unittest.TestCase):
                 s1 = np.sin(thetalist[0])
                 c12 = np.cos(thetalist[0] + thetalist[1])
                 s12 = np.sin(thetalist[0] + thetalist[1])
-                
+
                 T = np.eye(4)
                 T[0, 3] = l1 * c1 + l2 * c12
                 T[1, 3] = l1 * s1 + l2 * s12
@@ -138,13 +142,17 @@ class TestManipulatorController(unittest.TestCase):
         self.thetalist = np.array([0.1, 0.2], dtype=np.float32)
         self.dthetalist = np.array([0, 0], dtype=np.float32)
         self.ddthetalist = np.array([0, 0], dtype=np.float32)
-        self.joint_limits = np.array([[-np.pi, np.pi], [-np.pi, np.pi]], dtype=np.float32)
+        self.joint_limits = np.array(
+            [[-np.pi, np.pi], [-np.pi, np.pi]], dtype=np.float32
+        )
         self.torque_limits = np.array([[-10, 10], [-10, 10]], dtype=np.float32)
 
     def test_pid_control(self):
         """Test PID control convergence to a setpoint."""
         num_joints = len(self.thetalist)
-        thetalistd = np.array([0.5, 0.7] if num_joints == 2 else [0.5] * num_joints, dtype=np.float32)
+        thetalistd = np.array(
+            [0.5, 0.7] if num_joints == 2 else [0.5] * num_joints, dtype=np.float32
+        )
         dthetalistd = np.zeros_like(thetalistd)
 
         Kp = np.array([5.0] * num_joints, dtype=np.float32)
@@ -168,7 +176,7 @@ class TestManipulatorController(unittest.TestCase):
                 self.cp.asarray(Kd),
             )
 
-            if self.backend == 'cupy':
+            if self.backend == "cupy":
                 ddthetalist = self.cp.asnumpy(tau).astype(np.float32)
             else:
                 ddthetalist = tau.astype(np.float32)
@@ -194,7 +202,9 @@ class TestManipulatorController(unittest.TestCase):
     def test_computed_torque_control(self):
         """Test computed torque control with non-zero gravity."""
         num_joints = len(self.thetalist)
-        thetalistd = np.array([0.8, -0.5] if num_joints == 2 else [0.5] * num_joints, dtype=np.float32)
+        thetalistd = np.array(
+            [0.8, -0.5] if num_joints == 2 else [0.5] * num_joints, dtype=np.float32
+        )
         dthetalistd = np.zeros_like(thetalistd)
         ddthetalistd = np.zeros_like(thetalistd)
 
@@ -221,7 +231,7 @@ class TestManipulatorController(unittest.TestCase):
                 self.cp.asarray(Kd),
             )
 
-            if self.backend == 'cupy':
+            if self.backend == "cupy":
                 tau_np = self.cp.asnumpy(tau)
             else:
                 tau_np = tau
@@ -249,7 +259,9 @@ class TestManipulatorController(unittest.TestCase):
         steps = 200
         num_joints = len(self.thetalist)
         thetastart = np.copy(self.thetalist)
-        thetaend = np.array([0.8, -0.5] if num_joints == 2 else [0.5] * num_joints, dtype=np.float32)
+        thetaend = np.array(
+            [0.8, -0.5] if num_joints == 2 else [0.5] * num_joints, dtype=np.float32
+        )
 
         trajectory = []
         velocities = []
@@ -281,7 +293,7 @@ class TestManipulatorController(unittest.TestCase):
                 self.cp.asarray(self.Ftip),
             )
 
-            if self.backend == 'cupy':
+            if self.backend == "cupy":
                 torques.append(self.cp.asnumpy(tau_ff))
             else:
                 torques.append(tau_ff)
@@ -297,14 +309,18 @@ class TestManipulatorController(unittest.TestCase):
         num_joints = len(self.thetalist)
         thetalist = self.cp.asarray(self.thetalist)
         dthetalist = self.cp.asarray(self.dthetalist)
-        taulist = self.cp.asarray(np.array([1.0, 0.5] if num_joints == 2 else [1.0] * num_joints))
+        taulist = self.cp.asarray(
+            np.array([1.0, 0.5] if num_joints == 2 else [1.0] * num_joints)
+        )
         g = self.cp.asarray(self.g)
         Ftip = self.cp.asarray(self.Ftip)
         dt = 0.01
         Q = self.cp.asarray(np.eye(2 * num_joints) * 0.01)
 
         # Test initial prediction (x_hat and P are None)
-        self.controller.kalman_filter_predict(thetalist, dthetalist, taulist, g, Ftip, dt, Q)
+        self.controller.kalman_filter_predict(
+            thetalist, dthetalist, taulist, g, Ftip, dt, Q
+        )
 
         # Verify that x_hat and P are initialized
         self.assertIsNotNone(self.controller.x_hat)
@@ -313,22 +329,26 @@ class TestManipulatorController(unittest.TestCase):
 
         # Test second prediction (x_hat and P are now initialized)
         old_x_hat = self.controller.x_hat.copy()
-        self.controller.kalman_filter_predict(thetalist, dthetalist, taulist, g, Ftip, dt, Q)
-        
+        self.controller.kalman_filter_predict(
+            thetalist, dthetalist, taulist, g, Ftip, dt, Q
+        )
+
         # Verify that x_hat has been updated
         self.assertFalse(self.cp.allclose(old_x_hat, self.controller.x_hat))
 
     def test_kalman_filter_update(self):
         """Test Kalman filter update step."""
         num_joints = len(self.thetalist)
-        
+
         # Initialize the filter first
         thetalist = self.cp.asarray(self.thetalist)
         dthetalist = self.cp.asarray(self.dthetalist)
         self.controller.x_hat = self.cp.concatenate((thetalist, dthetalist))
         self.controller.P = self.cp.eye(2 * num_joints)
 
-        z = self.cp.asarray(np.concatenate([self.thetalist + 0.01, self.dthetalist + 0.005]))
+        z = self.cp.asarray(
+            np.concatenate([self.thetalist + 0.01, self.dthetalist + 0.005])
+        )
         R = self.cp.asarray(np.eye(2 * num_joints) * 0.001)
 
         old_x_hat = self.controller.x_hat.copy()
@@ -344,7 +364,9 @@ class TestManipulatorController(unittest.TestCase):
         dthetalistd = self.cp.asarray(self.dthetalist)
         thetalist = self.cp.asarray(self.thetalist)
         dthetalist = self.cp.asarray(self.dthetalist)
-        taulist = self.cp.asarray(np.array([1.0, 0.5] if num_joints == 2 else [1.0] * num_joints))
+        taulist = self.cp.asarray(
+            np.array([1.0, 0.5] if num_joints == 2 else [1.0] * num_joints)
+        )
         g = self.cp.asarray(self.g)
         Ftip = self.cp.asarray(self.Ftip)
         dt = 0.01
@@ -355,7 +377,7 @@ class TestManipulatorController(unittest.TestCase):
             thetalistd, dthetalistd, thetalist, dthetalist, taulist, g, Ftip, dt, Q, R
         )
 
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             theta_est_np = self.cp.asnumpy(theta_est)
             dtheta_est_np = self.cp.asnumpy(dtheta_est)
         else:
@@ -404,7 +426,9 @@ class TestManipulatorController(unittest.TestCase):
 
         for i in range(steps):
             try:
-                disturbance = np.random.normal(0, 0.0001, size=num_joints).astype(np.float32)
+                disturbance = np.random.normal(0, 0.0001, size=num_joints).astype(
+                    np.float32
+                )
 
                 tau = self.controller.pd_feedforward_control(
                     self.cp.asarray(trajectory[i]),
@@ -418,7 +442,7 @@ class TestManipulatorController(unittest.TestCase):
                     self.cp.asarray(self.Ftip),
                 )
 
-                if self.backend == 'cupy':
+                if self.backend == "cupy":
                     tau_np = self.cp.asnumpy(tau)
                 else:
                     tau_np = tau
@@ -460,7 +484,9 @@ class TestManipulatorController(unittest.TestCase):
                 else:
                     execution_history.append(np.copy(trajectory[i]))
 
-        self.assertTrue(len(execution_history) > 0, "No execution history was collected")
+        self.assertTrue(
+            len(execution_history) > 0, "No execution history was collected"
+        )
 
         stable_steps = min(10, len(execution_history))
         if stable_steps > 0:
@@ -470,12 +496,17 @@ class TestManipulatorController(unittest.TestCase):
             valid_indices = ~np.isnan(early_execution).any(axis=1)
             if np.any(valid_indices):
                 early_execution = early_execution[valid_indices]
-                early_trajectory = early_trajectory[valid_indices[:len(early_trajectory)]]
+                early_trajectory = early_trajectory[
+                    valid_indices[: len(early_trajectory)]
+                ]
 
                 if len(early_execution) > 0 and len(early_trajectory) > 0:
-                    first_tracking_error = np.mean(np.abs(early_execution[0] - early_trajectory[0]))
+                    first_tracking_error = np.mean(
+                        np.abs(early_execution[0] - early_trajectory[0])
+                    )
                     self.assertTrue(
-                        np.isfinite(first_tracking_error) and first_tracking_error < 0.5,
+                        np.isfinite(first_tracking_error)
+                        and first_tracking_error < 0.5,
                         f"Initial tracking error is too high: {first_tracking_error}",
                     )
             else:
@@ -499,7 +530,7 @@ class TestManipulatorController(unittest.TestCase):
             self.cp.asarray(self.torque_limits),
         )
 
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             clipped_theta = self.cp.asnumpy(clipped_theta)
             clipped_tau = self.cp.asnumpy(clipped_tau)
 
@@ -516,6 +547,7 @@ class TestManipulatorController(unittest.TestCase):
                 and clipped_tau[i] <= self.torque_limits[i, 1],
                 f"Torque limit enforcement failed for joint {i}: value {clipped_tau[i]} not in [{self.torque_limits[i, 0]}, {self.torque_limits[i, 1]}]",
             )
+
     def test_cartesian_space_control(self):
         """Test Cartesian space control."""
         num_joints = len(self.thetalist)
@@ -530,15 +562,11 @@ class TestManipulatorController(unittest.TestCase):
         Kd = self.cp.asarray(np.array([3.0, 3.0, 3.0], dtype=np.float32))
 
         tau = self.controller.cartesian_space_control(
-            desired_position,
-            current_joint_angles,
-            current_joint_velocities,
-            Kp,
-            Kd
+            desired_position, current_joint_angles, current_joint_velocities, Kp, Kd
         )
 
         # Convert back to NumPy if using CuPy
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             tau_np = self.cp.asnumpy(tau)
         else:
             tau_np = tau
@@ -547,22 +575,30 @@ class TestManipulatorController(unittest.TestCase):
         self.assertEqual(len(tau_np), num_joints)
         self.assertTrue(np.all(np.isfinite(tau_np)))
 
-
     def test_pd_control(self):
         """Test PD control without integral term."""
         num_joints = len(self.thetalist)
-        desired_position = self.cp.asarray(np.array([0.3, -0.2] if num_joints == 2 else [0.3] * num_joints))
-        desired_velocity = self.cp.asarray(np.array([0.1, 0.05] if num_joints == 2 else [0.1] * num_joints))
+        desired_position = self.cp.asarray(
+            np.array([0.3, -0.2] if num_joints == 2 else [0.3] * num_joints)
+        )
+        desired_velocity = self.cp.asarray(
+            np.array([0.1, 0.05] if num_joints == 2 else [0.1] * num_joints)
+        )
         current_position = self.cp.asarray(self.thetalist)
         current_velocity = self.cp.asarray(self.dthetalist)
         Kp = self.cp.asarray(np.array([8.0] * num_joints))
         Kd = self.cp.asarray(np.array([1.5] * num_joints))
 
         tau = self.controller.pd_control(
-            desired_position, desired_velocity, current_position, current_velocity, Kp, Kd
+            desired_position,
+            desired_velocity,
+            current_position,
+            current_velocity,
+            Kp,
+            Kd,
         )
 
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             tau_np = self.cp.asnumpy(tau)
         else:
             tau_np = tau
@@ -573,7 +609,7 @@ class TestManipulatorController(unittest.TestCase):
     def test_ziegler_nichols_tuning(self):
         """Test Ziegler-Nichols PID tuning methods."""
         Ku = 50.0  # Ultimate gain
-        Tu = 0.5   # Ultimate period
+        Tu = 0.5  # Ultimate period
 
         # Test P controller tuning
         Kp_p, Ki_p, Kd_p = self.controller.ziegler_nichols_tuning(Ku, Tu, kind="P")
@@ -588,7 +624,9 @@ class TestManipulatorController(unittest.TestCase):
         self.assertEqual(Kd_pi, 0.0)
 
         # Test PID controller tuning
-        Kp_pid, Ki_pid, Kd_pid = self.controller.ziegler_nichols_tuning(Ku, Tu, kind="PID")
+        Kp_pid, Ki_pid, Kd_pid = self.controller.ziegler_nichols_tuning(
+            Ku, Tu, kind="PID"
+        )
         self.assertEqual(Kp_pid, 0.6 * Ku)
         self.assertEqual(Ki_pid, 2.0 * Kp_pid / Tu)
         self.assertEqual(Kd_pid, 0.125 * Kp_pid * Tu)
@@ -596,8 +634,10 @@ class TestManipulatorController(unittest.TestCase):
         # Test with array inputs
         Ku_array = np.array([50.0, 40.0])
         Tu_array = np.array([0.5, 0.6])
-        Kp_array, Ki_array, Kd_array = self.controller.ziegler_nichols_tuning(Ku_array, Tu_array, kind="PID")
-        
+        Kp_array, Ki_array, Kd_array = self.controller.ziegler_nichols_tuning(
+            Ku_array, Tu_array, kind="PID"
+        )
+
         self.assertEqual(len(Kp_array), 2)
         self.assertEqual(len(Ki_array), 2)
         self.assertEqual(len(Kd_array), 2)
@@ -631,13 +671,17 @@ class TestManipulatorController(unittest.TestCase):
         """Test ultimate gain and period finding for Ziegler-Nichols tuning."""
         num_joints = len(self.thetalist)
         thetalist = np.array([0.1, 0.05] if num_joints == 2 else [0.1] * num_joints)
-        desired_joint_angles = np.array([0.5, 0.3] if num_joints == 2 else [0.5] * num_joints)
+        desired_joint_angles = np.array(
+            [0.5, 0.3] if num_joints == 2 else [0.5] * num_joints
+        )
         dt = 0.01
         max_steps = 200  # Reduced for faster testing
 
         try:
-            ultimate_gain, ultimate_period, gain_history, error_history = self.controller.find_ultimate_gain_and_period(
-                thetalist, desired_joint_angles, dt, max_steps
+            ultimate_gain, ultimate_period, gain_history, error_history = (
+                self.controller.find_ultimate_gain_and_period(
+                    thetalist, desired_joint_angles, dt, max_steps
+                )
             )
 
             # Check that we got reasonable values
@@ -654,14 +698,13 @@ class TestManipulatorController(unittest.TestCase):
             # In case the method fails due to numerical issues, just verify it doesn't crash
             self.assertIsInstance(e, Exception)
 
-
     def test_plot_steady_state_response(self):
         """Test plotting of steady‑state response (skip on TypeError)."""
         time = np.linspace(0, 3, 50)
         set_point = 1.5
         response = set_point * (1 - np.exp(-3 * time) * np.cos(5 * time))
 
-        with patch('matplotlib.pyplot.show'):
+        with patch("matplotlib.pyplot.show"):
             try:
                 self.controller.plot_steady_state_response(
                     time, response, set_point, title="Test Response"
@@ -675,13 +718,13 @@ class TestManipulatorController(unittest.TestCase):
     def test_control_error_handling(self):
         """Test error handling in control methods."""
         num_joints = len(self.thetalist)
-        
+
         # Test with mismatched array sizes
         thetalistd = np.array([0.5] * (num_joints + 1))  # Wrong size
         dthetalistd = np.array([0.1] * num_joints)
         thetalist = np.array(self.thetalist)
         dthetalist = np.array(self.dthetalist)
-        
+
         Kp = np.array([10.0] * num_joints)
         Ki = np.array([0.1] * num_joints)
         Kd = np.array([2.0] * num_joints)
@@ -705,30 +748,43 @@ class TestManipulatorController(unittest.TestCase):
         thetalist = self.cp.asarray(self.thetalist)
         dthetalist = self.cp.asarray(self.dthetalist)
         ddthetalist = self.cp.asarray(
-            np.array([0.1, -0.2] if num_joints == 2 else [0.1] * num_joints,
-                     dtype=np.float32)
+            np.array(
+                [0.1, -0.2] if num_joints == 2 else [0.1] * num_joints, dtype=np.float32
+            )
         )
         g = self.cp.asarray(self.g)
         Ftip = self.cp.asarray(self.Ftip)
         measurement_error = self.cp.asarray(
-            np.array([0.02, -0.01] if num_joints == 2 else [0.02] * num_joints,
-                     dtype=np.float32)
+            np.array(
+                [0.02, -0.01] if num_joints == 2 else [0.02] * num_joints,
+                dtype=np.float32,
+            )
         )
         # drop the dtype kwarg—allow the mock to pick its own floating dtype
         adaptation_gain = self.cp.asarray(0.05)
 
         # First call (initializes parameter_estimate)
         tau1 = self.controller.adaptive_control(
-            thetalist, dthetalist, ddthetalist, g, Ftip,
-            measurement_error, adaptation_gain
+            thetalist,
+            dthetalist,
+            ddthetalist,
+            g,
+            Ftip,
+            measurement_error,
+            adaptation_gain,
         )
         # Second call (re‑uses the existing parameter_estimate)
         tau2 = self.controller.adaptive_control(
-            thetalist, dthetalist, ddthetalist, g, Ftip,
-            measurement_error, adaptation_gain
+            thetalist,
+            dthetalist,
+            ddthetalist,
+            g,
+            Ftip,
+            measurement_error,
+            adaptation_gain,
         )
 
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             tau1_np = self.cp.asnumpy(tau1)
             tau2_np = self.cp.asnumpy(tau2)
         else:
@@ -740,31 +796,38 @@ class TestManipulatorController(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(tau1_np)))
         self.assertTrue(np.all(np.isfinite(tau2_np)))
 
-
     def test_robust_control(self):
         """Test robust control with disturbance estimation."""
         num_joints = len(self.thetalist)
         thetalist = self.cp.asarray(self.thetalist)
         dthetalist = self.cp.asarray(self.dthetalist)
         ddthetalist = self.cp.asarray(
-            np.array([0.1, -0.2] if num_joints == 2 else [0.1] * num_joints,
-                     dtype=np.float32)
+            np.array(
+                [0.1, -0.2] if num_joints == 2 else [0.1] * num_joints, dtype=np.float32
+            )
         )
         g = self.cp.asarray(self.g)
         Ftip = self.cp.asarray(self.Ftip)
         disturbance_estimate = self.cp.asarray(
-            np.array([0.05, -0.03] if num_joints == 2 else [0.05] * num_joints,
-                     dtype=np.float32)
+            np.array(
+                [0.05, -0.03] if num_joints == 2 else [0.05] * num_joints,
+                dtype=np.float32,
+            )
         )
         # again, no dtype kwarg here
         adaptation_gain = self.cp.asarray(0.1)
 
         tau = self.controller.robust_control(
-            thetalist, dthetalist, ddthetalist, g, Ftip,
-            disturbance_estimate, adaptation_gain
+            thetalist,
+            dthetalist,
+            ddthetalist,
+            g,
+            Ftip,
+            disturbance_estimate,
+            adaptation_gain,
         )
 
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             tau_np = self.cp.asnumpy(tau)
         else:
             tau_np = tau
@@ -772,35 +835,41 @@ class TestManipulatorController(unittest.TestCase):
         self.assertEqual(len(tau_np), num_joints)
         self.assertTrue(np.all(np.isfinite(tau_np)))
 
-
     def test_control_with_cupy_arrays(self):
         """Test that control methods work with *real* CuPy arrays (skip on mocks)."""
         # Skip unless this is a real cupy.ndarray with an asnumpy()
-        if self.backend != 'cupy' or not (
-            hasattr(cp, 'ndarray') and callable(getattr(cp, 'asnumpy', None))
+        if self.backend != "cupy" or not (
+            hasattr(cp, "ndarray") and callable(getattr(cp, "asnumpy", None))
         ):
             self.skipTest("Real CuPy not found, skipping CuPy-specific tests")
 
         num_joints = len(self.thetalist)
         # use cp.asarray (no dtype kwarg) to avoid mocking dtype issues
-        thetalistd   = cp.asarray([0.5] * num_joints)
-        dthetalistd  = cp.asarray([0.1] * num_joints)
+        thetalistd = cp.asarray([0.5] * num_joints)
+        dthetalistd = cp.asarray([0.1] * num_joints)
         ddthetalistd = cp.asarray([0.0] * num_joints)
-        thetalist    = cp.asarray(self.thetalist)
-        dthetalist   = cp.asarray(self.dthetalist)
-        Kp           = cp.asarray([10.0] * num_joints)
-        Ki           = cp.asarray([0.1] * num_joints)
-        Kd           = cp.asarray([2.0] * num_joints)
-        g            = cp.asarray(self.g)
-        Ftip         = cp.asarray(self.Ftip)
+        thetalist = cp.asarray(self.thetalist)
+        dthetalist = cp.asarray(self.dthetalist)
+        Kp = cp.asarray([10.0] * num_joints)
+        Ki = cp.asarray([0.1] * num_joints)
+        Kd = cp.asarray([2.0] * num_joints)
+        g = cp.asarray(self.g)
+        Ftip = cp.asarray(self.Ftip)
 
         tau_pid = self.controller.pid_control(
-            thetalistd, dthetalistd, thetalist, dthetalist,
-            self.dt, Kp, Ki, Kd
+            thetalistd, dthetalistd, thetalist, dthetalist, self.dt, Kp, Ki, Kd
         )
         tau_ct = self.controller.computed_torque_control(
-            thetalistd, dthetalistd, ddthetalistd,
-            thetalist, dthetalist, g, self.dt, Kp, Ki, Kd
+            thetalistd,
+            dthetalistd,
+            ddthetalistd,
+            thetalist,
+            dthetalist,
+            g,
+            self.dt,
+            Kp,
+            Ki,
+            Kd,
         )
         tau_pd = self.controller.pd_control(
             thetalistd, dthetalistd, thetalist, dthetalist, Kp, Kd
@@ -808,42 +877,35 @@ class TestManipulatorController(unittest.TestCase):
 
         # duck‑type: just check shape
         for tau in (tau_pid, tau_ct, tau_pd):
-            self.assertTrue(hasattr(tau, 'shape'))
+            self.assertTrue(hasattr(tau, "shape"))
             self.assertEqual(tau.shape[0], num_joints)
-
 
     def test_joint_space_control(self):
         """Test joint space control using *NumPy* inputs (skip under CuPy)."""
         # under the CuPy‐mock backend this will fail on "0 - array", so skip
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             self.skipTest("Skipping joint_space_control under CuPy mock")
 
         num_joints = len(self.thetalist)
         desired_joint_angles = np.array(
-            [0.5, -0.3] if num_joints == 2 else [0.5] * num_joints,
-            dtype=np.float32
+            [0.5, -0.3] if num_joints == 2 else [0.5] * num_joints, dtype=np.float32
         )
-        current_joint_angles   = np.array(self.thetalist, dtype=np.float32)
+        current_joint_angles = np.array(self.thetalist, dtype=np.float32)
         current_joint_velocities = np.array(self.dthetalist, dtype=np.float32)
         Kp = np.array([10.0] * num_joints, dtype=np.float32)
         Kd = np.array([2.0] * num_joints, dtype=np.float32)
 
         tau = self.controller.joint_space_control(
-            desired_joint_angles,
-            current_joint_angles,
-            current_joint_velocities,
-            Kp,
-            Kd
+            desired_joint_angles, current_joint_angles, current_joint_velocities, Kp, Kd
         )
 
         # under numpy backend, no need to convert
         self.assertEqual(len(tau), num_joints)
         self.assertTrue(np.all(np.isfinite(tau)))
 
-
     def test_steady_state_metrics(self):
         """Test calculation of steady‑state response metrics (skip under CuPy)."""
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             self.skipTest("Skipping steady_state_metrics under CuPy mock")
 
         time = np.linspace(0, 5, 100)
@@ -854,27 +916,32 @@ class TestManipulatorController(unittest.TestCase):
         self.assertGreater(rise_time, 0)
         self.assertLess(rise_time, time[-1])
 
-        percent_overshoot = self.controller.calculate_percent_overshoot(response, set_point)
+        percent_overshoot = self.controller.calculate_percent_overshoot(
+            response, set_point
+        )
         # allow a tiny negative number due to numerical noise
         self.assertGreaterEqual(percent_overshoot, -1e-2)
 
-        settling_time = self.controller.calculate_settling_time(time, response, set_point)
+        settling_time = self.controller.calculate_settling_time(
+            time, response, set_point
+        )
         self.assertGreater(settling_time, 0)
         self.assertLessEqual(settling_time, time[-1])
 
-        steady_state_error = self.controller.calculate_steady_state_error(response, set_point)
+        steady_state_error = self.controller.calculate_steady_state_error(
+            response, set_point
+        )
         self.assertLess(abs(steady_state_error), 0.1)
-
 
     def test_control_stability_with_large_gains(self):
         """Test controller behavior with unrealistically large gains."""
         num_joints = len(self.thetalist)
-        
+
         # Very large gains that might cause instability
         large_Kp = np.array([1000.0] * num_joints)
         large_Ki = np.array([500.0] * num_joints)
         large_Kd = np.array([100.0] * num_joints)
-        
+
         thetalistd = np.array([0.1] * num_joints)
         dthetalistd = np.array([0.0] * num_joints)
         thetalist = np.array(self.thetalist)
@@ -891,7 +958,7 @@ class TestManipulatorController(unittest.TestCase):
             self.cp.asarray(large_Kd),
         )
 
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             tau_np = self.cp.asnumpy(tau)
         else:
             tau_np = tau
@@ -902,12 +969,12 @@ class TestManipulatorController(unittest.TestCase):
     def test_control_with_zero_gains(self):
         """Test controller behavior with zero gains."""
         num_joints = len(self.thetalist)
-        
+
         # Zero gains
         zero_Kp = np.array([0.0] * num_joints)
         zero_Ki = np.array([0.0] * num_joints)
         zero_Kd = np.array([0.0] * num_joints)
-        
+
         thetalistd = np.array([0.5] * num_joints)
         dthetalistd = np.array([0.1] * num_joints)
         thetalist = np.array(self.thetalist)
@@ -924,7 +991,7 @@ class TestManipulatorController(unittest.TestCase):
             self.cp.asarray(zero_Kd),
         )
 
-        if self.backend == 'cupy':
+        if self.backend == "cupy":
             tau_np = self.cp.asnumpy(tau)
         else:
             tau_np = tau
@@ -939,11 +1006,11 @@ class TestManipulatorController(unittest.TestCase):
         self.controller.parameter_estimate = None
         self.controller.P = None
         self.controller.x_hat = None
-        
+
         # Close any matplotlib figures
-        plt.close('all')
+        plt.close("all")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Configure test runner
     unittest.main(verbosity=2, buffer=True)

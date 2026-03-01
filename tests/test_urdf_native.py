@@ -16,10 +16,11 @@ Tests core functionality:
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-import pytest
-import numpy as np
-from pathlib import Path
 import warnings
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # Test fixtures directory
 FIXTURES_DIR = Path(__file__).parent / "urdf_fixtures"
@@ -134,9 +135,7 @@ class TestJointTypes:
 
         # X position should change by 0.05
         np.testing.assert_allclose(
-            fk1["x_slide"][:3, 3] - fk0["x_slide"][:3, 3],
-            [0.05, 0, 0],
-            atol=1e-10
+            fk1["x_slide"][:3, 3] - fk0["x_slide"][:3, 3], [0.05, 0, 0], atol=1e-10
         )
 
     def test_fixed_joints_ignored(self):
@@ -232,8 +231,9 @@ class TestValidation:
 
     def test_cycle_detection(self):
         """Test cyclic URDF is detected at load time."""
-        from ManipulaPy.urdf import URDF
         import pytest
+
+        from ManipulaPy.urdf import URDF
 
         # Cyclic URDF should raise ValueError during loading
         with pytest.raises(ValueError, match="cyclic|root"):
@@ -313,9 +313,7 @@ class TestForwardKinematics:
             single_fk = robot.link_fk(cfgs[i], use_names=True)
             for link in robot.links:
                 np.testing.assert_allclose(
-                    batch_fk[link.name][i],
-                    single_fk[link.name],
-                    atol=1e-10
+                    batch_fk[link.name][i], single_fk[link.name], atol=1e-10
                 )
 
 

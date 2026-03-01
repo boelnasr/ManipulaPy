@@ -9,10 +9,11 @@ Supports base transforms, namespacing, and world-frame kinematics.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Union, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+
+import numpy as np
 
 from .types import Origin
 
@@ -291,12 +292,14 @@ class Scene:
                     collision_T_local = collision.origin.matrix
                     collision_T_world = link_T_world @ collision_T_local
 
-                    geometries.append({
-                        "robot": robot_name,
-                        "link": link.name,
-                        "geometry": collision.geometry,
-                        "transform": collision_T_world,
-                    })
+                    geometries.append(
+                        {
+                            "robot": robot_name,
+                            "link": link.name,
+                            "geometry": collision.geometry,
+                            "transform": collision_T_world,
+                        }
+                    )
 
         return geometries
 
@@ -333,13 +336,15 @@ class Scene:
                     visual_T_local = visual.origin.matrix
                     visual_T_world = link_T_world @ visual_T_local
 
-                    geometries.append({
-                        "robot": robot_name,
-                        "link": link.name,
-                        "geometry": visual.geometry,
-                        "material": visual.material,
-                        "transform": visual_T_world,
-                    })
+                    geometries.append(
+                        {
+                            "robot": robot_name,
+                            "link": link.name,
+                            "geometry": visual.geometry,
+                            "material": visual.material,
+                            "transform": visual_T_world,
+                        }
+                    )
 
         return geometries
 
@@ -364,19 +369,21 @@ class Scene:
 
         # Simple O(n^2) pairwise check
         for i, geom1 in enumerate(geometries):
-            for geom2 in geometries[i + 1:]:
+            for geom2 in geometries[i + 1 :]:
                 # Skip same robot (self-collision)
                 if geom1["robot"] == geom2["robot"]:
                     continue
 
                 # Simple bounding box overlap check
                 if self._bboxes_overlap(geom1, geom2):
-                    collisions.append((
-                        geom1["robot"],
-                        geom1["link"],
-                        geom2["robot"],
-                        geom2["link"],
-                    ))
+                    collisions.append(
+                        (
+                            geom1["robot"],
+                            geom1["link"],
+                            geom2["robot"],
+                            geom2["link"],
+                        )
+                    )
 
         return collisions
 
@@ -399,7 +406,7 @@ class Scene:
         self, geometry, transform: np.ndarray
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """Get axis-aligned bounding box for geometry in world frame."""
-        from .types import Box, Cylinder, Sphere, Mesh
+        from .types import Box, Cylinder, Mesh, Sphere
 
         center = transform[:3, 3]
 
@@ -421,7 +428,7 @@ class Scene:
 
         elif isinstance(geometry, Mesh):
             # If mesh has vertices, compute AABB
-            if hasattr(geometry, 'vertices') and geometry.vertices is not None:
+            if hasattr(geometry, "vertices") and geometry.vertices is not None:
                 vertices = geometry.vertices
                 # Transform vertices
                 ones = np.ones((len(vertices), 1))

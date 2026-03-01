@@ -1,0 +1,129 @@
+{
+  "current": {
+    "iterative_inverse_kinematics": {
+      "success_rate": 0.0,
+      "n_targets": 50,
+      "n_successes": 0,
+      "mean_time_ms": 2262.409,
+      "median_time_ms": 2267.982,
+      "p95_time_ms": 2341.208,
+      "mean_pos_error": null,
+      "mean_rot_error": null,
+      "mean_iterations": 5001.0
+    },
+    "smart_inverse_kinematics": {
+      "success_rate": 0.0,
+      "n_targets": 50,
+      "n_successes": 0,
+      "mean_time_ms": 6093.141,
+      "median_time_ms": 6160.626,
+      "p95_time_ms": 6276.629,
+      "mean_pos_error": null,
+      "mean_rot_error": null,
+      "mean_iterations": 5001.0
+    },
+    "robust_inverse_kinematics": {
+      "success_rate": 0.0,
+      "n_targets": 50,
+      "n_successes": 0,
+      "mean_time_ms": 18420.073,
+      "median_time_ms": 18515.388,
+      "p95_time_ms": 19042.52,
+      "mean_pos_error": null,
+      "mean_rot_error": null,
+      "mean_iterations": 15010.0
+    }
+  },
+  "branch1": {
+    "iterative_inverse_kinematics": {
+      "success_rate": 90.0,
+      "n_targets": 50,
+      "n_successes": 45,
+      "mean_time_ms": 209.569,
+      "median_time_ms": 11.237,
+      "p95_time_ms": 1929.279,
+      "mean_pos_error": 4.917e-05,
+      "mean_rot_error": 1.099e-05,
+      "mean_iterations": 537.3
+    },
+    "smart_inverse_kinematics": {
+      "success_rate": 96.0,
+      "n_targets": 50,
+      "n_successes": 48,
+      "mean_time_ms": 1869.992,
+      "median_time_ms": 28.926,
+      "p95_time_ms": 5944.363,
+      "mean_pos_error": 2.545e-05,
+      "mean_rot_error": 7.88e-06,
+      "mean_iterations": 1630.4
+    },
+    "robust_inverse_kinematics": {
+      "success_rate": 96.0,
+      "n_targets": 50,
+      "n_successes": 48,
+      "mean_time_ms": 907.556,
+      "median_time_ms": 26.903,
+      "p95_time_ms": 1737.002,
+      "mean_pos_error": 0.00069974,
+      "mean_rot_error": 0.00032915,
+      "mean_iterations": 806.6
+    },
+    "trac_ik": {
+      "success_rate": 4.0,
+      "n_targets": 50,
+      "n_successes": 2,
+      "mean_time_ms": 66.481,
+      "median_time_ms": 54.336,
+      "p95_time_ms": 61.595,
+      "mean_pos_error": 3.826e-05,
+      "mean_rot_error": 6.5e-07,
+      "mean_iterations": null
+    }
+  },
+  "branch2": {
+    "iterative_inverse_kinematics": {
+      "success_rate": 0.0,
+      "n_targets": 50,
+      "n_successes": 0,
+      "mean_time_ms": 2271.771,
+      "median_time_ms": 2271.567,
+      "p95_time_ms": 2311.438,
+      "mean_pos_error": null,
+      "mean_rot_error": null,
+      "mean_iterations": 5001.0
+    },
+    "smart_inverse_kinematics": {
+      "success_rate": 0.0,
+      "n_targets": 50,
+      "n_successes": 0,
+      "mean_time_ms": 6140.189,
+      "median_time_ms": 6105.408,
+      "p95_time_ms": 6380.831,
+      "mean_pos_error": null,
+      "mean_rot_error": null,
+      "mean_iterations": 5001.0
+    },
+    "robust_inverse_kinematics": {
+      "success_rate": 0.0,
+      "n_targets": 50,
+      "n_successes": 0,
+      "mean_time_ms": 18334.832,
+      "median_time_ms": 18347.769,
+      "p95_time_ms": 18850.218,
+      "mean_pos_error": null,
+      "mean_rot_error": null,
+      "mean_iterations": 15010.0
+    },
+    "trac_ik": {
+      "success_rate": 0.0,
+      "n_targets": 50,
+      "n_successes": 0,
+      "mean_time_ms": 69.09,
+      "median_time_ms": 66.472,
+      "p95_time_ms": 89.518,
+      "mean_pos_error": null,
+      "mean_rot_error": null,
+      "mean_iterations": null
+    }
+  }
+}

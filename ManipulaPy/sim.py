@@ -29,15 +29,17 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
+import logging
+import time
+
+import cupy as cp  # Import cupy for CUDA acceleration
+import matplotlib.pyplot as plt
+import numpy as np
 import pybullet as p
 import pybullet_data
-from ManipulaPy.path_planning import TrajectoryPlanning as tp
+
 from ManipulaPy.control import ManipulatorController
-import numpy as np
-import cupy as cp  # Import cupy for CUDA acceleration
-import time
-import logging
-import matplotlib.pyplot as plt
+from ManipulaPy.path_planning import TrajectoryPlanning as tp
 
 
 class Simulation:
@@ -60,10 +62,10 @@ class Simulation:
         self.joint_params = []
         self.reset_button = None
         self.home_position = None
-        
+
         # NEW: Track trajectory visualization bodies for cleanup
         self.trajectory_body_ids = []
-        
+
         self.setup_simulation()
 
     def setup_logger(self):
@@ -161,7 +163,7 @@ class Simulation:
     def set_robot_models(self, robot, dynamics):
         """
         Set pre-existing robot models to avoid reprocessing.
-        
+
         Args:
             robot: SerialManipulator instance
             dynamics: ManipulatorDynamics instance
@@ -231,33 +233,33 @@ class Simulation:
         """
         Create a thin capsule between point a and b; returns body-id.
         This creates REAL GEOMETRY that appears in getCameraImage() screenshots.
-        
+
         Args:
             a: Start point [x, y, z]
             b: End point [x, y, z]
             radius: Capsule radius in world units
             rgba: Color as [r, g, b, a] where values are 0-1
-        
+
         Returns:
             int: PyBullet body ID, or -1 if failed
         """
         a, b = np.array(a), np.array(b)
         v = b - a
         L = np.linalg.norm(v)
-        
+
         if L < 1e-6:
             return -1
-        
+
         # Calculate orientation to align capsule with the line direction
         z = v / L  # Direction vector
-        
+
         # Find perpendicular vectors
         x = np.cross([0, 0, 1], z)
         if np.linalg.norm(x) < 1e-6:
             x = np.cross([0, 1, 0], z)
         x = x / np.linalg.norm(x)
         y = np.cross(z, x)
-        
+
         # Calculate proper orientation for capsule
         # PyBullet capsules are aligned with Z-axis by default
         if abs(z[2]) > 0.99:  # Nearly vertical
@@ -275,26 +277,28 @@ class Simulation:
                     orn = p.getQuaternionFromEuler([0, 0, 0])
             else:
                 orn = p.getQuaternionFromEuler([0, 0, 0])
-        
+
         # Midpoint of the line segment
         mid = (a + b) / 2
-        
+
         try:
             # Create collision and visual shapes
             col = p.createCollisionShape(p.GEOM_CAPSULE, radius=radius, height=L)
-            vis = p.createVisualShape(p.GEOM_CAPSULE, radius=radius, length=L, rgbaColor=rgba)
-            
+            vis = p.createVisualShape(
+                p.GEOM_CAPSULE, radius=radius, length=L, rgbaColor=rgba
+            )
+
             # Create static body (mass=0)
             body_id = p.createMultiBody(
                 baseMass=0,
                 baseCollisionShapeIndex=col,
                 baseVisualShapeIndex=vis,
                 basePosition=mid,
-                baseOrientation=orn
+                baseOrientation=orn,
             )
-            
+
             return body_id
-            
+
         except Exception as e:
             self.logger.error(f"Failed to create capsule line: {e}")
             return -1
@@ -302,111 +306,103 @@ class Simulation:
     def plot_trajectory(self, ee_positions, line_width=3, color=[1, 0, 0]):
         """
         Plots the end-effector trajectory in PyBullet using REAL GEOMETRY.
-        
+
         This method now creates actual 3D capsules that will appear in screenshots
         taken with getCameraImage(), unlike the previous addUserDebugLine() approach.
-        
+
         Args:
             ee_positions: List of end-effector positions [[x,y,z], ...]
             line_width: Width factor for trajectory visualization
             color: RGB color as [r, g, b] where values are 0-1
-        
+
         Returns:
             list: Body IDs of created trajectory geometry (for cleanup)
         """
         # Clear any existing trajectory bodies
         self.clear_trajectory_visualization()
-        
+
         if len(ee_positions) < 2:
             self.logger.warning("Not enough positions to plot trajectory")
             return []
-        
+
         # Convert color to RGBA
         if len(color) == 3:
             rgba_color = color + [1.0]  # Add alpha
         else:
             rgba_color = color
-        
+
         # Calculate radius based on line_width (convert to world scale)
         base_radius = 0.003  # Base radius in world units
         radius = base_radius * (line_width / 3.0)  # Scale with line_width
-        
+
         trajectory_bodies = []
-        
-        self.logger.info(f"Creating trajectory visualization with {len(ee_positions)} points")
-        
+
+        self.logger.info(
+            f"Creating trajectory visualization with {len(ee_positions)} points"
+        )
+
         # Create capsule segments between consecutive points
         for i in range(1, len(ee_positions)):
             try:
                 # Get consecutive points
                 start_pos = ee_positions[i - 1]
                 end_pos = ee_positions[i]
-                
+
                 # Create multiple parallel capsules for thickness effect
                 for j in range(max(1, line_width // 2)):
                     # Slight offset for thickness
                     offset = j * 0.002  # Small offset in world units
-                    
-                    start_offset = [
-                        start_pos[0] + offset,
-                        start_pos[1],
-                        start_pos[2]
-                    ]
-                    end_offset = [
-                        end_pos[0] + offset,
-                        end_pos[1],
-                        end_pos[2]
-                    ]
-                    
+
+                    start_offset = [start_pos[0] + offset, start_pos[1], start_pos[2]]
+                    end_offset = [end_pos[0] + offset, end_pos[1], end_pos[2]]
+
                     # Create capsule segment
                     body_id = self._capsule_line(
-                        start_offset,
-                        end_offset,
-                        radius=radius,
-                        rgba=rgba_color
+                        start_offset, end_offset, radius=radius, rgba=rgba_color
                     )
-                    
+
                     if body_id != -1:
                         trajectory_bodies.append(body_id)
-                        
+
             except Exception as e:
                 self.logger.error(f"Failed to create trajectory segment {i}: {e}")
-        
+
         # Store body IDs for cleanup
         self.trajectory_body_ids.extend(trajectory_bodies)
-        
+
         # Add trajectory markers
         marker_bodies = self._add_trajectory_markers(ee_positions, rgba_color)
         self.trajectory_body_ids.extend(marker_bodies)
-        
-        self.logger.info(f"✅ Created trajectory visualization: {len(trajectory_bodies)} segments + {len(marker_bodies)} markers")
+
+        self.logger.info(
+            f"✅ Created trajectory visualization: {len(trajectory_bodies)} segments + {len(marker_bodies)} markers"
+        )
         self.logger.info("🎯 Trajectory will now appear in screenshots as 3D geometry!")
-        
+
         return trajectory_bodies
 
     def _add_trajectory_markers(self, ee_positions, color):
         """
         Add START/END markers using real geometry.
-        
+
         Args:
             ee_positions: List of end-effector positions
             color: RGBA color for markers
-        
+
         Returns:
             list: Body IDs of created markers
         """
         marker_bodies = []
-        
+
         try:
             # START marker (green sphere)
             start_visual = p.createVisualShape(
                 shapeType=p.GEOM_SPHERE,
                 radius=0.02,
-                rgbaColor=[0.0, 1.0, 0.0, 1.0]  # Green
+                rgbaColor=[0.0, 1.0, 0.0, 1.0],  # Green
             )
             start_collision = p.createCollisionShape(
-                shapeType=p.GEOM_SPHERE,
-                radius=0.02
+                shapeType=p.GEOM_SPHERE, radius=0.02
             )
             start_marker = p.createMultiBody(
                 baseMass=0,
@@ -415,21 +411,18 @@ class Simulation:
                 basePosition=[
                     ee_positions[0][0],
                     ee_positions[0][1],
-                    ee_positions[0][2] + 0.05
-                ]
+                    ee_positions[0][2] + 0.05,
+                ],
             )
             marker_bodies.append(start_marker)
-            
+
             # END marker (red sphere)
             end_visual = p.createVisualShape(
                 shapeType=p.GEOM_SPHERE,
                 radius=0.02,
-                rgbaColor=[1.0, 0.0, 0.0, 1.0]  # Red
+                rgbaColor=[1.0, 0.0, 0.0, 1.0],  # Red
             )
-            end_collision = p.createCollisionShape(
-                shapeType=p.GEOM_SPHERE,
-                radius=0.02
-            )
+            end_collision = p.createCollisionShape(shapeType=p.GEOM_SPHERE, radius=0.02)
             end_marker = p.createMultiBody(
                 baseMass=0,
                 baseCollisionShapeIndex=end_collision,
@@ -437,29 +430,28 @@ class Simulation:
                 basePosition=[
                     ee_positions[-1][0],
                     ee_positions[-1][1],
-                    ee_positions[-1][2] + 0.05
-                ]
+                    ee_positions[-1][2] + 0.05,
+                ],
             )
             marker_bodies.append(end_marker)
-            
+
             # Add intermediate waypoints if trajectory is long enough
             if len(ee_positions) > 10:
                 waypoint_indices = [
                     len(ee_positions) // 4,
                     len(ee_positions) // 2,
-                    3 * len(ee_positions) // 4
+                    3 * len(ee_positions) // 4,
                 ]
-                
+
                 for idx in waypoint_indices:
                     if 0 <= idx < len(ee_positions):
                         waypoint_visual = p.createVisualShape(
                             shapeType=p.GEOM_SPHERE,
                             radius=0.015,
-                            rgbaColor=[0.0, 0.0, 1.0, 1.0]  # Blue
+                            rgbaColor=[0.0, 0.0, 1.0, 1.0],  # Blue
                         )
                         waypoint_collision = p.createCollisionShape(
-                            shapeType=p.GEOM_SPHERE,
-                            radius=0.015
+                            shapeType=p.GEOM_SPHERE, radius=0.015
                         )
                         waypoint_marker = p.createMultiBody(
                             baseMass=0,
@@ -468,32 +460,36 @@ class Simulation:
                             basePosition=[
                                 ee_positions[idx][0],
                                 ee_positions[idx][1],
-                                ee_positions[idx][2] + 0.03
-                            ]
+                                ee_positions[idx][2] + 0.03,
+                            ],
                         )
                         marker_bodies.append(waypoint_marker)
-            
+
         except Exception as e:
             self.logger.error(f"Failed to create trajectory markers: {e}")
-        
+
         return marker_bodies
 
     def clear_trajectory_visualization(self):
         """
         Clear all trajectory visualization bodies from the simulation.
         """
-        if hasattr(self, 'trajectory_body_ids'):
+        if hasattr(self, "trajectory_body_ids"):
             removed_count = 0
             for body_id in self.trajectory_body_ids:
                 try:
                     p.removeBody(body_id)
                     removed_count += 1
                 except Exception as e:
-                    self.logger.warning(f"Could not remove trajectory body {body_id}: {e}")
-            
+                    self.logger.warning(
+                        f"Could not remove trajectory body {body_id}: {e}"
+                    )
+
             if removed_count > 0:
-                self.logger.info(f"🧹 Removed {removed_count} trajectory visualization bodies")
-            
+                self.logger.info(
+                    f"🧹 Removed {removed_count} trajectory visualization bodies"
+                )
+
             self.trajectory_body_ids = []
 
     def run_trajectory(self, joint_trajectory):
@@ -632,10 +628,10 @@ class Simulation:
         Closes the simulation.
         """
         self.logger.info("Closing simulation...")
-        
+
         # Clear trajectory visualization
         self.clear_trajectory_visualization()
-        
+
         self.disconnect_simulation()
         self.logger.info("Simulation closed.")
 
@@ -806,7 +802,7 @@ class Simulation:
         Destructor to clean up trajectory visualization when simulation is destroyed.
         """
         try:
-            if hasattr(self, 'trajectory_body_ids'):
+            if hasattr(self, "trajectory_body_ids"):
                 self.clear_trajectory_visualization()
         except Exception:
             pass  # Ignore errors during cleanup

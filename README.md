@@ -22,18 +22,15 @@
 
 ManipulaPy is a modern, comprehensive framework that bridges the gap between basic robotics libraries and sophisticated research tools. It provides seamless integration of kinematics, dynamics, control, and perception systems with optional CUDA acceleration for real-time applications.
 
-### What's New in 1.3.0
-- **Native URDF Parser**: NumPy 2.0+ compatible URDF parsing with zero external dependencies
-- **Batch Forward Kinematics**: 50x+ faster FK for trajectory analysis via `link_fk_batch()`
-- **Multi-Robot Scenes**: Manage multiple robots in shared workspace with world-frame transforms
-- **URDF Modification**: Programmatic calibration offsets and payload simulation via `URDFModifier`
-- **Enhanced urdf_processor**: New convenience methods (`batch_forward_kinematics`, `jacobian`, `inverse_kinematics`)
-- **PyBullet Optional**: urdf_processor works without PyBullet for lightweight deployments
-- **Robot Data Organization**: Cleaned up robot data folder, removed duplicates (6.7 MB saved)
-- **Comprehensive Robot Catalog**: 382-line MANIFEST.md documenting all 25 robots with specs
-- **Automated Validation**: New validation script ensures all robots are accessible and parseable
-- **Better Documentation**: Clear separation of production URDFs vs source packages
-- **All Robots Tested**: 25 robot models from 8 manufacturers validated and ready to use
+### What's New in 1.3.1
+- **TRAC-IK Solver** (96% success at 200ms): DLS-first strategy with SQP fallback, SVD-robust Jacobian solve, perturbation recovery, and backtracking line search
+- **Redesigned IK Solvers**: All inverse kinematics algorithms overhauled — convergence rates improved from ~70% to 96%+
+- **Geometric Error Model**: `iterative_inverse_kinematics` uses position + orientation geometric error instead of twist-based error
+- **SVD-Robust Jacobian**: Condition-number-based damping prevents NaN/Inf in near-singular configurations
+- **Stagnation Recovery**: Automatic perturbation detection breaks solvers out of local minima
+- **GIL-Aware Threading**: Sequential mode (default) avoids Python GIL contention; parallel mode uses 3-worker architecture for DLS+SQP
+- **Smart Fallback**: `smart_inverse_kinematics` auto-falls back to `robust_inverse_kinematics` on failure
+- **Multi-Start Rewrite**: `robust_inverse_kinematics` uses 10 diverse initial-guess strategies for broader workspace coverage
 
 ### Why ManipulaPy?
 
@@ -368,27 +365,31 @@ solution, success, iterations = robot.iterative_inverse_kinematics(
     T_desired=target_pose,
     thetalist0=joint_angles,
     eomg=1e-6, ev=1e-6,
-    max_iterations=5000,
+    max_iterations=10000,  # increased default in 1.3.1
+    damping=0.1,
     plot_residuals=True,
-    # Optional solver knobs (new in 1.2.0):
-    weight_position=1.5,
-    weight_orientation=1.0,
-    adaptive_tuning=True,
-    backtracking=True,
 )
 
-# Smart IK with caching
-from ManipulaPy.ik_helpers import IKInitialGuessCache
-cache = IKInitialGuessCache(max_size=200)
+# Smart IK with auto-fallback (new in 1.3.1)
 theta, success, iters = robot.smart_inverse_kinematics(
     target_pose,
-    strategy="cached",
-    cache=cache,
-    weight_position=1.5,
-    weight_orientation=1.0,
+    strategy="workspace_heuristic",
+    auto_fallback=True,  # falls back to robust_ik on failure
 )
-if success:
-    cache.add(target_pose, theta)
+
+# Robust IK with multi-start strategies (rewritten in 1.3.1)
+theta, success, iters = robot.robust_inverse_kinematics(
+    target_pose,
+    eomg=1e-4, ev=1e-4,
+)
+
+# TRAC-IK solver (new in 1.3.1) — 96% success at 200ms
+theta, success, solve_time = robot.trac_ik(target_pose, timeout=0.2)
+
+# Or with parallel DLS+SQP for harder problems
+theta, success, solve_time = robot.trac_ik(
+    target_pose, timeout=0.5, use_parallel=True
+)
 ```
 
 </details>
@@ -1009,7 +1010,7 @@ If you use ManipulaPy in your research, please cite:
   author={Mohamed Aboelnasr},
   year={2025},
   url={https://github.com/boelnasr/ManipulaPy},
-  version={1.3.0},
+  version={1.3.1},
   license={AGPL-3.0-or-later},
 }
 ```
@@ -1092,7 +1093,7 @@ All dependencies are AGPL-3.0 compatible:
 
 <div align="center">
 
-**🤖 ManipulaPy v1.3.0: Professional robotics tools for the Python ecosystem**
+**🤖 ManipulaPy v1.3.1: Professional robotics tools for the Python ecosystem**
 
 [![GitHub stars](https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=social)](https://github.com/boelnasr/ManipulaPy)
 [![PyPI Downloads](https://static.pepy.tech/badge/manipulapy)](https://pepy.tech/projects/manipulapy)

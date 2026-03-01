@@ -6,7 +6,8 @@ Trimesh-based URDF Visualization
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-from typing import TYPE_CHECKING, Optional, Dict, Union
+from typing import TYPE_CHECKING, Dict, Optional, Union
+
 import numpy as np
 
 if TYPE_CHECKING:
@@ -23,7 +24,7 @@ except ImportError:
 
 def _geometry_to_trimesh(geometry, color=None):
     """Convert URDF geometry to trimesh object."""
-    from ..types import Box, Cylinder, Sphere, Mesh
+    from ..types import Box, Cylinder, Mesh, Sphere
 
     if geometry is None:
         return None
@@ -34,9 +35,7 @@ def _geometry_to_trimesh(geometry, color=None):
         mesh = trimesh.creation.box(extents=geometry.size)
 
     elif isinstance(geometry, Cylinder):
-        mesh = trimesh.creation.cylinder(
-            radius=geometry.radius, height=geometry.length
-        )
+        mesh = trimesh.creation.cylinder(radius=geometry.radius, height=geometry.length)
 
     elif isinstance(geometry, Sphere):
         mesh = trimesh.creation.icosphere(radius=geometry.radius, subdivisions=3)

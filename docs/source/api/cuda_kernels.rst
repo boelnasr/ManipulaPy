@@ -295,38 +295,6 @@ Memory Management
 
      - **cuda.device_array** -- Device array with data transferred
 
-Memory Pool Class
--------------------
-
-.. autoclass:: _GlobalCudaMemoryPool
-
-   A memory pool for managing CUDA device arrays to improve memory allocation efficiency.
-
-   .. automethod:: get_array
-
-      Get a GPU array from the pool or allocate new one.
-
-      **Parameters:**
-
-        - **shape** (*tuple*) -- Array shape
-        - **dtype** (*np.dtype*) -- Data type
-
-      **Returns:**
-
-        - **cuda.device_array** -- GPU array
-
-   .. automethod:: return_array
-
-      Return a GPU array to the memory pool for potential future reuse.
-
-      **Parameters:**
-
-        - **array** (*cuda.device_array*) -- The CUDA device array to return
-
-   .. automethod:: clear
-
-      Clear the memory pool.
-
 -------------------
 Grid Configuration
 -------------------
@@ -396,35 +364,6 @@ Performance Tools
    **Returns:**
 
      - **tuple** -- ((grid_x, grid_y), (block_x, block_y))
-
--------------------
-Constant Memory
--------------------
-
-.. autofunction:: setup_constant_array
-
-   Set up a constant memory array for frequently accessed data.
-
-   **Parameters:**
-
-     - **name** (*str*) -- Unique identifier for the constant memory array
-     - **data** (*array-like*) -- Data to be stored in the constant memory array
-
-   **Returns:**
-
-     - **cuda.const.array** -- A CUDA constant memory array
-
-.. autofunction:: get_constant_array
-
-   Retrieve a constant memory array by its name.
-
-   **Parameters:**
-
-     - **name** (*str*) -- The unique identifier of the constant memory array
-
-   **Returns:**
-
-     - **cuda.const.array or None** -- The constant memory array if it exists
 
 -------------------
 Module Constants

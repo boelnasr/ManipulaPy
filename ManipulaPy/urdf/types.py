@@ -10,8 +10,9 @@ Copyright (c) 2025 Mohamed Aboelnasr
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, List, Union, Tuple
 from enum import Enum
+from typing import List, Optional, Tuple, Union
+
 import numpy as np
 
 
@@ -621,15 +622,30 @@ class Joint:
         """
         qx, qy, qz, qw = q
         # Normalize
-        n = np.sqrt(qx*qx + qy*qy + qz*qz + qw*qw)
+        n = np.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
         if n > 1e-10:
-            qx, qy, qz, qw = qx/n, qy/n, qz/n, qw/n
+            qx, qy, qz, qw = qx / n, qy / n, qz / n, qw / n
 
-        return np.array([
-            [1 - 2*(qy*qy + qz*qz), 2*(qx*qy - qz*qw), 2*(qx*qz + qy*qw)],
-            [2*(qx*qy + qz*qw), 1 - 2*(qx*qx + qz*qz), 2*(qy*qz - qx*qw)],
-            [2*(qx*qz - qy*qw), 2*(qy*qz + qx*qw), 1 - 2*(qx*qx + qy*qy)],
-        ], dtype=np.float64)
+        return np.array(
+            [
+                [
+                    1 - 2 * (qy * qy + qz * qz),
+                    2 * (qx * qy - qz * qw),
+                    2 * (qx * qz + qy * qw),
+                ],
+                [
+                    2 * (qx * qy + qz * qw),
+                    1 - 2 * (qx * qx + qz * qz),
+                    2 * (qy * qz - qx * qw),
+                ],
+                [
+                    2 * (qx * qz - qy * qw),
+                    2 * (qy * qz + qx * qw),
+                    1 - 2 * (qx * qx + qy * qy),
+                ],
+            ],
+            dtype=np.float64,
+        )
 
     def get_child_poses_batch(self, q: np.ndarray) -> np.ndarray:
         """

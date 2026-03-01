@@ -25,11 +25,11 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
-from scipy.spatial import ConvexHull
+import numpy as np
 from numba import cuda
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
+from scipy.spatial import ConvexHull
 
 
 class Singularity:
@@ -65,8 +65,8 @@ class Singularity:
             ax (matplotlib.axes._subplots.Axes3DSubplot, optional): Matplotlib 3D axis to plot on. Defaults to None.
         """
         J = self.serial_manipulator.jacobian(thetalist, frame="space")
-        J_v = J[:3,:]  # Linear velocity part of the Jacobian
-        J_w = J[3:,:]  # Angular velocity part of the Jacobian
+        J_v = J[:3, :]  # Linear velocity part of the Jacobian
+        J_w = J[3:, :]  # Angular velocity part of the Jacobian
 
         # Singular Value Decomposition (SVD) for both parts
         U_v, S_v, _ = np.linalg.svd(J_v)
@@ -76,7 +76,7 @@ class Singularity:
         radii_w = 1.0 / np.sqrt(S_w)
 
         # Generate points on a unit sphere
-        u, v = np.mgrid[0: 2 * np.pi: 20j, 0: np.pi: 10j]
+        u, v = np.mgrid[0 : 2 * np.pi : 20j, 0 : np.pi : 10j]
         x = np.cos(u) * np.sin(v)
         y = np.sin(u) * np.sin(v)
         z = np.cos(v)

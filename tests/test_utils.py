@@ -16,7 +16,9 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 """
 
 import unittest
+
 import numpy as np
+
 from ManipulaPy import utils
 
 
@@ -30,28 +32,29 @@ class TestUtilsScrewTheory(unittest.TestCase):
     def test_extract_r_list_revolute_joints(self):
         """Test r_list extraction from screw axes with revolute joints."""
         # Screw axis for revolute joint: [ω, v] where v = -ω × r
-        S_list = np.array([
-            [0, 0, 1, 0, 0, 0],  # Z-axis at origin
-            [0, 1, 0, 0, 0, 1],  # Y-axis at (0,0,1)
-        ]).T
+        S_list = np.array(
+            [
+                [0, 0, 1, 0, 0, 0],  # Z-axis at origin
+                [0, 1, 0, 0, 0, 1],  # Y-axis at (0,0,1)
+            ]
+        ).T
 
         r_list = utils.extract_r_list(S_list)
 
         # First joint: omega=[0,0,1], v=[0,0,0] => r=[0,0,0]
         # Second joint: omega=[0,1,0], v=[0,0,1] => r=[-1,0,0] (from actual implementation)
-        expected = np.array([
-            [0, 0, 0],
-            [-1, 0, 0]
-        ])
+        expected = np.array([[0, 0, 0], [-1, 0, 0]])
 
         np.testing.assert_array_almost_equal(r_list, expected, decimal=6)
 
     def test_extract_r_list_prismatic_joint(self):
         """Test r_list extraction for prismatic joints (omega=0)."""
-        S_list = np.array([
-            [0, 0, 0, 1, 0, 0],  # Prismatic along X
-            [0, 0, 0, 0, 1, 0],  # Prismatic along Y
-        ]).T
+        S_list = np.array(
+            [
+                [0, 0, 0, 1, 0, 0],  # Prismatic along X
+                [0, 0, 0, 0, 1, 0],  # Prismatic along Y
+            ]
+        ).T
 
         r_list = utils.extract_r_list(S_list)
 
@@ -66,19 +69,23 @@ class TestUtilsScrewTheory(unittest.TestCase):
 
     def test_extract_omega_list(self):
         """Test extraction of omega (angular velocity) from screw axes."""
-        S_list = np.array([
-            [0, 0, 1, 0, 0, 0],
-            [0, 1, 0, 0, 0, 1],
-            [1, 0, 0, 0, 0, 0],
-        ]).T
+        S_list = np.array(
+            [
+                [0, 0, 1, 0, 0, 0],
+                [0, 1, 0, 0, 0, 1],
+                [1, 0, 0, 0, 0, 0],
+            ]
+        ).T
 
         omega_list = utils.extract_omega_list(S_list.T)
 
-        expected = np.array([
-            [0, 0, 1],
-            [0, 1, 0],
-            [1, 0, 0],
-        ])
+        expected = np.array(
+            [
+                [0, 0, 1],
+                [0, 1, 0],
+                [1, 0, 0],
+            ]
+        )
 
         np.testing.assert_array_almost_equal(omega_list, expected, decimal=6)
 
@@ -93,10 +100,12 @@ class TestUtilsScrewTheory(unittest.TestCase):
         # Joint 1: ω=[0,0,1], r=[0,0,0] => v=[0,0,0]
         # Joint 2: ω=[0,1,0], r=[1,0,0] => v=-[0,1,0]×[1,0,0]=[0,0,1]
 
-        expected = np.array([
-            [0, 0, 1, 0, 0, 0],
-            [0, 1, 0, 0, 0, 1],
-        ]).T
+        expected = np.array(
+            [
+                [0, 0, 1, 0, 0, 0],
+                [0, 1, 0, 0, 0, 1],
+            ]
+        ).T
 
         np.testing.assert_array_almost_equal(S_list, expected, decimal=6)
 
@@ -114,11 +123,7 @@ class TestUtilsSkewSymmetric(unittest.TestCase):
         v = np.array([1, 2, 3])
         skew = utils.skew_symmetric(v)
 
-        expected = np.array([
-            [0, -3, 2],
-            [3, 0, -1],
-            [-2, 1, 0]
-        ])
+        expected = np.array([[0, -3, 2], [3, 0, -1], [-2, 1, 0]])
 
         np.testing.assert_array_almost_equal(skew, expected, decimal=10)
 
@@ -171,12 +176,7 @@ class TestUtilsSE3Operations(unittest.TestCase):
 
     def test_TransToRp_rotation_and_translation(self):
         """Test extracting R and p from general transformation."""
-        T = np.array([
-            [1, 0, 0, 1],
-            [0, 0, -1, 2],
-            [0, 1, 0, 3],
-            [0, 0, 0, 1]
-        ])
+        T = np.array([[1, 0, 0, 1], [0, 0, -1, 2], [0, 1, 0, 3], [0, 0, 0, 1]])
 
         R, p = utils.TransToRp(T)
 
@@ -195,12 +195,7 @@ class TestUtilsSE3Operations(unittest.TestCase):
 
     def test_TransInv_property(self):
         """Test that T @ T^-1 = I."""
-        T = np.array([
-            [0, -1, 0, 2],
-            [1, 0, 0, 3],
-            [0, 0, 1, 1],
-            [0, 0, 0, 1]
-        ])
+        T = np.array([[0, -1, 0, 2], [1, 0, 0, 3], [0, 0, 1, 1], [0, 0, 0, 1]])
 
         T_inv = utils.TransInv(T)
         product = T @ T_inv
@@ -265,12 +260,9 @@ class TestUtilsMatrixExpLogarithm(unittest.TestCase):
     def test_MatrixExp6_Log6_inverse(self):
         """Test that exp(log(T)) = T."""
         # Use a simpler transformation for better numerical stability
-        T = np.array([
-            [1.0, 0, 0, 1.0],
-            [0, 1.0, 0, 2.0],
-            [0, 0, 1.0, 3.0],
-            [0, 0, 0, 1]
-        ])
+        T = np.array(
+            [[1.0, 0, 0, 1.0], [0, 1.0, 0, 2.0], [0, 0, 1.0, 3.0], [0, 0, 0, 1]]
+        )
 
         log_T = utils.MatrixLog6(T)
         T_reconstructed = utils.MatrixExp6(log_T)
@@ -303,16 +295,12 @@ class TestUtilsMatrixExpLogarithm(unittest.TestCase):
     def test_rotation_logm_90_degrees(self):
         """Test rotation_logm for 90-degree Z-axis rotation."""
         # R_z(90°)
-        R = np.array([
-            [0, -1, 0],
-            [1, 0, 0],
-            [0, 0, 1]
-        ])
+        R = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 
         omega, theta = utils.rotation_logm(R)
 
         # Should return axis=[0,0,1], angle=π/2
-        self.assertAlmostEqual(theta, np.pi/2, places=6)
+        self.assertAlmostEqual(theta, np.pi / 2, places=6)
         expected_omega = np.array([0, 0, 1])
         np.testing.assert_array_almost_equal(omega, expected_omega, decimal=6)
 
@@ -321,11 +309,13 @@ class TestUtilsMatrixExpLogarithm(unittest.TestCase):
         # Use a rotation slightly less than 180° for numerical stability
         # 179 degrees around X-axis
         angle = np.deg2rad(179)
-        R = np.array([
-            [1, 0, 0],
-            [0, np.cos(angle), -np.sin(angle)],
-            [0, np.sin(angle), np.cos(angle)]
-        ])
+        R = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(angle), -np.sin(angle)],
+                [0, np.sin(angle), np.cos(angle)],
+            ]
+        )
 
         omega, theta = utils.rotation_logm(R)
 
@@ -392,17 +382,12 @@ class TestUtilsTransformFromTwist(unittest.TestCase):
     def test_transform_from_twist_pure_rotation(self):
         """Test transform_from_twist for pure rotation (v=0)."""
         S = np.array([0, 0, 1, 0, 0, 0])  # Z-axis rotation at origin
-        theta = np.pi/2
+        theta = np.pi / 2
 
         T = utils.transform_from_twist(S, theta)
 
         # Should be 90° rotation around Z with no translation
-        expected = np.array([
-            [0, -1, 0, 0],
-            [1, 0, 0, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
+        expected = np.array([[0, -1, 0, 0], [1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
 
         np.testing.assert_array_almost_equal(T, expected, decimal=6)
 
@@ -417,19 +402,12 @@ class TestUtilsTransformFromTwist(unittest.TestCase):
         # Should be pure translation by 2 units along X
         if T.shape == (3, 4):
             # 3x4 format: [R|p] without bottom row
-            expected = np.array([
-                [1, 0, 0, 2],
-                [0, 1, 0, 0],
-                [0, 0, 1, 0]
-            ])
+            expected = np.array([[1, 0, 0, 2], [0, 1, 0, 0], [0, 0, 1, 0]])
         else:
             # 4x4 format: full transformation matrix
-            expected = np.array([
-                [1, 0, 0, 2],
-                [0, 1, 0, 0],
-                [0, 0, 1, 0],
-                [0, 0, 0, 1]
-            ])
+            expected = np.array(
+                [[1, 0, 0, 2], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+            )
 
         np.testing.assert_array_almost_equal(T, expected, decimal=10)
 
@@ -452,7 +430,7 @@ class TestUtilsTimeScaling(unittest.TestCase):
     def test_cubic_time_scaling_midpoint(self):
         """Test cubic time scaling at midpoint."""
         Tf = 10.0
-        s_mid = utils.CubicTimeScaling(Tf, Tf/2)
+        s_mid = utils.CubicTimeScaling(Tf, Tf / 2)
 
         # At midpoint, cubic should be 0.5
         self.assertAlmostEqual(s_mid, 0.5, places=6)
@@ -465,7 +443,7 @@ class TestUtilsTimeScaling(unittest.TestCase):
 
         # Should be monotonically increasing
         for i in range(len(s_values) - 1):
-            self.assertGreaterEqual(s_values[i+1], s_values[i])
+            self.assertGreaterEqual(s_values[i + 1], s_values[i])
 
     def test_quintic_time_scaling_boundary_conditions(self):
         """Test quintic time scaling at t=0 and t=Tf."""
@@ -482,7 +460,7 @@ class TestUtilsTimeScaling(unittest.TestCase):
     def test_quintic_time_scaling_midpoint(self):
         """Test quintic time scaling at midpoint."""
         Tf = 10.0
-        s_mid = utils.QuinticTimeScaling(Tf, Tf/2)
+        s_mid = utils.QuinticTimeScaling(Tf, Tf / 2)
 
         # At midpoint, quintic should be 0.5
         self.assertAlmostEqual(s_mid, 0.5, places=6)
@@ -495,7 +473,7 @@ class TestUtilsTimeScaling(unittest.TestCase):
 
         # Should be monotonically increasing
         for i in range(len(s_values) - 1):
-            self.assertGreaterEqual(s_values[i+1], s_values[i])
+            self.assertGreaterEqual(s_values[i + 1], s_values[i])
 
 
 class TestUtilsEulerAngles(unittest.TestCase):
@@ -510,12 +488,14 @@ class TestUtilsEulerAngles(unittest.TestCase):
 
     def test_rotation_matrix_to_euler_angles_z_rotation(self):
         """Test Euler angles for pure Z-axis rotation."""
-        angle = np.pi/4
-        R = np.array([
-            [np.cos(angle), -np.sin(angle), 0],
-            [np.sin(angle), np.cos(angle), 0],
-            [0, 0, 1]
-        ])
+        angle = np.pi / 4
+        R = np.array(
+            [
+                [np.cos(angle), -np.sin(angle), 0],
+                [np.sin(angle), np.cos(angle), 0],
+                [0, 0, 1],
+            ]
+        )
 
         euler = utils.rotation_matrix_to_euler_angles(R)
 
@@ -592,5 +572,5 @@ class TestUtilsEdgeCases(unittest.TestCase):
         np.testing.assert_array_almost_equal(T[3, :], [0, 0, 0, 1], decimal=10)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

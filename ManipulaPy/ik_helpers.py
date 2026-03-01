@@ -17,15 +17,16 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
+from typing import List, Optional, Tuple, Union
+
 import numpy as np
-from typing import Optional, List, Tuple, Union
 from numpy.typing import NDArray
 
 
 def workspace_heuristic_guess(
     T_desired: NDArray[np.float64],
     n_joints: int,
-    joint_limits: List[Tuple[Optional[float], Optional[float]]]
+    joint_limits: List[Tuple[Optional[float], Optional[float]]],
 ) -> NDArray[np.float64]:
     """
     Generate initial guess using geometric workspace heuristic.
@@ -63,7 +64,7 @@ def workspace_heuristic_guess(
 
     # Joint 2: Elevation angle (rough approximation)
     if n_joints >= 2:
-        r_xy = np.sqrt(p[0]**2 + p[1]**2)
+        r_xy = np.sqrt(p[0] ** 2 + p[1] ** 2)
         theta[1] = np.arctan2(p[2], r_xy) if r_xy > 1e-6 else 0.0
 
     # Joint 3: Elbow configuration (neutral position)
@@ -104,7 +105,7 @@ def extrapolate_from_current(
     T_desired: NDArray[np.float64],
     jacobian_func,
     joint_limits: List[Tuple[Optional[float], Optional[float]]],
-    alpha: float = 0.5
+    alpha: float = 0.5,
 ) -> NDArray[np.float64]:
     """
     Extrapolate initial guess from current configuration.
@@ -246,14 +247,16 @@ class IKInitialGuessCache:
             max_size: Maximum number of solutions to cache (FIFO eviction)
         """
         # Store tuples of (pose, solution, residual/quality)
-        self.cache: List[Tuple[NDArray[np.float64], NDArray[np.float64], Optional[float]]] = []
+        self.cache: List[
+            Tuple[NDArray[np.float64], NDArray[np.float64], Optional[float]]
+        ] = []
         self.max_size = max_size
 
     def add(
         self,
         T: NDArray[np.float64],
         theta: NDArray[np.float64],
-        residual: Optional[float] = None
+        residual: Optional[float] = None,
     ) -> None:
         """
         Add successful solution to cache.
@@ -274,7 +277,7 @@ class IKInitialGuessCache:
         self,
         T_desired: NDArray[np.float64],
         k: int = 3,
-        joint_limits: Optional[List[Tuple[Optional[float], Optional[float]]]] = None
+        joint_limits: Optional[List[Tuple[Optional[float], Optional[float]]]] = None,
     ) -> Optional[NDArray[np.float64]]:
         """
         Get initial guess from k nearest cached solutions.
@@ -306,7 +309,7 @@ class IKInitialGuessCache:
 
         # Sort by composite score and take k nearest
         scored.sort(key=lambda x: x[0])
-        k_nearest = scored[:min(k, len(scored))]
+        k_nearest = scored[: min(k, len(scored))]
 
         # If the best cached solution is already very good, return it directly
         best_score, _, best_quality, best_theta = k_nearest[0]
@@ -327,8 +330,6 @@ class IKInitialGuessCache:
         # Prefer the averaged guess unless the best candidate is closer to limits
         avg_dist = np.linalg.norm(theta_avg - best_theta)
         return best_theta if avg_dist < 1e-6 else theta_avg
-
-        return theta_avg
 
     def clear(self) -> None:
         """Clear the cache."""
@@ -353,7 +354,7 @@ class IKInitialGuessCache:
         p_err = np.linalg.norm(T1[:3, 3] - T2[:3, 3])
 
         # Orientation error (Frobenius norm of rotation difference)
-        R_err = np.linalg.norm(T1[:3, :3] - T2[:3, :3], 'fro')
+        R_err = np.linalg.norm(T1[:3, :3] - T2[:3, :3], "fro")
 
         # Combined weighted error
         return p_err + 0.1 * R_err
@@ -361,9 +362,10 @@ class IKInitialGuessCache:
 
 # ========== Helper Functions ==========
 
+
 def _clip_to_limits(
     theta: NDArray[np.float64],
-    joint_limits: List[Tuple[Optional[float], Optional[float]]]
+    joint_limits: List[Tuple[Optional[float], Optional[float]]],
 ) -> NDArray[np.float64]:
     """
     Clip joint angles to their limits.
@@ -392,7 +394,7 @@ def adaptive_multi_start_ik(
     eomg: float = 2e-3,
     ev: float = 2e-3,
     max_iterations: int = 1500,
-    verbose: bool = False
+    verbose: bool = False,
 ) -> Tuple[NDArray[np.float64], bool, int, str]:
     """
     Adaptive multi-start IK with progressive parameter exploration.
@@ -443,33 +445,32 @@ def adaptive_multi_start_ik(
     # Progressively explore parameter space
     strategies = [
         # Phase 1: Conservative with best heuristics
-        ('workspace_heuristic', 0.02, 0.3),  # Smart guess, stable
-        ('midpoint', 0.03, 0.3),              # Neutral config
-
+        ("workspace_heuristic", 0.02, 0.3),  # Smart guess, stable
+        ("midpoint", 0.03, 0.3),  # Neutral config
         # Phase 2: Exploration with random starts
-        ('random', 0.02, 0.3),                # Random, conservative
-        ('random', 0.03, 0.25),               # Random, very stable
-        ('random', 0.015, 0.35),              # Random, less damping
-
+        ("random", 0.02, 0.3),  # Random, conservative
+        ("random", 0.03, 0.25),  # Random, very stable
+        ("random", 0.015, 0.35),  # Random, less damping
         # Phase 3: Aggressive exploration
-        ('random', 0.01, 0.4),                # Low damping, larger steps
-        ('random', 0.04, 0.2),                # High damping, tiny steps
-        ('workspace_heuristic', 0.01, 0.4),   # Retry heuristic aggressively
-
+        ("random", 0.01, 0.4),  # Low damping, larger steps
+        ("random", 0.04, 0.2),  # High damping, tiny steps
+        ("workspace_heuristic", 0.01, 0.4),  # Retry heuristic aggressively
         # Phase 4: Last resort attempts
-        ('random', 0.05, 0.15),               # Very conservative
-        ('midpoint', 0.01, 0.5),              # Aggressive from midpoint
+        ("random", 0.05, 0.15),  # Very conservative
+        ("midpoint", 0.01, 0.5),  # Aggressive from midpoint
     ]
 
     best_solution = None
-    best_error = float('inf')
+    best_error = float("inf")
     total_iterations = 0
 
     # Try strategies in order
     for attempt, (strategy, damping, step_cap) in enumerate(strategies[:max_attempts]):
         if verbose:
-            print(f"Attempt {attempt+1}/{max_attempts}: strategy={strategy}, "
-                  f"damping={damping}, step_cap={step_cap}")
+            print(
+                f"Attempt {attempt+1}/{max_attempts}: strategy={strategy}, "
+                f"damping={damping}, step_cap={step_cap}"
+            )
 
         try:
             # Call the IK solver with current strategy
@@ -480,7 +481,7 @@ def adaptive_multi_start_ik(
                 ev=ev,
                 max_iterations=max_iterations,
                 damping=damping,
-                step_cap=step_cap
+                step_cap=step_cap,
             )
 
             total_iterations += iters
@@ -512,16 +513,17 @@ def adaptive_multi_start_ik(
     if best_solution is None:
         # Return zeros if nothing worked
         from . import ik_helpers as helpers
+
         best_solution = helpers.midpoint_of_limits([])  # Will return zeros
 
     return best_solution, False, total_iterations, "none (failed)"
 
 
 __all__ = [
-    'workspace_heuristic_guess',
-    'extrapolate_from_current',
-    'random_in_limits',
-    'midpoint_of_limits',
-    'IKInitialGuessCache',
-    'adaptive_multi_start_ik',
+    "workspace_heuristic_guess",
+    "extrapolate_from_current",
+    "random_in_limits",
+    "midpoint_of_limits",
+    "IKInitialGuessCache",
+    "adaptive_multi_start_ik",
 ]

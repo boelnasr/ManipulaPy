@@ -7,12 +7,14 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
-import pytest
+from unittest.mock import MagicMock, patch
+
 import numpy as np
-from unittest.mock import MagicMock,patch
+import pytest
+
 from ManipulaPy.cuda_kernels import CUDA_AVAILABLE
 from ManipulaPy.singularity import Singularity
-from ManipulaPy.cuda_kernels import CUDA_AVAILABLE
+
 
 class MockSerialManipulator:
     """Mock class for SerialManipulator to provide a test Jacobian."""
@@ -60,7 +62,6 @@ def test_near_singularity_detection(singularity_analyzer):
     assert singularity_analyzer.near_singularity_detection(np.ones(6))
 
 
-
 def test_manipulability_ellipsoid_plot(singularity_analyzer):
     try:
         # Just test it doesn't crash (plotting optional)
@@ -82,16 +83,13 @@ def test_manipulability_ellipsoid_plot(singularity_analyzer):
         T[:3, 3] = np.full(3, np.sum(thetas))
         return T
 
-
     @pytest.fixture
     def singularity_analyzer():
         return Singularity(MockSerialManipulator())
 
-
     def test_singularity_detection(singularity_analyzer):
         assert singularity_analyzer.singularity_analysis(np.zeros(6))
         assert not singularity_analyzer.singularity_analysis(np.ones(6))
-
 
     def test_condition_number(singularity_analyzer):
         cond_singular = singularity_analyzer.condition_number(np.zeros(6))
@@ -100,11 +98,9 @@ def test_manipulability_ellipsoid_plot(singularity_analyzer):
         assert np.isinf(cond_singular)
         assert cond_regular > 1.0
 
-
     def test_near_singularity_detection(singularity_analyzer):
         assert singularity_analyzer.near_singularity_detection(np.zeros(6))
         assert singularity_analyzer.near_singularity_detection(np.ones(6))
-
 
     @patch("matplotlib.pyplot.show")  # Suppress actual plot
     def test_manipulability_ellipsoid_plot(mock_show, singularity_analyzer):
@@ -113,12 +109,13 @@ def test_manipulability_ellipsoid_plot(singularity_analyzer):
         except Exception as e:
             pytest.fail(f"manipulability_ellipsoid raised: {e}")
 
-
     @pytest.mark.skipif(not CUDA_AVAILABLE, reason="CUDA not available")
     @patch("matplotlib.pyplot.show")
     def test_plot_workspace_monte_carlo(mock_show, singularity_analyzer):
         joint_limits = [(-1, 1), (-2, 2), (-np.pi, np.pi)]
         try:
-            singularity_analyzer.plot_workspace_monte_carlo(joint_limits, num_samples=500)
+            singularity_analyzer.plot_workspace_monte_carlo(
+                joint_limits, num_samples=500
+            )
         except Exception as e:
             pytest.fail(f"plot_workspace_monte_carlo raised: {e}")

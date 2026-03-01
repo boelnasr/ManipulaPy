@@ -8,8 +8,9 @@ Generate vertices and faces for box, cylinder, sphere primitives.
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-import numpy as np
 from typing import Tuple
+
+import numpy as np
 
 
 def create_box_vertices(size: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

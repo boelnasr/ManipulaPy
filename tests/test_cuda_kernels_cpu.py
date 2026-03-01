@@ -11,13 +11,13 @@ import pytest
 
 from ManipulaPy import cuda_kernels
 from ManipulaPy.cuda_kernels import (
-    trajectory_cpu_fallback,
-    optimized_trajectory_generation,
-    optimized_potential_field,
-    optimized_batch_trajectory_generation,
     auto_select_optimal_kernel,
-    get_optimal_kernel_config,
     check_cuda_availability,
+    get_optimal_kernel_config,
+    optimized_batch_trajectory_generation,
+    optimized_potential_field,
+    optimized_trajectory_generation,
+    trajectory_cpu_fallback,
 )
 
 
@@ -87,7 +87,9 @@ def test_gpu_only_entrypoints_raise_when_no_cuda():
     obstacles = np.zeros((1, 3), dtype=np.float32)
 
     with pytest.raises(RuntimeError):
-        optimized_potential_field(positions, goal, obstacles, influence_distance=1.0, use_pinned=False)
+        optimized_potential_field(
+            positions, goal, obstacles, influence_distance=1.0, use_pinned=False
+        )
 
     with pytest.raises(RuntimeError):
         optimized_batch_trajectory_generation(
