@@ -1,3 +1,7 @@
+# =============================================================================
+# Python
+# =============================================================================
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -28,8 +32,6 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -54,21 +56,9 @@ coverage.xml
 *.mo
 *.pot
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
 # Sphinx documentation
 docs/_build/
+docs/build/
 
 # PyBuilder
 target/
@@ -83,24 +73,12 @@ ipython_config.py
 # pyenv
 .python-version
 
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# celery beat schedule file
-celerybeat-schedule
-
-# SageMath parsed files
-*.sage.py
-
 # Environments
 .env
 .venv
 env/
 venv/
+venv-test/
 ENV/
 env.bak/
 venv.bak/
@@ -112,9 +90,6 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
-
 # mypy
 .mypy_cache/
 .dmypy.json
@@ -123,12 +98,82 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-*.zip
-
-.claude/
+# =============================================================================
+# Editor / IDE
+# =============================================================================
 
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# =============================================================================
+# OS junk
+# =============================================================================
+
+.DS_Store
+Thumbs.db
+
+# =============================================================================
+# AI tooling state (per-developer, never share)
+# =============================================================================
+
+.claude/
+.claude-flow/
+.codex
+.context/
+.mcp.json
+
+# =============================================================================
+# Personal planning / scratch markdown (per-developer, never share)
+# =============================================================================
+
+RESTRUCTURING_PLAN.md
+V*_FIX_PATCH_PLAN.md
+*_PLAN.md
+*_PATCH_PLAN.md
+PLAN.md
+NOTES.md
+SCRATCH.md
+STATUS.md
+
+# =============================================================================
+# ML model weights (large binaries, downloaded on demand)
+# =============================================================================
+
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.h5
+*.ckpt
+yolov*.pt
+yolov*.onnx
+
+# =============================================================================
+# Benchmark / run artifacts
+# =============================================================================
+
+.benchmarks/
+accuracy_benchmark_results/
+benchmark_run.log
+*demo.log
+*_demo.log
+*.bench
+
+# =============================================================================
+# Archives (rarely belong in git)
+# =============================================================================
+
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# =============================================================================
+# Legacy / old work branches (keep ignored, can be deleted later)
+# =============================================================================
 
 ik_new_branch/
-
 ik_test_branch_2/
