@@ -202,7 +202,9 @@ def transform_from_twist(S, theta):
     omega = S[:3]
     v = S[3:]
     if np.linalg.norm(omega) == 0:  # Prismatic joint
-        return np.vstack((np.eye(3), v * theta)).T
+        T = np.eye(4)
+        T[:3, 3] = v * theta
+        return T
     else:  # Revolute joint
         skew_omega = skew_symmetric(omega)
         R = (

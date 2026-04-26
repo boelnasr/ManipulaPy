@@ -13,6 +13,17 @@ import numpy as np
 class TestUtilsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/utils.py bugs."""
 
+    def test_transform_from_twist_prismatic_returns_4x4(self):
+        from ManipulaPy.utils import transform_from_twist
+
+        S_prismatic = np.array([0, 0, 0, 1, 0, 0])
+        T = transform_from_twist(S_prismatic, theta=2.5)
+
+        self.assertEqual(T.shape, (4, 4))
+        np.testing.assert_array_almost_equal(T[:3, :3], np.eye(3))
+        np.testing.assert_array_almost_equal(T[:3, 3], [2.5, 0, 0])
+        np.testing.assert_array_almost_equal(T[3, :], [0, 0, 0, 1])
+
 
 class TestDynamicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/dynamics.py bugs."""
