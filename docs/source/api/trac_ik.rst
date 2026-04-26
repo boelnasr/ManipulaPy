@@ -1,7 +1,7 @@
-Transformations Module
+TRAC-IK Solver Module
 ======================
 
-.. automodule:: ManipulaPy.transformations
+.. automodule:: ManipulaPy.trac_ik
    :members:
    :undoc-members:
    :show-inheritance:

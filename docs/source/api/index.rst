@@ -29,6 +29,9 @@ This section contains auto-generated documentation for all key modules, classes,
    dynamics
    path_planning
    control
+   trac_ik
+   ik_helpers
+   utils
    urdf_processor
 
 .. rubric:: 🧠 Planning, Simulation & Optimization
