@@ -250,16 +250,15 @@ def logm(T):
     R = T[0:3, 0:3]
     p = T[0:3, 3]
     omega, theta = rotation_logm(R)
-    if np.linalg.norm(omega) < 1e-6:
-        v = p / theta
-    else:
-        G_inv = (
-            1 / theta * np.eye(3)
-            - 0.5 * skew_symmetric(omega)
-            + (1 / theta - 0.5 / np.tan(theta / 2))
-            * np.dot(skew_symmetric(omega), skew_symmetric(omega))
-        )
-        v = np.dot(G_inv, p)
+    if theta < 1e-6:
+        return np.hstack((np.zeros(3), p))
+    G_inv = (
+        1 / theta * np.eye(3)
+        - 0.5 * skew_symmetric(omega)
+        + (1 / theta - 0.5 / np.tan(theta / 2))
+        * np.dot(skew_symmetric(omega), skew_symmetric(omega))
+    )
+    v = np.dot(G_inv, p)
     return np.hstack((omega * theta, v))
 
 

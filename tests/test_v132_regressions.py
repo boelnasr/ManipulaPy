@@ -24,6 +24,18 @@ class TestUtilsRegressions(unittest.TestCase):
         np.testing.assert_array_almost_equal(T[:3, 3], [2.5, 0, 0])
         np.testing.assert_array_almost_equal(T[3, :], [0, 0, 0, 1])
 
+    def test_logm_pure_translation_no_div_by_zero(self):
+        from ManipulaPy.utils import logm
+
+        T = np.eye(4)
+        T[:3, 3] = [1.0, 2.0, 3.0]
+
+        result = logm(T)
+        self.assertFalse(np.any(np.isnan(result)))
+        self.assertFalse(np.any(np.isinf(result)))
+        np.testing.assert_array_almost_equal(result[:3], [0, 0, 0])
+        np.testing.assert_array_almost_equal(result[3:], [1, 2, 3])
+
 
 class TestDynamicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/dynamics.py bugs."""
