@@ -678,10 +678,11 @@ class ManipulatorController:
 
         rise_start = 0.1 * set_point
         rise_end = 0.9 * set_point
-        start_idx = np.where(response >= rise_start)[0][0]
-        end_idx = np.where(response >= rise_end)[0][0]
-        rise_time = time[end_idx] - time[start_idx]
-        return rise_time
+        start_idx = np.where(response >= rise_start)[0]
+        end_idx = np.where(response >= rise_end)[0]
+        if len(start_idx) == 0 or len(end_idx) == 0:
+            return float("inf")
+        return time[end_idx[0]] - time[start_idx[0]]
 
     def calculate_percent_overshoot(self, response, set_point):
         """
@@ -695,10 +696,10 @@ class ManipulatorController:
             float: Percent overshoot.
         """
         response = _to_numpy(response)
-
+        if set_point == 0:
+            return 0.0
         max_response = np.max(response)
-        percent_overshoot = ((max_response - set_point) / set_point) * 100
-        return percent_overshoot
+        return ((max_response - set_point) / set_point) * 100
 
     def calculate_settling_time(self, time, response, set_point, tolerance=0.02):
         """

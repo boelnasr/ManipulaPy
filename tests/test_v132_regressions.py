@@ -300,6 +300,22 @@ class TestControlRegressions(unittest.TestCase):
         )
         self.assertEqual(tau.shape, (n,))
 
+    def test_rise_time_handles_response_never_reaching_setpoint(self):
+        from ManipulaPy.control import ManipulatorController
+
+        ctrl = ManipulatorController(None)
+
+        rt = ctrl.calculate_rise_time(np.linspace(0, 1, 100), np.zeros(100), 1.0)
+        self.assertTrue(np.isinf(rt) or rt >= 0)
+
+    def test_percent_overshoot_handles_zero_setpoint(self):
+        from ManipulaPy.control import ManipulatorController
+
+        ctrl = ManipulatorController(None)
+
+        po = ctrl.calculate_percent_overshoot(np.array([0.0, 0.1, 0.0]), set_point=0.0)
+        self.assertTrue(np.isfinite(po))
+
 
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""
