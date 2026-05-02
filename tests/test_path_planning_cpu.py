@@ -32,8 +32,11 @@ def test_trajectory_cpu_fallback_quintic_midpoint_values():
 
     pos, vel, acc = _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
 
-    # Midpoint tau = 0.5 uses the implemented polynomial: 10*t^3 - 9*t^4
-    assert np.isclose(pos[N // 2, 0], 0.6875, atol=1e-4)
+    # Quintic time-scaling: s(tau) = 10*tau^3 - 15*tau^4 + 6*tau^5
+    # At tau = 0.5: s = 1.25 - 0.9375 + 0.1875 = 0.5
+    # (Previously asserted 0.6875, which was anchored to the buggy
+    # 10*t^3 - 9*t^4 reduction; fixed in v1.3.2 — see 842a004.)
+    assert np.isclose(pos[N // 2, 0], 0.5, atol=1e-4)
     # Velocities should stay finite
     assert np.all(np.isfinite(vel))
 
