@@ -157,9 +157,11 @@ def _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method):
         elif method == 5:  # quintic
             tau2 = tau * tau
             tau3 = tau2 * tau
-            s = 10.0 * tau3 - 15.0 * tau2 * tau2 + 6.0 * tau * tau3
-            s_dot = 30.0 * tau2 * (1.0 - 2.0 * tau + tau2) / Tf
-            s_ddot = 60.0 / (Tf * Tf) * tau * (1.0 - 2.0 * tau)
+            tau4 = tau2 * tau2
+            tau5 = tau4 * tau
+            s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5
+            s_dot = (30.0 * tau2 - 60.0 * tau3 + 30.0 * tau4) / Tf
+            s_ddot = (60.0 * tau - 180.0 * tau2 + 120.0 * tau3) / (Tf * Tf)
         else:  # unsupported method
             s = s_dot = s_ddot = 0.0
 
@@ -1418,8 +1420,10 @@ class OptimizedTrajectoryPlanning:
                 s_ddot = 6.0 / (Tf * Tf) * (1.0 - 2.0 * tau)
             elif method == 5:
                 tau2 = tau * tau
-                s_dot = 30.0 * tau2 * (1.0 - 2.0 * tau + tau2) / Tf
-                s_ddot = 60.0 / (Tf * Tf) * tau * (1.0 - 2.0 * tau)
+                tau3 = tau2 * tau
+                tau4 = tau2 * tau2
+                s_dot = (30.0 * tau2 - 60.0 * tau3 + 30.0 * tau4) / Tf
+                s_ddot = (60.0 * tau - 180.0 * tau2 + 120.0 * tau3) / (Tf * Tf)
             else:
                 s_dot = s_ddot = 0.0
 

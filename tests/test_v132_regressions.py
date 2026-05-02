@@ -139,6 +139,49 @@ class TestKinematicsRegressions(unittest.TestCase):
 
 class TestPathPlanningRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/path_planning.py bugs."""
+
+    def test_cartesian_quintic_acceleration_satisfies_boundary_conditions(self):
+        """The Cartesian-trajectory CPU fallback used a wrong s_ddot for the
+        quintic time-scaling: 60·τ·(1−2τ)/Tf² = (60τ − 120τ²)/Tf², missing
+        the +120τ³ term and using -120 instead of -180 on τ².
+
+        Quintic time-scaling REQUIRES s_ddot(0) = s_ddot(Tf) = 0 (zero
+        acceleration at both endpoints — that's the whole point of going
+        to 5th order). The buggy formula gives s_ddot(Tf) = -60/Tf² ≠ 0,
+        which would yank the end-effector at the end of every motion.
+        """
+        from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
+
+        planner = OptimizedTrajectoryPlanning.__new__(OptimizedTrajectoryPlanning)
+        planner.performance_stats = {
+            "cpu_calls": 0, "gpu_calls": 0,
+            "total_cpu_time": 0.0, "total_gpu_time": 0.0,
+            "kernel_launches": 0,
+        }
+        pstart = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+        pend   = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        Tf, N  = 1.0, 101  # 101 samples → endpoints at indices 0 and 100
+
+        traj_vel, traj_acc = planner._cartesian_trajectory_cpu(
+            pstart, pend, Tf, N, method=5
+        )
+
+        # Boundary acceleration MUST be zero for a quintic profile
+        np.testing.assert_array_almost_equal(
+            traj_acc[0], [0, 0, 0], decimal=4,
+            err_msg="Quintic s_ddot(0) != 0 — boundary condition violated")
+        np.testing.assert_array_almost_equal(
+            traj_acc[-1], [0, 0, 0], decimal=4,
+            err_msg="Quintic s_ddot(Tf) != 0 — missing +120·tau^3 term")
+
+        # And boundary velocity must also be zero
+        np.testing.assert_array_almost_equal(
+            traj_vel[0], [0, 0, 0], decimal=4,
+            err_msg="Quintic s_dot(0) != 0")
+        np.testing.assert_array_almost_equal(
+            traj_vel[-1], [0, 0, 0], decimal=4,
+            err_msg="Quintic s_dot(Tf) != 0")
+
     def test_screw_list_sign_correct_via_home_fk(self):
         """At home config, FK in BOTH frames must equal M_list (the home pose).
 
@@ -179,6 +222,38 @@ class TestPathPlanningRegressions(unittest.TestCase):
         self.assertFalse(
             np.allclose(T_pert, robot.M_list, atol=1e-6),
             "FK didn't respond to joint motion — screw chain may be degenerate")
+        
+
+    def test_quintic_polynomial_endpoints(self):
+        """Pure math test: quintic time-scaling endpoints."""
+        def s(tau):
+            return 10 * tau**3 - 15 * tau**4 + 6 * tau**5
+        def s_ddot(tau, Tf=1.0):
+            return (60 * tau - 180 * tau**2 + 120 * tau**3) / (Tf * Tf)
+
+        self.assertAlmostEqual(s(0.0), 0.0)
+        self.assertAlmostEqual(s(1.0), 1.0)
+        self.assertAlmostEqual(s_ddot(0.0), 0.0)
+        self.assertAlmostEqual(s_ddot(1.0), 0.0)
+    def test_quintic_trajectory_zero_endpoint_acceleration(self):
+        from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
+
+        class MockManip:
+            joint_limits = [(-3.14, 3.14)] * 6
+
+        class MockDyn:
+            pass
+
+        planner = OptimizedTrajectoryPlanning(
+            MockManip(), urdf_path=None, dynamics=MockDyn(),
+            joint_limits=[(-3.14, 3.14)] * 6,
+        )
+        thetastart = np.zeros(6)
+        thetaend = np.array([1.0, 0.5, 0.3, 0.2, 0.1, 0.0])
+        traj = planner.joint_trajectory(thetastart, thetaend, Tf=2.0, N=100, method=5)
+
+        np.testing.assert_array_almost_equal(traj["accelerations"][0], np.zeros(6), decimal=4)
+        np.testing.assert_array_almost_equal(traj["accelerations"][-1], np.zeros(6), decimal=4)
 
 
 class TestControlRegressions(unittest.TestCase):
