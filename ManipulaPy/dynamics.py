@@ -206,8 +206,10 @@ class ManipulatorDynamics(SerialManipulator):
     def gravity_forces(
         self,
         thetalist: Union[NDArray[np.float64], List[float]],
-        g: Union[NDArray[np.float64], List[float]] = [0, 0, -9.81],
+        g: Optional[Union[NDArray[np.float64], List[float]]] = None,
     ) -> NDArray[np.float64]:
+        if g is None:
+            g = [0, 0, -9.81]
         n = len(thetalist)
         grav = np.zeros(n)
         G = np.array(g)

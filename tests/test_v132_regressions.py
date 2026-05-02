@@ -123,6 +123,14 @@ class TestDynamicsRegressions(unittest.TestCase):
             warnings.simplefilter("always")
             dyn.mass_matrix(np.array([0.0]))
             self.assertTrue(any("legacy approximation" in str(wi.message) for wi in w))
+    
+    def test_gravity_forces_mutable_default_is_safe(self):
+        import inspect
+        from ManipulaPy.dynamics import ManipulatorDynamics
+
+        sig = inspect.signature(ManipulatorDynamics.gravity_forces)
+        g_default = sig.parameters["g"].default
+        self.assertIsNone(g_default, "Mutable default detected — should use None")
 
 
 class TestKinematicsRegressions(unittest.TestCase):
