@@ -139,6 +139,46 @@ class TestKinematicsRegressions(unittest.TestCase):
 
 class TestPathPlanningRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/path_planning.py bugs."""
+    def test_screw_list_sign_correct_via_home_fk(self):
+        """At home config, FK in BOTH frames must equal M_list (the home pose).
+
+        Uses the bundled tests/urdf_fixtures/simple_arm.urdf so this test
+        always runs without requiring ManipulaPy_data to be installed.
+        Verifies the asymmetric -omega/+omega convention in
+        kinematics.py:76/:83 produces correct FK end-to-end.
+        """
+        import os
+        from ManipulaPy.urdf_processor import URDFToSerialManipulator
+
+        urdf_path = os.path.join(
+            os.path.dirname(__file__), "urdf_fixtures", "simple_arm.urdf"
+        )
+        self.assertTrue(os.path.exists(urdf_path),
+                        f"Test fixture missing: {urdf_path}")
+
+        urdf = URDFToSerialManipulator(urdf_path)
+        robot = urdf.serial_manipulator
+        n = robot.S_list.shape[1]
+        home_config = np.zeros(n)
+
+        T_space = robot.forward_kinematics(home_config, frame="space")
+        T_body = robot.forward_kinematics(home_config, frame="body")
+
+        np.testing.assert_array_almost_equal(
+            T_space, robot.M_list, decimal=6,
+            err_msg="Space-frame FK at home != M_list — S_list sign suspect")
+        np.testing.assert_array_almost_equal(
+            T_body, robot.M_list, decimal=6,
+            err_msg="Body-frame FK at home != M_list — B_list sign suspect")
+
+        # Joint motion must actually move the EE — guards against a
+        # degenerate zero-screw chain that would also satisfy T == M trivially.
+        theta_test = np.zeros(n)
+        theta_test[0] = 0.01
+        T_pert = robot.forward_kinematics(theta_test, frame="space")
+        self.assertFalse(
+            np.allclose(T_pert, robot.M_list, atol=1e-6),
+            "FK didn't respond to joint motion — screw chain may be degenerate")
 
 
 class TestControlRegressions(unittest.TestCase):
