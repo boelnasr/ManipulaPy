@@ -281,6 +281,24 @@ class TestPathPlanningRegressions(unittest.TestCase):
 
 class TestControlRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/control.py bugs."""
+    def test_cartesian_space_control_dimensions(self):
+        from ManipulaPy.urdf_processor import URDFToSerialManipulator
+        from ManipulaPy.control import ManipulatorController
+        from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
+
+        urdf = URDFToSerialManipulator(str(urdf_file))
+
+        controller = ManipulatorController(urdf.dynamics)
+        n = len(urdf.serial_manipulator.joint_limits)
+
+        desired_position = np.array([0.4, 0.2, 0.5])
+        Kp = np.eye(3)
+        Kd = np.eye(3)
+
+        tau = controller.cartesian_space_control(
+            desired_position, np.zeros(n), np.zeros(n), Kp, Kd
+        )
+        self.assertEqual(tau.shape, (n,))
 
 
 class TestSingularityRegressions(unittest.TestCase):

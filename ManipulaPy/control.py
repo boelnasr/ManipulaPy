@@ -802,9 +802,9 @@ class ManipulatorController:
 
         current_position = self.dynamics.forward_kinematics(current_joint_angles)[:3, 3]
         e = desired_position - current_position
-        dthetalist = current_joint_velocities
-        J = self.dynamics.jacobian(current_joint_angles)
-        tau = J.T @ (Kp * e - Kd @ J @ dthetalist)
+        # Position-only control: use linear (3xN) part of Jacobian
+        J_v = self.dynamics.jacobian(current_joint_angles)[:3, :]
+        tau = J_v.T @ (Kp @ e - Kd @ J_v @ current_joint_velocities)
         return tau
 
     # ------------------------------------------------------------------------
