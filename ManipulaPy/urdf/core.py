@@ -11,7 +11,7 @@ Copyright (c) 2025 Mohamed Aboelnasr
 
 from collections import OrderedDict
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 import numpy as np
 
@@ -899,6 +899,8 @@ class URDF:
         omega_list = np.zeros((3, n), dtype=np.float64)
         r_list = np.zeros((3, n), dtype=np.float64)
         G_list = []
+        Mlist_per_link = [] #New: per-link COM tranosform in zero config
+
 
         for i, joint in enumerate(actuated):
             if joint.joint_type in (JointType.PLANAR, JointType.FLOATING):
@@ -933,7 +935,16 @@ class URDF:
             r_list[:, i] = p
 
             # Spatial inertia
+            # Per-link CoM transform in Zero config (for mass matrix)
             child_link = self._links[joint.child]
+            child_link_T = fk[joint.child]  # link frame in zero config
+            if child_link.inertial and child_link.inertial.origin is not None:
+                #CoM offset within link frame
+                com_local = child_link.inertial.origin.matrix
+                Mlist_per_link.append(child_link_T @ com_local)
+            else:
+                Mlist_per_link.append(child_link_T.copy())
+
             if child_link.inertial:
                 G_list.append(child_link.inertial.spatial_inertia)
             else:
@@ -952,11 +963,11 @@ class URDF:
             "omega_list": omega_list,
             "r_list": r_list,
             "joint_limits": self.joint_limits,
+            "Mlist_per_link": Mlist_per_link,
         }
 
     def to_serial_manipulator(
-        self, tip_link: Optional[str] = None
-    ) -> "SerialManipulator":
+        self, tip_link: Optional[str] = None) -> "SerialManipulator":
         """
         Convert to ManipulaPy SerialManipulator.
 
@@ -966,7 +977,8 @@ class URDF:
         Returns:
             SerialManipulator instance ready for IK/FK
         """
-        from ..kinematics import SerialManipulator
+        if TYPE_CHECKING:
+            from ..kinematics import SerialManipulator
         from ..utils import extract_omega_list
 
         params = self.extract_screw_axes(tip_link=tip_link)

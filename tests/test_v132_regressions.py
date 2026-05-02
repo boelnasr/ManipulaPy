@@ -39,6 +39,90 @@ class TestUtilsRegressions(unittest.TestCase):
 
 class TestDynamicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/dynamics.py bugs."""
+    def test_mass_matrix_2r_planar_arm_against_analytical(self):
+        """Verify mass matrix against analytical 2R planar arm.
+
+        For a 2R arm with point masses m1, m2 at distances L1, L2 from their
+        respective joints, the analytical mass matrix is:
+            M[0,0] = m1*L1^2 + m2*(L1^2 + L2^2 + 2*L1*L2*cos(theta2))
+            M[0,1] = M[1,0] = m2*(L2^2 + L1*L2*cos(theta2))
+            M[1,1] = m2*L2^2
+
+        Source: Murray, Li, Sastry "A Mathematical Introduction to Robotic
+        Manipulation" Example 4.3.
+        """
+        from ManipulaPy.dynamics import ManipulatorDynamics
+
+        L1 = L2 = 1.0
+        m1 = m2 = 1.0
+
+        # 2R planar arm in space frame: joints rotate about z axis
+        omega_list = np.array([[0, 0, 1], [0, 0, 1]]).T  # (3, 2)
+        r_list = np.array([[0, 0, 0], [L1, 0, 0]]).T     # joint locations
+        M_list = np.eye(4)
+        M_list[0, 3] = L1 + L2  # End-effector at full extension
+
+        # Per-link CoM transforms in zero config: link 1's CoM at (L1, 0, 0),
+        # link 2's CoM at (L1+L2, 0, 0)
+        M_link1_com = np.eye(4); M_link1_com[0, 3] = L1
+        M_link2_com = np.eye(4); M_link2_com[0, 3] = L1 + L2
+        Mlist_per_link = [M_link1_com, M_link2_com]
+
+        # Spatial inertia: point mass m has G = diag(0, 0, 0, m, m, m) in body frame
+        Glist = []
+        for m in (m1, m2):
+            G = np.zeros((6, 6))
+            G[3, 3] = G[4, 4] = G[5, 5] = m
+            Glist.append(G)
+        Glist = np.array(Glist)
+
+        dyn = ManipulatorDynamics(
+            M_list=M_list,
+            omega_list=omega_list,
+            r_list=r_list,
+            b_list=None,
+            S_list=None,
+            B_list=None,
+            Glist=Glist,
+            Mlist_per_link=Mlist_per_link,
+        )
+
+        # Test at theta = (0, pi/2)
+        theta = np.array([0.0, np.pi / 2])
+        M = dyn.mass_matrix(theta)
+
+        c2 = np.cos(theta[1])
+        M_expected = np.array([
+            [m1 * L1**2 + m2 * (L1**2 + L2**2 + 2 * L1 * L2 * c2),
+            m2 * (L2**2 + L1 * L2 * c2)],
+            [m2 * (L2**2 + L1 * L2 * c2),
+            m2 * L2**2],
+        ])
+
+        np.testing.assert_array_almost_equal(M, M_expected, decimal=4)
+        self.assertTrue(np.allclose(M, M.T, atol=1e-10), "Mass matrix not symmetric")
+
+
+    def test_mass_matrix_legacy_path_emits_warning(self):
+        """Constructing ManipulatorDynamics without Mlist_per_link should warn."""
+        import warnings
+        from ManipulaPy.dynamics import ManipulatorDynamics
+
+        omega_list = np.array([[0, 0, 1]]).T
+        r_list = np.array([[0, 0, 0]]).T
+        M_list = np.eye(4)
+        Glist = np.array([np.eye(6)])
+
+        dyn = ManipulatorDynamics(
+            M_list=M_list, omega_list=omega_list, r_list=r_list,
+            b_list=None, S_list=None, B_list=None, Glist=Glist,
+            # Mlist_per_link omitted intentionally
+        )
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            dyn.mass_matrix(np.array([0.0]))
+            self.assertTrue(any("legacy approximation" in str(wi.message) for wi in w))
 
 
 class TestKinematicsRegressions(unittest.TestCase):

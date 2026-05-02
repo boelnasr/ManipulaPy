@@ -43,9 +43,12 @@ class ManipulatorDynamics(SerialManipulator):
         S_list: NDArray[np.float64],
         B_list: NDArray[np.float64],
         Glist: Union[List[NDArray[np.float64]], NDArray[np.float64]],
+        Mlist_per_link: Optional[List[NDArray[np.float64]]] = None, # New
     ) -> None:
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
         self.Glist = Glist
+        self.Mlist_per_link = Mlist_per_link  # NEW
+
         self._mass_matrix_cache: Dict[Tuple[float, ...], NDArray[np.float64]] = {}
         self._mass_matrix_derivative_cache: Dict[
             Tuple[Any, ...], NDArray[np.float64]
@@ -54,38 +57,88 @@ class ManipulatorDynamics(SerialManipulator):
     def mass_matrix(
         self, thetalist: Union[NDArray[np.float64], List[float]]
     ) -> NDArray[np.float64]:
+        """Compute mass matrix using per-link body Jacobians.
+
+        M(θ) = Σ_k J_k^T G_k J_k
+
+        Where J_k is the body Jacobian of link k's CoM (6×n), and G_k is link
+        k's spatial inertia in body frame. For joints i > k, J_k[:, i] = 0
+        (link k doesn't depend on those joints).
+
+        Reference: Modern Robotics §8.3 / Murray, Li, Sastry §4.3.
+
+        If Mlist_per_link is None (legacy path), falls back to the previous
+        EE-Jacobian approximation with a deprecation warning.
+        """
+        from ManipulaPy.utils import adjoint_transform as _ad
+
         thetalist_key = tuple(thetalist)
         if thetalist_key in self._mass_matrix_cache:
             return self._mass_matrix_cache[thetalist_key]
 
         n = len(thetalist)
+
+        if self.Mlist_per_link is None:
+            # Legacy fallback (still wrong, but preserves old behavior for
+            # callers constructing ManipulatorDynamics manually without per-link M)
+            import warnings
+            warnings.warn(
+                "mass_matrix called without Mlist_per_link — using legacy "
+                "approximation (incorrect for non-trivial robots). Construct "
+                "ManipulatorDynamics via URDFToSerialManipulator to get accurate "
+                "mass matrix.",
+                stacklevel=2,
+            )
+            return self._mass_matrix_legacy(thetalist)
+
         M = np.zeros((n, n), dtype=np.float64)
 
-        # Precompute the "space" transforms for each link
+        # Spatial Jacobian columns J_s[:, i] = Ad(prefix_i) @ S_i, built once
+        # via the canonical incremental formula in kinematics.jacobian. Body
+        # twist of link k is then J_b_k[:, i] = Ad(T_k_com^-1) @ J_s[:, i].
+        J_s = self.jacobian(thetalist, frame="space")  # (6, n)
+
+        for k in range(n):
+            # T_k_com(θ): base → link k CoM at the current configuration.
+            # Joints k+1..n don't move link k, so truncating thetalist to
+            # k+1 entries gives the correct link pose; the inv(M_list)
+            # @ Mlist_per_link[k] offset shifts from link frame to CoM frame.
+            T_k_zero = self.Mlist_per_link[k]
+            T_k = self.forward_kinematics(thetalist[: k + 1], frame="space")
+            T_k_at_zero = self.forward_kinematics(np.zeros(k + 1), frame="space")
+            T_link_to_com = np.linalg.inv(T_k_at_zero) @ T_k_zero
+            T_k_com = T_k @ T_link_to_com
+
+            # Convert spatial → body for link k. Columns i > k stay zero
+            # because joint i is downstream of link k and doesn't move it.
+            Ad_inv_T_k_com = _ad(np.linalg.inv(T_k_com))
+            J_k = np.zeros((6, n), dtype=np.float64)
+            J_k[:, : k + 1] = Ad_inv_T_k_com @ J_s[:, : k + 1]
+
+            M += J_k.T @ self.Glist[k] @ J_k
+
+        # Symmetrize against floating-point drift
+        M = 0.5 * (M + M.T)
+        self._mass_matrix_cache[thetalist_key] = M
+        return M
+
+    def _mass_matrix_legacy(self, thetalist):
+        """Legacy mass matrix (incorrect, kept for backward compat). DO NOT USE."""
+        thetalist_key = tuple(thetalist)
+        n = len(thetalist)
+        M = np.zeros((n, n), dtype=np.float64)
         AdT = np.zeros((6, 6, n + 1))
         AdT[:, :, 0] = np.eye(6)
         for j in range(n):
             T = self.forward_kinematics(thetalist[: j + 1], frame="space")
             AdT[:, :, j + 1] = ad(T)
-
-        # Full space Jacobian at the end-effector
-        J_full = self.jacobian(thetalist, frame="space")  # shape (6, n)
-
-        # Implement the correct formula: M(θ) = Σᵢ JᵢᵀI_i Jᵢ
-        # where Jᵢ is the spatial Jacobian up to link i, and I_i is link i's spatial inertia in base frame
+        J_full = self.jacobian(thetalist, frame="space")
         for i in range(n):
             for j in range(n):
-                # Transform the i-th link's inertia into the base frame
                 Ii_base = AdT[:, :, i + 1].T @ self.Glist[i] @ AdT[:, :, i + 1]
-
-                # Get the spatial Jacobian columns for joints i and j
-                Ji = J_full[:, i]  # i-th column of Jacobian
-                Jj = J_full[:, j]  # j-th column of Jacobian
-
-                # Accumulate M[i,j] = Jᵢᵀ I_i Jⱼ for each link
+                Ji = J_full[:, i]
+                Jj = J_full[:, j]
                 M[i, j] += Ji.T @ Ii_base @ Jj
-
-        # Ensure exact symmetry (guard against tiny floating-point drift)
         M = 0.5 * (M + M.T)
         self._mass_matrix_cache[thetalist_key] = M
         return M

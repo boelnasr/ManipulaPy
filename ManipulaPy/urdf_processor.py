@@ -187,11 +187,13 @@ class URDFToSerialManipulator:
 
         return {
             "M": params["M"],
+            "omeg_list": params["S_list"][:3,:],
             "Slist": params["S_list"],
             "Blist": params["B_list"],
             "Glist": params["G_list"],
             "actuated_joints_num": self.robot.num_dofs,
             "joint_limits": params["joint_limits"],
+            "Mlist_per_link": params.get("Mlist_per_link"),
         }
 
     def load_urdf(self, urdf_name: str) -> dict:
@@ -290,12 +292,14 @@ class URDFToSerialManipulator:
         data = self.robot_data
         self.manipulator_dynamics = ManipulatorDynamics(
             M_list=data["M"],
-            omega_list=data["Slist"][:, :3],
+            omega_list=data["Slist"][:3, :],
             r_list=utils.extract_r_list(data["Slist"]),
             b_list=None,  # If needed, define or extract from URDF
             S_list=data["Slist"],
             B_list=data["Blist"],
             Glist=data["Glist"],
+            Mlist_per_link=data.get("Mlist_per_link"),   # ← ADD THIS LINE                                                                                                         
+
         )
         return self.manipulator_dynamics
 
