@@ -977,8 +977,7 @@ class URDF:
         Returns:
             SerialManipulator instance ready for IK/FK
         """
-        if TYPE_CHECKING:
-            from ..kinematics import SerialManipulator
+        from ..kinematics import SerialManipulator
         from ..utils import extract_omega_list
 
         params = self.extract_screw_axes(tip_link=tip_link)
