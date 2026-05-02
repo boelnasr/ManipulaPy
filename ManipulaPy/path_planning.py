@@ -1729,7 +1729,7 @@ class OptimizedTrajectoryPlanning:
         tcp_positions = [pose[:3, 3] for pose in tcp_trajectory]
 
         velocity, acceleration, jerk = self.calculate_derivatives(tcp_positions, dt)
-        time = np.arange(0, len(tcp_positions) * dt, dt)
+        time_array = np.arange(0, len(tcp_positions) * dt, dt)
 
         elapsed = time.time() - start_time
 
@@ -1739,22 +1739,22 @@ class OptimizedTrajectoryPlanning:
 
         for i, label in enumerate(["X", "Y", "Z"]):
             plt.subplot(4, 1, 1)
-            plt.plot(time, np.array(tcp_positions)[:, i], label=f"TCP {label} Position")
+            plt.plot(time_array, np.array(tcp_positions)[:, i], label=f"TCP {label} Position")
             plt.ylabel("Position")
             plt.legend()
 
             plt.subplot(4, 1, 2)
-            plt.plot(time[:-1], velocity[:, i], label=f"TCP {label} Velocity")
+            plt.plot(time_array[:-1], velocity[:, i], label=f"TCP {label} Velocity")
             plt.ylabel("Velocity")
             plt.legend()
 
             plt.subplot(4, 1, 3)
-            plt.plot(time[:-2], acceleration[:, i], label=f"TCP {label} Acceleration")
+            plt.plot(time_array[:-2], acceleration[:, i], label=f"TCP {label} Acceleration")
             plt.ylabel("Acceleration")
             plt.legend()
 
             plt.subplot(4, 1, 4)
-            plt.plot(time[:-3], jerk[:, i], label=f"TCP {label} Jerk")
+            plt.plot(time_array[:-3], jerk[:, i], label=f"TCP {label} Jerk")
             plt.xlabel("Time")
             plt.ylabel("Jerk")
             plt.legend()

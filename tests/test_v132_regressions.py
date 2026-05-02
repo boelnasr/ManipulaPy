@@ -235,6 +235,19 @@ class TestPathPlanningRegressions(unittest.TestCase):
         self.assertAlmostEqual(s(1.0), 1.0)
         self.assertAlmostEqual(s_ddot(0.0), 0.0)
         self.assertAlmostEqual(s_ddot(1.0), 0.0)
+    def test_plot_tcp_trajectory_does_not_shadow_time_module(self):
+        """plot_tcp_trajectory must not bind a local 'time' that shadows
+        the imported 'time' module — doing so breaks the timing branch
+        with AttributeError mid-execution."""
+        import inspect
+        from ManipulaPy import path_planning
+
+        src = inspect.getsource(path_planning)
+        self.assertNotIn(
+            "time = np.arange", src,
+            "Variable 'time' shadows the time module — rename to time_array",
+        )
+
     def test_quintic_trajectory_zero_endpoint_acceleration(self):
         from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
 
@@ -254,6 +267,16 @@ class TestPathPlanningRegressions(unittest.TestCase):
 
         np.testing.assert_array_almost_equal(traj["accelerations"][0], np.zeros(6), decimal=4)
         np.testing.assert_array_almost_equal(traj["accelerations"][-1], np.zeros(6), decimal=4)
+    
+    def test_plot_tcp_trajectory_does_not_shadow_time_module(self):
+        import inspect
+        from ManipulaPy import path_planning
+
+        src = inspect.getsource(path_planning)
+        self.assertNotIn(
+            "time = np.arange", src,
+            "Variable 'time' shadows the time module — rename to time_array",
+        )
 
 
 class TestControlRegressions(unittest.TestCase):
