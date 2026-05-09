@@ -39,10 +39,15 @@ try:
     import cupy as cp  # Optional: CUDA acceleration
     _CUPY_AVAILABLE = True
 except ImportError:
-    cp = np  # Fall back to NumPy (cp.array → np.array)
+    class _NumpyProxy:
+        def __getattr__(self, name):
+            return getattr(np, name)
+
+        def asnumpy(self, x):
+            return np.asarray(x)
+
+    cp = _NumpyProxy()
     _CUPY_AVAILABLE = False
-    if not hasattr(cp, "asnumpy"):
-        cp.asnumpy = np.asarray
 
 try:
     import pybullet as p  # Required for Simulation; sim cannot run without it
@@ -550,8 +555,6 @@ class Simulation:
         Runs the controller with the specified parameters.
         """
         self.logger.info("Running controller...")
-        current_positions = self.get_joint_positions()
-        current_velocities = np.zeros_like(current_positions)
         ee_positions = []
 
         for i in range(len(desired_positions)):
@@ -560,11 +563,6 @@ class Simulation:
             # For real closed-loop control, use p.TORQUE_CONTROL mode directly
             # in your own loop. See v1.3.2 CHANGELOG.
             self.set_joint_positions(desired_positions[i])
-            current_positions = self.get_joint_positions()
-            # Query actual joint velocities from PyBullet for non-fixed joints only
-            states = [p.getJointState(self.robot_id, j) for j in self.non_fixed_joints]
-            current_velocities = np.array([s[1] for s in states])
-
             p.stepSimulation()
 
             # Get end-effector position
