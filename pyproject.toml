@@ -56,7 +56,7 @@ dependencies = [
 
     # Core robotics (required)
     "numba>=0.55",
-    "pybullet>=3.0.6",
+    "pybullet>=3.2.5,<4.0",
     # Note: urchin is now optional - native URDF parser is default
     "trimesh>=3.9.14",
 
@@ -81,7 +81,7 @@ minimal = [
     "scipy>=1.5.2",
     "matplotlib>=3.3",
     "numba>=0.55",
-    "pybullet>=3.0.6",
+    "pybullet>=3.2.5,<4.0",
 ]
 
 # Legacy URDF parser (urchin) - NOT compatible with NumPy 2.0+
@@ -97,7 +97,7 @@ gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
 gpu-pycuda = ["pycuda>=2021.1"]
 
 # Physics simulation
-simulation = ["pybullet>=3.0.6"]
+simulation = []
 
 # Vision for headless environments (CI-friendly)
 vision-headless = [

@@ -194,9 +194,7 @@ class TracIKSolver:
 
                 # Collect DLS results as they complete
                 try:
-                    for future in as_completed(
-                        dls_futures, timeout=dls_timeout + 0.05
-                    ):
+                    for future in as_completed(dls_futures, timeout=dls_timeout + 0.05):
                         try:
                             theta, success, error = future.result(timeout=0.05)
                             update_result(theta, success, error)

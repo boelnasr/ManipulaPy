@@ -5,13 +5,197 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] — targeting 1.3.2
+
+> **Status:** In progress on `release/v1.3.2-fix-patch`. Tasks 1–14 of the
+> v1.3.2 fix patch are complete; tasks 15–37 are still landing — see
+> `V1.3.2_FIX_PATCH_PLAN.md` for the full scope. Entries below will be moved
+> under `## [1.3.2] - <date>` at release time, and additional Added / Changed /
+> Fixed lines will be appended as remaining tasks land.
+>
+> **Summary so far:** Stability and correctness patch addressing bugs across
+> utilities, dynamics, kinematics, path planning, Cartesian control,
+> singularity analysis, potential-field planning, and the PyBullet
+> simulation wrapper (optional-dep guards + an honest open-loop
+> `run_controller`). The
+> dynamics mass-matrix computation has been rewritten to use per-link CoM body
+> Jacobians (verified against the Murray/Li/Sastry 2R-planar-arm analytical
+> reference), the quintic time-scaling polynomial has been corrected, and
+> several edge cases that previously produced `NaN` / `inf` / `LinAlgError`
+> have been guarded. Includes a new regression test file
+> (`tests/test_v132_regressions.py`) covering each fix.
+>
+> **Impact (so far):**
+> - Dynamics: `mass_matrix` now matches analytical references for non-trivial
+>   `M_list` link offsets (off-diagonal sign error fixed)
+> - Path planning: quintic trajectories now have zero acceleration at endpoints
+>   as required; TCP trajectory plotting no longer crashes mid-execution
+> - Cartesian control: `cartesian_space_control` no longer raises a
+>   `ValueError` shape mismatch on first call
+> - Singularity: `singularity_analysis` now works on redundant (>6 DOF) and
+>   under-actuated robots (was crashing on `LinAlgError`);
+>   `manipulability_ellipsoid` produces finite radii at singular
+>   configurations
+> - Potential field: gradient stays finite and provides an escape direction
+>   when the configuration coincides with an obstacle
+> - Sim: `import ManipulaPy.sim` now succeeds without `cupy` or `pybullet`
+>   installed (raises a clear `ImportError` with install hint only when
+>   `Simulation()` is actually constructed); `Simulation.run_controller`
+>   now performs honest open-loop position tracking rather than the
+>   previous dimensionally-wrong torque-as-position-delta loop
+>   (**behavior change** — see Changed)
+> - Utilities: `transform_from_twist` returns a proper 4×4 SE(3) for prismatic
+>   joints; `logm` no longer divides by zero on pure translation
+> - Tests: new `tests/test_v132_regressions.py` scaffold encoding each
+>   regression as an explicit assertion
 
 ### Added
-- (placeholder)
+- **Regression test scaffold** (`tests/test_v132_regressions.py`) with one
+  test class per fixed module (`TestUtilsRegressions`,
+  `TestDynamicsRegressions`, `TestPathPlanningRegressions`,
+  `TestKinematicsRegressions`, `TestControlRegressions`,
+  `TestSingularityRegressions`, `TestPotentialFieldRegressions`,
+  `TestSimRegressions`) — each fix below has an accompanying assertion
+  that locks in the corrected behavior.
+- **Per-link CoM transforms** plumbed through URDF processing:
+  - `urdf/core.py` `extract_screw_axes` now returns `Mlist_per_link` alongside
+    the existing screw axes
+  - `urdf_processor.py` forwards `Mlist_per_link` to `ManipulatorDynamics`
+  - `ManipulatorDynamics.__init__` accepts the optional `Mlist_per_link`
+    argument used by the rewritten `mass_matrix`
+- **Home-configuration FK regression test** for the kinematics screw-list
+  sign convention (verifies `extract_screw_list` produces axes consistent
+  with the URDF home pose).
+
+### Changed
+- **`dynamics.mass_matrix`** — rewritten to use per-link body Jacobians
+  `J_k = Ad(T_k_com⁻¹) · J_s`, computed once per link from the spatial
+  Jacobian of the current configuration. Replaces the previous implementation
+  that effectively reused end-effector Jacobian columns and produced sign
+  errors on the off-diagonals when `M_list ≠ I`. Verified against
+  Murray/Li/Sastry §4 Example 4.3 (2R planar arm). Reference: Modern
+  Robotics §8.3.
+- **Legacy `mass_matrix` path** retained with a `DeprecationWarning` for
+  callers that construct `ManipulatorDynamics` directly without
+  `Mlist_per_link` — old behavior still available, just no longer the default.
+- **`urdf/core.py`** — removed an incorrect `TYPE_CHECKING` guard that wrapped
+  a runtime import; the guarded symbol is needed at call time, and the guard
+  caused an `UnboundLocalError` on the import path.
+- **`sim.Simulation.run_controller`** (**BEHAVIOR + SIGNATURE CHANGE**) —
+  switched from a broken closed-loop body that wrote
+  `set_joint_positions(current + torque * dt)` (dimensionally wrong:
+  torque is not a velocity) to honest open-loop position tracking that
+  calls `set_joint_positions(desired_positions[i])` directly. The
+  controller's `computed_torque_control` is no longer invoked from this
+  method. The signature was also reduced from
+  `run_controller(controller, desired_positions, desired_velocities,
+  desired_accelerations, g, Ftip, Kp, Ki, Kd)` to
+  `run_controller(desired_positions)` — the eight removed parameters
+  were unused after the open-loop rewrite and made the API misleading.
+  Callers upgrading from v1.3.1 will get a `TypeError` with positional
+  arg counts pointing them here. For real closed-loop torque control,
+  drive PyBullet's `p.TORQUE_CONTROL` mode directly in your own loop.
+  The new entry path also validates `desired_positions` via
+  `np.asarray(list(...), dtype=float)` and raises `ValueError` on
+  empty input, non-2D shape, or wrong joint count — and the same
+  conversion implicitly transfers `cupy.ndarray` waypoints to host
+  NumPy via `__array__` before they reach PyBullet's C extension.
 
 ### Fixed
-- (placeholder)
+- **`utils.transform_from_twist`** — returned a 3×4 matrix for prismatic
+  joints (built via `np.vstack((np.eye(3), v*theta)).T`). Now correctly
+  returns a 4×4 SE(3) transform.
+- **`utils.logm`** — divided by `theta = 0` for pure-translation inputs
+  (where `R = I`), producing `NaN`. Now branches on `theta < 1e-6` and
+  returns the linear twist directly.
+- **`dynamics.gravity_forces`** — used a mutable default `g=[0, 0, -9.81]`
+  that callers could mutate, polluting future calls. Switched to a `None`
+  sentinel with the default applied inside the function body.
+- **`dynamics.mass_matrix` off-diagonal sign error** — diagonals were
+  correct, but off-diagonals were negated when the home transform `M_list`
+  was non-identity. See **Changed** above for the rewrite.
+- **`path_planning` quintic time-scaling polynomial** — the `s` formula used
+  `6*tau*tau3` (= `6*τ⁴`) instead of `6*τ⁵`, and `s_ddot` used
+  `60*τ - 120*τ²` instead of `60*τ - 180*τ² + 120*τ³`. Both occurrences
+  fixed (joint-space and Cartesian generators). Quintic trajectories now
+  satisfy zero-acceleration boundary conditions at endpoints as required.
+- **`path_planning.plot_tcp_trajectory`** — local `time = np.arange(...)`
+  shadowed the imported `time` module, breaking the subsequent
+  `time.time()` timing calls with `AttributeError` mid-execution. Renamed
+  the local array to `time_array`; module references preserved.
+- **`control.cartesian_space_control`** — mixed the full 6×N Jacobian with
+  a 3-vector position error, raising
+  `ValueError: matmul: ... size 6 is different from 3` on first call. Now
+  uses the linear (3×N) part of the Jacobian for position-only control.
+- **`control` performance metrics** (`calculate_rise_time`,
+  `calculate_percent_overshoot`) — degenerate inputs (response never
+  reaches the rise band, zero set-point) produced `IndexError` or `inf`/
+  `nan`. Both now return well-defined sentinel values (`inf` for
+  unreachable rise time, `0.0` for zero set-point overshoot).
+- **`singularity.singularity_analysis`** — `np.linalg.det()` raised
+  `LinAlgError` on the non-square Jacobians produced by redundant (>6 DOF)
+  or under-actuated robots, crashing analysis on every KUKA iiwa, Franka
+  Panda, and Baxter configuration. Switched to the smallest singular
+  value (`np.linalg.svd`), which is well-defined for any Jacobian shape
+  and is the standard manipulability measure.
+- **`singularity.manipulability_ellipsoid`** — `1 / sqrt(S)` produced
+  `inf` at singular configurations, breaking visualization plots and any
+  caller using ellipsoid extents around singularities. Singular values
+  are now clamped to `1e-10`, so radii stay large but finite (correctly
+  reflecting the anisotropy near singularities).
+- **`potential_field.compute_repulsive_potential` / `compute_gradient`** —
+  when the configuration coincided with an obstacle (`d = 0`), `1/d` and
+  `1/d³` produced `inf` / `nan`, and the gradient was zero (no escape
+  direction, robot stuck inside the obstacle). Distance is now clamped,
+  and a deterministic +x escape direction is returned when the
+  configuration is exactly at an obstacle, so the planner can always
+  move away.
+- **Missing `simulation` extra in package metadata** — the `Simulation`
+  constructor's `ImportError` hint pointed users at
+  `pip install 'ManipulaPy[simulation]'`, but no such extra existed in
+  `pyproject.toml` or `setup.py`, so following the hint silently did
+  not install `pybullet`. Added the extra to both files
+  (`simulation = ["pybullet>=3.0.6"]` / `"simulation":
+  ["pybullet>=3.2.5,<4.0"]`) so the documented install command actually
+  works on minimal installs once `pybullet` moves out of `install_requires`
+  in a follow-up packaging task.
+- **`sim.py` hard imports of `cupy` and `pybullet`** — module-level
+  `import cupy as cp` and `import pybullet as p` raised `ImportError` on
+  every minimal install, so `from ManipulaPy import sim` failed for any
+  user without the GPU/sim extras. Both imports are now guarded with
+  `try/except ImportError`; `cupy` falls back to a `_NumpyProxy` wrapper
+  that delegates attribute access to NumPy via `__getattr__` and
+  provides an `asnumpy` method on the proxy itself (so existing call
+  sites keep working without mutating the real `numpy` module), and
+  PyBullet absence raises a clear `ImportError("Simulation requires
+  pybullet. Install with: pip install 'ManipulaPy[simulation]'")` only
+  when `Simulation()` is actually constructed. Module import is now
+  safe on minimal installs.
+
+### Tests
+- **`tests/test_path_planning_cpu.py::test_trajectory_cpu_fallback_quintic_midpoint_values`**
+  — corrected the expected midpoint value from `0.6875` to `0.5`. The
+  prior expectation was anchored to the buggy `10·τ³ − 9·τ⁴` polynomial
+  rather than the correct quintic; updating the fix exposed the stale
+  test value.
+- **`tests/test_singularity_extended.py`** (`test_3dof_robot`,
+  `test_7dof_robot`) — previously asserted `LinAlgError` because `det()`
+  crashed on non-square Jacobians. Rewritten to assert SVD-based
+  singularity detection on the same fixtures, matching the new behavior
+  in `singularity_analysis`.
+- **`tests/test_sim.py::TestControllerIntegration::test_run_controller`**
+  — was calibrated against the broken closed-loop behavior (asserted
+  `mock_controller.computed_torque_control.called`). Rewritten to assert
+  the new contract: `assert_not_called()` on the controller, and that
+  `set_joint_positions` is invoked with each `desired_position` in
+  order. Uses `np.testing.assert_array_equal` per call.
+- **`tests/test_v132_regressions.py::TestSimRegressions::test_sim_module_imports_without_pybullet`**
+  — runs the import-blocking probe in a `subprocess.run([sys.executable, ...])`
+  rather than mutating `sys.modules` and `builtins.__import__` in-process.
+  In-process module reloads leaked through to `tests/test_sim.py`'s
+  autouse PyBullet patches and corrupted shared module state across
+  ~10 unrelated tests; the subprocess sandbox makes the probe
+  side-effect-free by construction.
 
 ## [1.3.1] - 2026-03-01
 

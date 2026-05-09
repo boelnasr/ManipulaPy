@@ -21,6 +21,53 @@ Thank you for your interest in contributing to ManipulaPy! We welcome contributi
 
 ---
 
+## Development
+
+### Build & Development Commands
+
+```bash
+# Install in dev mode
+pip install -e ".[dev]"
+
+# Run all tests
+python -m pytest tests/ -v
+
+# Run a single test file
+python -m pytest tests/test_kinematics.py -v
+
+# Run a single test
+python -m pytest tests/test_control.py::TestManipulatorController::test_pid_control -v
+
+# Run tests by marker
+python -m pytest tests/ -v -m "not (cuda or vision or simulation)"
+
+# Run with coverage
+python -m pytest tests/ --cov=ManipulaPy --cov-report=term-missing
+
+# Lint (check only)
+python -m black --check ManipulaPy/ tests/
+python -m isort --check-only ManipulaPy/ tests/
+python -m flake8 ManipulaPy/ tests/
+
+# Lint (auto-fix)
+python -m black ManipulaPy/ tests/
+python -m isort ManipulaPy/ tests/
+
+# Build docs
+python -m sphinx docs/source docs/build/html -b html
+```
+
+### CI/CD
+
+- **test.yml**: Python 3.8/3.9/3.10/3.11 matrix, PyTorch CPU, Codecov. Env: `SKIP_CUDA_TESTS=true`, `SKIP_VISION_TESTS=true`, `SKIP_SIMULATION_TESTS=true`
+- **lint.yml**: black --check + flake8, auto-commits formatting fixes
+- **pypi-publish.yml**: Triggered by `v*` tags, publishes to PyPI via `PYPI_API_TOKEN`
+
+For architecture details, class hierarchy, GPU/CPU strategy, and code conventions,
+see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
 ## AI Usage Policy
 
 We value transparency and responsibility in software development. While generative AI tools (e.g., GitHub Copilot, ChatGPT, CodeWhisperer) can be helpful in drafting and brainstorming, **all contributions must be human-verified and reviewed**.
