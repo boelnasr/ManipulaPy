@@ -461,8 +461,6 @@ class TestSimRegressions(unittest.TestCase):
             np.array([0.5, 0, 0, 0, 0, 0]),
             np.array([1.0, 0, 0, 0, 0, 0]),
         ]
-        desired_velocities = [np.zeros(6)] * 3
-        desired_accelerations = [np.zeros(6)] * 3
 
         with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
              patch("ManipulaPy.sim.p") as mock_p, \
@@ -482,22 +480,8 @@ class TestSimRegressions(unittest.TestCase):
             sim.get_joint_positions = MagicMock(return_value=np.zeros(6))
             sim.plot_trajectory = MagicMock()
 
-            controller = MagicMock()
-            controller.computed_torque_control.return_value = np.ones(6) * 100.0
+            sim.run_controller(desired_positions)
 
-            sim.run_controller(
-                controller,
-                desired_positions,
-                desired_velocities,
-                desired_accelerations,
-                g=np.array([0.0, 0.0, -9.81]),
-                Ftip=np.zeros(6),
-                Kp=np.eye(6),
-                Ki=np.eye(6),
-                Kd=np.eye(6),
-            )
-
-            controller.computed_torque_control.assert_not_called()
             actual_calls = [call.args[0] for call in sim.set_joint_positions.call_args_list]
             self.assertEqual(len(actual_calls), len(desired_positions))
             for actual, expected in zip(actual_calls, desired_positions):

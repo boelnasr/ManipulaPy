@@ -539,20 +539,16 @@ class Simulation:
         self.logger.info("Trajectory completed.")
         return ee_positions[-1]  # Return the last end-effector position
 
-    def run_controller(
-        self,
-        controller,
-        desired_positions,
-        desired_velocities,
-        desired_accelerations,
-        g,
-        Ftip,
-        Kp,
-        Ki,
-        Kd,
-    ):
+    def run_controller(self, desired_positions):
         """
-        Runs the controller with the specified parameters.
+        Drive the robot through ``desired_positions`` in open-loop position
+        control, one configuration per simulation step.
+
+        For real closed-loop torque control, drive PyBullet's
+        ``p.TORQUE_CONTROL`` mode directly in your own loop. The previous
+        signature accepted a controller object plus PID gains; those were
+        removed in v1.3.2 because the loop body never produced honest
+        closed-loop behavior. See CHANGELOG.
         """
         self.logger.info("Running controller...")
         ee_positions = []

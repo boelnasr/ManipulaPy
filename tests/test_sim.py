@@ -455,52 +455,20 @@ class TestControllerIntegration:
     """Test controller integration"""
 
     def test_run_controller(self):
-        """run_controller now performs open-loop position tracking; the controller's computed_torque_control is not called."""
-        # Mock cupy
-        with patch("cupy.array") as mock_array, patch("cupy.asnumpy") as mock_asnumpy:
+        """run_controller performs open-loop position tracking — set_joint_positions is called once per desired configuration in order."""
+        sim = Simulation("test.urdf", [(-1, 1)] * 6)  # Make sure we have 6 joints
+        sim.non_fixed_joints = list(range(6))  # 6 joints to match mock
 
-            mock_array.side_effect = lambda x: np.array(x)
-            mock_asnumpy.side_effect = lambda x: (
-                np.array(x) if not isinstance(x, np.ndarray) else x
-            )
+        desired_positions = [[0.0] * 6, [0.5] * 6]  # 6 joints
 
-            sim = Simulation("test.urdf", [(-1, 1)] * 6)  # Make sure we have 6 joints
-            sim.non_fixed_joints = list(range(6))  # 6 joints to match mock
+        with patch.object(sim, "set_joint_positions") as mock_set:
+            final_pos = sim.run_controller(desired_positions)
 
-            # Mock controller
-            mock_controller = Mock()
-            mock_controller.computed_torque_control.return_value = np.array(
-                [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
-            )
-
-            desired_positions = [[0.0] * 6, [0.5] * 6]  # 6 joints
-            desired_velocities = [[0.0] * 6, [0.1] * 6]
-            desired_accelerations = [[0.0] * 6, [0.01] * 6]
-            g = [0, 0, -9.81]
-            Ftip = [0, 0, 0, 0, 0, 0]
-            Kp = [10] * 6
-            Ki = [1] * 6
-            Kd = [0.1] * 6
-
-            with patch.object(sim, "set_joint_positions") as mock_set:
-                final_pos = sim.run_controller(
-                    mock_controller,
-                    desired_positions,
-                    desired_velocities,
-                    desired_accelerations,
-                    g,
-                    Ftip,
-                    Kp,
-                    Ki,
-                    Kd,
-                )
-
-                assert final_pos is not None
-                mock_controller.computed_torque_control.assert_not_called()
-                actual_calls = [c.args[0] for c in mock_set.call_args_list]
-                assert len(actual_calls) == len(desired_positions)
-                for actual, expected in zip(actual_calls, desired_positions):
-                    np.testing.assert_array_equal(actual, expected)
+            assert final_pos is not None
+            actual_calls = [c.args[0] for c in mock_set.call_args_list]
+            assert len(actual_calls) == len(desired_positions)
+            for actual, expected in zip(actual_calls, desired_positions):
+                np.testing.assert_array_equal(actual, expected)
 
 
 class TestParameterManagement:
