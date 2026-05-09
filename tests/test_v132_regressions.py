@@ -543,6 +543,21 @@ class TestControlRegressions(unittest.TestCase):
         self.assertEqual(result.returncode, 0,
                          f"control.py failed to import without cupy:\n{result.stderr}")
 
+    def test_settling_time_returns_first_settled_time_not_last(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        # Monotonic settled at t=1.0 onward
+        t = np.array([0.0, 1.0, 2.0, 3.0])
+        r = np.array([0.0, 1.0, 1.0, 1.0])
+        self.assertAlmostEqual(ctrl.calculate_settling_time(t, r, 1.0, tolerance=0.02), 1.0)
+
+    def test_settling_time_handles_negative_setpoint(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        t = np.array([0.0, 1.0, 2.0, 3.0])
+        r = np.array([0.0, -1.0, -1.0, -1.0])
+        # Symmetric to the positive case — should return 1.0, not time[-1]
+        self.assertAlmostEqual(ctrl.calculate_settling_time(t, r, -1.0, tolerance=0.02), 1.0)
 
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""

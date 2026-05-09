@@ -757,22 +757,37 @@ class ManipulatorController:
         """
         Calculate the settling time.
 
+        Returns the first time at which the response enters the tolerance band
+        and never leaves it again.  Returns ``float('inf')`` when the response
+        never enters the band, or enters but does not remain settled through
+        the end of the recorded data.
+
         Parameters:
             time (np.ndarray): Array of time steps.
             response (np.ndarray): Array of response values.
             set_point (float): Desired set point value.
-            tolerance (float): Tolerance for settling time calculation.
+            tolerance (float): Fractional tolerance band (default 0.02 = 2 %).
 
         Returns:
-            float: Settling time.
+            float: Settling time, or inf if the response never settles.
         """
         time = _to_numpy(time)
         response = _to_numpy(response)
 
-        settling_threshold = set_point * tolerance
-        settling_idx = np.where(np.abs(response - set_point) <= settling_threshold)[0]
-        settling_time = time[settling_idx[-1]] if len(settling_idx) > 0 else time[-1]
-        return settling_time
+        settling_threshold = abs(set_point) * tolerance
+        in_band = np.abs(response - set_point) <= settling_threshold
+        if not np.any(in_band):
+            return float("inf")
+        n = len(in_band)
+        last_excursion = -1
+        for i in range(n - 1, -1, -1):
+            if not in_band[i]:
+                last_excursion = i
+                break
+        if last_excursion == n - 1:
+            return float("inf")  # never settles
+        first_settled_idx = last_excursion + 1
+        return float(time[first_settled_idx])
 
     def calculate_steady_state_error(self, response, set_point):
         """
