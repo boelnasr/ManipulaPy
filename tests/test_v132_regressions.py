@@ -331,6 +331,32 @@ class TestSingularityRegressions(unittest.TestCase):
         result = sing.singularity_analysis(np.zeros(7))
         self.assertIsInstance(result, (bool, np.bool_))
 
+    def test_manipulability_ellipsoid_radii_finite_at_singular_jacobian(self):
+        """A singular Jacobian must still produce finite plotted ellipsoid points."""
+        from ManipulaPy.singularity import Singularity
+
+        class MockManip:
+            def jacobian(self, thetalist, frame="space"):
+                return np.zeros((6, 6))
+
+        class RecordingAxis:
+            def __init__(self):
+                self.surfaces = []
+
+            def plot_surface(self, x, y, z, **kwargs):
+                self.surfaces.append((x, y, z))
+
+            def set_title(self, title):
+                pass
+
+        ax = RecordingAxis()
+        Singularity(MockManip()).manipulability_ellipsoid(np.zeros(6), ax=ax)
+
+        self.assertEqual(len(ax.surfaces), 2)
+        for surface in ax.surfaces:
+            for values in surface:
+                self.assertTrue(np.all(np.isfinite(values)))
+
 
 class TestPotentialFieldRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/potential_field.py bugs."""

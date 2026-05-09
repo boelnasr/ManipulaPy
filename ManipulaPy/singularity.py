@@ -62,10 +62,10 @@ class Singularity:
 
         # Singular Value Decomposition (SVD) for both parts
         U_v, S_v, _ = np.linalg.svd(J_v)
-        radii_v = 1.0 / np.sqrt(S_v)
+        radii_v = 1.0 / np.sqrt(np.maximum(S_v, 1e-10))
 
         U_w, S_w, _ = np.linalg.svd(J_w)
-        radii_w = 1.0 / np.sqrt(S_w)
+        radii_w = 1.0 / np.sqrt(np.maximum(S_w, 1e-10))
 
         # Generate points on a unit sphere
         u, v = np.mgrid[0 : 2 * np.pi : 20j, 0 : np.pi : 10j]
