@@ -520,6 +520,29 @@ class TestControlRegressions(unittest.TestCase):
 
         self.assertFalse(np.allclose(old_x_hat, ctrl.x_hat))
 
+    def test_control_module_imports_without_cupy(self):
+        """ManipulaPy.control must import on a cupy-less machine.
+
+        Currently fails because Union[cp.ndarray, ...] in enforce_limits is
+        evaluated at class-body time and cp is None when cupy is missing.
+        """
+        import subprocess, sys, textwrap
+        script = textwrap.dedent("""
+            import builtins, importlib, sys
+            real = builtins.__import__
+            def fake(name, *a, **k):
+                if name.split('.')[0] == 'cupy':
+                    raise ImportError('blocked')
+                return real(name, *a, **k)
+            builtins.__import__ = fake
+            sys.modules.pop('ManipulaPy.control', None)
+            importlib.import_module('ManipulaPy.control')
+        """)
+        result = subprocess.run([sys.executable, "-c", script],
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0,
+                         f"control.py failed to import without cupy:\n{result.stderr}")
+
 
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""
