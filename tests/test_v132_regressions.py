@@ -331,6 +331,26 @@ class TestControlRegressions(unittest.TestCase):
         self.assertEqual(ctrl.eint.shape, (2,),
                          "eint must reset when input DOF changes")
 
+    def test_ziegler_nichols_tuning_rejects_zero_period(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        with self.assertRaises(ValueError):
+            ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=0.0, kind="PID")
+
+    def test_ziegler_nichols_tuning_rejects_negative_period(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        with self.assertRaises(ValueError):
+            ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=-1.0, kind="PID")
+
+    def test_ziegler_nichols_tuning_rejects_nonfinite_period(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        with self.assertRaises(ValueError):
+            ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=float("nan"), kind="PID")
+        with self.assertRaises(ValueError):
+            ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=float("inf"), kind="PID")
+
 
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""

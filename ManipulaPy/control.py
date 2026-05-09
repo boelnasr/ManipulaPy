@@ -823,6 +823,13 @@ class ManipulatorController:
         Ku = _to_numpy(Ku).astype(float)
         Tu = _to_numpy(Tu).astype(float)
 
+        if not np.all(np.isfinite(Tu)) or np.any(Tu <= 0):
+            raise ValueError(
+                f"Tu (ultimate period) must be positive and finite, got Tu={Tu!r}. "
+                "Tu == 0 typically indicates find_ultimate_gain_and_period found no "
+                "sustained oscillation; check your gain sweep."
+            )
+
         kind = kind.upper()
         if kind == "P":
             Kp, Ki, Kd = 0.50 * Ku, 0.0 * Ku, 0.0 * Ku
