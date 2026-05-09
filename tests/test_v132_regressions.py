@@ -316,6 +316,21 @@ class TestControlRegressions(unittest.TestCase):
         po = ctrl.calculate_percent_overshoot(np.array([0.0, 0.1, 0.0]), set_point=0.0)
         self.assertTrue(np.isfinite(po))
 
+    def test_pid_control_resets_eint_on_dof_change(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        # First call: 6-DOF
+        Kp, Ki, Kd = np.eye(6), np.eye(6), np.eye(6)
+        ctrl.pid_control(np.ones(6), np.zeros(6), np.zeros(6), np.zeros(6),
+                         dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd)
+        self.assertEqual(ctrl.eint.shape, (6,))
+        # Second call: 2-DOF
+        Kp2, Ki2, Kd2 = np.eye(2), np.eye(2), np.eye(2)
+        ctrl.pid_control(np.ones(2), np.zeros(2), np.zeros(2), np.zeros(2),
+                         dt=0.01, Kp=Kp2, Ki=Ki2, Kd=Kd2)
+        self.assertEqual(ctrl.eint.shape, (2,),
+                         "eint must reset when input DOF changes")
+
 
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""

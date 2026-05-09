@@ -142,7 +142,12 @@ class ManipulatorController:
         Ki = _to_numpy(Ki)
         Kd = _to_numpy(Kd)
 
-        if self.eint is None:
+        if self.eint is None or self.eint.shape != thetalist.shape:
+            if self.eint is not None and self.eint.shape != thetalist.shape:
+                logger.warning(
+                    "Controller state shape mismatch (%s vs %s); resetting integral.",
+                    self.eint.shape, thetalist.shape,
+                )
             self.eint = np.zeros_like(thetalist)
 
         e = thetalistd - thetalist
@@ -235,7 +240,12 @@ class ManipulatorController:
         Ki = _to_numpy(Ki)
         Kd = _to_numpy(Kd)
 
-        if self.eint is None:
+        if self.eint is None or self.eint.shape != thetalist.shape:
+            if self.eint is not None and self.eint.shape != thetalist.shape:
+                logger.warning(
+                    "Controller state shape mismatch (%s vs %s); resetting integral.",
+                    self.eint.shape, thetalist.shape,
+                )
             self.eint = np.zeros_like(thetalist)
 
         e = thetalistd - thetalist
