@@ -32,11 +32,26 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 import logging
 import time
 
-import cupy as cp  # Import cupy for CUDA acceleration
 import matplotlib.pyplot as plt
 import numpy as np
-import pybullet as p
-import pybullet_data
+
+try:
+    import cupy as cp  # Optional: CUDA acceleration
+    _CUPY_AVAILABLE = True
+except ImportError:
+    cp = np  # Fall back to NumPy (cp.array → np.array)
+    _CUPY_AVAILABLE = False
+    if not hasattr(cp, "asnumpy"):
+        cp.asnumpy = np.asarray
+
+try:
+    import pybullet as p  # Required for Simulation; sim cannot run without it
+    import pybullet_data
+    _PYBULLET_AVAILABLE = True
+except ImportError:
+    p = None
+    pybullet_data = None
+    _PYBULLET_AVAILABLE = False
 
 from ManipulaPy.control import ManipulatorController
 from ManipulaPy.path_planning import TrajectoryPlanning as tp
@@ -52,6 +67,11 @@ class Simulation:
         real_time_factor=1.0,
         physics_client=None,
     ):
+        if not _PYBULLET_AVAILABLE:
+            raise ImportError(
+                "Simulation requires pybullet. Install with: "
+                "pip install 'ManipulaPy[simulation]'"
+            )
         self.urdf_file_path = urdf_file_path
         self.joint_limits = joint_limits
         self.torque_limits = torque_limits

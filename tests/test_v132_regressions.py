@@ -391,6 +391,34 @@ class TestPotentialFieldRegressions(unittest.TestCase):
 class TestSimRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/sim.py bugs."""
 
+    def test_sim_module_imports_without_cupy_or_pybullet(self):
+        """sim module must be importable even when optional deps are missing."""
+        import builtins
+        import importlib
+        import sys
+        from unittest.mock import patch
+
+        blocked = {"cupy", "pybullet", "pybullet_data"}
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name.split(".")[0] in blocked:
+                raise ImportError(f"blocked optional dependency: {name}")
+            return real_import(name, *args, **kwargs)
+
+        previous = sys.modules.pop("ManipulaPy.sim", None)
+        try:
+            with patch("builtins.__import__", side_effect=fake_import):
+                sim_module = importlib.import_module("ManipulaPy.sim")
+            self.assertFalse(sim_module._CUPY_AVAILABLE)
+            self.assertFalse(sim_module._PYBULLET_AVAILABLE)
+            with self.assertRaisesRegex(ImportError, "ManipulaPy\\[simulation\\]"):
+                sim_module.Simulation("robot.urdf", joint_limits=[])
+        finally:
+            sys.modules.pop("ManipulaPy.sim", None)
+            if previous is not None:
+                sys.modules["ManipulaPy.sim"] = previous
+
 
 class TestVisionRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/vision.py bugs."""
