@@ -54,6 +54,11 @@ setup(
             "torchvision>=0.9.0,<1.0",     # Computer vision models
         ],
         
+        # Physics simulation
+        "simulation": [
+            "pybullet>=3.2.5,<4.0",        # Physics simulation
+        ],
+        
         # Development and testing tools
         "dev": [
             "pytest>=7.0.0,<8.0",
