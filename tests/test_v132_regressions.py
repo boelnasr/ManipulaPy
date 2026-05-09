@@ -880,6 +880,22 @@ class TestSimRegressions(unittest.TestCase):
         sim.logger.debug.assert_called_once()
         self.assertTrue(sim.logger.debug.call_args.kwargs["exc_info"])
 
+    def test_simulation_with_external_physics_client_loads_robot(self):
+        """Passing an existing physics_client must still load plane + robot."""
+        from unittest.mock import patch, MagicMock
+        from ManipulaPy.sim import Simulation
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p") as mock_p, \
+             patch("ManipulaPy.sim.pybullet_data") as mock_pd:
+            mock_p.loadURDF.side_effect = [101, 202]   # plane, robot
+            mock_p.getNumJoints.return_value = 6
+            mock_p.getJointInfo.side_effect = lambda r, i: (i, b"j", 0)  # 0 = JOINT_REVOLUTE
+            mock_p.JOINT_FIXED = 4
+            sim = Simulation("robot.urdf", joint_limits=[(-1, 1)] * 6, physics_client=42)
+            self.assertEqual(sim.robot_id, 202)
+            self.assertEqual(sim.plane_id, 101)
+            self.assertEqual(len(sim.non_fixed_joints), 6)
+            self.assertEqual(sim.home_position.shape, (6,))
 
 class TestSimPybulletGuards(unittest.TestCase):
     """Task 15: every public method that touches p.* must raise a clear

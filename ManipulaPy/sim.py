@@ -156,28 +156,27 @@ class Simulation:
         """
         Sets up the simulation environment.
         """
+        _check_pybullet_available()
         if self.physics_client is None:
             self.physics_client = p.connect(p.GUI)
-            p.resetSimulation()
-            p.setAdditionalSearchPath(pybullet_data.getDataPath())
-            p.setGravity(0, 0, -9.81)
-            p.setTimeStep(self.time_step)
+        p.resetSimulation()
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        p.setGravity(0, 0, -9.81)
+        p.setTimeStep(self.time_step)
 
-            # Load the ground plane
-            self.plane_id = p.loadURDF("plane.urdf")
+        # Load the ground plane
+        self.plane_id = p.loadURDF("plane.urdf")
 
-            # Load the robot
-            self.robot_id = p.loadURDF(self.urdf_file_path, useFixedBase=True)
+        # Load the robot
+        self.robot_id = p.loadURDF(self.urdf_file_path, useFixedBase=True)
 
-            # Identify non-fixed joints
-            self.non_fixed_joints = [
-                i
-                for i in range(p.getNumJoints(self.robot_id))
-                if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
-            ]
-            self.home_position = np.zeros(len(self.non_fixed_joints))
-        else:
-            self.logger.info("Simulation already initialized.")
+        # Identify non-fixed joints
+        self.non_fixed_joints = [
+            i
+            for i in range(p.getNumJoints(self.robot_id))
+            if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
+        ]
+        self.home_position = np.zeros(len(self.non_fixed_joints))
 
     def initialize_robot(self):
         """
