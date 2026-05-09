@@ -187,7 +187,7 @@ class URDFToSerialManipulator:
 
         return {
             "M": params["M"],
-            "omeg_list": params["S_list"][:3,:],
+            "omega_list": params["S_list"][:3, :],
             "Slist": params["S_list"],
             "Blist": params["B_list"],
             "Glist": params["G_list"],
@@ -278,7 +278,7 @@ class URDFToSerialManipulator:
 
         return SerialManipulator(
             M_list=data["M"],
-            omega_list=utils.extract_omega_list(data["Slist"]),
+            omega_list=data["omega_list"],
             S_list=data["Slist"],
             B_list=data["Blist"],
             G_list=data["Glist"],
@@ -292,7 +292,7 @@ class URDFToSerialManipulator:
         data = self.robot_data
         self.manipulator_dynamics = ManipulatorDynamics(
             M_list=data["M"],
-            omega_list=data["Slist"][:3, :],
+            omega_list=data["omega_list"],
             r_list=utils.extract_r_list(data["Slist"]),
             b_list=None,  # If needed, define or extract from URDF
             S_list=data["Slist"],
