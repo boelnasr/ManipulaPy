@@ -455,7 +455,7 @@ class TestControllerIntegration:
     """Test controller integration"""
 
     def test_run_controller(self):
-        """Test running controller with trajectory"""
+        """run_controller now performs open-loop position tracking; the controller's computed_torque_control is not called."""
         # Mock cupy
         with patch("cupy.array") as mock_array, patch("cupy.asnumpy") as mock_asnumpy:
 
@@ -482,20 +482,25 @@ class TestControllerIntegration:
             Ki = [1] * 6
             Kd = [0.1] * 6
 
-            final_pos = sim.run_controller(
-                mock_controller,
-                desired_positions,
-                desired_velocities,
-                desired_accelerations,
-                g,
-                Ftip,
-                Kp,
-                Ki,
-                Kd,
-            )
+            with patch.object(sim, "set_joint_positions") as mock_set:
+                final_pos = sim.run_controller(
+                    mock_controller,
+                    desired_positions,
+                    desired_velocities,
+                    desired_accelerations,
+                    g,
+                    Ftip,
+                    Kp,
+                    Ki,
+                    Kd,
+                )
 
-            assert final_pos is not None
-            assert mock_controller.computed_torque_control.called
+                assert final_pos is not None
+                mock_controller.computed_torque_control.assert_not_called()
+                actual_calls = [c.args[0] for c in mock_set.call_args_list]
+                assert len(actual_calls) == len(desired_positions)
+                for actual, expected in zip(actual_calls, desired_positions):
+                    np.testing.assert_array_equal(actual, expected)
 
 
 class TestParameterManagement:

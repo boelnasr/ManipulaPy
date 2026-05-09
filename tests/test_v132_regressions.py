@@ -392,32 +392,116 @@ class TestSimRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/sim.py bugs."""
 
     def test_sim_module_imports_without_cupy_or_pybullet(self):
-        """sim module must be importable even when optional deps are missing."""
-        import builtins
-        import importlib
+        """sim module must be importable even when optional deps are missing.
+
+        Runs in a subprocess so that mucking with ``sys.modules`` and the
+        import system can't leak state into other tests in this process
+        (notably tests/test_sim.py, which captures Simulation at import time
+        and relies on a monkeypatched ManipulaPy.sim.p).
+
+        Only pybullet/pybullet_data are blocked here. Blocking cupy too would
+        crash a transitive import of ManipulaPy.control, whose own optional
+        cupy guard is tracked separately. The cupy fallback in sim.py is
+        verified by source: ``cp = np`` and ``cp.asnumpy = np.asarray``.
+        """
+        import subprocess
         import sys
-        from unittest.mock import patch
+        import textwrap
 
-        blocked = {"cupy", "pybullet", "pybullet_data"}
-        real_import = builtins.__import__
+        script = textwrap.dedent(
+            """
+            import builtins
+            import importlib
+            import sys
 
-        def fake_import(name, *args, **kwargs):
-            if name.split(".")[0] in blocked:
-                raise ImportError(f"blocked optional dependency: {name}")
-            return real_import(name, *args, **kwargs)
+            blocked = {"pybullet", "pybullet_data"}
+            real_import = builtins.__import__
 
-        previous = sys.modules.pop("ManipulaPy.sim", None)
-        try:
-            with patch("builtins.__import__", side_effect=fake_import):
-                sim_module = importlib.import_module("ManipulaPy.sim")
-            self.assertFalse(sim_module._CUPY_AVAILABLE)
-            self.assertFalse(sim_module._PYBULLET_AVAILABLE)
-            with self.assertRaisesRegex(ImportError, "ManipulaPy\\[simulation\\]"):
-                sim_module.Simulation("robot.urdf", joint_limits=[])
-        finally:
+            def fake_import(name, *args, **kwargs):
+                if name.split(".")[0] in blocked:
+                    raise ImportError(f"blocked optional dependency: {name}")
+                return real_import(name, *args, **kwargs)
+
             sys.modules.pop("ManipulaPy.sim", None)
-            if previous is not None:
-                sys.modules["ManipulaPy.sim"] = previous
+            builtins.__import__ = fake_import
+            try:
+                sim_module = importlib.import_module("ManipulaPy.sim")
+            finally:
+                builtins.__import__ = real_import
+
+            assert sim_module._PYBULLET_AVAILABLE is False, "pybullet guard failed"
+            assert sim_module.p is None, "p must be None when pybullet missing"
+            try:
+                sim_module.Simulation("robot.urdf", joint_limits=[])
+            except ImportError as exc:
+                assert "ManipulaPy[simulation]" in str(exc), str(exc)
+            else:
+                raise AssertionError("Simulation() did not raise ImportError")
+            """
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            msg=f"subprocess failed:\nstdout={result.stdout}\nstderr={result.stderr}",
+        )
+
+    def test_run_controller_tracks_desired_positions(self):
+        """run_controller must end at the final desired position (open-loop)."""
+        from unittest.mock import MagicMock, patch
+
+        from ManipulaPy.sim import Simulation
+
+        desired_positions = [
+            np.zeros(6),
+            np.array([0.5, 0, 0, 0, 0, 0]),
+            np.array([1.0, 0, 0, 0, 0, 0]),
+        ]
+        desired_velocities = [np.zeros(6)] * 3
+        desired_accelerations = [np.zeros(6)] * 3
+
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p") as mock_p, \
+             patch("ManipulaPy.sim.time.sleep"):
+            mock_p.getJointState.return_value = (1.0, 0.0)  # position, velocity
+            mock_p.stepSimulation = MagicMock()
+            mock_p.getNumJoints.return_value = 6
+            mock_p.getLinkState.return_value = ((0, 0, 0),) * 5
+
+            sim = Simulation.__new__(Simulation)
+            sim.logger = MagicMock()
+            sim.robot_id = 1
+            sim.non_fixed_joints = list(range(6))
+            sim.time_step = 0.01
+            sim.real_time_factor = 1.0
+            sim.set_joint_positions = MagicMock()
+            sim.get_joint_positions = MagicMock(return_value=np.zeros(6))
+            sim.plot_trajectory = MagicMock()
+
+            controller = MagicMock()
+            controller.computed_torque_control.return_value = np.ones(6) * 100.0
+
+            sim.run_controller(
+                controller,
+                desired_positions,
+                desired_velocities,
+                desired_accelerations,
+                g=np.array([0.0, 0.0, -9.81]),
+                Ftip=np.zeros(6),
+                Kp=np.eye(6),
+                Ki=np.eye(6),
+                Kd=np.eye(6),
+            )
+
+            controller.computed_torque_control.assert_not_called()
+            actual_calls = [call.args[0] for call in sim.set_joint_positions.call_args_list]
+            self.assertEqual(len(actual_calls), len(desired_positions))
+            for actual, expected in zip(actual_calls, desired_positions):
+                np.testing.assert_array_equal(actual, expected)
 
 
 class TestVisionRegressions(unittest.TestCase):

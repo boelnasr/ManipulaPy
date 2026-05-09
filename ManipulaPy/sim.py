@@ -555,25 +555,15 @@ class Simulation:
         ee_positions = []
 
         for i in range(len(desired_positions)):
-            control_signal = controller.computed_torque_control(
-                thetalistd=cp.array(desired_positions[i]),
-                dthetalistd=cp.array(desired_velocities[i]),
-                ddthetalistd=cp.array(desired_accelerations[i]),
-                thetalist=cp.array(current_positions),
-                dthetalist=cp.array(current_velocities),
-                g=cp.array(g),
-                dt=self.time_step,
-                Kp=cp.array(Kp),
-                Ki=cp.array(Ki),
-                Kd=cp.array(Kd),
-            )
-
-            self.set_joint_positions(
-                cp.asnumpy(current_positions)
-                + cp.asnumpy(control_signal) * self.time_step
-            )
+            # Open-loop position tracking. Closed-loop torque control via
+            # this method was always broken (treated torque as position delta).
+            # For real closed-loop control, use p.TORQUE_CONTROL mode directly
+            # in your own loop. See v1.3.2 CHANGELOG.
+            self.set_joint_positions(desired_positions[i])
             current_positions = self.get_joint_positions()
-            current_velocities = cp.asnumpy(control_signal) / self.time_step
+            # Query actual joint velocities from PyBullet for non-fixed joints only
+            states = [p.getJointState(self.robot_id, j) for j in self.non_fixed_joints]
+            current_velocities = np.array([s[1] for s in states])
 
             p.stepSimulation()
 
