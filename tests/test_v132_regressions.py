@@ -391,18 +391,20 @@ class TestPotentialFieldRegressions(unittest.TestCase):
 class TestSimRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/sim.py bugs."""
 
-    def test_sim_module_imports_without_cupy_or_pybullet(self):
-        """sim module must be importable even when optional deps are missing.
+    def test_sim_module_imports_without_pybullet(self):
+        """sim module must be importable when pybullet is missing.
 
         Runs in a subprocess so that mucking with ``sys.modules`` and the
         import system can't leak state into other tests in this process
         (notably tests/test_sim.py, which captures Simulation at import time
         and relies on a monkeypatched ManipulaPy.sim.p).
 
-        Only pybullet/pybullet_data are blocked here. Blocking cupy too would
-        crash a transitive import of ManipulaPy.control, whose own optional
-        cupy guard is tracked separately. The cupy fallback in sim.py is
-        verified by source: ``cp = np`` and ``cp.asnumpy = np.asarray``.
+        Scope is intentionally limited to pybullet/pybullet_data. Blocking
+        cupy too would crash a transitive import of ManipulaPy.control,
+        whose own optional cupy guard is tracked separately. The cupy
+        fallback in sim.py is exercised by source review (``_NumpyProxy``
+        delegates to ``np`` and exposes ``asnumpy``) rather than by this
+        end-to-end import probe.
         """
         import subprocess
         import sys

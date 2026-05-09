@@ -40,6 +40,11 @@ try:
     _CUPY_AVAILABLE = True
 except ImportError:
     class _NumpyProxy:
+        # Internal fallback shim: enough of cupy's surface for sim.py's own
+        # call sites (cp.array, cp.asnumpy). Not a drop-in cupy replacement —
+        # cp.cuda.*, cp.ndarray identity (isinstance), and asnumpy keyword
+        # arguments are unsupported. Do NOT import this as ManipulaPy.sim.cp
+        # from external code; depend on cupy directly if you need GPU semantics.
         def __getattr__(self, name):
             return getattr(np, name)
 
