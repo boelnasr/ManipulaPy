@@ -584,6 +584,69 @@ class TestSimRegressions(unittest.TestCase):
             second_call_arg = sim.set_joint_positions.call_args_list[1].args[0]
             np.testing.assert_array_equal(second_call_arg, second_waypoint)
 
+class TestSimPybulletGuards(unittest.TestCase):
+    """Task 15: every public method that touches p.* must raise a clear
+    ImportError when pybullet is unavailable, never AttributeError on the
+    None proxy installed by Task 13's import guard.
+    """
+
+    # Methods that directly call p.*. Each entry: (method_name, args_factory).
+    # Orchestration methods (run_trajectory, simulate_robot_motion, etc.) are
+    # included because they delegate to the leaf methods and users hit them
+    # directly; failing fast at the entry point gives a clearer error.
+    _METHODS_AND_ARGS = [
+        ("set_joint_positions", lambda: (np.zeros(6),)),
+        ("get_joint_positions", lambda: ()),
+        ("plot_trajectory", lambda: (np.zeros((3, 3)),)),
+        ("clear_trajectory_visualization", lambda: ()),
+        ("get_joint_parameters", lambda: ()),
+        ("check_collisions", lambda: ()),
+        ("step_simulation", lambda: ()),
+        ("add_joint_parameters", lambda: ()),
+        ("add_reset_button", lambda: ()),
+        ("add_additional_parameters", lambda: ()),
+        ("update_simulation_parameters", lambda: ()),
+        ("save_joint_states", lambda: ("/tmp/_v132_states.csv",)),
+        ("run_trajectory", lambda: (np.zeros((1, 6)),)),
+        ("simulate_robot_motion", lambda: (np.zeros((1, 6)),)),
+        ("simulate_robot_with_desired_angles", lambda: (np.zeros(6),)),
+        ("manual_control", lambda: ()),
+        ("plot_trajectory_in_scene", lambda: (np.zeros((1, 6)), np.zeros((1, 3)))),
+    ]
+
+    def _make_bare_sim(self):
+        from unittest.mock import MagicMock
+        from ManipulaPy.sim import Simulation
+        sim = Simulation.__new__(Simulation)
+        sim.logger = MagicMock()
+        sim.physics_client = 1
+        sim.robot_id = 1
+        sim.non_fixed_joints = list(range(6))
+        sim.time_step = 0.01
+        sim.real_time_factor = 1.0
+        sim.joint_params = []
+        sim.reset_button = None
+        sim.home_position = None
+        sim.trajectory_body_ids = []
+        return sim
+
+    def test_public_methods_raise_importerror_without_pybullet(self):
+        from unittest.mock import patch
+        for method_name, args_factory in self._METHODS_AND_ARGS:
+            with self.subTest(method=method_name):
+                sim = self._make_bare_sim()
+                method = getattr(sim, method_name)
+                args = args_factory()
+                with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", False), \
+                     patch("ManipulaPy.sim.p", None):
+                    with self.assertRaises(ImportError) as ctx:
+                        method(*args)
+                self.assertIn(
+                    "ManipulaPy[simulation]",
+                    str(ctx.exception),
+                    f"{method_name}: ImportError must hint at the install extra",
+                )
+
 
 class TestVisionRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/vision.py bugs."""

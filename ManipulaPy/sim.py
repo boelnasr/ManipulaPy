@@ -63,6 +63,23 @@ except ImportError:
     pybullet_data = None
     _PYBULLET_AVAILABLE = False
 
+
+def _check_pybullet_available():
+    """Raise a clear ImportError if pybullet is unavailable.
+
+    __init__ already does this, but every public method that touches p.*
+    needs the same check at runtime — users can bypass __init__ via
+    ``Simulation.__new__`` (tests do), or hot-swap the pybullet module after
+    construction. Without this, those paths surface confusing
+    ``AttributeError: 'NoneType' object has no attribute ...`` instead.
+    """
+    if not _PYBULLET_AVAILABLE or p is None:
+        raise ImportError(
+            "pybullet is required for this Simulation operation. "
+            "Install with: pip install 'ManipulaPy[simulation]'"
+        )
+
+
 from ManipulaPy.control import ManipulatorController
 from ManipulaPy.path_planning import TrajectoryPlanning as tp
 
@@ -219,6 +236,7 @@ class Simulation:
         """
         Adds GUI sliders for each joint.
         """
+        _check_pybullet_available()
         if not self.joint_params:
             for i, joint_index in enumerate(self.non_fixed_joints):
                 param_id = p.addUserDebugParameter(
@@ -233,6 +251,7 @@ class Simulation:
         """
         Adds a reset button to the simulation.
         """
+        _check_pybullet_available()
         if self.reset_button is None:
             try:
                 self.reset_button = p.addUserDebugParameter("Reset", 1, 0, 1)
@@ -243,6 +262,7 @@ class Simulation:
         """
         Sets the joint positions of the robot.
         """
+        _check_pybullet_available()
         p.setJointMotorControlArray(
             self.robot_id,
             self.non_fixed_joints,
@@ -254,6 +274,7 @@ class Simulation:
         """
         Gets the current joint positions of the robot.
         """
+        _check_pybullet_available()
         joint_positions = [
             p.getJointState(self.robot_id, i)[0] for i in self.non_fixed_joints
         ]
@@ -348,6 +369,7 @@ class Simulation:
         Returns:
             list: Body IDs of created trajectory geometry (for cleanup)
         """
+        _check_pybullet_available()
         # Clear any existing trajectory bodies
         self.clear_trajectory_visualization()
 
@@ -504,6 +526,7 @@ class Simulation:
         """
         Clear all trajectory visualization bodies from the simulation.
         """
+        _check_pybullet_available()
         if hasattr(self, "trajectory_body_ids"):
             removed_count = 0
             for body_id in self.trajectory_body_ids:
@@ -526,6 +549,7 @@ class Simulation:
         """
         Runs a joint trajectory in the simulation.
         """
+        _check_pybullet_available()
         self.logger.info("Running trajectory...")
         ee_positions = []
 
@@ -555,6 +579,7 @@ class Simulation:
         removed in v1.3.2 because the loop body never produced honest
         closed-loop behavior. See CHANGELOG.
         """
+        _check_pybullet_available()
         self.logger.info("Running controller...")
         ee_positions = []
 
@@ -597,12 +622,14 @@ class Simulation:
         """
         Gets the current values of the GUI sliders.
         """
+        _check_pybullet_available()
         return [p.readUserDebugParameter(param_id) for param_id in self.joint_params]
 
     def simulate_robot_motion(self, desired_angles_trajectory):
         """
         Simulates the robot's motion using a given trajectory of desired joint angles.
         """
+        _check_pybullet_available()
         self.logger.info("Simulating robot motion...")
         ee_positions = []
 
@@ -628,6 +655,7 @@ class Simulation:
         Args:
             desired_angles (np.ndarray): Desired joint angles.
         """
+        _check_pybullet_available()
         self.logger.info("Simulating robot with desired joint angles...")
 
         p.setJointMotorControlArray(
@@ -664,6 +692,7 @@ class Simulation:
         """
         Checks for collisions in the simulation and logs them.
         """
+        _check_pybullet_available()
         if self.robot_id is None:
             self.logger.warning(
                 "Cannot check for collisions before simulation is started."
@@ -680,6 +709,7 @@ class Simulation:
         """
         Steps the simulation forward by one time step.
         """
+        _check_pybullet_available()
         self.logger.info("Setting up the simulation environment...")
         self.connect_simulation()
         self.add_additional_parameters()
@@ -688,6 +718,7 @@ class Simulation:
         """
         Adds additional GUI parameters for controlling physics properties like gravity and time step.
         """
+        _check_pybullet_available()
         if not hasattr(self, "gravity_param"):
             self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
         if not hasattr(self, "time_step_param"):
@@ -699,6 +730,7 @@ class Simulation:
         """
         Updates simulation parameters from GUI controls.
         """
+        _check_pybullet_available()
         gravity = p.readUserDebugParameter(self.gravity_param)
         time_step = p.readUserDebugParameter(self.time_step_param)
         p.setGravity(0, 0, gravity)
@@ -709,6 +741,7 @@ class Simulation:
         """
         Allows manual control of the robot through the PyBullet UI sliders.
         """
+        _check_pybullet_available()
         self.logger.info("Starting manual control...")
         if not self.joint_params:
             self.add_joint_parameters()  # Ensure sliders are created
@@ -751,6 +784,7 @@ class Simulation:
         Args:
             filename (str): The filename for the CSV file.
         """
+        _check_pybullet_available()
         joint_states = [
             p.getJointState(self.robot_id, i) for i in self.non_fixed_joints
         ]
@@ -767,6 +801,7 @@ class Simulation:
         """
         Plots the trajectory in the simulation scene.
         """
+        _check_pybullet_available()
         self.logger.info("Plotting trajectory in simulation scene...")
         ee_positions = np.array(end_effector_trajectory)
 
