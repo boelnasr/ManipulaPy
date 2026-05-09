@@ -177,21 +177,13 @@ Core Simulation Methods
       
       final_pos = sim.run_trajectory(trajectory)
 
-**Controller Integration**
+**Open-Loop Position Tracking**
 
-.. py:method:: run_controller(controller, desired_positions, desired_velocities, desired_accelerations, g, Ftip, Kp, Ki, Kd) -> np.ndarray
+.. py:method:: run_controller(desired_positions) -> np.ndarray
 
-   Execute closed-loop control with real-time feedback and visualization.
+   Execute open-loop position tracking with real-time visualization. For closed-loop torque control, drive PyBullet's ``p.TORQUE_CONTROL`` mode directly. See ``CHANGELOG.md`` for the v1.3.2 migration notes.
 
-   :param ManipulatorController controller: Controller instance from ManipulaPy.control
-   :param np.ndarray desired_positions: Desired joint positions (N_steps × DOF)
-   :param np.ndarray desired_velocities: Desired joint velocities (N_steps × DOF)
-   :param np.ndarray desired_accelerations: Desired joint accelerations (N_steps × DOF)
-   :param list g: Gravity vector [gx, gy, gz] in m/s²
-   :param list Ftip: External force/torque at end-effector [fx, fy, fz, τx, τy, τz]
-   :param list Kp: Proportional gains for each joint
-   :param list Ki: Integral gains for each joint
-   :param list Kd: Derivative gains for each joint
+   :param array_like desired_positions: Sequence of joint configurations to visit in open-loop position control, shape (N, n_joints)
    :return: Final end-effector position
    :rtype: np.ndarray
 
@@ -275,17 +267,15 @@ Data Logging and Analysis
 Advanced Examples
 -----------------
 
-Closed-Loop Control Simulation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Open-Loop Position Tracking Simulation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Demonstrate advanced controller integration with GPU acceleration:
+Demonstrate trajectory generation followed by open-loop position tracking:
 
 .. code-block:: python
 
    from ManipulaPy.sim import Simulation
-   from ManipulaPy.control import ManipulatorController
    from ManipulaPy.path_planning import TrajectoryPlanning
-   import cupy as cp
    import numpy as np
 
    # Setup simulation
@@ -307,22 +297,8 @@ Demonstrate advanced controller integration with GPU acceleration:
        method=5 # Quintic time scaling
    )
 
-   # Controller parameters
-   controller = ManipulatorController(sim.dynamics)
-   Kp = np.array([50, 40, 30, 20, 15, 10])  # Position gains
-   Ki = np.array([0.1, 0.1, 0.1, 0.05, 0.05, 0.05])  # Integral gains  
-   Kd = np.array([5, 4, 3, 2, 1.5, 1])     # Derivative gains
-
-   # Execute closed-loop control
-   final_pos = sim.run_controller(
-       controller=controller,
-       desired_positions=traj_data["positions"],
-       desired_velocities=traj_data["velocities"], 
-       desired_accelerations=traj_data["accelerations"],
-       g=[0, 0, -9.81],
-       Ftip=[0, 0, 0, 0, 0, 0],
-       Kp=Kp, Ki=Ki, Kd=Kd
-   )
+   # Execute open-loop position tracking
+   final_pos = sim.run_controller(traj_data["positions"])
 
 Multi-Phase Simulation Workflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
