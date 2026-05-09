@@ -929,6 +929,23 @@ class TestSimRegressions(unittest.TestCase):
             self.assertIn("forces", kwargs, "forces= must be supplied")
             self.assertEqual(len(kwargs["forces"]), 6)
 
+    def test_setup_logger_does_not_duplicate_handlers(self):
+        """Constructing Simulation N times must not stack N stream handlers."""
+        import logging
+        from unittest.mock import patch, MagicMock
+        from ManipulaPy.sim import Simulation
+        # Clear any leftover handlers from prior test runs
+        logging.getLogger("SimulationLogger").handlers.clear()
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p"), patch("ManipulaPy.sim.pybullet_data"):
+            sims = [Simulation.__new__(Simulation) for _ in range(3)]
+            for s in sims:
+                s.logger = s.setup_logger()
+            handler_count = len([h for h in sims[0].logger.handlers
+                                 if isinstance(h, logging.StreamHandler)])
+            self.assertEqual(handler_count, 1,
+                             f"Expected 1 stream handler, got {handler_count}")
+
 class TestSimPybulletGuards(unittest.TestCase):
     """Task 15: every public method that touches p.* must raise a clear
     ImportError when pybullet is unavailable, never AttributeError on the
