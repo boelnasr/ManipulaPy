@@ -553,12 +553,28 @@ class Simulation:
         self.logger.info("Running controller...")
         ee_positions = []
 
-        for i in range(len(desired_positions)):
+        positions_arr = np.asarray(list(desired_positions), dtype=float)
+        if positions_arr.size == 0:
+            raise ValueError("desired_positions is empty; nothing to track")
+        if positions_arr.ndim != 2:
+            raise ValueError(
+                "desired_positions must have shape (N waypoints x DOF); "
+                f"actual shape is {positions_arr.shape}"
+            )
+        expected_dof = len(self.non_fixed_joints)
+        actual_dof = positions_arr.shape[1]
+        if actual_dof != expected_dof:
+            raise ValueError(
+                "desired_positions joint count mismatch: "
+                f"expected {expected_dof}, got {actual_dof}"
+            )
+
+        for pos in positions_arr:
             # Open-loop position tracking. Closed-loop torque control via
             # this method was always broken (treated torque as position delta).
             # For real closed-loop control, use p.TORQUE_CONTROL mode directly
             # in your own loop. See v1.3.2 CHANGELOG.
-            self.set_joint_positions(desired_positions[i])
+            self.set_joint_positions(pos)
             p.stepSimulation()
 
             # Get end-effector position

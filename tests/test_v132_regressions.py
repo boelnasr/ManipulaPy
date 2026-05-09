@@ -487,6 +487,101 @@ class TestSimRegressions(unittest.TestCase):
             for actual, expected in zip(actual_calls, desired_positions):
                 np.testing.assert_array_equal(actual, expected)
 
+    def test_run_controller_rejects_1d_input(self):
+        """run_controller requires a 2D waypoint matrix."""
+        from unittest.mock import MagicMock, patch
+
+        from ManipulaPy.sim import Simulation
+
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p"), \
+             patch("ManipulaPy.sim.time.sleep"):
+            sim = Simulation.__new__(Simulation)
+            sim.logger = MagicMock()
+            sim.robot_id = 1
+            sim.non_fixed_joints = list(range(6))
+            sim.time_step = 0.01
+            sim.real_time_factor = 1.0
+            sim.set_joint_positions = MagicMock()
+            sim.plot_trajectory = MagicMock()
+
+            with self.assertRaisesRegex(ValueError, "shape|2D"):
+                sim.run_controller(np.zeros(6))
+
+    def test_run_controller_rejects_empty_input(self):
+        """run_controller rejects empty trajectories before stepping."""
+        from unittest.mock import MagicMock, patch
+
+        from ManipulaPy.sim import Simulation
+
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p"), \
+             patch("ManipulaPy.sim.time.sleep"):
+            sim = Simulation.__new__(Simulation)
+            sim.logger = MagicMock()
+            sim.robot_id = 1
+            sim.non_fixed_joints = list(range(6))
+            sim.time_step = 0.01
+            sim.real_time_factor = 1.0
+            sim.set_joint_positions = MagicMock()
+            sim.plot_trajectory = MagicMock()
+
+            with self.assertRaisesRegex(ValueError, "empty"):
+                sim.run_controller([])
+
+    def test_run_controller_rejects_wrong_dof(self):
+        """run_controller requires waypoint width to match movable joints."""
+        from unittest.mock import MagicMock, patch
+
+        from ManipulaPy.sim import Simulation
+
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p"), \
+             patch("ManipulaPy.sim.time.sleep"):
+            sim = Simulation.__new__(Simulation)
+            sim.logger = MagicMock()
+            sim.robot_id = 1
+            sim.non_fixed_joints = list(range(6))
+            sim.time_step = 0.01
+            sim.real_time_factor = 1.0
+            sim.set_joint_positions = MagicMock()
+            sim.plot_trajectory = MagicMock()
+
+            with self.assertRaisesRegex(ValueError, "6|3|joint count"):
+                sim.run_controller([np.zeros(3)])
+
+    def test_run_controller_accepts_generator(self):
+        """run_controller materializes iterable waypoints before tracking."""
+        from unittest.mock import MagicMock, patch
+
+        from ManipulaPy.sim import Simulation
+
+        first_waypoint = np.zeros(6)
+        second_waypoint = np.array([0.5, 0, 0, 0, 0, 0])
+        desired_positions = (waypoint for waypoint in [first_waypoint, second_waypoint])
+
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p") as mock_p, \
+             patch("ManipulaPy.sim.time.sleep"):
+            mock_p.stepSimulation = MagicMock()
+            mock_p.getNumJoints.return_value = 6
+            mock_p.getLinkState.return_value = ((0, 0, 0),) * 5
+
+            sim = Simulation.__new__(Simulation)
+            sim.logger = MagicMock()
+            sim.robot_id = 1
+            sim.non_fixed_joints = list(range(6))
+            sim.time_step = 0.01
+            sim.real_time_factor = 1.0
+            sim.set_joint_positions = MagicMock()
+            sim.plot_trajectory = MagicMock()
+
+            sim.run_controller(desired_positions)
+
+            self.assertEqual(sim.set_joint_positions.call_count, 2)
+            second_call_arg = sim.set_joint_positions.call_args_list[1].args[0]
+            np.testing.assert_array_equal(second_call_arg, second_waypoint)
+
 
 class TestVisionRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/vision.py bugs."""
