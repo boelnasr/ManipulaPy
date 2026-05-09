@@ -331,11 +331,40 @@ class TestControlRegressions(unittest.TestCase):
         self.assertEqual(ctrl.eint.shape, (2,),
                          "eint must reset when input DOF changes")
 
+    def test_pid_control_dof_change_logs_debug_not_warning(self):
+        from unittest.mock import patch
+
+        from ManipulaPy.control import ManipulatorController
+
+        ctrl = ManipulatorController(None)
+        Kp, Ki, Kd = np.eye(3), np.eye(3), np.eye(3)
+        ctrl.pid_control(np.ones(3), np.zeros(3), np.zeros(3), np.zeros(3),
+                         dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd)
+
+        with patch("ManipulaPy.control.logger.warning") as warning, \
+             patch("ManipulaPy.control.logger.debug") as debug:
+            Kp2, Ki2, Kd2 = np.eye(2), np.eye(2), np.eye(2)
+            ctrl.pid_control(np.ones(2), np.zeros(2), np.zeros(2), np.zeros(2),
+                             dt=0.01, Kp=Kp2, Ki=Ki2, Kd=Kd2)
+
+        warning.assert_not_called()
+        debug.assert_called_once()
+
     def test_ziegler_nichols_tuning_rejects_zero_period(self):
         from ManipulaPy.control import ManipulatorController
         ctrl = ManipulatorController(None)
         with self.assertRaises(ValueError):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=0.0, kind="PID")
+
+    def test_ziegler_nichols_p_allows_zero_period(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+
+        Kp, Ki, Kd = ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=0.0, kind="P")
+
+        self.assertEqual(Kp, 5.0)
+        self.assertEqual(Ki, 0.0)
+        self.assertEqual(Kd, 0.0)
 
     def test_ziegler_nichols_tuning_rejects_negative_period(self):
         from ManipulaPy.control import ManipulatorController
@@ -362,6 +391,36 @@ class TestControlRegressions(unittest.TestCase):
                              dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd, i_clamp=5.0)
         self.assertTrue(np.all(np.abs(ctrl.eint) <= 5.0 + 1e-9),
                         f"eint={ctrl.eint} exceeded clamp")
+
+    def test_pid_control_rejects_invalid_i_clamp(self):
+        from ManipulaPy.control import ManipulatorController
+
+        ctrl = ManipulatorController(None)
+        for bad_clamp in (-5.0, 0.0, float("nan"), float("inf")):
+            with self.subTest(i_clamp=bad_clamp):
+                with self.assertRaises(ValueError):
+                    ctrl.pid_control(np.ones(2), np.zeros(2), np.zeros(2), np.zeros(2),
+                                     dt=0.01, Kp=np.eye(2), Ki=np.eye(2),
+                                     Kd=np.eye(2), i_clamp=bad_clamp)
+
+    def test_computed_torque_control_rejects_invalid_i_clamp(self):
+        from ManipulaPy.control import ManipulatorController
+
+        class Dynamics:
+            def mass_matrix(self, thetalist):
+                return np.eye(len(thetalist))
+
+            def inverse_dynamics(self, *args):
+                return np.zeros(2)
+
+        ctrl = ManipulatorController(Dynamics())
+        with self.assertRaises(ValueError):
+            ctrl.computed_torque_control(
+                np.ones(2), np.zeros(2), np.zeros(2),
+                np.zeros(2), np.zeros(2), np.array([0, 0, -9.81]),
+                dt=0.01, Kp=np.eye(2), Ki=np.eye(2), Kd=np.eye(2),
+                i_clamp=float("nan"),
+            )
 
     def test_pid_control_unclamped_when_clamp_none(self):
         """Default (i_clamp=None) preserves existing accumulation behavior."""
@@ -398,6 +457,14 @@ class TestControlRegressions(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctrl.kalman_filter_update(z, R_wrong)
 
+    def test_kalman_filter_update_rejects_column_vector_z(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        ctrl.x_hat = np.zeros(4)
+        ctrl.P = np.eye(4)
+        with self.assertRaises(ValueError):
+            ctrl.kalman_filter_update(np.zeros((4, 1)), np.eye(4))
+
     def test_kalman_filter_predict_rejects_bad_Q_shape(self):
         from ManipulaPy.control import ManipulatorController
         ctrl = ManipulatorController(None)
@@ -411,6 +478,47 @@ class TestControlRegressions(unittest.TestCase):
                 np.array([0, 0, -9.81]), np.zeros(6),
                 dt=0.01, Q=Q_wrong,
             )
+
+    def test_kalman_filters_explicitly_convert_real_cupy_like_arrays(self):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        import ManipulaPy.control as control
+        from ManipulaPy.control import ManipulatorController
+
+        class ExplicitArray:
+            def __init__(self, value):
+                self.value = np.asarray(value)
+
+            def get(self):
+                return self.value
+
+            def __array__(self, dtype=None):
+                raise TypeError("Implicit conversion to a NumPy array is not allowed")
+
+        class Dynamics:
+            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+                return np.zeros_like(thetalist)
+
+        ctrl = ManipulatorController(Dynamics())
+        with patch.object(control, "CUPY_AVAILABLE", True), \
+             patch.object(control, "cp", SimpleNamespace(ndarray=ExplicitArray)):
+            ctrl.kalman_filter_predict(
+                ExplicitArray([0.0, 0.0]),
+                ExplicitArray([0.0, 0.0]),
+                ExplicitArray([0.0, 0.0]),
+                ExplicitArray([0.0, 0.0, -9.81]),
+                ExplicitArray(np.zeros(6)),
+                dt=0.01,
+                Q=ExplicitArray(np.eye(4) * 0.01),
+            )
+            old_x_hat = ctrl.x_hat.copy()
+            ctrl.kalman_filter_update(
+                ExplicitArray(np.ones(4) * 0.01),
+                ExplicitArray(np.eye(4) * 0.001),
+            )
+
+        self.assertFalse(np.allclose(old_x_hat, ctrl.x_hat))
 
 
 class TestSingularityRegressions(unittest.TestCase):

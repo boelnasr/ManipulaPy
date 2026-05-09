@@ -78,6 +78,23 @@ def _to_numpy(arr):
     return np.asarray(arr)
 
 
+def _validate_i_clamp(i_clamp: Optional[float]) -> Optional[float]:
+    """Return a scalar positive finite integral clamp, or None if disabled."""
+    if i_clamp is None:
+        return None
+
+    clamp = np.asarray(_to_numpy(i_clamp), dtype=float)
+    if clamp.size != 1:
+        raise ValueError(f"i_clamp must be a scalar, got shape {clamp.shape}")
+
+    clamp_value = float(clamp.reshape(-1)[0])
+    if not np.isfinite(clamp_value) or clamp_value <= 0:
+        raise ValueError(
+            f"i_clamp must be positive and finite when set, got {i_clamp!r}"
+        )
+    return clamp_value
+
+
 class ManipulatorController:
     def __init__(self, dynamics: Any) -> None:
         """
@@ -145,7 +162,7 @@ class ManipulatorController:
 
         if self.eint is None or self.eint.shape != thetalist.shape:
             if self.eint is not None and self.eint.shape != thetalist.shape:
-                logger.warning(
+                logger.debug(
                     "Controller state shape mismatch (%s vs %s); resetting integral.",
                     self.eint.shape, thetalist.shape,
                 )
@@ -153,6 +170,7 @@ class ManipulatorController:
 
         e = thetalistd - thetalist
         self.eint += e * dt
+        i_clamp = _validate_i_clamp(i_clamp)
         if i_clamp is not None:
             np.clip(self.eint, -i_clamp, i_clamp, out=self.eint)
 
@@ -246,7 +264,7 @@ class ManipulatorController:
 
         if self.eint is None or self.eint.shape != thetalist.shape:
             if self.eint is not None and self.eint.shape != thetalist.shape:
-                logger.warning(
+                logger.debug(
                     "Controller state shape mismatch (%s vs %s); resetting integral.",
                     self.eint.shape, thetalist.shape,
                 )
@@ -254,6 +272,7 @@ class ManipulatorController:
 
         e = thetalistd - thetalist
         self.eint += e * dt
+        i_clamp = _validate_i_clamp(i_clamp)
         if i_clamp is not None:
             np.clip(self.eint, -i_clamp, i_clamp, out=self.eint)
 
@@ -406,7 +425,7 @@ class ManipulatorController:
         taulist = _to_numpy(taulist)
         g = _to_numpy(g)
         Ftip = _to_numpy(Ftip)
-        Q = np.asarray(Q)
+        Q = _to_numpy(Q)
         n = self.x_hat.shape[0] if self.x_hat is not None else len(thetalist) * 2
         if Q.shape != (n, n):
             raise ValueError(f"Q must have shape ({n}, {n}), got {Q.shape}")
@@ -452,12 +471,17 @@ class ManipulatorController:
         Returns:
             None
         """
-        z = np.asarray(z)
-        R = np.asarray(R)
-        n = self.x_hat.shape[0]
-        if z.shape[0] != n:
+        z = _to_numpy(z)
+        R = _to_numpy(R)
+        if self.x_hat is None:
             raise ValueError(
-                f"z must have length {n} to match x_hat, got length {z.shape[0]}"
+                "kalman_filter_update called before kalman_filter_predict; "
+                "x_hat has not been initialized"
+            )
+        n = self.x_hat.shape[0]
+        if z.shape != (n,):
+            raise ValueError(
+                f"z must have shape ({n},) to match x_hat, got {z.shape}"
             )
         if R.shape != (n, n):
             raise ValueError(f"R must have shape ({n}, {n}), got {R.shape}")
@@ -837,26 +861,27 @@ class ManipulatorController:
     # ------------------------------------------------------------------------
     def ziegler_nichols_tuning(self, Ku, Tu, kind="PID"):
         Ku = _to_numpy(Ku).astype(float)
-        Tu = _to_numpy(Tu).astype(float)
-
-        if not np.all(np.isfinite(Tu)) or np.any(Tu <= 0):
-            raise ValueError(
-                f"Tu (ultimate period) must be positive and finite, got Tu={Tu!r}. "
-                "Tu == 0 typically indicates find_ultimate_gain_and_period found no "
-                "sustained oscillation; check your gain sweep."
-            )
-
         kind = kind.upper()
+
         if kind == "P":
             Kp, Ki, Kd = 0.50 * Ku, 0.0 * Ku, 0.0 * Ku
-        elif kind == "PI":
-            Kp, Ki, Kd = 0.45 * Ku, 1.2 * Ku / Tu, 0.0 * Ku
-        elif kind == "PID":
-            Kp = 0.60 * Ku
-            Ki = 2.0 * Kp / Tu
-            Kd = 0.125 * Kp * Tu
         else:
-            raise ValueError("kind must be 'P', 'PI' or 'PID'")
+            Tu = _to_numpy(Tu).astype(float)
+            if not np.all(np.isfinite(Tu)) or np.any(Tu <= 0):
+                raise ValueError(
+                    f"Tu (ultimate period) must be positive and finite, got Tu={Tu!r}. "
+                    "Tu == 0 typically indicates find_ultimate_gain_and_period found no "
+                    "sustained oscillation; check your gain sweep."
+                )
+
+            if kind == "PI":
+                Kp, Ki, Kd = 0.45 * Ku, 1.2 * Ku / Tu, 0.0 * Ku
+            elif kind == "PID":
+                Kp = 0.60 * Ku
+                Ki = 2.0 * Kp / Tu
+                Kd = 0.125 * Kp * Tu
+            else:
+                raise ValueError("kind must be 'P', 'PI' or 'PID'")
 
         # Return scalars as plain floats so assertEqual passes exactly
         if Ku.size == 1:
