@@ -584,6 +584,76 @@ class TestSimRegressions(unittest.TestCase):
             second_call_arg = sim.set_joint_positions.call_args_list[1].args[0]
             np.testing.assert_array_equal(second_call_arg, second_waypoint)
 
+    def test_loop_methods_close_simulation_on_inner_exception(self):
+        """Non-KeyboardInterrupt exceptions inside simulation loops must clean up."""
+        from unittest.mock import MagicMock, patch
+
+        from ManipulaPy.sim import Simulation
+
+        def make_sim():
+            sim = Simulation.__new__(Simulation)
+            sim.logger = MagicMock()
+            sim.physics_client = 1
+            sim.robot_id = 1
+            sim.non_fixed_joints = list(range(6))
+            sim.time_step = 0.01
+            sim.real_time_factor = 1.0
+            sim.joint_params = [object()]
+            sim.reset_button = 1
+            sim.home_position = np.zeros(6)
+            sim.trajectory_body_ids = []
+            sim.controller = MagicMock()
+            sim.set_joint_positions = MagicMock()
+            sim.get_joint_parameters = MagicMock(return_value=np.zeros(6))
+            sim.check_collisions = MagicMock()
+            sim.update_simulation_parameters = MagicMock()
+            sim.add_joint_parameters = MagicMock()
+            sim.add_additional_parameters = MagicMock()
+            sim.add_reset_button = MagicMock()
+            sim.run_trajectory = MagicMock()
+            sim.clear_trajectory_visualization = MagicMock()
+            sim.close_simulation = MagicMock()
+            return sim
+
+        cases = [
+            (
+                "simulate_robot_with_desired_angles",
+                lambda sim: sim.simulate_robot_with_desired_angles(np.zeros(6)),
+            ),
+            ("manual_control", lambda sim: sim.manual_control()),
+            ("run", lambda sim: sim.run(np.zeros((1, 6)))),
+        ]
+
+        for method_name, exercise in cases:
+            with self.subTest(method=method_name):
+                sim = make_sim()
+                with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+                     patch("ManipulaPy.sim.p") as mock_p, \
+                     patch("ManipulaPy.sim.time.sleep"):
+                    mock_p.stepSimulation.side_effect = RuntimeError("boom")
+
+                    with self.assertRaisesRegex(RuntimeError, "boom"):
+                        exercise(sim)
+
+                sim.close_simulation.assert_called_once_with()
+
+    def test_del_logs_cleanup_failure_at_debug_level(self):
+        """Destructor cleanup failures should be visible only at debug level."""
+        from unittest.mock import MagicMock
+
+        from ManipulaPy.sim import Simulation
+
+        sim = Simulation.__new__(Simulation)
+        sim.logger = MagicMock()
+        sim.trajectory_body_ids = [1]
+        sim.clear_trajectory_visualization = MagicMock(side_effect=RuntimeError("boom"))
+
+        sim.__del__()
+
+        sim.logger.debug.assert_called_once()
+        self.assertTrue(sim.logger.debug.call_args.kwargs["exc_info"])
+
+
 class TestSimPybulletGuards(unittest.TestCase):
     """Task 15: every public method that touches p.* must raise a clear
     ImportError when pybullet is unavailable, never AttributeError on the

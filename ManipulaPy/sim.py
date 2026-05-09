@@ -177,7 +177,7 @@ class Simulation:
             ]
             self.home_position = np.zeros(len(self.non_fixed_joints))
         else:
-            print("Simulation already initialized.")
+            self.logger.info("Simulation already initialized.")
 
     def initialize_robot(self):
         """
@@ -673,8 +673,12 @@ class Simulation:
                 p.stepSimulation()
                 time.sleep(time_step / self.real_time_factor)
         except KeyboardInterrupt:
-            print("Simulation stopped by user.")
+            self.logger.info("Simulation stopped by user.")
             self.logger.info("Robot simulation with desired angles completed.")
+            self.close_simulation()
+        except Exception:
+            self.close_simulation()
+            raise
 
     def close_simulation(self):
         """
@@ -774,8 +778,11 @@ class Simulation:
                     self.set_joint_positions(self.home_position)
                     break  # Exit manual control to restart trajectory loop
         except KeyboardInterrupt:
-            print("Manual control stopped by user.")
             self.logger.info("Manual control stopped.")
+            self.close_simulation()
+        except Exception:
+            self.close_simulation()
+            raise
 
     def save_joint_states(self, filename="joint_states.csv"):
         """
@@ -856,6 +863,9 @@ class Simulation:
         except KeyboardInterrupt:
             self.logger.info("Simulation stopped by user.")
             self.close_simulation()
+        except Exception:
+            self.close_simulation()
+            raise
 
     def __del__(self):
         """
@@ -865,4 +875,12 @@ class Simulation:
             if hasattr(self, "trajectory_body_ids"):
                 self.clear_trajectory_visualization()
         except Exception:
-            pass  # Ignore errors during cleanup
+            logger = getattr(self, "logger", None)
+            if logger is not None:
+                try:
+                    logger.debug(
+                        "Failed to clear trajectory visualization during cleanup.",
+                        exc_info=True,
+                    )
+                except Exception:
+                    pass
