@@ -361,6 +361,32 @@ class TestSingularityRegressions(unittest.TestCase):
 class TestPotentialFieldRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/potential_field.py bugs."""
 
+    def test_repulsive_potential_when_at_obstacle(self):
+        from ManipulaPy.potential_field import PotentialField
+
+        pf = PotentialField(attractive_gain=1.0, repulsive_gain=1.0, influence_distance=0.5)
+        q = np.array([1.0, 1.0, 1.0])
+        p_val = pf.compute_repulsive_potential(q, [q.copy()])
+        self.assertTrue(np.isfinite(p_val))
+
+    def test_repulsive_gradient_when_at_obstacle(self):
+        from ManipulaPy.potential_field import PotentialField
+
+        pf = PotentialField(attractive_gain=1.0, repulsive_gain=1.0, influence_distance=0.5)
+        q = np.array([1.0, 1.0, 1.0])
+        grad = pf.compute_gradient(q, np.zeros(3), [q.copy()])
+        self.assertTrue(np.all(np.isfinite(grad)))
+
+    def test_repulsive_gradient_at_obstacle_provides_escape_direction(self):
+        """When q == obstacle exactly, gradient must be nonzero so robot can escape."""
+        from ManipulaPy.potential_field import PotentialField
+
+        pf = PotentialField(attractive_gain=0.0, repulsive_gain=1.0, influence_distance=0.5)
+        q = np.array([1.0, 1.0, 1.0])
+        grad = pf.compute_gradient(q, np.zeros(3), [q.copy()])
+        # Must be nonzero so -grad gives a nonzero force
+        self.assertGreater(np.linalg.norm(grad), 0, "Robot stuck at obstacle has no escape force")
+
 
 class TestSimRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/sim.py bugs."""

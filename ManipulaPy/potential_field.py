@@ -54,10 +54,11 @@ class PotentialField:
         for obstacle in obstacles:
             d = np.linalg.norm(q - obstacle)
             if d <= self.influence_distance:
+                d_safe = max(d, 1e-10)
                 repulsive_potential += (
                     2
                     * self.repulsive_gain
-                    * (1.0 / d - 1.0 / self.influence_distance) ** 2
+                    * (1.0 / d_safe - 1.0 / self.influence_distance) ** 2
                 )
         return 10 * repulsive_potential
 
@@ -74,14 +75,23 @@ class PotentialField:
         # = 40 * gain * (1/d - 1/d0) * (-(q-obs)/d^3)
         repulsive_gradient = np.zeros_like(q)
         for obstacle in obstacles:
-            d = np.linalg.norm(q - obstacle)
+            diff = q - obstacle
+            d = np.linalg.norm(diff)
             if d <= self.influence_distance:
+                d_safe = max(d, 1e-10)
+                # If q is exactly at obstacle, pick an arbitrary escape direction
+                # (otherwise robot is stuck because gradient is zero)
+                if d < 1e-10:
+                    direction = np.zeros_like(q)
+                    direction[0] = 1.0  # Escape along +x (arbitrary but consistent)
+                else:
+                    direction = diff
                 repulsive_gradient += (
                     -40
                     * self.repulsive_gain
-                    * (1.0 / d - 1.0 / self.influence_distance)
-                    * (1.0 / (d**3))
-                    * (q - obstacle)
+                    * (1.0 / d_safe - 1.0 / self.influence_distance)
+                    * (1.0 / (d_safe ** 3))
+                    * direction
                 )
 
         # Total gradient
