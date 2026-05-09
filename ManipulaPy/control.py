@@ -406,7 +406,10 @@ class ManipulatorController:
         taulist = _to_numpy(taulist)
         g = _to_numpy(g)
         Ftip = _to_numpy(Ftip)
-        Q = _to_numpy(Q)
+        Q = np.asarray(Q)
+        n = self.x_hat.shape[0] if self.x_hat is not None else len(thetalist) * 2
+        if Q.shape != (n, n):
+            raise ValueError(f"Q must have shape ({n}, {n}), got {Q.shape}")
 
         if self.x_hat is None:
             self.x_hat = np.concatenate((thetalist, dthetalist))
@@ -449,8 +452,15 @@ class ManipulatorController:
         Returns:
             None
         """
-        z = _to_numpy(z)
-        R = _to_numpy(R)
+        z = np.asarray(z)
+        R = np.asarray(R)
+        n = self.x_hat.shape[0]
+        if z.shape[0] != n:
+            raise ValueError(
+                f"z must have length {n} to match x_hat, got length {z.shape[0]}"
+            )
+        if R.shape != (n, n):
+            raise ValueError(f"R must have shape ({n}, {n}), got {R.shape}")
 
         H = np.eye(len(self.x_hat))
         y = z - H @ self.x_hat

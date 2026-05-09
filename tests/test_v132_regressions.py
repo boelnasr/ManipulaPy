@@ -376,6 +376,42 @@ class TestControlRegressions(unittest.TestCase):
         # 100 steps x 1.0 error x 0.01 dt = 1.0 expected
         np.testing.assert_allclose(ctrl.eint, [1.0], atol=1e-9)
 
+    def test_kalman_filter_update_rejects_shape_mismatch(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        ctrl.x_hat = np.zeros(4)
+        ctrl.P = np.eye(4)
+        # z is 2-vector but x_hat is 4-vector — mismatch must raise ValueError
+        z_wrong = np.zeros(2)
+        R_wrong = np.eye(2)
+        with self.assertRaises(ValueError):
+            ctrl.kalman_filter_update(z_wrong, R_wrong)
+
+    def test_kalman_filter_update_rejects_bad_R_shape(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        ctrl.x_hat = np.zeros(4)
+        ctrl.P = np.eye(4)
+        # z matches n=4 but R is not (4,4)
+        z = np.zeros(4)
+        R_wrong = np.eye(3)
+        with self.assertRaises(ValueError):
+            ctrl.kalman_filter_update(z, R_wrong)
+
+    def test_kalman_filter_predict_rejects_bad_Q_shape(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        ctrl.x_hat = np.zeros(4)
+        ctrl.P = np.eye(4)
+        # Q must be (4,4); passing (3,3) must raise ValueError
+        Q_wrong = np.eye(3)
+        with self.assertRaises(ValueError):
+            ctrl.kalman_filter_predict(
+                np.zeros(2), np.zeros(2), np.zeros(2),
+                np.array([0, 0, -9.81]), np.zeros(6),
+                dt=0.01, Q=Q_wrong,
+            )
+
 
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""
