@@ -257,16 +257,23 @@ class Simulation:
             except Exception as e:
                 self.logger.error(f"Failed to add reset button: {e}")
 
-    def set_joint_positions(self, joint_positions):
+    def set_joint_positions(self, joint_positions, forces=None):
         """
         Sets the joint positions of the robot.
         """
         _check_pybullet_available()
+        n = len(self.non_fixed_joints)
+        if forces is None:
+            if getattr(self, "torque_limits", None) is not None:
+                forces = list(self.torque_limits)
+            else:
+                forces = [1000.0] * n
         p.setJointMotorControlArray(
             self.robot_id,
             self.non_fixed_joints,
             p.POSITION_CONTROL,
             targetPositions=joint_positions,
+            forces=forces,
         )
 
     def get_joint_positions(self):

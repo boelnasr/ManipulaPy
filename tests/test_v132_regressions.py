@@ -912,6 +912,23 @@ class TestSimRegressions(unittest.TestCase):
             self.assertEqual(len(sim.non_fixed_joints), 6)
             self.assertEqual(sim.home_position.shape, (6,))
 
+    def test_set_joint_positions_passes_forces_kwarg(self):
+        """set_joint_positions must pass forces= so URDFs with low effort
+        limits don't silently fail to track."""
+        from unittest.mock import MagicMock, patch
+        from ManipulaPy.sim import Simulation
+        sim = Simulation.__new__(Simulation)
+        sim.logger = MagicMock()
+        sim.robot_id = 1
+        sim.non_fixed_joints = list(range(6))
+        sim.torque_limits = None
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p") as mock_p:
+            sim.set_joint_positions(np.zeros(6))
+            kwargs = mock_p.setJointMotorControlArray.call_args.kwargs
+            self.assertIn("forces", kwargs, "forces= must be supplied")
+            self.assertEqual(len(kwargs["forces"]), 6)
+
 class TestSimPybulletGuards(unittest.TestCase):
     """Task 15: every public method that touches p.* must raise a clear
     ImportError when pybullet is unavailable, never AttributeError on the
