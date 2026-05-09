@@ -96,9 +96,6 @@ gpu-cuda12 = ["cupy-cuda12x>=12.0.0"]
 gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
 gpu-pycuda = ["pycuda>=2021.1"]
 
-# Physics simulation
-simulation = []
-
 # Vision for headless environments (CI-friendly)
 vision-headless = [
     "opencv-python-headless>=4.5",
