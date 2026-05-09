@@ -320,6 +320,17 @@ class TestControlRegressions(unittest.TestCase):
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""
 
+    def test_singularity_analysis_works_on_redundant_robot(self):
+        from ManipulaPy.singularity import Singularity
+
+        class MockManip:
+            def jacobian(self, thetalist, frame="space"):
+                return np.random.randn(6, 7)  # 7-DOF redundant
+
+        sing = Singularity(MockManip())
+        result = sing.singularity_analysis(np.zeros(7))
+        self.assertIsInstance(result, (bool, np.bool_))
+
 
 class TestPotentialFieldRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/potential_field.py bugs."""

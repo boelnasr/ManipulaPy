@@ -43,18 +43,10 @@ class Singularity:
         self.serial_manipulator = serial_manipulator
 
     def singularity_analysis(self, thetalist):
-        """
-        Analyze if the manipulator is at a singularity based on the determinant of the Jacobian matrix.
-
-        Parameters:
-            thetalist (numpy.ndarray): Array of joint angles in radians.
-
-        Returns:
-            bool: True if the manipulator is at a singularity, False otherwise.
-        """
+        """Detect singularity using smallest singular value (works for any Jacobian shape)."""
         J = self.serial_manipulator.jacobian(thetalist, frame="space")
-        det_J = np.linalg.det(J)
-        return abs(det_J) < 1e-4
+        singular_values = np.linalg.svd(J, compute_uv=False)
+        return bool(singular_values[-1] < 1e-4)
 
     def manipulability_ellipsoid(self, thetalist, ax=None):
         """

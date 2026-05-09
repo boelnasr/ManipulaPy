@@ -432,7 +432,7 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
     """Tests with different robot configurations."""
 
     def test_3dof_robot(self):
-        """Test singularity analysis requires square Jacobian."""
+        """Test singularity analysis on under-actuated (3-DOF) robot via SVD."""
 
         class Mock3DOFRobot:
             def jacobian(self, thetalist, frame="space"):
@@ -454,12 +454,12 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
         # Test with 3-element configuration
         theta_singular = np.zeros(3)
 
-        # singularity_analysis expects square Jacobian, should raise error
-        with self.assertRaises(np.linalg.LinAlgError):
-            singularity.singularity_analysis(theta_singular)
+        # SVD-based detection works on non-square Jacobians; zero Jacobian is singular
+        result = singularity.singularity_analysis(theta_singular)
+        self.assertTrue(result)
 
     def test_7dof_robot(self):
-        """Test singularity analysis requires square Jacobian."""
+        """Test singularity analysis on redundant (7-DOF) robot via SVD."""
 
         class Mock7DOFRobot:
             def jacobian(self, thetalist, frame="space"):
@@ -481,12 +481,10 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
         robot = Mock7DOFRobot()
         singularity = Singularity(robot)
 
-        # Test with 7-element configuration
+        # SVD-based detection works on redundant Jacobians without raising
         theta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
-
-        # singularity_analysis expects square Jacobian, should raise error
-        with self.assertRaises(np.linalg.LinAlgError):
-            singularity.singularity_analysis(theta)
+        result = singularity.singularity_analysis(theta)
+        self.assertIsInstance(result, (bool, np.bool_))
 
 
 if __name__ == "__main__":
