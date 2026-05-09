@@ -351,6 +351,31 @@ class TestControlRegressions(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=float("inf"), kind="PID")
 
+    def test_pid_control_integral_windup_clamped_when_set(self):
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        desired = np.array([1.0, 1.0])
+        actual = np.array([0.0, 0.0])  # constant 1.0 rad error, controller cannot move plant
+        Kp, Ki, Kd = np.eye(2), np.eye(2), np.eye(2)
+        for _ in range(1000):
+            ctrl.pid_control(desired, np.zeros(2), actual, np.zeros(2),
+                             dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd, i_clamp=5.0)
+        self.assertTrue(np.all(np.abs(ctrl.eint) <= 5.0 + 1e-9),
+                        f"eint={ctrl.eint} exceeded clamp")
+
+    def test_pid_control_unclamped_when_clamp_none(self):
+        """Default (i_clamp=None) preserves existing accumulation behavior."""
+        from ManipulaPy.control import ManipulatorController
+        ctrl = ManipulatorController(None)
+        desired = np.array([1.0])
+        actual = np.array([0.0])
+        Kp, Ki, Kd = np.eye(1), np.eye(1), np.eye(1)
+        for _ in range(100):
+            ctrl.pid_control(desired, np.zeros(1), actual, np.zeros(1),
+                             dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd)
+        # 100 steps x 1.0 error x 0.01 dt = 1.0 expected
+        np.testing.assert_allclose(ctrl.eint, [1.0], atol=1e-9)
+
 
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""

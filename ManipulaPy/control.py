@@ -107,6 +107,7 @@ class ManipulatorController:
         Kp: Union[NDArray[np.float64], List[float]],
         Ki: Union[NDArray[np.float64], List[float]],
         Kd: Union[NDArray[np.float64], List[float]],
+        i_clamp: Optional[float] = None,
     ) -> NDArray[np.float64]:
         """
         Computed Torque Control.
@@ -152,6 +153,8 @@ class ManipulatorController:
 
         e = thetalistd - thetalist
         self.eint += e * dt
+        if i_clamp is not None:
+            np.clip(self.eint, -i_clamp, i_clamp, out=self.eint)
 
         # Dynamics computations (no GPU↔CPU transfers)
         M = self.dynamics.mass_matrix(thetalist)
@@ -213,6 +216,7 @@ class ManipulatorController:
         Kp: Union[NDArray[np.float64], List[float]],
         Ki: Union[NDArray[np.float64], List[float]],
         Kd: Union[NDArray[np.float64], List[float]],
+        i_clamp: Optional[float] = None,
     ) -> NDArray[np.float64]:
         """
         PID Control.
@@ -250,6 +254,8 @@ class ManipulatorController:
 
         e = thetalistd - thetalist
         self.eint += e * dt
+        if i_clamp is not None:
+            np.clip(self.eint, -i_clamp, i_clamp, out=self.eint)
 
         e_dot = dthetalistd - dthetalist
         tau = Kp * e + Ki * self.eint + Kd * e_dot
