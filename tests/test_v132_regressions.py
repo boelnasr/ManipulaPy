@@ -2292,6 +2292,67 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             joined = "\n".join(cm.output)
             self.assertIn("Explicit package mapping", joined)
 
+    def test_h2d_pinned_skips_pinned_memory_by_default(self):
+        """_h2d_pinned must NOT call cuda.pinned_array() unless the user
+        opts in via MANIPULAPY_USE_PINNED_MEMORY=1. The pinned path
+        SIGSEGVs on numba 0.65 + driver 580 (CUDA 13 ABI) — a try/except
+        cannot catch it, so the only safe default is to skip it entirely.
+
+        We patch ``cuda.pinned_array`` to a sentinel that records calls
+        and verify it is never invoked under the default env.
+        """
+        import importlib
+        import os
+        from unittest.mock import MagicMock, patch
+
+        # Make sure the module is loaded so we can patch its symbols.
+        import ManipulaPy.cuda_kernels as ck
+
+        if not ck.CUDA_AVAILABLE:
+            self.skipTest("CUDA path not exercised when CUDA is unavailable")
+
+        arr = np.zeros(8, dtype=np.float32)
+        spy = MagicMock(name="pinned_array_spy")
+        # Default: opt-in flag is False — pinned_array must NOT be touched.
+        with patch.object(ck, "_PINNED_MEMORY_OPT_IN", False), \
+             patch.object(ck.cuda, "pinned_array", spy):
+            try:
+                ck._h2d_pinned(arr)
+            except Exception:
+                # We only care that pinned_array wasn't called; the
+                # transfer itself may legitimately fail in some test envs.
+                pass
+            spy.assert_not_called()
+
+    def test_h2d_pinned_uses_pinned_memory_when_opted_in(self):
+        """When the user sets MANIPULAPY_USE_PINNED_MEMORY=1, _h2d_pinned
+        must route through cuda.pinned_array() — that's the whole point
+        of the opt-in flag. If pinned_array raises a real exception, the
+        function falls back to cuda.to_device.
+        """
+        from unittest.mock import MagicMock, patch
+        import ManipulaPy.cuda_kernels as ck
+
+        if not ck.CUDA_AVAILABLE:
+            self.skipTest("CUDA path not exercised when CUDA is unavailable")
+
+        arr = np.zeros(8, dtype=np.float32)
+        # Sentinel that records the call AND returns a numpy-array-like
+        # object so the assignment + to_device still works.
+        captured = {}
+
+        def fake_pinned_array(shape, dtype):
+            captured["called"] = True
+            captured["shape"] = shape
+            captured["dtype"] = dtype
+            return np.zeros(shape, dtype=dtype)
+
+        with patch.object(ck, "_PINNED_MEMORY_OPT_IN", True), \
+             patch.object(ck.cuda, "pinned_array", side_effect=fake_pinned_array):
+            ck._h2d_pinned(arr)
+        self.assertTrue(captured.get("called"))
+        self.assertEqual(captured["shape"], arr.shape)
+
     def test_trajectory_cpu_fallback_handles_zero_Tf_without_warnings(self):
         """trajectory_cpu_fallback used to emit a numpy RuntimeWarning
         ("invalid value encountered in divide") when called with Tf=0

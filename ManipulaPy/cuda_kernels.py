@@ -278,9 +278,29 @@ def check_cupy_availability():
     return CUPY_AVAILABLE
 
 
+# Pinned-memory opt-in: numba.cuda.pinned_array() segfaults (SIGSEGV, not a
+# catchable Python exception) on certain numba+driver combinations — e.g.
+# numba 0.65 + NVIDIA driver 580 (CUDA 13 ABI). The crash happens in
+# numba/cuda/api.py during cuMemHostRegister, before the try/except below
+# can ever fire. Keep the path off by default so users on broken combos
+# don't lose their Python process; opt back in with
+# MANIPULAPY_USE_PINNED_MEMORY=1 when the combo is known good (numba <=
+# 0.59 with driver 535, or numba 0.66+ with the upstream fix landed).
+_PINNED_MEMORY_OPT_IN = os.environ.get(
+    "MANIPULAPY_USE_PINNED_MEMORY", "0"
+).lower() in ("1", "true", "yes")
+
+
 # ENHANCED MEMORY MANAGEMENT
 def _h2d_pinned(arr):
-    """Optimized pinned memory transfer for maximum bandwidth."""
+    """Host-to-device transfer with optional pinned-memory acceleration.
+
+    Pinned memory delivers ~3x peak transfer bandwidth on large arrays, but
+    ``cuda.pinned_array`` is currently incompatible with several modern
+    numba+driver combinations (see ``_PINNED_MEMORY_OPT_IN`` above). Plain
+    ``cuda.to_device`` is correct on every supported configuration; pinned
+    transfers are a pure performance optimisation that must be opted in.
+    """
     if not CUDA_AVAILABLE:
         raise RuntimeError("CUDA not available")
 
@@ -288,13 +308,18 @@ def _h2d_pinned(arr):
     if not arr.flags["C_CONTIGUOUS"]:
         arr = np.ascontiguousarray(arr)
 
-    # Use pinned memory for ~3x faster transfers
+    # Safe default: skip pinned memory entirely unless explicitly enabled.
+    if not _PINNED_MEMORY_OPT_IN:
+        return cuda.to_device(arr)
+
+    # Opt-in pinned-memory path (~3x bandwidth on supported configs).
     try:
         pinned_arr = cuda.pinned_array(arr.shape, dtype=arr.dtype)
         pinned_arr[:] = arr
         return cuda.to_device(pinned_arr)
     except Exception:
-        # Fallback to regular transfer
+        # If pinned_array raised a real Python exception we can still fall
+        # back; segfaults bypass this branch (process is already gone).
         return cuda.to_device(arr)
 
 
@@ -1096,7 +1121,11 @@ if CUDA_AVAILABLE:
             )
 
             if dist_sq > 0.0 and dist_sq < influence_distance * influence_distance:
-                dist_inv = math.rsqrt(dist_sq)
+                # math.rsqrt is supported as a CUDA intrinsic in numba <=
+                # 0.59 but was dropped in 0.65. 1.0 / math.sqrt(...) is
+                # portable across all numba versions and lowers to the
+                # same PTX (rsqrt.approx.f32) under -ffast-math.
+                dist_inv = 1.0 / math.sqrt(dist_sq)
                 influence_term = dist_inv - influence_distance_inv
                 repulsive_term = 0.5 * influence_term * influence_term
                 repulsive_pot += repulsive_term
@@ -1693,12 +1722,17 @@ if CUDA_AVAILABLE:
 
         # Calculate statistics
         times = np.array(times)
+        mean_time = float(np.mean(times))
         stats = {
-            "mean_time": np.mean(times),
-            "std_time": np.std(times),
-            "min_time": np.min(times),
-            "max_time": np.max(times),
-            "median_time": np.median(times),
+            # avg_time is an alias for mean_time kept for compatibility
+            # with pre-v1.3.2 callers (and tests) that expected the
+            # "avg_time" key.
+            "avg_time": mean_time,
+            "mean_time": mean_time,
+            "std_time": float(np.std(times)),
+            "min_time": float(np.min(times)),
+            "max_time": float(np.max(times)),
+            "median_time": float(np.median(times)),
             "all_times": times.tolist(),
             "memory_pool_stats": get_memory_pool_stats(),
         }
