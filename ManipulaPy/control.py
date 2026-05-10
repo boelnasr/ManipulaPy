@@ -168,7 +168,7 @@ class ManipulatorController:
                     "Controller state shape mismatch (%s vs %s); resetting integral.",
                     self.eint.shape, thetalist.shape,
                 )
-            self.eint = np.zeros_like(thetalist)
+            self.eint = np.zeros_like(thetalist, dtype=float)
 
         e = thetalistd - thetalist
         self.eint += e * dt
@@ -270,7 +270,7 @@ class ManipulatorController:
                     "Controller state shape mismatch (%s vs %s); resetting integral.",
                     self.eint.shape, thetalist.shape,
                 )
-            self.eint = np.zeros_like(thetalist)
+            self.eint = np.zeros_like(thetalist, dtype=float)
 
         e = thetalistd - thetalist
         self.eint += e * dt
@@ -872,7 +872,10 @@ class ManipulatorController:
         e = desired_position - current_position
         # Position-only control: use linear (3xN) part of Jacobian
         J_v = self.dynamics.jacobian(current_joint_angles)[:3, :]
-        tau = J_v.T @ (Kp @ e - Kd @ J_v @ current_joint_velocities)
+        cartesian_velocity = J_v @ current_joint_velocities
+        Kp_term = Kp @ e if np.ndim(Kp) == 2 else Kp * e
+        Kd_term = Kd @ cartesian_velocity if np.ndim(Kd) == 2 else Kd * cartesian_velocity
+        tau = J_v.T @ (Kp_term - Kd_term)
         return tau
 
     # ------------------------------------------------------------------------

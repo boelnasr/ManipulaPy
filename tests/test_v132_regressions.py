@@ -300,6 +300,28 @@ class TestControlRegressions(unittest.TestCase):
         )
         self.assertEqual(tau.shape, (n,))
 
+    def test_cartesian_space_control_accepts_vector_gains(self):
+        from ManipulaPy.control import ManipulatorController
+
+        class Dynamics:
+            def forward_kinematics(self, current_joint_angles):
+                T = np.eye(4)
+                return T
+
+            def jacobian(self, current_joint_angles):
+                return np.vstack([np.eye(3), np.zeros((3, 3))])
+
+        ctrl = ManipulatorController(Dynamics())
+        tau = ctrl.cartesian_space_control(
+            desired_position=np.array([1.0, 2.0, 3.0]),
+            current_joint_angles=np.zeros(3),
+            current_joint_velocities=np.array([0.5, 1.0, 1.5]),
+            Kp=np.array([10.0, 20.0, 30.0]),
+            Kd=np.array([1.0, 2.0, 3.0]),
+        )
+
+        np.testing.assert_allclose(tau, np.array([9.5, 38.0, 85.5]))
+
     def test_rise_time_handles_response_never_reaching_setpoint(self):
         from ManipulaPy.control import ManipulatorController
 
@@ -434,6 +456,53 @@ class TestControlRegressions(unittest.TestCase):
                              dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd)
         # 100 steps x 1.0 error x 0.01 dt = 1.0 expected
         np.testing.assert_allclose(ctrl.eint, [1.0], atol=1e-9)
+
+    def test_pid_control_initializes_integral_as_float_for_integer_inputs(self):
+        from ManipulaPy.control import ManipulatorController
+
+        ctrl = ManipulatorController(None)
+        tau = ctrl.pid_control(
+            thetalistd=[1, 1],
+            dthetalistd=[0, 0],
+            thetalist=[0, 0],
+            dthetalist=[0, 0],
+            dt=0.01,
+            Kp=[1, 1],
+            Ki=[1, 1],
+            Kd=[1, 1],
+        )
+
+        self.assertTrue(np.issubdtype(ctrl.eint.dtype, np.floating))
+        np.testing.assert_allclose(ctrl.eint, [0.01, 0.01])
+        np.testing.assert_allclose(tau, [1.01, 1.01])
+
+    def test_computed_torque_control_initializes_integral_as_float_for_integer_inputs(self):
+        from ManipulaPy.control import ManipulatorController
+
+        class Dynamics:
+            def mass_matrix(self, thetalist):
+                return np.eye(len(thetalist))
+
+            def inverse_dynamics(self, *args):
+                return np.zeros(2)
+
+        ctrl = ManipulatorController(Dynamics())
+        tau = ctrl.computed_torque_control(
+            thetalistd=[1, 1],
+            dthetalistd=[0, 0],
+            ddthetalistd=[0, 0],
+            thetalist=[0, 0],
+            dthetalist=[0, 0],
+            g=[0, 0, -9],
+            dt=0.01,
+            Kp=[1, 1],
+            Ki=[1, 1],
+            Kd=[1, 1],
+        )
+
+        self.assertTrue(np.issubdtype(ctrl.eint.dtype, np.floating))
+        np.testing.assert_allclose(ctrl.eint, [0.01, 0.01])
+        np.testing.assert_allclose(tau, [1.01, 1.01])
 
     def test_kalman_filter_update_rejects_shape_mismatch(self):
         from ManipulaPy.control import ManipulatorController
@@ -599,6 +668,32 @@ class TestSingularityRegressions(unittest.TestCase):
             for values in surface:
                 self.assertTrue(np.all(np.isfinite(values)))
 
+    def test_manipulability_ellipsoid_handles_underactuated_jacobian(self):
+        from ManipulaPy.singularity import Singularity
+
+        class MockManip:
+            def jacobian(self, thetalist, frame="space"):
+                return np.array([[1.0], [0.0], [0.0], [0.0], [1.0], [0.0]])
+
+        class RecordingAxis:
+            def __init__(self):
+                self.surfaces = []
+
+            def plot_surface(self, x, y, z, **kwargs):
+                self.surfaces.append((x, y, z))
+
+            def set_title(self, title):
+                pass
+
+        ax = RecordingAxis()
+        Singularity(MockManip()).manipulability_ellipsoid(np.zeros(1), ax=ax)
+
+        self.assertEqual(len(ax.surfaces), 2)
+        for surface in ax.surfaces:
+            for values in surface:
+                self.assertEqual(values.shape, (20, 10))
+                self.assertTrue(np.all(np.isfinite(values)))
+
 
 class TestPotentialFieldRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/potential_field.py bugs."""
@@ -628,6 +723,16 @@ class TestPotentialFieldRegressions(unittest.TestCase):
         grad = pf.compute_gradient(q, np.zeros(3), [q.copy()])
         # Must be nonzero so -grad gives a nonzero force
         self.assertGreater(np.linalg.norm(grad), 0, "Robot stuck at obstacle has no escape force")
+
+    def test_repulsive_gradient_at_obstacle_escape_is_bounded(self):
+        from ManipulaPy.potential_field import PotentialField
+
+        pf = PotentialField(attractive_gain=0.0, repulsive_gain=1.0, influence_distance=0.5)
+        q = np.array([1.0, 1.0, 1.0])
+
+        grad = pf.compute_gradient(q, np.zeros(3), [q.copy()])
+
+        np.testing.assert_allclose(grad, [1.0, 0.0, 0.0])
 
 
 class TestSimRegressions(unittest.TestCase):

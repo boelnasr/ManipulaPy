@@ -84,6 +84,8 @@ class PotentialField:
                 if d < 1e-10:
                     direction = np.zeros_like(q)
                     direction[0] = 1.0  # Escape along +x (arbitrary but consistent)
+                    repulsive_gradient += self.repulsive_gain * direction
+                    continue
                 else:
                     direction = diff
                 repulsive_gradient += (

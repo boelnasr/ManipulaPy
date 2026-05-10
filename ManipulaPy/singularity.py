@@ -61,10 +61,12 @@ class Singularity:
         J_w = J[3:, :]  # Angular velocity part of the Jacobian
 
         # Singular Value Decomposition (SVD) for both parts
-        U_v, S_v, _ = np.linalg.svd(J_v)
+        U_v, S_v, _ = np.linalg.svd(J_v, full_matrices=True)
+        S_v = np.pad(S_v, (0, U_v.shape[1] - S_v.shape[0]), constant_values=0.0)
         radii_v = 1.0 / np.sqrt(np.maximum(S_v, 1e-10))
 
-        U_w, S_w, _ = np.linalg.svd(J_w)
+        U_w, S_w, _ = np.linalg.svd(J_w, full_matrices=True)
+        S_w = np.pad(S_w, (0, U_w.shape[1] - S_w.shape[0]), constant_values=0.0)
         radii_w = 1.0 / np.sqrt(np.maximum(S_w, 1e-10))
 
         # Generate points on a unit sphere
