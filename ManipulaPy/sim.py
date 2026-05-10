@@ -329,7 +329,12 @@ class Simulation:
                 axis_norm = np.linalg.norm(axis)
                 if axis_norm > 1e-6:
                     axis = axis / axis_norm
-                    orn = p.getQuaternionFromAxisAngle(axis, angle)
+                    # Inline axis-angle to quaternion to avoid relying on
+                    # p.getQuaternionFromAxisAngle, which is missing from
+                    # several pybullet builds (cross-version portability).
+                    half = angle / 2.0
+                    s = np.sin(half)
+                    orn = (axis[0] * s, axis[1] * s, axis[2] * s, np.cos(half))
                 else:
                     orn = p.getQuaternionFromEuler([0, 0, 0])
             else:
@@ -360,7 +365,7 @@ class Simulation:
             self.logger.error(f"Failed to create capsule line: {e}")
             return -1
 
-    def plot_trajectory(self, ee_positions, line_width=3, color=[1, 0, 0]):
+    def plot_trajectory(self, ee_positions, line_width=3, color=None):
         """
         Plots the end-effector trajectory in PyBullet using REAL GEOMETRY.
 
@@ -382,6 +387,9 @@ class Simulation:
         if len(ee_positions) < 2:
             self.logger.warning("Not enough positions to plot trajectory")
             return []
+
+        if color is None:
+            color = [1, 0, 0]
 
         # Convert color to RGBA
         if len(color) == 3:

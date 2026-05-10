@@ -6,9 +6,12 @@ Trimesh-based URDF Visualization
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
+import logging
 from typing import TYPE_CHECKING, Dict, Optional, Union
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..core import URDF
@@ -47,8 +50,11 @@ def _geometry_to_trimesh(geometry, color=None):
                 # Apply scale
                 if not np.allclose(geometry.scale, 1.0):
                     mesh.apply_scale(geometry.scale)
-            except Exception:
-                # Create placeholder if mesh loading fails
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load mesh {geometry.filename!r} for "
+                    f"visualization: {e!r}. Using placeholder box."
+                )
                 mesh = trimesh.creation.box(extents=[0.01, 0.01, 0.01])
 
     if mesh is not None and color is not None:

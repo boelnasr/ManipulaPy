@@ -1040,6 +1040,48 @@ class TestSimRegressions(unittest.TestCase):
             self.assertEqual(handler_count, 1,
                              f"Expected 1 stream handler, got {handler_count}")
 
+    def test_capsule_line_uses_inline_axis_angle_quaternion(self):
+        """_capsule_line must not depend on p.getQuaternionFromAxisAngle —
+        that helper is missing from several pybullet builds. Inline math
+        replaced it; confirm by deleting the helper from the mocked module
+        and verifying _capsule_line still completes successfully.
+        """
+        from unittest.mock import MagicMock, patch
+        from ManipulaPy.sim import Simulation
+
+        sim = Simulation.__new__(Simulation)
+        sim.logger = MagicMock()
+
+        with patch("ManipulaPy.sim.p") as mock_p:
+            mock_p.getQuaternionFromEuler.return_value = (0, 0, 0, 1)
+            mock_p.createCollisionShape.return_value = 10
+            mock_p.createVisualShape.return_value = 11
+            mock_p.createMultiBody.return_value = 12
+            del mock_p.getQuaternionFromAxisAngle  # simulate stripped pybullet build
+
+            body_id = sim._capsule_line(
+                np.array([0.0, 0.0, 0.0]),
+                np.array([1.0, 0.0, 0.0]),
+            )
+
+        self.assertEqual(body_id, 12)
+        mock_p.createMultiBody.assert_called_once()
+
+    def test_plot_trajectory_no_mutable_default_color(self):
+        """color=[1, 0, 0] as a mutable default is the same footgun as Task 4.
+        Fix: use color=None and assign the default inside the function."""
+        import inspect
+        from ManipulaPy.sim import Simulation
+
+        sig = inspect.signature(Simulation.plot_trajectory)
+        color_default = sig.parameters["color"].default
+        self.assertIsNone(
+            color_default,
+            "Simulation.plot_trajectory color default must be None — found "
+            f"{color_default!r}",
+        )
+
+
 class TestSimPybulletGuards(unittest.TestCase):
     """Task 15: every public method that touches p.* must raise a clear
     ImportError when pybullet is unavailable, never AttributeError on the
@@ -1458,6 +1500,60 @@ class TestUrdfRegressions(unittest.TestCase):
         warning = "\n".join(cm.output)
         self.assertIn("robot.dae", warning)
         self.assertIn("pip install trimesh", warning)
+
+    def test_urdf_processor_omega_list_shape_and_values(self):
+        """omega_list must be (3, N) with each column a unit screw axis.
+
+        Earlier code derived omega from data['Slist'] using inconsistent
+        slicing; commit 83c1068 centralised the source on data['omega_list']
+        and renamed the prior 'omeg_list' typo. This locks in the shape
+        and value invariants.
+        """
+        try:
+            from ManipulaPy.urdf_processor import URDFToSerialManipulator
+            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
+        except Exception as e:
+            self.skipTest(f"UR5 fixture unavailable: {e}")
+
+        urdf = URDFToSerialManipulator(str(urdf_file))
+        for path_label, omega in (
+            ("serial_manipulator", urdf.serial_manipulator.omega_list),
+            ("manipulator_dynamics", urdf.manipulator_dynamics.omega_list),
+        ):
+            self.assertEqual(
+                omega.shape, (3, 6),
+                f"{path_label}.omega_list expected (3, 6) for UR5, got {omega.shape}",
+            )
+            norms = np.linalg.norm(omega, axis=0)
+            np.testing.assert_array_almost_equal(norms, np.ones(6), decimal=4)
+
+    def test_trimesh_viz_mesh_load_failure_emits_warning(self):
+        """trimesh_viz silently fell back to a placeholder box when mesh load
+        failed, hiding viz problems. Commit on Task 38 logs a warning before
+        falling back.
+        """
+        from unittest.mock import MagicMock, patch
+
+        from ManipulaPy.urdf.types import Mesh
+        from ManipulaPy.urdf.visualization import trimesh_viz
+
+        if not trimesh_viz.TRIMESH_AVAILABLE:
+            self.skipTest("trimesh not installed")
+
+        geometry = Mesh(filename="/missing/mesh.stl", scale=[1, 1, 1])
+
+        with patch.object(trimesh_viz.trimesh, "load", side_effect=ValueError("bad mesh")), \
+             patch.object(trimesh_viz.trimesh.creation, "box", return_value=MagicMock()) as box, \
+             self.assertLogs("ManipulaPy.urdf.visualization.trimesh_viz", level="WARNING") as cm:
+            result = trimesh_viz._geometry_to_trimesh(geometry)
+
+        self.assertIsNotNone(result)
+        box.assert_called_once()
+        joined = "\n".join(cm.output)
+        self.assertIn("missing/mesh.stl", joined)
+        self.assertIn("placeholder", joined)
+
+
 class TestCudaKernelRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/cuda_kernels.py bugs.
 
