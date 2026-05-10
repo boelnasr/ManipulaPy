@@ -625,7 +625,7 @@ class Vision:
         self,
         depth_image: np.ndarray,
         rgb_image: np.ndarray,
-        depth_threshold: float = 0.0,
+        depth_threshold: float = 5.0,
         camera_index: int = 0,
         step: int = 5,
     ):

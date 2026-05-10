@@ -1107,6 +1107,40 @@ class TestSimPybulletGuards(unittest.TestCase):
 class TestVisionRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/vision.py bugs."""
 
+    def test_detect_obstacles_default_threshold_does_not_filter_everything(self):
+        """depth_threshold=0.0 + 'if mean_depth > threshold: continue' was
+        filtering out every detection with positive depth (i.e., all real
+        obstacles). With the new 5.0m default a 1m obstacle survives.
+        """
+        from types import SimpleNamespace
+
+        from ManipulaPy.vision import Vision
+
+        vision = Vision.__new__(Vision)
+        vision.logger = SimpleNamespace(
+            error=lambda *args, **kwargs: None,
+            warning=lambda *args, **kwargs: None,
+            info=lambda *args, **kwargs: None,
+        )
+        vision.cameras = {
+            0: {
+                "intrinsic_matrix": np.array(
+                    [[100.0, 0.0, 1.0], [0.0, 100.0, 1.0], [0.0, 0.0, 1.0]]
+                )
+            }
+        }
+        vision._ensure_yolo_loaded = lambda: True
+        box = SimpleNamespace(xyxy=[np.array([0, 0, 2, 2])])
+        result = SimpleNamespace(boxes=[box])
+        vision.yolo_model = lambda image, conf=0.3: [result]
+
+        depth = np.ones((4, 4), dtype=np.float32)
+        rgb = np.zeros((4, 4, 3), dtype=np.uint8)
+        positions, orientations = vision.detect_obstacles(depth, rgb)
+
+        self.assertEqual(positions.shape, (1, 3))
+        self.assertEqual(orientations.shape, (1,))
+
 
 class TestUrdfRegressions(unittest.TestCase):
     def test_mesh_load_failure_emits_warning(self):
