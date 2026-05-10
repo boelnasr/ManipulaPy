@@ -1515,6 +1515,161 @@ class TestCudaKernelRegressions(unittest.TestCase):
                 f"{kernel_name} missing linear method branch — non-quintic falls through to cubic"
             )
 
+    # ------------------------------------------------------------------
+    # Tasks 30, 31, 32, 33 — remaining CUDA kernel adversarial findings
+    # ------------------------------------------------------------------
+
+    def _kernel_source(self, name):
+        import inspect
+        from ManipulaPy import cuda_kernels
+
+        src = inspect.getsource(cuda_kernels)
+        marker = f"def {name}("
+        start = src.index(marker)
+        # Stop at the next decorator or end of file.
+        rest = src[start:]
+        end_rel = rest.find("\n    @cuda.jit")
+        return rest if end_rel < 0 else rest[:end_rel]
+
+    def test_cartesian_kernel_no_shared_memory_race(self):
+        """cartesian_trajectory_kernel must compute scaling per-thread, not via
+        a shared-memory write from thread (0,0) only.
+        """
+        body = self._kernel_source("cartesian_trajectory_kernel")
+        self.assertNotIn(
+            "cuda.shared.array", body,
+            "cartesian_trajectory_kernel still uses shared-memory scaling — "
+            "thread (0,0) wrote scaling for its own t_idx, other threads read it.",
+        )
+        self.assertNotIn("cuda.syncthreads", body)
+
+    def test_cartesian_kernel_quintic_position_uses_tau5(self):
+        """The quintic position formula must include 6 * tau^5, not 6 * tau * tau^3 (=tau^4)."""
+        body = self._kernel_source("cartesian_trajectory_kernel")
+        self.assertNotIn(
+            "6.0 * tau * tau3", body,
+            "cartesian_trajectory_kernel quintic position is using "
+            "'6 * tau * tau3' (= 6 tau^4); correct quintic needs 6 tau^5.",
+        )
+        # Either form spelled out is acceptable.
+        self.assertTrue(
+            "6.0 * tau5" in body or "6.0 * tau2 * tau3" in body,
+            f"expected 6*tau5 or 6*tau2*tau3 in cartesian quintic; body=\n{body[:600]}",
+        )
+
+    def test_cartesian_kernel_quintic_acceleration_includes_one_minus_tau(self):
+        """Quintic s_ddot must be 60 tau (1 - tau)(1 - 2tau) / Tf^2,
+        not the truncated 60 tau (1 - 2tau) / Tf^2.
+        """
+        body = self._kernel_source("cartesian_trajectory_kernel")
+        self.assertIn(
+            "(1.0 - tau) * (1.0 - 2.0 * tau)", body,
+            "cartesian_trajectory_kernel quintic acceleration is missing the "
+            "(1 - tau) factor — it would zero-cross at tau=0.5 incorrectly.",
+        )
+
+    def test_cartesian_kernel_supports_linear_method(self):
+        body = self._kernel_source("cartesian_trajectory_kernel")
+        self.assertIn(
+            "s = tau", body,
+            "cartesian_trajectory_kernel else-branch must implement the linear "
+            "method (method == 1) instead of falling through to s = 0.",
+        )
+
+    def test_batch_kernel_no_shared_memory_race(self):
+        body = self._kernel_source("batch_trajectory_kernel")
+        self.assertNotIn(
+            "cuda.shared.array", body,
+            "batch_trajectory_kernel still uses shared-memory scaling — same "
+            "race as cartesian_trajectory_kernel.",
+        )
+
+    def test_batch_kernel_quintic_position_uses_tau5(self):
+        body = self._kernel_source("batch_trajectory_kernel")
+        self.assertNotIn("6.0 * tau * tau3", body)
+        self.assertTrue(
+            "6.0 * tau5" in body or "6.0 * tau2 * tau3" in body,
+        )
+
+    def test_batch_kernel_quintic_acceleration_includes_one_minus_tau(self):
+        body = self._kernel_source("batch_trajectory_kernel")
+        self.assertIn("(1 - tau) * (1 - 2 * tau)", body)
+
+    def test_batch_kernel_supports_linear_method(self):
+        body = self._kernel_source("batch_trajectory_kernel")
+        self.assertIn("s = tau", body)
+
+    def test_quintic_formula_satisfies_boundary_conditions(self):
+        """Pure-Python equivalent of the corrected quintic — proves the new
+        formula gives s(0)=0, s(1)=1, s_dot(0)=s_dot(1)=0, s_ddot(0)=s_ddot(1)=0.
+        """
+        Tf = 2.0
+        for tau in (0.0, 1.0):
+            tau2 = tau * tau
+            tau3 = tau2 * tau
+            tau4 = tau2 * tau2
+            tau5 = tau4 * tau
+            s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5
+            s_dot = 30.0 * tau2 * (1.0 - 2.0 * tau + tau2) / Tf
+            s_ddot = 60.0 * tau * (1.0 - tau) * (1.0 - 2.0 * tau) / (Tf * Tf)
+            if tau == 0.0:
+                self.assertAlmostEqual(s, 0.0)
+            else:
+                self.assertAlmostEqual(s, 1.0)
+            self.assertAlmostEqual(s_dot, 0.0)
+            self.assertAlmostEqual(s_ddot, 0.0)
+
+    def test_forward_dynamics_kernel_has_no_temporal_data_race(self):
+        """forward_dynamics_kernel previously read thetamat[t_idx-1, j_idx] from
+        another thread's not-yet-written row — a classic CUDA temporal race.
+        The fixed kernel integrates from initial state per-thread.
+        """
+        body = self._kernel_source("forward_dynamics_kernel")
+        self.assertNotIn(
+            "thetamat[t_idx - 1", body,
+            "forward_dynamics_kernel still reads thetamat[t_idx - 1, j_idx] — "
+            "temporal data race across parallel threads.",
+        )
+        self.assertNotIn("dthetamat[t_idx - 1", body)
+        # The fixed version must walk from t=0 to t_idx within the thread.
+        self.assertIn("range(t_idx + 1)", body)
+
+    def test_potential_gradient_repulsive_pushes_away_from_obstacle(self):
+        """Pure-Python equivalent of the fused potential gradient — verifies
+        the corrected sign on the repulsive term: force = -∇U must point
+        AWAY from the obstacle. The buggy code dropped the leading minus,
+        so -∇U pulled the robot toward obstacles.
+        """
+        import math
+
+        # Robot at (1, 0, 0), obstacle at origin, goal at (5, 0, 0).
+        pos = (1.0, 0.0, 0.0)
+        goal = (5.0, 0.0, 0.0)
+        obs = (0.0, 0.0, 0.0)
+        influence_distance = 2.0
+
+        diff = tuple(pos[i] - goal[i] for i in range(3))
+        grad = list(diff)  # attractive component
+
+        obs_diff = tuple(pos[i] - obs[i] for i in range(3))
+        dist_sq = sum(c * c for c in obs_diff)
+        if 0.0 < dist_sq < influence_distance * influence_distance:
+            dist_inv = 1.0 / math.sqrt(dist_sq)
+            influence_term = dist_inv - 1.0 / influence_distance
+            # Corrected sign — matches the fixed kernel.
+            grad_factor = -influence_term * dist_inv * dist_inv * dist_inv
+            for i in range(3):
+                grad[i] += grad_factor * obs_diff[i]
+
+        # Force is -gradient. Robot is at +x relative to obstacle, so the
+        # repulsive push must be in +x. Goal is also at +x, so attractive
+        # also pulls in +x. Net force_x must be positive.
+        force = tuple(-g for g in grad)
+        self.assertGreater(force[0], 0.0,
+            "repulsive force must push the robot in +x (away from obstacle).")
+        self.assertAlmostEqual(force[1], 0.0)
+        self.assertAlmostEqual(force[2], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

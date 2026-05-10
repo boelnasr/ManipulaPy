@@ -943,9 +943,14 @@ if CUDA_AVAILABLE:
         ddthetamat,
         joint_limits,
     ):
-        """
-        FIXED: Forward dynamics kernel with correct 14-parameter signature.
-        Removed the problematic 'stream' parameter.
+        """Forward dynamics kernel.
+
+        Each thread integrates from the initial state up to its own ``t_idx``,
+        avoiding the temporal data race in the previous version (which read
+        ``thetamat[t_idx-1]`` while parallel threads at lower ``t_idx`` may
+        not have written that row yet). Cost is O(t_idx * intRes) per
+        thread instead of O(intRes), but correctness no longer depends on
+        warp scheduling.
         """
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -953,46 +958,38 @@ if CUDA_AVAILABLE:
         if t_idx >= taumat.shape[0] or j_idx >= thetalist.shape[0]:
             return
 
-        # Initialize state
-        if t_idx > 0:
-            current_theta = thetamat[t_idx - 1, j_idx]
-            current_dtheta = dthetamat[t_idx - 1, j_idx]
-        else:
-            current_theta = thetalist[j_idx]
-            current_dtheta = dthetalist[j_idx]
-
-        tau = taumat[t_idx, j_idx]
+        current_theta = thetalist[j_idx]
+        current_dtheta = dthetalist[j_idx]
         dt_step = dt / intRes
-
-        # Integration loop
         ddtheta = 0.0
-        for _ in range(intRes):
-            # Simplified forward dynamics
-            M_inv = (
-                1.0 / Glist[j_idx, j_idx, j_idx]
-                if (
-                    j_idx < Glist.shape[0]
-                    and j_idx < Glist.shape[1]
-                    and j_idx < Glist.shape[2]
-                    and Glist[j_idx, j_idx, j_idx] != 0.0
+
+        # Walk from t=0 to this thread's t_idx, applying the torque sample
+        # for each completed time bin. This is independent per thread.
+        for step in range(t_idx + 1):
+            tau = taumat[step, j_idx]
+            for _ in range(intRes):
+                M_inv = (
+                    1.0 / Glist[j_idx, j_idx, j_idx]
+                    if (
+                        j_idx < Glist.shape[0]
+                        and j_idx < Glist.shape[1]
+                        and j_idx < Glist.shape[2]
+                        and Glist[j_idx, j_idx, j_idx] != 0.0
+                    )
+                    else 1.0
                 )
-                else 1.0
-            )
+                g_force = g[2] * 0.1 if g.shape[0] > 2 else 0.0
+                ddtheta = (tau - g_force) * M_inv
 
-            g_force = g[2] * 0.1 if g.shape[0] > 2 else 0.0
-            ddtheta = (tau - g_force) * M_inv
+                current_dtheta += ddtheta * dt_step
+                current_theta += current_dtheta * dt_step
 
-            # Integrate
-            current_dtheta += ddtheta * dt_step
-            current_theta += current_dtheta * dt_step
+                if j_idx < joint_limits.shape[0]:
+                    current_theta = max(
+                        joint_limits[j_idx, 0],
+                        min(current_theta, joint_limits[j_idx, 1]),
+                    )
 
-            # Apply joint limits
-            if j_idx < joint_limits.shape[0]:
-                current_theta = max(
-                    joint_limits[j_idx, 0], min(current_theta, joint_limits[j_idx, 1])
-                )
-
-        # Store results
         thetamat[t_idx, j_idx] = current_theta
         dthetamat[t_idx, j_idx] = current_dtheta
         ddthetamat[t_idx, j_idx] = ddtheta
@@ -1001,9 +998,12 @@ if CUDA_AVAILABLE:
     def cartesian_trajectory_kernel(
         pstart, pend, traj_pos, traj_vel, traj_acc, Tf, N, method
     ):
-        """
-        FIXED: Cartesian trajectory kernel with correct 8-parameter signature.
-        Removed the problematic 'stream' parameter.
+        """Cartesian trajectory kernel.
+
+        Each thread computes its own time scaling (no shared memory) so the
+        scaling matches its own ``t_idx``. Quintic acceleration uses the
+        full ``60 tau (1 - tau) (1 - 2 tau) / Tf^2`` form, and the linear
+        method (1) is no longer silently zeroed.
         """
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         coord_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -1011,33 +1011,23 @@ if CUDA_AVAILABLE:
         if t_idx >= N or coord_idx >= 3:
             return
 
-        # Shared memory for time scaling
-        shared_scaling = cuda.shared.array(3, dtype=float32)
-
-        if cuda.threadIdx.x == 0 and cuda.threadIdx.y == 0:
-            tau = t_idx / (N - 1)
-
-            if method == 3:  # Cubic
-                s = 3.0 * tau * tau - 2.0 * tau * tau * tau
-                s_dot = 6.0 * tau * (1.0 - tau) / Tf
-                s_ddot = 6.0 / (Tf * Tf) * (1.0 - 2.0 * tau)
-            elif method == 5:  # Quintic
-                tau2, tau3 = tau * tau, tau * tau * tau
-                s = 10.0 * tau3 - 15.0 * tau2 * tau2 + 6.0 * tau * tau3
-                s_dot = 30.0 * tau2 * (1.0 - 2.0 * tau + tau2) / Tf
-                s_ddot = 60.0 / (Tf * Tf) * tau * (1.0 - 2.0 * tau)
-            else:
-                s = s_dot = s_ddot = 0.0
-
-            shared_scaling[0] = s
-            shared_scaling[1] = s_dot
-            shared_scaling[2] = s_ddot
-
-        cuda.syncthreads()
-
-        s = shared_scaling[0]
-        s_dot = shared_scaling[1]
-        s_ddot = shared_scaling[2]
+        tau = t_idx / (N - 1)
+        if method == 3:  # Cubic
+            s = 3.0 * tau * tau - 2.0 * tau * tau * tau
+            s_dot = 6.0 * tau * (1.0 - tau) / Tf
+            s_ddot = 6.0 / (Tf * Tf) * (1.0 - 2.0 * tau)
+        elif method == 5:  # Quintic
+            tau2 = tau * tau
+            tau3 = tau2 * tau
+            tau4 = tau2 * tau2
+            tau5 = tau4 * tau
+            s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5
+            s_dot = 30.0 * tau2 * (1.0 - 2.0 * tau + tau2) / Tf
+            s_ddot = 60.0 * tau * (1.0 - tau) * (1.0 - 2.0 * tau) / (Tf * Tf)
+        else:  # Linear (method == 1) and any other value
+            s = tau
+            s_dot = 1.0 / Tf
+            s_ddot = 0.0
 
         dp = pend[coord_idx] - pstart[coord_idx]
 
@@ -1095,7 +1085,12 @@ if CUDA_AVAILABLE:
                 repulsive_term = 0.5 * influence_term * influence_term
                 repulsive_pot += repulsive_term
 
-                grad_factor = influence_term * dist_inv * dist_inv * dist_inv
+                # ∇U_rep = (1/d - 1/d_0) * (-1/d^3) * (pos - obstacle).
+                # Force = -∇U_rep then points pos -> away_from_obstacle, which
+                # is what a repulsive potential field is meant to produce. The
+                # previous code dropped the leading minus, so the resulting
+                # gradient pulled the robot toward obstacles.
+                grad_factor = -influence_term * dist_inv * dist_inv * dist_inv
                 grad_x += grad_factor * obs_diff_x
                 grad_y += grad_factor * obs_diff_y
                 grad_z += grad_factor * obs_diff_z
@@ -1128,32 +1123,26 @@ if CUDA_AVAILABLE:
         if batch_idx >= batch_size or t_idx >= N or j_idx >= thetastart_batch.shape[1]:
             return
 
-        # Shared memory for time-scaling coefficients
-        shared_scaling = cuda.shared.array(3, dtype=float32)
-        if cuda.threadIdx.x == 0 and cuda.threadIdx.y == 0 and cuda.threadIdx.z == 0:
-            tau = t_idx / (N - 1)
-            if method == 3:
-                s = 3.0 * tau * tau - 2.0 * tau * tau * tau
-                s_dot = 6.0 * tau * (1.0 - tau) / Tf
-                s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
-            elif method == 5:
-                tau2, tau3 = tau * tau, tau * tau * tau
-                s = 10.0 * tau3 - 15.0 * tau2 * tau2 + 6.0 * tau * tau3
-                s_dot = 30.0 * tau2 * (1 - 2 * tau + tau2) / Tf
-                s_ddot = 60.0 * tau * (1 - 2 * tau) / (Tf * Tf)
-            else:
-                s = s_dot = s_ddot = 0.0
-
-            shared_scaling[0] = s
-            shared_scaling[1] = s_dot
-            shared_scaling[2] = s_ddot
-
-        cuda.syncthreads()
-
-        # Read time-scaling
-        s = shared_scaling[0]
-        s_dot = shared_scaling[1]
-        s_ddot = shared_scaling[2]
+        # Per-thread time-scaling computation. Previous version wrote scaling
+        # for thread (0,0,0)'s t_idx into shared memory and let every other
+        # thread read it — so threads at different t_idx got the wrong scaling.
+        tau = t_idx / (N - 1)
+        if method == 3:
+            s = 3.0 * tau * tau - 2.0 * tau * tau * tau
+            s_dot = 6.0 * tau * (1.0 - tau) / Tf
+            s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
+        elif method == 5:
+            tau2 = tau * tau
+            tau3 = tau2 * tau
+            tau4 = tau2 * tau2
+            tau5 = tau4 * tau
+            s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5
+            s_dot = 30.0 * tau2 * (1 - 2 * tau + tau2) / Tf
+            s_ddot = 60.0 * tau * (1 - tau) * (1 - 2 * tau) / (Tf * Tf)
+        else:  # Linear (method == 1) and any other value
+            s = tau
+            s_dot = 1.0 / Tf
+            s_ddot = 0.0
 
         # Compute delta for this trajectory
         dtheta = thetaend_batch[batch_idx, j_idx] - thetastart_batch[batch_idx, j_idx]
