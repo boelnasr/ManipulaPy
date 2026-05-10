@@ -22,6 +22,16 @@
 
 ManipulaPy is a modern, comprehensive framework that bridges the gap between basic robotics libraries and sophisticated research tools. It provides seamless integration of kinematics, dynamics, control, and perception systems with optional CUDA acceleration for real-time applications.
 
+### What's New in 1.3.2
+- **Modular optional extras**: default `pip install ManipulaPy` is now lightweight (numpy, scipy, matplotlib, numba, pillow). Add `[simulation]` for PyBullet, `[urdf]` for urchin/trimesh, `[vision]` for OpenCV/ultralytics/torch, `[ml]` for scikit-learn, `[cuda]` for CuPy, or `[all]` for everything
+- **Native NumPy 2.0-compatible URDF parser** (`ManipulaPy.urdf.URDF`) with `PackageResolver` supporting `package://`, `file://`, ROS package discovery, and explicit-mapping precedence
+- **PEP 561 `py.typed` marker** ships in the wheel — mypy/pyright now treat ManipulaPy as a typed package
+- **Python 3.12 support** added to the CI matrix and PyPI classifiers
+- **CUDA kernel correctness fixes**: corrected quintic acceleration formula, removed shared-memory race in trajectory kernels, fixed temporal data race in `forward_dynamics_kernel`, added `method=1` (linear) support to all variants, guarded N≤1 against div-zero, and **corrected the repulsive-potential-gradient sign** that was previously attracting the robot toward obstacles
+- **Simulation guards**: every `Simulation` method that touches PyBullet now raises a clear `ImportError` with install hint when the extra is missing (instead of `AttributeError` on a None proxy)
+- **`Vision.detect_obstacles`** default `depth_threshold` raised from 0.0 → 5.0 m (the old default silently filtered every detection)
+- **Kalman filter validation**: `kalman_filter_update` now validates both `x_hat` and `self.P` shape before running matrix algebra; `calculate_settling_time` returns first-cross time and supports negative setpoints
+
 ### What's New in 1.3.1
 - **TRAC-IK Solver** (96% success at 200ms): DLS-first strategy with SQP fallback, SVD-robust Jacobian solve, perturbation recovery, and backtracking line search
 - **Redesigned IK Solvers**: All inverse kinematics algorithms overhauled — convergence rates improved from ~70% to 96%+
@@ -144,19 +154,40 @@ Before installing ManipulaPy, make sure your system has:
    - Verify headers/libs under `/usr/include` and `/usr/lib/x86_64-linux-gnu` (or your distro’s equivalent).
 
 ---
-ManipulaPy attempts to install all dependencies by default for the best user experience. Missing dependencies are handled gracefully - the package will still work with available features.
+ManipulaPy uses a lightweight default install. The base package installs core
+robotics, control, dynamics, and CPU trajectory dependencies only. Simulation,
+vision, mesh loading, ML, and CUDA dependencies live behind optional extras so
+minimal installs work on platforms without heavy prebuilt wheels.
 
 ```bash
-# One command installs everything (recommended)
+# Core install: kinematics, dynamics, control, native URDF, CPU trajectories
 pip install ManipulaPy
 ```
 
-**What gets installed automatically:**
+**What the default install includes:**
 
 - ✅ **Core robotics** (always): kinematics, dynamics, control, basic trajectory planning
-- 🚀 **GPU acceleration** (if CUDA available): 40x+ speedups for large problems (N > 1000)
-- 👁️ **Vision features** (if system supports): camera capture, object detection, stereo vision
-- 🎮 **Simulation** (if compatible): PyBullet physics simulation and visualization
+- ✅ **Native URDF processing**: URDF parsing and serial manipulator conversion
+- ✅ **CPU planning utilities**: NumPy/Numba-backed trajectory routines
+
+Install optional feature groups when needed:
+
+```bash
+# PyBullet simulation and visualization
+pip install "ManipulaPy[simulation]"
+
+# Trimesh-backed URDF mesh loading
+pip install "ManipulaPy[urdf]"
+
+# OpenCV/YOLO/torch vision stack
+pip install "ManipulaPy[vision]"
+
+# CUDA 11.x acceleration on non-macOS systems
+pip install "ManipulaPy[cuda]"
+
+# Everything maintained by the v1.3.2 optional dependency split
+pip install "ManipulaPy[all]"
+```
 
 ### Check Your Installation
 
@@ -175,7 +206,7 @@ ManipulaPy.print_system_info()
 ### Alternative Installation Options
 
 ```bash
-# Minimal installation (core features only)
+# Backwards-compatible minimal extra used by older install docs
 pip install ManipulaPy[minimal]
 
 # Specific CUDA version if auto-detection fails
@@ -1010,7 +1041,7 @@ If you use ManipulaPy in your research, please cite:
   author={Mohamed Aboelnasr},
   year={2025},
   url={https://github.com/boelnasr/ManipulaPy},
-  version={1.3.1},
+  version={1.3.2},
   license={AGPL-3.0-or-later},
 }
 ```
@@ -1093,7 +1124,7 @@ All dependencies are AGPL-3.0 compatible:
 
 <div align="center">
 
-**🤖 ManipulaPy v1.3.1: Professional robotics tools for the Python ecosystem**
+**🤖 ManipulaPy v1.3.2: Professional robotics tools for the Python ecosystem**
 
 [![GitHub stars](https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=social)](https://github.com/boelnasr/ManipulaPy)
 [![PyPI Downloads](https://static.pepy.tech/badge/manipulapy)](https://pepy.tech/projects/manipulapy)

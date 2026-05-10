@@ -1,5 +1,5 @@
-# URDF Processor User Guide
-==========================
+URDF Processor User Guide
+=========================
 
 This guide covers the URDF Processor module in ManipulaPy, which converts URDF (Unified Robot Description Format) files into SerialManipulator and ManipulatorDynamics objects for analytical robotics computations.
 

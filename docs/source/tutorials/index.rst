@@ -6,6 +6,5 @@ Tutorials
 
    kinematics_guide
    dynamics_guide
-   trajectory_planning
-   installation
-   urdf_processor
+   Trajectory_Planning
+   Urdf Procsssor

@@ -61,14 +61,13 @@ Welcome to the comprehensive ManipulaPy User Guide! This section provides detail
    :maxdepth: 2
    :caption: Perception & Intelligence
 
-   Vision
+   vision
    Perception
 
 .. toctree::
    :maxdepth: 2
    :caption: Advanced Topics
 
-   Singularity_Analysis 
    CUDA_Kernels
 
 🗺️ Learning Pathways
@@ -148,7 +147,7 @@ Choose your learning path based on your experience level and goals:
             <div class="step">
                <span class="step-number">4</span>
                <div class="step-content">
-                  <a href="Singularity_Analysis .html"><strong>Singularity Analysis</strong></a>
+                  <a href="Singularity_Analysis.html"><strong>Singularity Analysis</strong></a>
                   <p>Analyze robot workspace and limitations</p>
                </div>
             </div>
@@ -203,7 +202,7 @@ Choose your learning path based on your experience level and goals:
             <div class="step">
                <span class="step-number">1</span>
                <div class="step-content">
-                  <a href="Vision.html"><strong>Vision Systems</strong></a>
+                  <a href="vision.html"><strong>Vision Systems</strong></a>
                   <p>Camera setup, calibration, and processing</p>
                </div>
             </div>
@@ -350,7 +349,7 @@ Computer vision, environmental understanding, and intelligent robot behavior:
    <div class="guide-grid">
       <div class="guide-card perception">
          <div class="guide-icon">📷</div>
-         <h4><a href="Vision.html">Vision Systems</a></h4>
+         <h4><a href="vision.html">Vision Systems</a></h4>
          <p><strong>Difficulty:</strong> Intermediate</p>
          <p>Camera setup, stereo vision, depth processing, and multi-camera systems.</p>
          <div class="guide-features">
@@ -381,7 +380,7 @@ Cutting-edge techniques for performance and analysis:
    <div class="guide-grid">
       <div class="guide-card advanced">
          <div class="guide-icon">⚠️</div>
-         <h4><a href="Singularity_Analysis .html">Singularity Analysis</a></h4>
+         <h4><a href="Singularity_Analysis.html">Singularity Analysis</a></h4>
          <p><strong>Difficulty:</strong> Advanced</p>
          <p>Workspace analysis, manipulability ellipsoids, and singularity avoidance.</p>
          <div class="guide-features">
@@ -441,10 +440,10 @@ Cutting-edge techniques for performance and analysis:
       <div class="ref-section">
          <h4>👁️ Perception</h4>
          <ul>
-            <li><a href="Vision.html#camera-setup">Setup Cameras</a></li>
+            <li><a href="vision.html#camera-setup">Setup Cameras</a></li>
             <li><a href="Perception.html#obstacle-detection">Detect Obstacles</a></li>
             <li><a href="Perception.html#data-flow-architecture">Data Flow Pipeline</a></li>
-            <li><a href="Vision.html#stereo-vision">Stereo Processing</a></li>
+            <li><a href="vision.html#stereo-vision">Stereo Processing</a></li>
          </ul>
       </div>
       
@@ -452,7 +451,7 @@ Cutting-edge techniques for performance and analysis:
          <h4>🎓 Advanced Topics</h4>
          <ul>
             <li><a href="Control.html#computed-torque-control">Computed Torque Control</a></li>
-            <li><a href="Singularity_Analysis .html#manipulability">Manipulability Analysis</a></li>
+            <li><a href="Singularity_Analysis.html#manipulability">Manipulability Analysis</a></li>
             <li><a href="Potential_Field.html#artificial-potential-fields">Potential Field Planning</a></li>
             <li><a href="CUDA_Kernels.html#custom-kernels">Custom CUDA Kernels</a></li>
          </ul>
