@@ -1117,7 +1117,29 @@ class TestUrdfRegressions(unittest.TestCase):
         with self.assertLogs("ManipulaPy.urdf.types", level="WARNING") as cm:
             mesh._load_mesh()
         self.assertTrue(any("not found" in msg.lower() for msg in cm.output))
+    def test_package_resolver_refuses_ambiguous_package_uri(self):
+        import tempfile
+        from pathlib import Path
 
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for workspace in ("ws1", "ws2"):
+                mesh = root / workspace / "demo_pkg" / "meshes" / "base.stl"
+                mesh.parent.mkdir(parents=True)
+                mesh.write_text("solid empty\nendsolid empty\n")
+
+            resolver = PackageResolver()
+            resolver.add_search_path(root / "ws1")
+            resolver.add_search_path(root / "ws2")
+
+            uri = "package://demo_pkg/meshes/base.stl"
+            with self.assertLogs("ManipulaPy.urdf.resolver", level="WARNING") as cm:
+                resolved = resolver.resolve(uri)
+
+            self.assertEqual(resolved, uri)
+            self.assertTrue(any("multiple" in msg.lower() for msg in cm.output))
 
 class TestCudaKernelRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/cuda_kernels.py bugs.

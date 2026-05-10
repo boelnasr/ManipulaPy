@@ -17,6 +17,10 @@ import numpy as np
 
 from .types import Joint, JointType, Link, Material, Transmission
 
+if TYPE_CHECKING:
+    from ..dynamics import ManipulatorDynamics
+    from ..kinematics import SerialManipulator
+
 
 class URDF:
     """
@@ -967,7 +971,8 @@ class URDF:
         }
 
     def to_serial_manipulator(
-        self, tip_link: Optional[str] = None) -> "SerialManipulator":
+        self, tip_link: Optional[str] = None
+    ) -> "SerialManipulator":
         """
         Convert to ManipulaPy SerialManipulator.
 
