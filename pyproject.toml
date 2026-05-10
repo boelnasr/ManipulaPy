@@ -26,6 +26,7 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -46,42 +47,51 @@ keywords = [
 ]
 
 # ------------------------------------------------------------------
-# Install all dependencies by default - let individual imports handle missing ones gracefully
+# Core dependencies — numerical/plotting only. Heavy and platform-specific
+# deps (pybullet, torch, opencv, ultralytics, cupy, trimesh) live in
+# optional groups so `pip install ManipulaPy` succeeds on minimal images
+# and platforms without prebuilt wheels (e.g., Apple Silicon — closes #25).
 dependencies = [
-    # Core numerical computing (required)
-    # NumPy 2.0+ now supported via native URDF parser
     "numpy>=1.19.2,<3.0",
     "scipy>=1.5.2",
     "matplotlib>=3.3",
-
-    # Core robotics (required)
     "numba>=0.55",
-    "pybullet>=3.2.5,<4.0",
-    # Note: urchin is now optional - native URDF parser is default
-    "trimesh>=3.9.14",
-
-    # Machine learning (install but handle gracefully if fails)
-    "torch>=1.8.0",
-    "scikit-learn>=1.0",
-
-    # Vision and perception (install but handle gracefully if fails)
-    "opencv-python>=4.5",
-    "ultralytics>=8.0",
     "pillow>=8.0.0",
-
-    # GPU acceleration (install but handle gracefully if fails)
-    # Note: This will attempt CUDA 11.x first, fallback handled in code
-    "cupy-cuda11x>=10.0.0; sys_platform != 'darwin'",  # No CUDA on macOS typically
 ]
 
 [project.optional-dependencies]
-# Minimal installation for constrained environments
+# Pin-only minimal install (kept for backwards compatibility — same set
+# as default ``dependencies`` plus pybullet for users coming from the
+# pre-1.3.2 install instructions).
 minimal = [
     "numpy>=1.19.2,<3.0",
     "scipy>=1.5.2",
     "matplotlib>=3.3",
     "numba>=0.55",
     "pybullet>=3.2.5,<4.0",
+]
+
+# Feature groups (1.3.2 — heavy deps moved here)
+simulation = ["pybullet>=3.2.5,<4.0"]
+urdf = ["trimesh>=3.9.14"]
+vision = [
+    "opencv-python>=4.5",
+    "ultralytics>=8.0",
+    "torch>=1.8.0",
+]
+ml = ["torch>=1.8.0", "scikit-learn>=1.0"]
+cuda = ["cupy-cuda11x>=10.0.0; sys_platform != 'darwin'"]
+
+# Convenience: install everything (no self-references — the resolver
+# handles direct deps more reliably than ``ManipulaPy[simulation,...]``).
+all = [
+    "pybullet>=3.2.5,<4.0",
+    "trimesh>=3.9.14",
+    "opencv-python>=4.5",
+    "ultralytics>=8.0",
+    "torch>=1.8.0",
+    "scikit-learn>=1.0",
+    "cupy-cuda11x>=10.0.0; sys_platform != 'darwin'",
 ]
 
 # Legacy URDF parser (urchin) - NOT compatible with NumPy 2.0+

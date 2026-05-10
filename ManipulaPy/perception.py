@@ -28,7 +28,18 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 import logging
 
 import numpy as np
-from sklearn.cluster import DBSCAN
+
+# scikit-learn is now part of the optional ``ml`` extra
+# (pip install "ManipulaPy[ml]"). Guard the import so a minimal install
+# can still import this module — DBSCAN-using code paths raise a clear
+# error at call time rather than failing the whole module import.
+try:
+    from sklearn.cluster import DBSCAN
+
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    DBSCAN = None
+    _SKLEARN_AVAILABLE = False
 
 
 class Perception:
@@ -224,6 +235,12 @@ class Perception:
                 "⚠️ No points provided to cluster_obstacles; returning empty results."
             )
             return np.array([]), 0
+
+        if not _SKLEARN_AVAILABLE:
+            raise ImportError(
+                "cluster_obstacles requires scikit-learn. "
+                "Install with: pip install \"ManipulaPy[ml]\""
+            )
 
         dbscan_model = DBSCAN(eps=eps, min_samples=min_samples)
         dbscan_model.fit(points)

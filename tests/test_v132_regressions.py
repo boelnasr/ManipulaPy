@@ -1914,6 +1914,94 @@ class TestTestInfraRegressions(unittest.TestCase):
         )
 
 
+class TestPackagingRegressions(unittest.TestCase):
+    """Regressions for pyproject.toml / setup.py / wheel metadata (Tasks 45-48)."""
+
+    def _load_pyproject(self):
+        import sys
+        from pathlib import Path
+
+        if sys.version_info >= (3, 11):
+            import tomllib
+        else:
+            import tomli as tomllib  # type: ignore
+
+        repo_root = Path(__file__).resolve().parents[1]
+        with open(repo_root / "pyproject.toml", "rb") as f:
+            return tomllib.load(f), repo_root
+
+    def test_heavy_dependencies_are_optional_not_core(self):
+        """torch, opencv-python, ultralytics, pybullet, cupy-* and trimesh
+        must NOT be in [project.dependencies] — they live in optional groups
+        so `pip install ManipulaPy` works on Apple Silicon and minimal
+        images (closes GitHub issue #25)."""
+        pyproject, _ = self._load_pyproject()
+
+        core_deps = {
+            dep.split(">=")[0].split("==")[0].split(";")[0].split("[")[0].strip().lower()
+            for dep in pyproject["project"]["dependencies"]
+        }
+        heavy = {
+            "cupy-cuda11x", "pybullet", "torch", "opencv-python",
+            "ultralytics", "trimesh",
+        }
+        leaked = core_deps & heavy
+        self.assertFalse(
+            leaked,
+            f"heavy deps still in core dependencies: {leaked}",
+        )
+
+        optional = pyproject["project"]["optional-dependencies"]
+        for group in ("simulation", "vision", "urdf", "cuda", "all"):
+            self.assertIn(group, optional, f"missing optional group [{group}]")
+
+    def test_python_312_classifier_present_no_premature_313(self):
+        """Python 3.12 is supported (Numba/SciPy ship 3.12 wheels). 3.13
+        is held back until CI proves it green."""
+        pyproject, _ = self._load_pyproject()
+        classifiers = pyproject["project"]["classifiers"]
+        self.assertIn("Programming Language :: Python :: 3.12", classifiers)
+        self.assertNotIn("Programming Language :: Python :: 3.13", classifiers)
+
+    def test_py_typed_marker_present(self):
+        """PEP 561 marker so downstream type checkers honor inline hints."""
+        from pathlib import Path
+        repo_root = Path(__file__).resolve().parents[1]
+        self.assertTrue(
+            (repo_root / "ManipulaPy" / "py.typed").is_file(),
+            "ManipulaPy/py.typed missing — type checkers will treat the "
+            "package as untyped",
+        )
+
+    def test_setup_py_version_matches_pyproject(self):
+        """setup.py is legacy but stale-version metadata is misleading.
+        Keep the version field synced with pyproject.toml's [project].version."""
+        from pathlib import Path
+        import re
+
+        pyproject, repo_root = self._load_pyproject()
+        target = pyproject["project"]["version"]
+
+        text = (repo_root / "setup.py").read_text()
+        m = re.search(r"^\s*version\s*=\s*['\"]([^'\"]+)['\"]", text, re.M)
+        self.assertIsNotNone(m, "could not find version= in setup.py")
+        self.assertEqual(
+            m.group(1), target,
+            f"setup.py version {m.group(1)!r} != pyproject {target!r}",
+        )
+
+    def test_data_manifest_does_not_lie_about_mesh_bundling(self):
+        """The wheel doesn't bundle .stl/.dae/.obj/.mesh assets (excluded
+        by MANIFEST.in). The data manifest must say so explicitly so users
+        on a PyPI install aren't surprised."""
+        from pathlib import Path
+        repo_root = Path(__file__).resolve().parents[1]
+        manifest = (repo_root / "ManipulaPy" / "ManipulaPy_data" / "MANIFEST.md").read_text()
+        # The wheel-note callout must be present
+        self.assertIn("PyPI wheel", manifest)
+        self.assertIn("NOT bundled", manifest)
+
+
 class TestXacroRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/urdf/xacro.py — security audit (Task 41)."""
 
