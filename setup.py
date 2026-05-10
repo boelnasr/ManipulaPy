@@ -8,7 +8,7 @@ setup(
     # Version is canonical in pyproject.toml; this duplicate is kept synced
     # for any legacy tooling that still parses setup.py directly. pip and
     # `python -m build` use pyproject.toml's [project] table, not this.
-    version="1.3.1",
+    version="1.3.2",
     author="Mohamed Aboelnasr",
     author_email="aboelnasr1997@gmail.com",
     description="A comprehensive, GPU-accelerated Python framework for robotic manipulation, perception, and control",

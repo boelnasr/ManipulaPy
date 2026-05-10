@@ -5,49 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] — targeting 1.3.2
+## [1.3.2] — 2026-05-10
 
-> **Status:** In progress on `release/v1.3.2-fix-patch`. Tasks 1–14 of the
-> v1.3.2 fix patch are complete; tasks 15–37 are still landing — see
-> `V1.3.2_FIX_PATCH_PLAN.md` for the full scope. Entries below will be moved
-> under `## [1.3.2] - <date>` at release time, and additional Added / Changed /
-> Fixed lines will be appended as remaining tasks land.
+> **Status:** Functional fix tasks 1–48 are complete on
+> `release/v1.3.2-fix-patch`. Task 49 documentation sync is in progress
+> (this changelog has been reconciled); Task 50 release ritual remains:
+> bump `pyproject.toml` and `ManipulaPy.__version__`, update `STATUS.md`,
+> tag, and publish after final verification.
 >
-> **Summary so far:** Stability and correctness patch addressing bugs across
-> utilities, dynamics, kinematics, path planning, Cartesian control,
-> singularity analysis, potential-field planning, and the PyBullet
-> simulation wrapper (optional-dep guards + an honest open-loop
-> `run_controller`). The
-> dynamics mass-matrix computation has been rewritten to use per-link CoM body
-> Jacobians (verified against the Murray/Li/Sastry 2R-planar-arm analytical
-> reference), the quintic time-scaling polynomial has been corrected, and
-> several edge cases that previously produced `NaN` / `inf` / `LinAlgError`
-> have been guarded. Includes a new regression test file
-> (`tests/test_v132_regressions.py`) covering each fix.
+> **Summary:** Comprehensive stability and correctness patch addressing bugs
+> across utilities, dynamics, kinematics, path planning, control, singularity
+> analysis, potential-field planning, simulation, URDF mesh handling, CUDA
+> kernels, test infrastructure, security review findings, and packaging. This
+> release batches the confirmed v1.3.2 fixes together before the maintainer
+> shifts focus to other projects.
 >
-> **Impact (so far):**
-> - Dynamics: `mass_matrix` now matches analytical references for non-trivial
->   `M_list` link offsets (off-diagonal sign error fixed)
-> - Path planning: quintic trajectories now have zero acceleration at endpoints
->   as required; TCP trajectory plotting no longer crashes mid-execution
-> - Cartesian control: `cartesian_space_control` no longer raises a
->   `ValueError` shape mismatch on first call
-> - Singularity: `singularity_analysis` now works on redundant (>6 DOF) and
->   under-actuated robots (was crashing on `LinAlgError`);
->   `manipulability_ellipsoid` produces finite radii at singular
->   configurations
-> - Potential field: gradient stays finite and provides an escape direction
->   when the configuration coincides with an obstacle
-> - Sim: `import ManipulaPy.sim` now succeeds without `cupy` or `pybullet`
->   installed (raises a clear `ImportError` with install hint only when
->   `Simulation()` is actually constructed); `Simulation.run_controller`
->   now performs honest open-loop position tracking rather than the
->   previous dimensionally-wrong torque-as-position-delta loop
->   (**behavior change** — see Changed)
-> - Utilities: `transform_from_twist` returns a proper 4×4 SE(3) for prismatic
->   joints; `logm` no longer divides by zero on pure translation
-> - Tests: new `tests/test_v132_regressions.py` scaffold encoding each
->   regression as an explicit assertion
+> **Impact:**
+> - Core math: prismatic twists, pure-translation `logm`, mass matrix,
+>   quintic trajectories, and Jacobian-based controls now have regression
+>   coverage.
+> - Control: degenerate metrics, Ziegler-Nichols validation, integral windup,
+>   Kalman shape/CuPy handling, and DOF-change state resets are hardened.
+> - Simulation: optional dependency imports are guarded, public PyBullet entry
+>   points fail clearly when unavailable, `physics_client=` loads the robot,
+>   loop cleanup is exception-safe, and position-control commands include
+>   force limits.
+> - CUDA: trajectory kernels no longer race on shared time-scaling state,
+>   all trajectory variants implement linear/cubic/quintic branches, quintic
+>   formulas are fixed, and force/gradient kernels avoid temporal/sign bugs.
+> - Packaging: heavy dependencies are optional, Apple Silicon installs no
+>   longer compile PyBullet by default, Python 3.12 metadata is declared, and
+>   package-data docs are honest about mesh assets.
 
 ### Added
 - **Regression test scaffold** (`tests/test_v132_regressions.py`) with one
@@ -66,6 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Home-configuration FK regression test** for the kinematics screw-list
   sign convention (verifies `extract_screw_list` produces axes consistent
   with the URDF home pose).
+- **Optional dependency groups** for simulation, vision, URDF mesh handling,
+  CUDA, ML, and "all" installs. The base install is now intentionally light.
+- **PEP 561 marker** (`ManipulaPy/py.typed`) and Python 3.12 classifier for
+  downstream type-checkers and packaging metadata.
+- **Expanded v1.3.2 regression coverage** in `tests/test_v132_regressions.py`
+  with 100+ explicit assertions spanning core math, sim/control audit fixes,
+  CUDA source guards, URDF/package-data behavior, and optional-dependency
+  import contracts.
 
 ### Changed
 - **`dynamics.mass_matrix`** — rewritten to use per-link body Jacobians
@@ -100,6 +96,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty input, non-2D shape, or wrong joint count — and the same
   conversion implicitly transfers `cupy.ndarray` waypoints to host
   NumPy via `__array__` before they reach PyBullet's C extension.
+- **Default install footprint** — heavy dependencies (`pybullet`, `torch`,
+  `opencv-python`, `ultralytics`, `trimesh`, `cupy`) moved behind optional
+  extras. Use `ManipulaPy[simulation]`, `ManipulaPy[vision]`,
+  `ManipulaPy[urdf]`, `ManipulaPy[cuda]`, `ManipulaPy[ml]`, or
+  `ManipulaPy[all]` when those surfaces are needed.
+- **`control.pid_control` and `control.computed_torque_control`** — added
+  optional `i_clamp` integral saturation. Omitting it preserves the previous
+  accumulation behavior; invalid clamp values now raise `ValueError`.
+- **`vision.detect_obstacles`** — default `depth_threshold` changed from
+  `0.0` to `5.0` meters so the default no longer filters out every obstacle.
+- **`urdf/core.py` type imports** — `SerialManipulator` and
+  `ManipulatorDynamics` are now imported under `TYPE_CHECKING` for forward
+  annotations, while runtime conversion methods keep local imports.
 
 ### Fixed
 - **`utils.transform_from_twist`** — returned a 3×4 matrix for prismatic
@@ -126,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`control.cartesian_space_control`** — mixed the full 6×N Jacobian with
   a 3-vector position error, raising
   `ValueError: matmul: ... size 6 is different from 3` on first call. Now
-  uses the linear (3×N) part of the Jacobian for position-only control.
+  uses the linear (3×N) part of the Jacobian for position-only control and
+  supports both matrix gains and 1-D vector gains.
 - **`control` performance metrics** (`calculate_rise_time`,
   `calculate_percent_overshoot`) — degenerate inputs (response never
   reaches the rise band, zero set-point) produced `IndexError` or `inf`/
@@ -142,14 +152,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `inf` at singular configurations, breaking visualization plots and any
   caller using ellipsoid extents around singularities. Singular values
   are now clamped to `1e-10`, so radii stay large but finite (correctly
-  reflecting the anisotropy near singularities).
+  reflecting the anisotropy near singularities). Under-actuated 1–2 DOF
+  Jacobians are also padded to avoid dimension mismatch in ellipsoid plotting.
 - **`potential_field.compute_repulsive_potential` / `compute_gradient`** —
   when the configuration coincided with an obstacle (`d = 0`), `1/d` and
   `1/d³` produced `inf` / `nan`, and the gradient was zero (no escape
   direction, robot stuck inside the obstacle). Distance is now clamped,
-  and a deterministic +x escape direction is returned when the
-  configuration is exactly at an obstacle, so the planner can always
-  move away.
+  and a deterministic bounded +x escape direction is returned when the
+  configuration is exactly at an obstacle, so the planner can always move
+  away without an explosive `1 / d³` step.
 - **Missing `simulation` extra in package metadata** — the `Simulation`
   constructor's `ImportError` hint pointed users at
   `pip install 'ManipulaPy[simulation]'`, but no such extra existed in
@@ -171,6 +182,229 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pybullet. Install with: pip install 'ManipulaPy[simulation]'")` only
   when `Simulation()` is actually constructed. Module import is now
   safe on minimal installs.
+
+### Fixed — sim.py
+- **Public methods now raise a clear `ImportError`** with install hint
+  when `pybullet` is unavailable, instead of `AttributeError` on the
+  `None` proxy installed by the import guard. Covers
+  `set_joint_positions`, `simulate_robot_motion`, `run_trajectory`,
+  `manual_control`, `step_simulation`, and the trajectory plotting helpers.
+- **Infinite control loops** (`manual_control`, `simulate_robot_with_desired_angles`,
+  `run`) now ensure clean shutdown
+  even if the controller raises, so PyBullet GUI windows and physics
+  clients no longer leak across test runs or notebook iterations.
+- **`Simulation(physics_client=…)` constructor path** now loads the
+  plane and robot regardless of who owns the physics client. Previously
+  the URDF-loading step was skipped when an external client was passed
+  in, leaving `Simulation` half-initialized (no robot, broken
+  downstream calls).
+- **`set_joint_positions` passes `forces=` to PyBullet position control**
+  using `self.torque_limits` (or `1000 N` per joint as a sane default).
+  Without `forces=`, PyBullet silently capped torque at near-zero and
+  joints failed to track without any error message.
+- **`Simulation.setup_logger` no longer duplicates handlers**.
+  Re-instantiating `Simulation` (common in notebooks and tests) used to
+  stack stream handlers, producing N copies of every log line. The
+  logger now checks for an existing `StreamHandler` before adding one.
+- **`_capsule_line` builds quaternions inline** instead of calling
+  `p.getQuaternionFromAxisAngle`, which is missing from several
+  pybullet builds. The math is identical (`q = (axis * sin(θ/2),
+  cos(θ/2))`) and removes a cross-version compatibility hazard.
+- **`plot_trajectory` mutable default color**: `color=[1, 0, 0]` became
+  `color=None` with the default applied inside the body, eliminating
+  the same footgun fixed earlier in `dynamics.gravity_forces`.
+
+### Fixed — control.py
+- **`ziegler_nichols_tuning` now validates `Tu`** for the PI/PID
+  branches (must be > 0); previously `Tu = 0` produced `inf` gains
+  silently. The P-only branch ignores `Tu` so backwards-compatible
+  callers that pass `Tu = 0` still work.
+- **PID/computed-torque controllers expose an optional `i_clamp` kwarg**
+  (default: unclamped, behavior identical to v1.3.1) for integral
+  windup protection. When set, the integrator is clamped to `[-i_clamp,
+  +i_clamp]` per joint. The clamp value itself is validated (must be
+  scalar, finite, and positive) so hostile inputs (`-5.0`, `nan`)
+  raise rather than silently corrupting state.
+- **Kalman filter input shape validation**: predict/update paths
+  now rejects mis-shaped measurements with a clear error instead of
+  broadcasting silently. Real CuPy arrays still convert through the
+  `_to_numpy` boundary; the previous `np.asarray` change that broke
+  CuPy compatibility was reverted.
+- **Controller integrator state resets on DOF change** with a debug
+  log (was a `warning` — too noisy for legitimate test/notebook flows
+  that switch arms). Prevents a stale `eint` array from a prior
+  controller leaking into the next arm's tracking.
+- **Runtime `cp.ndarray` type expressions removed from annotations** so
+  importing `ManipulaPy.control` no longer crashes on a CPU-only install
+  where `cupy` is `None`.
+- **`calculate_settling_time` returns the first-settled time** and uses
+  the magnitude tolerance `abs(set_point) * tolerance`. Previously it
+  returned the index of the last in-band sample (off-by-one for
+  oscillatory responses) and used the signed `set_point * tolerance`
+  threshold, which gave the wrong sign for negative setpoints.
+- **`pid_control` / `computed_torque_control` initialize `eint` as
+  `float`** so integer-valued `thetalist` inputs accumulate fractional
+  error correctly. Previously `np.zeros_like(int_array)` produced an
+  integer accumulator that truncated every `e * dt` step.
+- **`cartesian_space_control` accepts vector Kp/Kd gains** (e.g.,
+  `Kp = np.array([10, 20, 30])`) by switching to element-wise
+  multiplication when the gain has `ndim < 2`. Matrix gains continue
+  to use the standard matmul path.
+
+### Fixed — singularity.py
+- **`manipulability_ellipsoid` handles under-actuated Jacobians**
+  (rows > cols, e.g., a 1-DOF prismatic-only arm). SVD with
+  `full_matrices=True` plus right-padding the singular value vector
+  produces a shape-consistent ellipsoid surface instead of raising a
+  broadcasting error.
+
+### Fixed — potential_field.py
+- **Repulsive gradient at exact obstacle contact** now applies the
+  escape force to `repulsive_gradient` (was previously a no-op when
+  `d < 1e-10`). Combined with the existing escape-direction logic,
+  this means the gradient is non-zero and bounded even when the robot
+  spawns inside an obstacle.
+
+### Fixed — urdf and mesh loading
+- **`urdf/types.py::Mesh._load_mesh`** distinguishes missing-file from
+  load-failure cases. `trimesh` raises `ValueError` (not
+  `FileNotFoundError`) for non-existent paths, so the previous
+  `except FileNotFoundError` branch never fired and missing files were
+  reported as generic "Failed to load mesh". Now an explicit
+  `Path.is_file()` check emits "Mesh file not found: …" and the
+  generic branch only catches genuine load failures.
+- **`urdf/resolver.py::PackageResolver`**:
+    * Explicit `add_package(name, path)` mappings now override
+      auto-discovery (search paths, ROS env vars, base path, ancestor
+      heuristic). Earlier the explicit map was just one of N candidates
+      and could be overridden by any other matching strategy, which
+      contradicted the warning text instructing callers to use
+      `add_package` to disambiguate.
+    * `use_ros=False` now genuinely isolates the resolver from
+      `ROS_PACKAGE_PATH` and `AMENT_PREFIX_PATH`. Previously
+      environment-driven additions were unconditional.
+    * Restored use of `_find_ros_package` (ament_index, rospkg,
+      catkin_find) when `use_ros=True`. The helper had become dead
+      code in the rewrite; only `ROS_PACKAGE_PATH` was being scanned.
+    * Search-path candidates now include both `search_path/pkg/relative`
+      and `search_path/relative` forms (regression: prior code only
+      tried the first).
+    * Path traversal in package URIs (`package://pkg/../etc/passwd`)
+      is refused with a warning instead of being silently joined.
+    * Symlinked or duplicate-mounted search paths no longer falsely
+      trigger the ambiguity refusal — candidates are deduped by
+      `Path.resolve()` canonical path before counting.
+    * Malformed URIs (`package://`, `package://pkg`, `package://pkg/`)
+      now warn instead of returning unchanged silently.
+    * `file://` URIs use `urllib.request.url2pathname` so
+      `file:///C:/robot/mesh.stl` resolves correctly on Windows.
+    * Filename and exception text are interpolated with `!r` so URDF
+      filenames containing newlines or control characters cannot
+      forge log lines.
+- **`urdf/types.py::Mesh._load_attempted`** flag prevents warning
+  floods. Property accessors (`vertices`, `faces`) used to call
+  `_load_mesh` on every access for a failed mesh; now load is one-shot
+  per `Mesh` instance.
+- **`urdf_processor.py` omega extraction** centralised on
+  `data["omega_list"]`. The earlier code had a typo (`omeg_list`) and
+  an inconsistent slicing of `Slist[:, :3]` vs `Slist[:3, :]` that
+  silently produced wrong-shape omega arrays for non-3-DOF arms.
+- **`urdf/visualization/trimesh_viz.py`** now logs a warning naming
+  the mesh path before falling back to a placeholder box. Previously a
+  bare `except` swallowed both the failure and the diagnostic.
+- **`urdf/geometry/mesh_loader.py`** logs the full mesh path (not
+  `path.name`) and uses `!r` in interpolated filename / exception
+  text. Two missing meshes named `robot.dae` in different directories
+  are now distinguishable in the log.
+
+### Fixed — vision.py
+- **`detect_obstacles` default `depth_threshold=5.0`** (was `0.0`).
+  The combined filter `if mean_depth > depth_threshold: continue`
+  was discarding every detection with positive depth — i.e., every
+  real obstacle. Vision-driven planning now sees the world as
+  intended.
+
+### Fixed — CUDA kernels (no GPU in CI)
+- **`trajectory_kernel` + 4 optimized variants**
+  (`_vectorized`, `_memory_optimized`, `_warp_optimized`,
+  `_cache_friendly`) — shared-memory race fixed (thread (0,0)
+  was writing scaling for its own `t_idx` and other threads were
+  reading those wrong values); per-thread scaling computation
+  replaces the shared-memory hand-off. Linear method (`method == 1`)
+  is now an explicit branch instead of falling through to cubic.
+- **`cartesian_trajectory_kernel`**: same shared-memory race
+  removed; quintic position polynomial corrected (`6 * tau * tau3`
+  ≡ 6 τ⁴ → `10 τ³ − 15 τ⁴ + 6 τ⁵`); quintic acceleration now
+  includes the `(1 − τ)` factor (`60 τ (1 − τ)(1 − 2 τ) / Tf²`),
+  satisfying boundary conditions `s_ddot(0) = s_ddot(1) = 0`;
+  linear branch added.
+- **`batch_trajectory_kernel`**: same set of four bugs as cartesian.
+- **`forward_dynamics_kernel`**: temporal data race removed by
+  having each thread integrate from initial state up to its own
+  `t_idx` instead of reading `thetamat[t_idx − 1]` from rows that
+  parallel threads at lower `t_idx` may not have written yet. Cost
+  is `O(t_idx · intRes)` per thread now, but correctness no longer
+  depends on warp scheduling.
+- **`fused_potential_gradient_kernel`** repulsive gradient sign
+  corrected. The kernel had dropped the leading minus from
+  `∇U_rep = (1/d − 1/d₀)(−1/d³)(q − q_obs)`, so `−∇U` (the force
+  the planner uses) pulled the robot toward obstacles instead of
+  pushing away.
+
+### Fixed — security / packaging
+- **`cuda_kernels.py` bare `except:`** narrowed to `except Exception:`
+  (previously caught `SystemExit` / `KeyboardInterrupt`). Resolves
+  flake8 E722.
+- **`cuda_kernels.py` `setup_cuda_environment_for_40x_speedup`** now
+  uses `os.environ.setdefault` for `CUDA_*` and `NUMBA_CUDA_*` keys
+  instead of unconditional assignment. User-set values (e.g.,
+  `CUDA_LAUNCH_BLOCKING=1` for debugging) survive.
+- **`urdf/xacro.py` arg validation** before forwarding to
+  `subprocess.run`: arg names must match `[A-Za-z_][A-Za-z0-9_]*`,
+  values reject shell metacharacters (`; | & \` $ < >`), embedded
+  NUL/CR/LF, and CLI-flag-lookalikes. Negative numerics (`-1.5`,
+  `-2`) are explicitly allowed (joint limits, offsets). Same name
+  validation applies to `_process_with_package` even though it
+  doesn't shell out.
+- **Heavy dependencies moved to optional groups** in
+  `pyproject.toml`. `pip install ManipulaPy` now installs only
+  numpy, scipy, matplotlib, numba, and pillow; pybullet, torch,
+  trimesh, opencv-python, ultralytics, scikit-learn and cupy live
+  in `[simulation]`, `[urdf]`, `[vision]`, `[ml]`, `[cuda]`, and
+  `[all]` extras. Closes GitHub issue #25 (M1/ARM install
+  failure — no prebuilt pybullet wheel on Apple Silicon). The
+  `Simulation` constructor's existing install hint
+  (`pip install "ManipulaPy[simulation]"`) now actually does what
+  it advertises.
+- **`perception.py` sklearn import guarded** so the module imports
+  without scikit-learn; `cluster_obstacles` raises a clear
+  `ImportError` with install hint when invoked without `[ml]`.
+- **Python 3.12 classifier** added to `pyproject.toml`. 3.13 deferred
+  pending CI verification.
+- **PEP 561 `py.typed` marker** ships in the wheel so downstream type
+  checkers (mypy, pyright, pylance) honor inline type hints.
+- **`ManipulaPy_data/MANIFEST.md`** updated to be honest about wheel
+  contents — meshes are NOT bundled by `MANIFEST.in`, only URDFs ship
+  in the PyPI wheel. Anyone hitting visualization paths on a PyPI
+  install gets per-mesh "not found" warnings rather than silent
+  placeholder geometry with no diagnostic.
+- **`setup.py`** version field synced to `1.3.2` (was stale at
+  `1.2.0`). `pyproject.toml` is canonical for `pip` and
+  `python -m build`; setup.py duplication is kept synced for any
+  legacy tooling that still parses it.
+
+### Fixed — test infrastructure
+- **`tests/conftest.py`** torch mock now exposes `_MockTensor` as a
+  real class (instead of `Mock()` instances) so `isinstance(x,
+  torch.Tensor)` and `issubclass` checks behave as production code
+  expects. Earlier behavior caused ~6 dependency-detection paths to
+  silently mis-skip.
+- **`tests/test_trajectory_planning.py`** moves `import psutil`
+  into the existing try/except so the test file collects on systems
+  without `psutil` installed.
+- **`tests/test_control.py`** wraps the top-level `import cupy as
+  cp` in try/except so collection succeeds on CPU-only contributor
+  machines (analogous to the `sim.py` guard pattern).
 
 ### Tests
 - **`tests/test_path_planning_cpu.py::test_trajectory_cpu_fallback_quintic_midpoint_values`**

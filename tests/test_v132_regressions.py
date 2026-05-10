@@ -1990,6 +1990,28 @@ class TestPackagingRegressions(unittest.TestCase):
             f"setup.py version {m.group(1)!r} != pyproject {target!r}",
         )
 
+    def test_init_py_version_matches_pyproject(self):
+        """ManipulaPy.__version__ must match pyproject.toml [project].version
+        so what `pip install` ships and what `import ManipulaPy; print(...)`
+        reports are the same string."""
+        import ManipulaPy
+
+        pyproject, _ = self._load_pyproject()
+        self.assertEqual(
+            ManipulaPy.__version__,
+            pyproject["project"]["version"],
+            "ManipulaPy.__version__ drift from pyproject.toml",
+        )
+
+    def test_changelog_has_v132_release_section(self):
+        """v1.3.2 ship-ritual: CHANGELOG must have a dated [1.3.2] section
+        (no lingering '[Unreleased] — targeting 1.3.2' header)."""
+        from pathlib import Path
+        repo_root = Path(__file__).resolve().parents[1]
+        text = (repo_root / "CHANGELOG.md").read_text()
+        self.assertIn("## [1.3.2]", text)
+        self.assertNotIn("[Unreleased] — targeting 1.3.2", text)
+
     def test_data_manifest_does_not_lie_about_mesh_bundling(self):
         """The wheel doesn't bundle .stl/.dae/.obj/.mesh assets (excluded
         by MANIFEST.in). The data manifest must say so explicitly so users
