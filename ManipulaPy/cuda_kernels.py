@@ -347,7 +347,7 @@ def make_2d_grid(N: int, num_joints: int, block_size: Tuple[int, int] = (128, 8)
         max_threads_per_block = (
             cuda.get_current_device().MAX_THREADS_PER_BLOCK if CUDA_AVAILABLE else 1024
         )
-    except:
+    except Exception:
         sm_count = 16  # Fallback
         max_threads_per_block = 1024
 
@@ -2010,14 +2010,15 @@ def setup_cuda_environment_for_40x_speedup():
 
     print("🔧 Setting up CUDA environment for 40x+ speedup...")
 
-    # CUDA environment optimizations
-    os.environ["CUDA_CACHE_DISABLE"] = "0"  # Enable kernel caching
-    os.environ["CUDA_LAUNCH_BLOCKING"] = "0"  # Enable async execution
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # Stable device ordering
+    # CUDA environment optimizations — setdefault so we never clobber a
+    # value the user (or a test harness) explicitly set, only fill in defaults.
+    os.environ.setdefault("CUDA_CACHE_DISABLE", "0")  # Enable kernel caching
+    os.environ.setdefault("CUDA_LAUNCH_BLOCKING", "0")  # Enable async execution
+    os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")  # Stable device ordering
 
     # Numba optimizations
-    os.environ["NUMBA_CUDA_CACHE_SIZE"] = "2048"  # Larger cache
-    os.environ["NUMBA_CUDA_LOW_OCCUPANCY_WARNINGS"] = "0"  # Reduce warnings
+    os.environ.setdefault("NUMBA_CUDA_CACHE_SIZE", "2048")  # Larger cache
+    os.environ.setdefault("NUMBA_CUDA_LOW_OCCUPANCY_WARNINGS", "0")  # Reduce warnings
 
     if CUPY_AVAILABLE:
         import cupy as cp

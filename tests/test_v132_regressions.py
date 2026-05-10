@@ -1800,6 +1800,103 @@ class TestCudaKernelRegressions(unittest.TestCase):
         self.assertAlmostEqual(force[1], 0.0)
         self.assertAlmostEqual(force[2], 0.0)
 
+    def test_cuda_kernels_has_no_bare_except_handlers(self):
+        """Bare 'except:' swallows SystemExit/KeyboardInterrupt and trips
+        flake8 E722. Narrow to 'except Exception:'."""
+        import ast
+        import inspect
+
+        from ManipulaPy import cuda_kernels
+
+        tree = ast.parse(inspect.getsource(cuda_kernels))
+        bare_handlers = [
+            node.lineno for node in ast.walk(tree)
+            if isinstance(node, ast.ExceptHandler) and node.type is None
+        ]
+        self.assertEqual(bare_handlers, [],
+                         f"bare except handlers at lines {bare_handlers}")
+
+    def test_setup_cuda_environment_respects_existing_user_values(self):
+        """setup_cuda_environment must not clobber env vars the user set
+        explicitly. Use setdefault, not direct assignment."""
+        import os
+        from ManipulaPy.cuda_kernels import setup_cuda_environment_for_40x_speedup
+
+        key = "CUDA_LAUNCH_BLOCKING"
+        previous = os.environ.get(key)
+        os.environ[key] = "1"
+        try:
+            setup_cuda_environment_for_40x_speedup()
+            self.assertEqual(os.environ[key], "1",
+                "setup_cuda_environment must not overwrite user-set values")
+        finally:
+            if previous is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = previous
+
+
+class TestXacroRegressions(unittest.TestCase):
+    """Regressions for ManipulaPy/urdf/xacro.py — security audit (Task 41)."""
+
+    def test_xacro_arg_name_must_match_identifier_pattern(self):
+        from pathlib import Path
+        from ManipulaPy.urdf.xacro import XacroProcessor
+
+        for bad_key in ("--malicious-flag", "key with spaces", "key;rm -rf",
+                        "1leading_digit"):
+            with self.subTest(key=bad_key):
+                with self.assertRaises(ValueError):
+                    XacroProcessor._process_with_command(
+                        Path("/nonexistent.xacro"), {bad_key: "value"}
+                    )
+
+    def test_xacro_arg_value_rejects_shell_metacharacters(self):
+        from pathlib import Path
+        from ManipulaPy.urdf.xacro import XacroProcessor
+
+        for bad_value in ("foo;rm -rf", "foo|cat", "$(echo)", "a`b`",
+                          "line1\nline2", "trailing\x00null"):
+            with self.subTest(value=bad_value):
+                with self.assertRaises(ValueError):
+                    XacroProcessor._process_with_command(
+                        Path("/nonexistent.xacro"), {"safe_key": bad_value}
+                    )
+
+    def test_xacro_arg_value_rejects_cli_flag_lookalikes(self):
+        from pathlib import Path
+        from ManipulaPy.urdf.xacro import XacroProcessor
+
+        for bad_value in ("--malicious", "-foo", "--help"):
+            with self.subTest(value=bad_value):
+                with self.assertRaises(ValueError):
+                    XacroProcessor._process_with_command(
+                        Path("/nonexistent.xacro"), {"safe_key": bad_value}
+                    )
+
+    def test_xacro_arg_value_allows_negative_numbers(self):
+        """Codex caught: rejecting all '-' values would break legit
+        negative numerics like joint limits or offsets."""
+        import subprocess
+        from pathlib import Path
+        from unittest.mock import patch
+        from ManipulaPy.urdf.xacro import XacroProcessor
+
+        # We expect validation to PASS (no ValueError) for negative numbers,
+        # so the call advances to subprocess.run. Mock that so we don't need
+        # the xacro binary, then assert the formatted CLI arg made it through.
+        with patch("ManipulaPy.urdf.xacro.subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[], returncode=0, stdout="<robot/>", stderr=""
+            )
+            XacroProcessor._process_with_command(
+                Path("/some.xacro"),
+                {"offset": "-1.5", "limit": "-2"},
+            )
+            cmd = mock_run.call_args[0][0]
+            self.assertIn("offset:=-1.5", cmd)
+            self.assertIn("limit:=-2", cmd)
+
 
 if __name__ == "__main__":
     unittest.main()

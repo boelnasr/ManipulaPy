@@ -9,12 +9,21 @@ Copyright (c) 2025 Mohamed Aboelnasr
 """
 
 import logging
+import re
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# Xacro arg names must be plain Python-identifier-shaped tokens. Values must
+# not contain shell metacharacters or look like CLI flags (so a malicious
+# arg can't smuggle a flag past xacro). Negative numbers (``-1.5``) are
+# allowed because the flag check requires an alphabetic char after the dash.
+_XACRO_ARG_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_FORBIDDEN_VALUE_CHARS = set(";|&`$<>\n\r\x00")
+_LOOKS_LIKE_FLAG_RE = re.compile(r"^-[^0-9.]")
+_MAX_VALUE_LEN = 4096
 
 
 class XacroProcessor:
@@ -72,12 +81,34 @@ class XacroProcessor:
         filename: Path,
         args: Optional[Dict[str, str]] = None,
     ) -> str:
-        """Process using system xacro command."""
+        """Process using system xacro command with validated args."""
         cmd = ["xacro", str(filename)]
 
         if args:
             for key, value in args.items():
-                cmd.append(f"{key}:={value}")
+                key_str = str(key)
+                if not _XACRO_ARG_NAME_RE.match(key_str):
+                    raise ValueError(
+                        f"Invalid xacro arg name {key!r}: must match "
+                        "[A-Za-z_][A-Za-z0-9_]*"
+                    )
+                value_str = str(value)
+                if any(c in value_str for c in _FORBIDDEN_VALUE_CHARS):
+                    raise ValueError(
+                        f"Invalid xacro arg value for {key!r}: contains "
+                        "shell metacharacter"
+                    )
+                if _LOOKS_LIKE_FLAG_RE.match(value_str):
+                    raise ValueError(
+                        f"Invalid xacro arg value for {key!r}: value looks "
+                        f"like a CLI flag ({value_str!r})"
+                    )
+                if len(value_str) > _MAX_VALUE_LEN:
+                    raise ValueError(
+                        f"Invalid xacro arg value for {key!r}: exceeds "
+                        f"{_MAX_VALUE_LEN} chars"
+                    )
+                cmd.append(f"{key_str}:={value_str}")
 
         result = subprocess.run(
             cmd,
@@ -96,6 +127,14 @@ class XacroProcessor:
     ) -> str:
         """Process using xacro Python package."""
         import xacro
+
+        if args:
+            for key in args:
+                if not _XACRO_ARG_NAME_RE.match(str(key)):
+                    raise ValueError(
+                        f"Invalid xacro arg name {key!r}: must match "
+                        "[A-Za-z_][A-Za-z0-9_]*"
+                    )
 
         # Build argument list
         xacro_args = [str(filename)]
