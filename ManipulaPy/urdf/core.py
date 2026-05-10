@@ -903,7 +903,7 @@ class URDF:
         omega_list = np.zeros((3, n), dtype=np.float64)
         r_list = np.zeros((3, n), dtype=np.float64)
         G_list = []
-        Mlist_per_link = [] #New: per-link COM tranosform in zero config
+        Mlist_per_link = []  # New: per-link CoM transform in zero config
 
 
         for i, joint in enumerate(actuated):

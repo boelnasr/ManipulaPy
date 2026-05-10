@@ -54,7 +54,7 @@ python -m black ManipulaPy/ tests/
 python -m isort ManipulaPy/ tests/
 
 # Build docs
-python -m sphinx docs/source docs/build/html -b html
+python -m sphinx -b html docs/source docs/build/html
 ```
 
 ### CI/CD

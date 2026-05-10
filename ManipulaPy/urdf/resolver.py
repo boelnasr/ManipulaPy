@@ -216,7 +216,7 @@ class PackageResolver:
                 candidates.append(("search_path", str(cand)))
 
         # Strategy 3: ROS package path env
-        ros_paths = os.environ.get("ROS_PACKAGE_PATH", "").split(":")
+        ros_paths = os.environ.get("ROS_PACKAGE_PATH", "").split(os.pathsep)
         for ros_path in ros_paths:
             if not ros_path:
                 continue
