@@ -203,7 +203,10 @@ def _load_with_trimesh(path: Path) -> Optional[MeshData]:
         )
 
     except ImportError:
-        logger.warning("trimesh not available for loading complex mesh formats")
+        logger.warning(
+                f"Cannot load '{path.name}' — trimesh is required for "
+                f"{path.suffix} files. Install with: pip install trimesh"
+            )
         return None
     except Exception as e:
         logger.warning(f"trimesh failed to load {path}: {e}")

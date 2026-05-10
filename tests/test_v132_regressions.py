@@ -1140,7 +1140,28 @@ class TestUrdfRegressions(unittest.TestCase):
 
             self.assertEqual(resolved, uri)
             self.assertTrue(any("multiple" in msg.lower() for msg in cm.output))
+    def test_mesh_loader_import_warning_mentions_file_and_install_hint(self):
+        import builtins
+        from pathlib import Path
+        from unittest.mock import patch
 
+        from ManipulaPy.urdf.geometry import mesh_loader
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "trimesh":
+                raise ImportError("blocked trimesh")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import), \
+            self.assertLogs("ManipulaPy.urdf.geometry.mesh_loader", level="WARNING") as cm:
+            result = mesh_loader._load_with_trimesh(Path("robot.dae"))
+
+        self.assertIsNone(result)
+        warning = "\n".join(cm.output)
+        self.assertIn("robot.dae", warning)
+        self.assertIn("pip install trimesh", warning)
 class TestCudaKernelRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/cuda_kernels.py bugs.
 
