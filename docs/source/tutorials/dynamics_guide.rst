@@ -13,8 +13,9 @@ Mass Matrix Computation
 
 .. code-block:: python
 
+    import numpy as np
     from ManipulaPy.dynamics import ManipulatorDynamics
-    
+
     # Create dynamics object
     dynamics = ManipulatorDynamics(
         M_list=M,
@@ -32,6 +33,8 @@ Inverse Dynamics
 ---------------
 
 .. code-block:: python
+
+    import numpy as np
 
     # Compute required torques
     joint_angles = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
@@ -52,6 +55,8 @@ Forward Dynamics
 ---------------
 
 .. code-block:: python
+
+    import numpy as np
 
     # Simulate robot motion
     applied_torques = np.array([10, 5, 3, 2, 1, 0.5])

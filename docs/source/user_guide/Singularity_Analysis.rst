@@ -213,6 +213,8 @@ Core Analysis Methods
 
    .. code-block:: python
 
+       import numpy as np
+
        # Example: Check multiple configurations
        test_configs = [
            np.zeros(6),                    # Home
@@ -367,6 +369,9 @@ Analyze singularities along planned trajectories:
 
 .. code-block:: python
 
+    import numpy as np
+    import matplotlib.pyplot as plt
+
     def analyze_trajectory_singularities(analyzer, trajectory, time_steps=None):
         """Analyze singularities along a trajectory."""
         
@@ -447,6 +452,7 @@ Implement real-time singularity monitoring for robot control:
 
     import time
     import threading
+    import numpy as np
     from collections import deque
 
     class SingularityMonitor:
@@ -551,6 +557,8 @@ Cache Jacobian computations for repeated configurations:
 
 .. code-block:: python
 
+    import numpy as np
+
     class CachedSingularityAnalyzer:
         """Singularity analyzer with Jacobian caching."""
         
@@ -591,6 +599,8 @@ Cache Jacobian computations for repeated configurations:
 Process multiple configurations efficiently:
 
 .. code-block:: python
+
+    import numpy as np
 
     def batch_singularity_analysis(analyzer, configurations, batch_size=100):
         """Efficiently analyze multiple configurations."""
@@ -635,6 +645,8 @@ Common Issues and Solutions
 Problem: Condition numbers become infinite or NaN
 
 .. code-block:: python
+
+    import numpy as np
 
     def robust_condition_number(analyzer, thetalist, max_condition=1e12):
         """Robust condition number computation with error handling."""
@@ -697,6 +709,7 @@ Unit Testing Framework
 
 .. code-block:: python
 
+    import numpy as np
     import unittest
 
     class TestSingularityAnalysis(unittest.TestCase):

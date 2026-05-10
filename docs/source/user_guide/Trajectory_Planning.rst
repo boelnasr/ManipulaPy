@@ -154,9 +154,10 @@ Setting Up Trajectory Planning
 
 .. code-block:: python
 
+   import numpy as np
    from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
    from ManipulaPy.urdf_processor import URDFToSerialManipulator
-   
+
    # Load robot model
    processor = URDFToSerialManipulator("robot.urdf")
    robot = processor.serial_manipulator
@@ -243,9 +244,11 @@ Generates smooth joint-space trajectories with CUDA acceleration:
 
 .. code-block:: python
 
+   import numpy as np
+
    def joint_trajectory_example():
        """Demonstrate joint trajectory generation options."""
-       
+
        # Setup
        theta_start = np.zeros(6)
        theta_end = np.array([0.8, -0.5, 0.3, -0.2, 0.6, -0.4])
@@ -300,9 +303,12 @@ Generates Cartesian-space trajectories for end-effector motion:
 
 .. code-block:: python
 
+   import numpy as np
+   import matplotlib.pyplot as plt
+
    def cartesian_trajectory_example():
        """Demonstrate Cartesian trajectory generation."""
-       
+
        # Define start and end poses
        X_start = np.eye(4)
        X_start[:3, 3] = [0.3, 0.2, 0.5]  # Start position
@@ -398,9 +404,12 @@ Computes required joint torques along a trajectory:
 
 .. code-block:: python
 
+   import numpy as np
+   import matplotlib.pyplot as plt
+
    def dynamics_analysis_example():
        """Analyze dynamics along a trajectory."""
-       
+
        # Generate joint trajectory
        theta_start = np.zeros(6)
        theta_end = np.array([0.5, 0.3, -0.2, 0.1, 0.4, -0.1])
@@ -464,9 +473,12 @@ Simulates robot motion given applied torques:
 
 .. code-block:: python
 
+   import numpy as np
+   import matplotlib.pyplot as plt
+
    def forward_dynamics_simulation():
        """Simulate robot motion using forward dynamics."""
-       
+
        # Initial conditions
        theta_initial = np.array([0.1, 0.2, -0.1, 0.0, 0.3, 0.0])
        theta_dot_initial = np.zeros(6)
@@ -590,9 +602,11 @@ Static plotting of trajectory data:
 
 .. code-block:: python
 
+   import numpy as np
+
    def trajectory_visualization_example():
        """Comprehensive trajectory visualization."""
-       
+
        # Generate sample trajectory
        theta_start = np.array([0.0, 0.5, -0.3, 0.0, 0.2, 0.0])
        theta_end = np.array([0.8, -0.2, 0.4, -0.5, 0.6, -0.3])
@@ -621,9 +635,11 @@ Visualization for Cartesian trajectories:
 
 .. code-block:: python
 
+   import numpy as np
+
    def cartesian_visualization_example():
        """Visualize Cartesian trajectory."""
-       
+
        # Generate Cartesian trajectory
        X_start = np.eye(4)
        X_start[:3, 3] = [0.4, 0.3, 0.5]
@@ -656,6 +672,8 @@ Collision Avoidance
 The trajectory planner includes collision detection and avoidance:
 
 .. code-block:: python
+
+   import numpy as np
 
    def collision_avoidance_example():
        """Demonstrate collision avoidance in trajectory planning."""
@@ -698,6 +716,9 @@ Multi-Point Trajectories
 Creating trajectories through multiple waypoints:
 
 .. code-block:: python
+
+   import numpy as np
+   import matplotlib.pyplot as plt
 
    def multi_waypoint_trajectory():
        """Generate trajectory through multiple waypoints."""
@@ -823,9 +844,11 @@ The trajectory planner uses CUDA for high-performance computations:
 
 .. code-block:: python
 
+   import numpy as np
+
    def performance_comparison():
        """Compare CPU vs CUDA performance for trajectory generation."""
-       
+
        import time
        
        # Large trajectory for performance testing
@@ -884,6 +907,8 @@ Batch Processing
 Processing multiple trajectories efficiently:
 
 .. code-block:: python
+
+   import numpy as np
 
    def batch_trajectory_processing():
        """Process multiple trajectories in batch for efficiency."""
@@ -1229,6 +1254,9 @@ Complete pick-and-place trajectory planning:
 
 .. code-block:: python
 
+   import numpy as np
+   import matplotlib.pyplot as plt
+
    def pick_and_place_trajectory():
        """Generate trajectory for pick-and-place operation."""
        
@@ -1502,6 +1530,8 @@ Error Handling and Debugging
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def trajectory_debugging_tools():
        """Tools for debugging trajectory planning issues."""

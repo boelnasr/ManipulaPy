@@ -129,6 +129,9 @@ The optimized `joint_trajectory()` method automatically selects the best executi
 
 .. code-block:: python
 
+   import numpy as np
+   import time
+
    def optimized_trajectory_demo():
        """Demonstrate adaptive trajectory generation with performance monitoring."""
        
@@ -179,6 +182,9 @@ batch_joint_trajectory() for Multiple Trajectories
 Process multiple trajectories simultaneously with optimized batch kernels:
 
 .. code-block:: python
+
+   import numpy as np
+   import time
 
    def batch_trajectory_demo():
        """Demonstrate high-performance batch trajectory generation."""
@@ -249,6 +255,9 @@ Memory Pool Management
 Optimize memory allocation for better performance:
 
 .. code-block:: python
+
+   import numpy as np
+   import time
 
    def memory_optimization_demo():
        """Demonstrate memory pool optimization for sustained performance."""
@@ -385,6 +394,9 @@ GPU-accelerated dynamics computation with optimized memory management:
 
 .. code-block:: python
 
+   import numpy as np
+   import time
+
    def optimized_dynamics_demo():
        """Demonstrate optimized dynamics computation with performance analysis."""
        
@@ -450,6 +462,9 @@ Enhanced forward_dynamics_trajectory()
 Optimized forward dynamics simulation with adaptive execution:
 
 .. code-block:: python
+
+   import numpy as np
+   import time
 
    def optimized_forward_dynamics_demo():
        """Demonstrate optimized forward dynamics simulation."""
@@ -542,6 +557,9 @@ GPU-accelerated Cartesian trajectory generation with adaptive execution:
 
 .. code-block:: python
 
+   import numpy as np
+   import time
+
    def optimized_cartesian_demo():
        """Demonstrate optimized Cartesian trajectory generation."""
        
@@ -623,6 +641,9 @@ High-Performance Pick-and-Place
 Optimized trajectory planning for industrial pick-and-place operations:
 
 .. code-block:: python
+
+   import numpy as np
+   import time
 
    def optimized_pick_and_place():
        """Demonstrate optimized pick-and-place trajectory planning."""
@@ -804,6 +825,9 @@ Optimized trajectory planning for multiple robots with collision avoidance:
 
 .. code-block:: python
 
+   import numpy as np
+   import time
+
    def multi_robot_coordination():
        """Demonstrate optimized multi-robot trajectory coordination."""
        
@@ -948,6 +972,9 @@ Adaptive Performance Tuning
 The planner automatically adapts its execution strategy based on performance history:
 
 .. code-block:: python
+
+   import numpy as np
+   import time
 
    def adaptive_tuning_demo():
        """Demonstrate automatic performance tuning capabilities."""

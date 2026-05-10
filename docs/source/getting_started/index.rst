@@ -30,6 +30,15 @@ The fastest way to get started:
 
    pip install manipulapy
 
+.. note::
+   As of v1.3.2, the default install is intentionally lightweight — it
+   pulls only the core numerical/plotting stack (NumPy, SciPy, matplotlib,
+   numba, pillow). Heavier or platform-specific dependencies such as
+   ``pybullet``, ``opencv-python``, ``torch``, ``scikit-learn``, ``trimesh``,
+   and ``urchin`` now live in optional extras (see below) so that the base
+   install succeeds on minimal images and platforms without prebuilt wheels
+   (e.g., Apple Silicon).
+
 🚀 **Recommended Install (with GPU acceleration)**
 
 For the best performance:
@@ -52,17 +61,23 @@ If you want to contribute or modify the library:
 
 .. code-block:: bash
 
-   git clone https://github.com/yourusername/ManipulaPy.git
+   git clone https://github.com/boelnasr/ManipulaPy.git
    cd ManipulaPy
    pip install -e .[dev]
 
 .. note::
    **System Requirements:**
-   
+
    - Python 3.8 or higher
-   - NumPy, SciPy (automatically installed)
-   - Optional: CUDA for GPU acceleration
-   - Optional: PyBullet for simulation
+   - Core (auto-installed): NumPy, SciPy, matplotlib, numba, pillow
+   - Optional extras (install on demand):
+
+     - ``[simulation]`` — PyBullet physics simulation
+     - ``[urdf]`` — trimesh-based URDF mesh loading
+     - ``[vision]`` — OpenCV, Ultralytics/YOLO, PyTorch
+     - ``[ml]`` — PyTorch + scikit-learn for learning-based components
+     - ``[cuda]`` — CuPy (CUDA 11.x) for GPU acceleration
+     - ``[all]`` — everything above
 
 Verify Your Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -180,7 +195,13 @@ Your First Simulation
 
 🎬 **PyBullet Physics Simulation**
 
-Note that simulations require a CUDA installation, and a GPU.
+.. note::
+   Simulation runs on CPU via PyBullet — no GPU or CUDA is required.
+   You do, however, need the ``[simulation]`` extra:
+
+   .. code-block:: bash
+
+      pip install "ManipulaPy[simulation]"
 
 Bring your robot to life with realistic physics:
 
@@ -213,7 +234,9 @@ Your First Control System
 
 🎛️ **Intelligent Robot Control**
 
-Note that robot control requires a CUDA installation, and a GPU.
+.. note::
+   The control module is pure NumPy/SciPy — it ships with the default
+   install and does **not** require CUDA, a GPU, or any extras.
 
 Control your robot with advanced algorithms:
 
@@ -256,6 +279,15 @@ Your First Vision System
 ------------------------
 
 👁️ **Computer Vision & Perception**
+
+.. note::
+   The vision and perception modules pull in OpenCV, Ultralytics/YOLO,
+   and PyTorch, which are *not* part of the default install. Install the
+   ``[vision]`` extra first:
+
+   .. code-block:: bash
+
+      pip install "ManipulaPy[vision]"
 
 Add eyes to your robot:
 
@@ -407,9 +439,15 @@ Common Issues & Solutions
 📞 **Need Help?**
 
 - 📖 Check the :doc:`../api/index` for detailed function documentation
-- 🐛 Report bugs on `GitHub Issues <https://github.com/yourusername/ManipulaPy/issues>`_
+- 🐛 Report bugs on `GitHub Issues <https://github.com/boelnasr/ManipulaPy/issues>`_
 - 💬 Join our community discussions
 - 📧 Contact the maintainers for support
+
+.. tip::
+   Curious what changed in this release? See the
+   `v1.3.2 changelog <https://github.com/boelnasr/ManipulaPy/blob/main/CHANGELOG.md>`_
+   for highlights — the lightweight default install, the new ``[simulation]``,
+   ``[urdf]``, ``[vision]``, and ``[ml]`` extras, plus control/sim/URDF bug fixes.
 
 .. raw:: html
 
