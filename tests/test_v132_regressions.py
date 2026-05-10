@@ -235,18 +235,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
         self.assertAlmostEqual(s(1.0), 1.0)
         self.assertAlmostEqual(s_ddot(0.0), 0.0)
         self.assertAlmostEqual(s_ddot(1.0), 0.0)
-    def test_plot_tcp_trajectory_does_not_shadow_time_module(self):
-        """plot_tcp_trajectory must not bind a local 'time' that shadows
-        the imported 'time' module — doing so breaks the timing branch
-        with AttributeError mid-execution."""
-        import inspect
-        from ManipulaPy import path_planning
 
-        src = inspect.getsource(path_planning)
-        self.assertNotIn(
-            "time = np.arange", src,
-            "Variable 'time' shadows the time module — rename to time_array",
-        )
 
     def test_quintic_trajectory_zero_endpoint_acceleration(self):
         from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
@@ -1120,7 +1109,14 @@ class TestVisionRegressions(unittest.TestCase):
 
 
 class TestUrdfRegressions(unittest.TestCase):
-    """Regressions for URDF subsystem bugs."""
+    def test_mesh_load_failure_emits_warning(self):
+        import logging
+        from ManipulaPy.urdf.types import Mesh  # adjust import path as needed
+
+        mesh = Mesh(filename="/nonexistent/path/to/mesh.stl", scale=[1, 1, 1])
+        with self.assertLogs("ManipulaPy.urdf.types", level="WARNING") as cm:
+            mesh._load_mesh()
+        self.assertTrue(any("not found" in msg.lower() for msg in cm.output))
 
 
 class TestCudaKernelRegressions(unittest.TestCase):

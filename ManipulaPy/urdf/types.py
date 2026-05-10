@@ -11,9 +11,15 @@ Copyright (c) 2025 Mohamed Aboelnasr
 
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 
 
 def _array_eq(a: np.ndarray, b: np.ndarray, tol: float = 1e-10) -> bool:
@@ -312,18 +318,22 @@ class Mesh:
         return self._faces
 
     def _load_mesh(self) -> None:
-        """Load mesh from file using trimesh."""
+        if not Path(self.filename).is_file():
+            logger.warning(f"Mesh file not found: {self.filename}")
+            return
         try:
             import trimesh
-
             mesh = trimesh.load(self.filename, force="mesh")
             self._vertices = np.asarray(mesh.vertices, dtype=np.float64)
             self._faces = np.asarray(mesh.faces, dtype=np.int64)
             self._trimesh = mesh
         except ImportError:
-            pass  # trimesh not available
-        except Exception:
-            pass  # Failed to load mesh
+            logger.warning(
+                f"trimesh not installed — cannot load mesh '{self.filename}'. "
+                "Install with: pip install trimesh"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load mesh '{self.filename}': {e}")
 
     def __eq__(self, other):
         if not isinstance(other, Mesh):
