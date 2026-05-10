@@ -1509,11 +1509,15 @@ class TestUrdfRegressions(unittest.TestCase):
         and renamed the prior 'omeg_list' typo. This locks in the shape
         and value invariants.
         """
+        from pathlib import Path
         try:
             from ManipulaPy.urdf_processor import URDFToSerialManipulator
             from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
-        except Exception as e:
+        except (ImportError, ModuleNotFoundError) as e:
             self.skipTest(f"UR5 fixture unavailable: {e}")
+
+        if not Path(str(urdf_file)).exists():
+            self.skipTest(f"UR5 fixture unavailable: {urdf_file}")
 
         urdf = URDFToSerialManipulator(str(urdf_file))
         for path_label, omega in (
@@ -1761,8 +1765,11 @@ class TestCudaKernelRegressions(unittest.TestCase):
             "temporal data race across parallel threads.",
         )
         self.assertNotIn("dthetamat[t_idx - 1", body)
-        # The fixed version must walk from t=0 to t_idx within the thread.
-        self.assertIn("range(t_idx + 1)", body)
+        # The fixed version must preserve row 0 as the initial state, then walk
+        # from t=1 to t_idx within the thread to match the CPU trajectory path.
+        self.assertIn("if t_idx == 0", body)
+        self.assertIn("range(1, t_idx + 1)", body)
+        self.assertNotIn("range(t_idx + 1)", body)
 
     def test_potential_gradient_repulsive_pushes_away_from_obstacle(self):
         """Pure-Python equivalent of the fused potential gradient — verifies
@@ -1990,6 +1997,58 @@ class TestPackagingRegressions(unittest.TestCase):
             f"setup.py version {m.group(1)!r} != pyproject {target!r}",
         )
 
+    def _setup_py_keyword(self, keyword_name):
+        """Return a literal setup.py keyword argument from the setup() call."""
+        import ast
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[1]
+        tree = ast.parse((repo_root / "setup.py").read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "setup":
+                for keyword in node.keywords:
+                    if keyword.arg == keyword_name:
+                        return ast.literal_eval(keyword.value)
+        raise AssertionError(f"setup.py missing setup({keyword_name}=...)")
+
+    def test_setup_py_core_dependencies_follow_optional_split(self):
+        """Legacy setup.py must not reintroduce the heavy deps that pyproject
+        moved behind extras. Some downstream tools still inspect setup.py."""
+        install_requires = self._setup_py_keyword("install_requires")
+        core_deps = {
+            dep.split(">=")[0].split("==")[0].split(";")[0].split("[")[0].strip().lower()
+            for dep in install_requires
+        }
+        heavy = {
+            "cupy-cuda11x", "cupy-cuda12x", "pycuda", "pybullet", "torch",
+            "torchvision", "opencv-python", "ultralytics", "trimesh", "urchin",
+            "scikit-learn",
+        }
+        self.assertFalse(
+            core_deps & heavy,
+            f"setup.py install_requires still contains heavy deps: {core_deps & heavy}",
+        )
+
+        extras = self._setup_py_keyword("extras_require")
+        for group in ("simulation", "vision", "urdf", "cuda", "ml", "all"):
+            self.assertIn(group, extras, f"setup.py missing extra {group!r}")
+
+    def test_setup_py_package_data_does_not_reinclude_meshes(self):
+        """Task 48 chose URDF-only wheels; setup.py package_data must not
+        contradict MANIFEST.in by listing mesh globs."""
+        package_data = self._setup_py_keyword("package_data")
+        package_data_text = repr(package_data).lower()
+        for suffix in (".stl", ".dae", ".obj", ".mesh"):
+            self.assertNotIn(suffix, package_data_text)
+
+    def test_python_312_ci_matrix_present(self):
+        """Declaring Python 3.12 support requires CI coverage for 3.12."""
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[1]
+        workflow = (repo_root / ".github" / "workflows" / "test.yml").read_text()
+        self.assertIn("3.12", workflow)
+
     def test_init_py_version_matches_pyproject(self):
         """ManipulaPy.__version__ must match pyproject.toml [project].version
         so what `pip install` ships and what `import ManipulaPy; print(...)`
@@ -2084,6 +2143,204 @@ class TestXacroRegressions(unittest.TestCase):
             cmd = mock_run.call_args[0][0]
             self.assertIn("offset:=-1.5", cmd)
             self.assertIn("limit:=-2", cmd)
+
+
+class TestCodeRabbitRoundTwo(unittest.TestCase):
+    """Regressions for the second CodeRabbit pass over v1.3.2 work.
+
+    Each test pins one finding from the review so the same regression
+    cannot land twice.
+    """
+
+    def test_kalman_filter_update_validates_P_shape(self):
+        """kalman_filter_update must reject self.P=None or wrong-shape P
+        with a clear ValueError, before reaching the matrix algebra (which
+        would fail with a confusing low-level error).
+        """
+        from unittest.mock import MagicMock
+        from ManipulaPy.control import ManipulatorController
+
+        ctrl = ManipulatorController.__new__(ManipulatorController)
+        ctrl.dynamics = MagicMock()
+
+        # Case 1: P is None
+        ctrl.x_hat = np.zeros(4)
+        ctrl.P = None
+        with self.assertRaises(ValueError) as ctx:
+            ctrl.kalman_filter_update(np.zeros(4), np.eye(4))
+        self.assertIn("P must be initialized", str(ctx.exception))
+
+        # Case 2: P is wrong shape
+        ctrl.P = np.eye(3)  # should be (4, 4)
+        with self.assertRaises(ValueError) as ctx:
+            ctrl.kalman_filter_update(np.zeros(4), np.eye(4))
+        self.assertIn("(4, 4)", str(ctx.exception))
+
+        # Case 3: P is correctly shaped — should not raise from this guard
+        ctrl.P = np.eye(4)
+        try:
+            ctrl.kalman_filter_update(np.zeros(4), np.eye(4))
+        except ValueError as e:
+            self.fail(f"P shape check rejected a valid (4,4) P: {e}")
+
+    def test_connect_disconnect_initialize_robot_raise_importerror_without_pybullet(self):
+        """connect_simulation/disconnect_simulation/initialize_robot must
+        all surface ImportError when pybullet is missing — previously they
+        skipped _check_pybullet_available() and raised AttributeError on
+        the None proxy instead.
+        """
+        from unittest.mock import patch, MagicMock
+        from ManipulaPy.sim import Simulation
+
+        for method_name in ("connect_simulation", "disconnect_simulation", "initialize_robot"):
+            with self.subTest(method=method_name):
+                sim = Simulation.__new__(Simulation)
+                sim.logger = MagicMock()
+                sim.physics_client = 1
+                sim.urdf_file_path = "/nonexistent.urdf"
+                sim.time_step = 0.01
+                with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", False), \
+                     patch("ManipulaPy.sim.p", None):
+                    with self.assertRaises(ImportError) as ctx:
+                        getattr(sim, method_name)()
+                self.assertIn("ManipulaPy[simulation]", str(ctx.exception))
+
+    def test_set_joint_positions_collapses_torque_pairs_to_scalars(self):
+        """set_joint_positions must hand PyBullet one scalar per joint.
+        torque_limits is canonically [(min, max), ...]; the previous code
+        passed those tuples through verbatim and PyBullet rejected them.
+        """
+        from unittest.mock import MagicMock, patch
+        from ManipulaPy.sim import Simulation
+
+        sim = Simulation.__new__(Simulation)
+        sim.logger = MagicMock()
+        sim.robot_id = 1
+        sim.non_fixed_joints = list(range(3))
+        sim.torque_limits = [(-10.0, 10.0), (-20.0, 5.0), (-3.0, 30.0)]
+        sim.physics_client = 1
+
+        captured = {}
+
+        def fake_set_motor(robot_id, indices, mode, targetPositions, forces):
+            captured["forces"] = forces
+
+        fake_p = MagicMock()
+        fake_p.setJointMotorControlArray.side_effect = fake_set_motor
+        fake_p.POSITION_CONTROL = 0
+        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
+             patch("ManipulaPy.sim.p", fake_p):
+            sim.set_joint_positions([0.0, 0.0, 0.0])
+
+        forces = captured["forces"]
+        self.assertEqual(len(forces), 3, "one scalar per joint required")
+        for f in forces:
+            self.assertIsInstance(f, float, f"forces must be scalars, got {type(f)}")
+        # Max abs magnitudes from each (min, max) pair.
+        self.assertAlmostEqual(forces[0], 10.0)
+        self.assertAlmostEqual(forces[1], 20.0)
+        self.assertAlmostEqual(forces[2], 30.0)
+
+    def test_manifest_load_example_imports_get_robot_urdf(self):
+        """The ManipulaPy_data/MANIFEST.md snippet that calls
+        ``URDF.load(get_robot_urdf('ur5'))`` must also import
+        ``get_robot_urdf`` so users can copy-paste it verbatim.
+        """
+        from pathlib import Path
+        manifest = Path(__file__).resolve().parents[1] / "ManipulaPy" / "ManipulaPy_data" / "MANIFEST.md"
+        text = manifest.read_text(encoding="utf-8")
+        # Every ```python block that calls get_robot_urdf(...) must first
+        # import it.
+        import re
+        blocks = re.findall(r"```python\n(.*?)```", text, re.DOTALL)
+        offending = []
+        for i, block in enumerate(blocks):
+            if "get_robot_urdf(" in block and "from ManipulaPy.ManipulaPy_data import get_robot_urdf" not in block:
+                offending.append(i)
+        self.assertEqual(
+            offending, [],
+            f"MANIFEST.md python block(s) {offending} call get_robot_urdf without importing it",
+        )
+
+    def test_resolver_explicit_map_miss_does_not_fall_through(self):
+        """When add_package() pins a package to a path and the requested
+        file is absent under that path, the resolver must NOT silently
+        return a hit from another search path — that defeats the explicit
+        override.
+        """
+        import tempfile
+        from pathlib import Path
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            pinned = tmp / "pinned"
+            other = tmp / "other"
+            (pinned / "meshes").mkdir(parents=True)
+            (other / "mypkg" / "meshes").mkdir(parents=True)
+            # File only exists under the auto-discoverable path, not the
+            # explicit one. The resolver should refuse to fall back.
+            (other / "mypkg" / "meshes" / "robot.dae").write_text("")
+
+            resolver = PackageResolver(base_path=str(other))
+            resolver.add_package("mypkg", str(pinned))
+
+            with self.assertLogs("ManipulaPy.urdf.resolver", level="WARNING") as cm:
+                result = resolver._resolve_package_uri("package://mypkg/meshes/robot.dae")
+            self.assertEqual(result, "package://mypkg/meshes/robot.dae",
+                             "explicit-map miss must not fall through to other strategies")
+            joined = "\n".join(cm.output)
+            self.assertIn("Explicit package mapping", joined)
+
+    def test_trajectory_kernels_guard_division_by_zero_when_N_equals_one(self):
+        """All trajectory kernels normalize by (N - 1). With N=1 that is
+        division by zero, producing NaN/Inf. Source must guard with
+        ``0.0 if N <= 1 else t_idx / (N - 1.0)``.
+        """
+        from pathlib import Path
+        src = Path(__file__).resolve().parents[1] / "ManipulaPy" / "cuda_kernels.py"
+        text = src.read_text(encoding="utf-8")
+
+        # The unguarded forms must not appear anywhere.
+        bad = [line for line in text.splitlines()
+               if line.strip().startswith("tau =") and "t_idx /" in line
+               and "0.0 if N <= 1 else" not in line]
+        self.assertEqual(
+            bad, [],
+            f"unguarded N==1 division remains: {bad}",
+        )
+        # And the guarded form must appear at least 7 times (one per kernel
+        # variant identified in the v1.3.2 patch).
+        guarded_count = text.count("0.0 if N <= 1 else t_idx / (N - 1.0)")
+        self.assertGreaterEqual(
+            guarded_count, 7,
+            f"expected >=7 guarded tau assignments, got {guarded_count}",
+        )
+
+    def test_simulation_rst_open_loop_examples_import_numpy(self):
+        """The Open-Loop RST snippets call ``np.array(...)``; without an
+        explicit ``import numpy as np`` they fail when copy-pasted.
+        """
+        from pathlib import Path
+        rst = Path(__file__).resolve().parents[1] / "docs" / "source" / "api" / "simulation.rst"
+        text = rst.read_text(encoding="utf-8")
+
+        # Find every Open-Loop section (there are two) — each must contain
+        # an ``import numpy as np`` line ahead of the np.array call.
+        import re
+        # Split by RST heading ---- underlines so we get section bodies.
+        sections = re.split(r"\n(?=Open-Loop[^\n]*\n[-=~]+\n)", text)
+        offenders = []
+        for section in sections:
+            header_match = re.match(r"(Open-Loop[^\n]*)", section)
+            if not header_match:
+                continue
+            if "np.array(" in section and "import numpy as np" not in section:
+                offenders.append(header_match.group(1))
+        self.assertEqual(
+            offenders, [],
+            f"Open-Loop section(s) {offenders} use np.array() without `import numpy as np`",
+        )
 
 
 if __name__ == "__main__":

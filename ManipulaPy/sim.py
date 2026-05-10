@@ -134,6 +134,7 @@ class Simulation:
         """
         Connects to the PyBullet simulation.
         """
+        _check_pybullet_available()
         self.logger.info("Connecting to PyBullet simulation...")
         if self.physics_client is None:
             self.physics_client = p.connect(p.GUI)
@@ -146,6 +147,7 @@ class Simulation:
         """
         Disconnects from the PyBullet simulation.
         """
+        _check_pybullet_available()
         self.logger.info("Disconnecting from PyBullet simulation...")
         if self.physics_client is not None:
             p.disconnect()
@@ -182,6 +184,7 @@ class Simulation:
         """
         Initializes the robot using the URDF processor.
         """
+        _check_pybullet_available()
         # Only skip URDF processing if self.robot is already set.
         if hasattr(self, "robot") and self.robot is not None:
             self.logger.warning("Robot already initialized. Skipping URDF processing.")
@@ -265,7 +268,15 @@ class Simulation:
         n = len(self.non_fixed_joints)
         if forces is None:
             if getattr(self, "torque_limits", None) is not None:
-                forces = list(self.torque_limits)
+                # PyBullet wants one scalar per joint, but torque_limits is
+                # commonly a list of (min, max) pairs. Collapse each pair to
+                # the maximum absolute magnitude so the motor can both push
+                # and pull within the configured limits.
+                torque_limits = np.asarray(self.torque_limits, dtype=float)
+                if torque_limits.ndim == 2 and torque_limits.shape[1] == 2:
+                    forces = np.max(np.abs(torque_limits), axis=1).tolist()
+                else:
+                    forces = torque_limits.tolist()
             else:
                 forces = [1000.0] * n
         p.setJointMotorControlArray(

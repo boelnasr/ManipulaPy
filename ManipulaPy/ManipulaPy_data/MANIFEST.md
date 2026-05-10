@@ -215,6 +215,7 @@ parser's `PackageResolver` resolves these paths automatically:
 
 ```python
 from ManipulaPy.urdf import URDF
+from ManipulaPy.ManipulaPy_data import get_robot_urdf
 
 # Works automatically when running from a repo checkout (meshes present).
 # On a PyPI install the URDF still loads, but `package://...` references
@@ -375,6 +376,8 @@ robot = URDF.load(urdf_path)  # Automatically sets up mesh paths
 
 1. **Use the database API** instead of hardcoding paths:
    ```python
+   from ManipulaPy.ManipulaPy_data import get_robot_urdf
+
    # ✓ Good
    urdf_path = get_robot_urdf('ur5')
 
@@ -384,6 +387,9 @@ robot = URDF.load(urdf_path)  # Automatically sets up mesh paths
 
 2. **Check availability** before loading:
    ```python
+   from ManipulaPy.urdf import URDF
+   from ManipulaPy.ManipulaPy_data import get_robot_urdf, check_robot_available
+
    if check_robot_available('ur5'):
        robot = URDF.load(get_robot_urdf('ur5'))
    ```
@@ -391,6 +397,7 @@ robot = URDF.load(urdf_path)  # Automatically sets up mesh paths
 3. **Use the native parser** for best compatibility:
    ```python
    from ManipulaPy.urdf import URDF
+   from ManipulaPy.ManipulaPy_data import get_robot_urdf
    robot = URDF.load(get_robot_urdf('panda'))  # NumPy 2.0+ compatible
    ```
 

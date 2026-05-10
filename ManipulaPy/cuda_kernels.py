@@ -577,7 +577,7 @@ if CUDA_AVAILABLE:
         if t_idx >= N or j_idx >= thetastart.shape[0]:
             return
 
-        tau = t_idx / (N - 1.0)
+        tau = 0.0 if N <= 1 else t_idx / (N - 1.0)
 
         if method == 3:  # Cubic
             tau2 = tau * tau
@@ -647,7 +647,7 @@ if CUDA_AVAILABLE:
                 break
 
             # Compute time scaling
-            tau = t_idx / (N - 1.0)
+            tau = 0.0 if N <= 1 else t_idx / (N - 1.0)
 
             if method == 5:  # Quintic - optimized computation
                 tau2 = tau * tau
@@ -704,7 +704,7 @@ if CUDA_AVAILABLE:
             # Process time steps with grid-stride
             for t_idx in range(t_start, N, stride_t):
                 # Compute time scaling
-                tau = t_idx / (N - 1.0)
+                tau = 0.0 if N <= 1 else t_idx / (N - 1.0)
 
                 if method == 5:  # Quintic
                     tau_sq = tau * tau
@@ -772,7 +772,7 @@ if CUDA_AVAILABLE:
 
         if t_idx < N:
             # Optimized time scaling computation
-            tau = t_idx / (N - 1.0)
+            tau = 0.0 if N <= 1 else t_idx / (N - 1.0)
 
             if method == 5:  # Quintic
                 tau2 = tau * tau
@@ -830,7 +830,7 @@ if CUDA_AVAILABLE:
 
         # Load time scaling data to shared memory
         if j_local == 0 and t_idx < N:
-            tau = t_idx / (N - 1.0)
+            tau = 0.0 if N <= 1 else t_idx / (N - 1.0)
 
             if method == 5:  # Quintic
                 tau2 = tau * tau
@@ -963,9 +963,16 @@ if CUDA_AVAILABLE:
         dt_step = dt / intRes
         ddtheta = 0.0
 
-        # Walk from t=0 to this thread's t_idx, applying the torque sample
-        # for each completed time bin. This is independent per thread.
-        for step in range(t_idx + 1):
+        if t_idx == 0:
+            thetamat[t_idx, j_idx] = current_theta
+            dthetamat[t_idx, j_idx] = current_dtheta
+            ddthetamat[t_idx, j_idx] = 0.0
+            return
+
+        # Walk from t=1 to this thread's t_idx, matching the CPU path's
+        # convention that row 0 is the initial state and taumat[i] advances
+        # state row i. This remains independent per thread.
+        for step in range(1, t_idx + 1):
             tau = taumat[step, j_idx]
             for _ in range(intRes):
                 M_inv = (
@@ -1011,7 +1018,7 @@ if CUDA_AVAILABLE:
         if t_idx >= N or coord_idx >= 3:
             return
 
-        tau = t_idx / (N - 1)
+        tau = 0.0 if N <= 1 else t_idx / (N - 1.0)
         if method == 3:  # Cubic
             s = 3.0 * tau * tau - 2.0 * tau * tau * tau
             s_dot = 6.0 * tau * (1.0 - tau) / Tf
@@ -1126,7 +1133,7 @@ if CUDA_AVAILABLE:
         # Per-thread time-scaling computation. Previous version wrote scaling
         # for thread (0,0,0)'s t_idx into shared memory and let every other
         # thread read it — so threads at different t_idx got the wrong scaling.
-        tau = t_idx / (N - 1)
+        tau = 0.0 if N <= 1 else t_idx / (N - 1.0)
         if method == 3:
             s = 3.0 * tau * tau - 2.0 * tau * tau * tau
             s_dot = 6.0 * tau * (1.0 - tau) / Tf

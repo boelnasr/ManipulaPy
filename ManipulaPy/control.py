@@ -481,6 +481,11 @@ class ManipulatorController:
                 "x_hat has not been initialized"
             )
         n = self.x_hat.shape[0]
+        if self.P is None or getattr(self.P, "shape", None) != (n, n):
+            raise ValueError(
+                f"P must be initialized with shape ({n}, {n}) before update; "
+                f"got {None if self.P is None else self.P.shape}"
+            )
         if z.shape != (n,):
             raise ValueError(
                 f"z must have shape ({n},) to match x_hat, got {z.shape}"

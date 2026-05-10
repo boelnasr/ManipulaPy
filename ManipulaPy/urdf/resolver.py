@@ -222,10 +222,21 @@ class PackageResolver:
 
         # Strategy 1: explicit package map (highest precedence — short-circuits
         # ambiguity detection so add_package() remains a working escape hatch).
+        # If the caller pinned this package and the file is missing under the
+        # pinned root, do NOT fall through to other strategies: silently
+        # returning a different package would defeat the explicit override.
         if package_name in self._package_map:
             cand = Path(self._package_map[package_name]) / relative_path
             if cand.exists():
                 return str(cand)
+            logger.warning(
+                "Explicit package mapping for %r did not contain %r under %r; "
+                "refusing to fall back to auto-discovery to honor the override.",
+                package_name,
+                relative_path,
+                str(self._package_map[package_name]),
+            )
+            return uri
 
         candidates: List[Path] = []
 
