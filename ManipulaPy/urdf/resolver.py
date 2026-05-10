@@ -201,13 +201,14 @@ class PackageResolver:
             return uri  # Malformed
         package_name, relative_path = parts[0], parts[1]
 
-        candidates = []
-
-        # Strategy 1: explicit package map
+        # Strategy 1: explicit package map (highest precedence — short-circuits
+        # ambiguity detection so add_package() remains a working escape hatch).
         if package_name in self._package_map:
             cand = Path(self._package_map[package_name]) / relative_path
             if cand.exists():
-                candidates.append(("explicit_map", str(cand)))
+                return str(cand)
+
+        candidates = []
 
         # Strategy 2: search paths
         for search_path in self._search_paths:

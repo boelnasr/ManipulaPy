@@ -1140,6 +1140,41 @@ class TestUrdfRegressions(unittest.TestCase):
 
             self.assertEqual(resolved, uri)
             self.assertTrue(any("multiple" in msg.lower() for msg in cm.output))
+
+    def test_package_resolver_explicit_map_overrides_other_strategies(self):
+        """add_package() must short-circuit ambiguity detection.
+
+        The remediation advice in the ambiguity warning instructs callers to
+        call add_package() to disambiguate. If add_package() then competes with
+        the discovery sources it was meant to override, the escape hatch is
+        broken — exactly the regression Codex flagged on Task 27.
+        """
+        import tempfile
+        from pathlib import Path
+
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for workspace in ("preferred", "shadow"):
+                mesh = root / workspace / "demo_pkg" / "meshes" / "base.stl"
+                mesh.parent.mkdir(parents=True)
+                mesh.write_text(workspace)
+
+            preferred_mesh = root / "preferred" / "demo_pkg" / "meshes" / "base.stl"
+
+            resolver = PackageResolver(use_ros=False)
+            resolver.add_search_path(root / "shadow")
+            resolver.add_package("demo_pkg", str(root / "preferred" / "demo_pkg"))
+
+            resolved = resolver.resolve("package://demo_pkg/meshes/base.stl")
+
+            self.assertEqual(
+                resolved,
+                str(preferred_mesh),
+                "add_package() mapping must take precedence over search paths.",
+            )
+
     def test_mesh_loader_import_warning_mentions_file_and_install_hint(self):
         import builtins
         from pathlib import Path
