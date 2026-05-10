@@ -6,6 +6,23 @@ Simulation API Reference
 
 This page documents **ManipulaPy.sim**, the module for PyBullet-based simulation capabilities with real-time visualization, physics simulation, and interactive control.
 
+.. note::
+   All ``Simulation`` methods raise :class:`ImportError` with the hint
+   ``pip install ManipulaPy[simulation]`` if PyBullet is not installed.
+   The ``[simulation]`` extra is required for any sim-related code.
+
+.. versionchanged:: 1.3.2
+   Every public ``Simulation`` method that touches PyBullet now performs an
+   explicit availability check and raises :class:`ImportError` with the
+   install hint above when PyBullet is missing. Previously, calling these
+   methods after constructing a ``Simulation`` via ``__new__`` (or after
+   hot-swapping the module) surfaced an ``AttributeError`` on ``NoneType``
+   instead. PyBullet ``>= 3.2.5`` is now sufficient — quaternion construction
+   no longer depends on ``p.getQuaternionFromAxisAngle`` (added in 3.2.7) and
+   uses inline axis-angle math instead. Repeated ``Simulation()``
+   instantiation also no longer duplicates log handlers on
+   ``SimulationLogger``.
+
 .. tip::
    For conceptual explanations, see :doc:`../user_guide/Simulation`.
 
@@ -72,6 +89,27 @@ Joint Control
 -------------
 
 .. automethod:: Simulation.set_joint_positions
+
+.. py:method:: Simulation.set_joint_positions(joint_positions, forces=None)
+   :noindex:
+
+   :param joint_positions: Target joint positions, one per non-fixed joint.
+   :param forces: Per-joint maximum motor force passed to PyBullet's
+      ``POSITION_CONTROL``. When ``None`` (the default), the value is
+      auto-derived from ``self.torque_limits``: if ``torque_limits`` is a
+      list of ``(min, max)`` pairs, each pair is collapsed to its
+      ``max(|min|, |max|)`` so the motor can both push and pull within the
+      configured limits. If ``torque_limits`` is unset, a default of
+      ``1000.0 N`` per joint is used.
+
+   .. versionchanged:: 1.3.2
+      Added the ``forces`` keyword argument and the auto-derivation of
+      per-joint force magnitudes from ``self.torque_limits`` when
+      ``forces=None``. Previously, position commands were issued without an
+      explicit ``forces=`` array and ``torque_limits`` (when shaped as
+      ``(N, 2)``) was passed straight through to PyBullet, which expects a
+      flat scalar per joint.
+
 .. automethod:: Simulation.get_joint_positions
 .. automethod:: Simulation.get_joint_parameters
 
@@ -86,6 +124,31 @@ Controller Integration
 ----------------------
 
 .. automethod:: Simulation.run_controller
+
+.. py:method:: Simulation.run_controller(desired_positions)
+   :noindex:
+
+   Drive the robot through ``desired_positions`` in open-loop position
+   control, one configuration per simulation step.
+
+   :param desired_positions: Array-like with shape ``(N, DOF)`` — one row per
+      waypoint, one column per non-fixed joint. Empty input or a row width
+      that does not match ``len(self.non_fixed_joints)`` raises
+      :class:`ValueError`.
+   :returns: The end-effector world position after the final waypoint, as
+      returned by ``p.getLinkState(...)[4]``.
+   :rtype: numpy.ndarray
+
+   .. versionchanged:: 1.3.2
+      The signature was reduced to a single positional argument. The previous
+      multi-argument form
+      ``run_controller(thetalistd, dthetalistd, ddthetalistd, g, Ftip, Kp,
+      Ki, Kd, dt)`` — which accepted dynamics, gravity, end-effector wrench,
+      and PID gains — was removed because the loop body never produced
+      honest closed-loop behavior (computed torques were applied as position
+      deltas). For real closed-loop torque control, drive PyBullet's
+      ``p.TORQUE_CONTROL`` mode directly in your own loop and feed it the
+      torques produced by :class:`ManipulaPy.control.ManipulatorController`.
 
 ---
 
@@ -114,6 +177,25 @@ Trajectory Visualization
 ------------------------
 
 .. automethod:: Simulation.plot_trajectory
+
+.. py:method:: Simulation.plot_trajectory(ee_positions, line_width=3, color=None)
+   :noindex:
+
+   :param ee_positions: List of end-effector positions ``[[x, y, z], ...]``
+      to render as a 3D capsule spline.
+   :param line_width: Thickness factor for the trajectory; scales the
+      underlying capsule radius and the number of parallel capsules drawn
+      per segment.
+   :param color: RGB triplet ``[r, g, b]`` (values in ``0..1``) for the
+      trajectory. Defaults to ``None``, in which case a red colour
+      (``[1, 0, 0]``) is selected at call time.
+
+   .. versionchanged:: 1.3.2
+      The default value of ``color`` changed from a mutable list/tuple
+      default (which leaked the same object across calls) to ``None``. The
+      red default is now constructed fresh on each invocation when
+      ``color is None``.
+
 .. automethod:: Simulation.plot_trajectory_in_scene
 
 Data Management

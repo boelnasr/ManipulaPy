@@ -157,6 +157,14 @@ Clustering Analysis
    - **labels** (*np.ndarray*) -- Shape (N,) cluster assignments
    - **num_clusters** (*int*) -- Count of identified clusters excluding noise
 
+   :raises ImportError: if scikit-learn is not installed. Install the
+       optional ML extra with ``pip install "ManipulaPy[ml]"``.
+
+   .. versionchanged:: 1.3.2
+      ``import ManipulaPy.perception`` now succeeds without scikit-learn —
+      only ``cluster_obstacles`` (and pipelines that call it) raise
+      ``ImportError`` at call time.
+
    **DBSCAN Implementation:**
    
    - Uses sklearn.cluster.DBSCAN with L2 distance metric
@@ -264,9 +272,9 @@ Required Dependencies
    * - Module
      - Purpose
      - Integration Point
-   * - ``sklearn.cluster.DBSCAN``
+   * - ``sklearn.cluster.DBSCAN`` *(optional, since v1.3.2)*
      - Point clustering
-     - cluster_obstacles() method
+     - cluster_obstacles() method — install via ``pip install "ManipulaPy[ml]"``
    * - ``numpy``
      - Array operations
      - All coordinate manipulations
@@ -276,6 +284,14 @@ Required Dependencies
    * - ``ManipulaPy.vision``
      - Low-level vision
      - vision_instance dependency
+
+.. note::
+   As of v1.3.2, ``import ManipulaPy.perception`` no longer requires
+   scikit-learn — the import is guarded internally. Only
+   :py:meth:`Perception.cluster_obstacles` (and the
+   :py:meth:`Perception.detect_and_cluster_obstacles` pipeline that calls it)
+   raise ``ImportError`` if the ``ml`` extra is missing.
+
 
 Vision Module Interface
 ----------------------

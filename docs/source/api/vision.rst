@@ -176,7 +176,12 @@ YOLO Integration
    
    - **depth_image** (*np.ndarray*) -- Depth image for 3D positioning
    - **rgb_image** (*np.ndarray*) -- RGB image for YOLO detection
-   - **depth_threshold** (*float, optional*) -- Maximum depth consideration (default: 0.0)
+   - **depth_threshold** (*float, optional*) -- Maximum depth (m) to consider for obstacles. Default: 5.0.
+
+   .. versionchanged:: 1.3.2
+      Default raised from 0.0 → 5.0 — the prior default silently filtered
+      every detection.
+
    - **camera_index** (*int, optional*) -- Camera for intrinsic parameters (default: 0)
    - **step** (*int, optional*) -- Depth downsampling stride (default: 5)
 

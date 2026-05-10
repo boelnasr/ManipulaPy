@@ -56,8 +56,20 @@ Trajectory Kernels
      - **traj_acc** (*cuda.device_array*) -- Output trajectory accelerations
      - **Tf** (*float*) -- Total trajectory time
      - **N** (*int*) -- Number of trajectory points
-     - **method** (*int*) -- Time scaling method (3=cubic, 5=quintic)
+     - **method** (*int*) -- Time scaling method (1=linear, 3=cubic, 5=quintic)
      - **stream** (*int*) -- CUDA stream for kernel execution
+
+   .. note::
+      All trajectory kernels are safe at ``N <= 1`` (returns ``tau = 0``
+      so single-sample trajectories produce the start configuration
+      instead of NaN/Inf from division by zero). Linear time-scaling
+      (``method=1``) is supported in every trajectory kernel variant
+      (``trajectory_kernel``, ``trajectory_kernel_vectorized``,
+      ``trajectory_kernel_memory_optimized``,
+      ``trajectory_kernel_warp_optimized``,
+      ``trajectory_kernel_cache_friendly``,
+      ``cartesian_trajectory_kernel``, and ``batch_trajectory_kernel``)
+      as of v1.3.2; previously only cubic and quintic were honored.
 
 .. autofunction:: cartesian_trajectory_kernel
 
@@ -72,8 +84,14 @@ Trajectory Kernels
      - **traj_acc** (*cuda.device_array*) -- Output trajectory accelerations
      - **Tf** (*float*) -- Total trajectory duration
      - **N** (*int*) -- Number of trajectory points
-     - **method** (*int*) -- Time-scaling method (3=cubic, 5=quintic)
+     - **method** (*int*) -- Time-scaling method (1=linear, 3=cubic, 5=quintic)
      - **stream** (*int*) -- CUDA stream for kernel execution
+
+   .. versionchanged:: 1.3.2
+      Each thread now computes its own time scaling (no shared-memory
+      reuse), eliminating a race where thread (0,0,0)'s ``t_idx`` scaling
+      leaked into all other threads. Quintic acceleration also uses the
+      correct ``s_ddot = 60 tau (1 - tau)(1 - 2 tau) / Tf**2``.
 
 .. autofunction:: batch_trajectory_kernel
 
@@ -88,9 +106,15 @@ Trajectory Kernels
      - **traj_acc_batch** (*cuda.device_array*) -- Output trajectory accelerations
      - **Tf** (*float*) -- Total trajectory duration
      - **N** (*int*) -- Number of trajectory timesteps
-     - **method** (*int*) -- Time-scaling method (3=cubic, 5=quintic)
+     - **method** (*int*) -- Time-scaling method (1=linear, 3=cubic, 5=quintic)
      - **batch_size** (*int*) -- Number of trajectory batches
      - **stream** (*int*) -- CUDA stream for kernel execution
+
+   .. versionchanged:: 1.3.2
+      Per-thread time scaling replaces the previous shared-memory layout
+      that broadcast a single thread's ``t_idx`` to the whole block, and
+      quintic acceleration uses the full
+      ``60 tau (1 - tau)(1 - 2 tau) / Tf**2`` form.
 
 Dynamics Kernels
 -------------------
@@ -135,10 +159,23 @@ Dynamics Kernels
      - **joint_limits** (*cuda.device_array*) -- Joint position limits
      - **stream** (*int*) -- CUDA stream for kernel execution
 
+   .. versionchanged:: 1.3.2
+      Each thread now integrates from the initial state up to its own
+      ``t_idx`` instead of reading ``thetamat[t_idx-1]``, removing the
+      temporal data race where threads at higher ``t_idx`` could read
+      rows that lower-``t_idx`` threads had not yet written.
+
 Potential Field Kernels
 --------------------------
 
 .. autofunction:: fused_potential_gradient_kernel
+
+   .. versionchanged:: 1.3.2
+      Repulsive-gradient sign corrected. Previous versions produced an
+      *attracting* repulsive field due to a sign error in the gradient
+      factor (``grad_factor`` is now ``-influence_term * dist_inv**3``).
+      Existing code relying on the v1.3.1 behavior must be reviewed --
+      the sign flip is a correctness fix, not an API change.
 
    CUDA kernel for computing potential and gradient for path planning.
 
@@ -198,7 +235,7 @@ High-Level Wrappers
      - **thetaend** (*np.ndarray*) -- Final joint configuration
      - **Tf** (*float*) -- Total trajectory duration
      - **N** (*int*) -- Number of trajectory timesteps
-     - **method** (*int*) -- Trajectory generation method
+     - **method** (*int*) -- Trajectory generation method (1=linear, 3=cubic, 5=quintic)
      - **use_pinned** (*bool*) -- Use pinned memory for faster GPU transfers
 
    **Returns:**
@@ -231,7 +268,7 @@ High-Level Wrappers
      - **thetaend_batch** (*np.ndarray*) -- Batch of final joint configurations
      - **Tf** (*float*) -- Total trajectory duration
      - **N** (*int*) -- Number of trajectory timesteps
-     - **method** (*int*) -- Trajectory generation method identifier
+     - **method** (*int*) -- Trajectory generation method identifier (1=linear, 3=cubic, 5=quintic)
      - **use_pinned** (*bool*) -- Use pinned memory for faster GPU transfers
 
    **Returns:**
@@ -252,7 +289,7 @@ CPU Fallback Functions
      - **thetaend** (*np.ndarray*) -- Target joint configurations
      - **Tf** (*float*) -- Total trajectory duration
      - **N** (*int*) -- Number of trajectory points to generate
-     - **method** (*int*) -- Time scaling method (3=cubic, 5=quintic)
+     - **method** (*int*) -- Time scaling method (1=linear, 3=cubic, 5=quintic)
 
    **Returns:**
 
