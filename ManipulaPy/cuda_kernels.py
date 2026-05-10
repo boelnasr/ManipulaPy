@@ -473,27 +473,36 @@ def trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method):
     """Optimized CPU fallback using NumPy vectorization."""
     num_joints = len(thetastart)
 
-    # Vectorized time computation
-    t = np.linspace(0, Tf, N, dtype=np.float32)
-    tau = t / Tf
+    # Degenerate inputs collapse to "sit at start": s = s_dot = s_ddot = 0.
+    # Matches the GPU kernels' N<=1 guard and avoids the divide-by-zero
+    # RuntimeWarning when callers pass Tf=0 (regression coverage in
+    # test_zero_time_trajectory accepts NaN but the warning is noisy).
+    if N <= 1 or Tf <= 0.0:
+        s = np.zeros(N, dtype=np.float32)
+        s_dot = np.zeros(N, dtype=np.float32)
+        s_ddot = np.zeros(N, dtype=np.float32)
+    else:
+        # Vectorized time computation
+        t = np.linspace(0, Tf, N, dtype=np.float32)
+        tau = t / Tf
 
-    # Vectorized time scaling
-    if method == 3:  # Cubic
-        s = 3.0 * tau**2 - 2.0 * tau**3
-        s_dot = 6.0 * tau * (1.0 - tau) / Tf
-        s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
-    elif method == 5:  # Quintic
-        tau2 = tau**2
-        tau3 = tau**3
-        tau4 = tau**4
-        tau5 = tau**5
-        s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5
-        s_dot = (30.0 * tau2 - 60.0 * tau3 + 30.0 * tau4) / Tf
-        s_ddot = (60.0 * tau - 180.0 * tau2 + 120.0 * tau3) / (Tf * Tf)
-    else:  # Linear
-        s = tau
-        s_dot = np.ones_like(tau) / Tf
-        s_ddot = np.zeros_like(tau)
+        # Vectorized time scaling
+        if method == 3:  # Cubic
+            s = 3.0 * tau**2 - 2.0 * tau**3
+            s_dot = 6.0 * tau * (1.0 - tau) / Tf
+            s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
+        elif method == 5:  # Quintic
+            tau2 = tau**2
+            tau3 = tau**3
+            tau4 = tau**4
+            tau5 = tau**5
+            s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5
+            s_dot = (30.0 * tau2 - 60.0 * tau3 + 30.0 * tau4) / Tf
+            s_ddot = (60.0 * tau - 180.0 * tau2 + 120.0 * tau3) / (Tf * Tf)
+        else:  # Linear (method == 1) and any other value
+            s = tau
+            s_dot = np.ones_like(tau) / Tf
+            s_ddot = np.zeros_like(tau)
 
     # Vectorized trajectory computation
     delta = thetaend - thetastart

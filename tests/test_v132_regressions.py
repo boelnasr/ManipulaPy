@@ -2292,6 +2292,38 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             joined = "\n".join(cm.output)
             self.assertIn("Explicit package mapping", joined)
 
+    def test_trajectory_cpu_fallback_handles_zero_Tf_without_warnings(self):
+        """trajectory_cpu_fallback used to emit a numpy RuntimeWarning
+        ("invalid value encountered in divide") when called with Tf=0
+        because of `tau = t / Tf`. The GPU kernels were guarded against
+        N<=1 in earlier commits; the CPU fallback must apply the same
+        guard so that degenerate inputs return a sit-at-start trajectory
+        instead of NaN/Inf + a warning.
+        """
+        import warnings
+        from ManipulaPy.cuda_kernels import trajectory_cpu_fallback
+
+        thetastart = np.array([0.0, 0.1], dtype=np.float32)
+        thetaend = np.array([1.0, 0.9], dtype=np.float32)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            # Tf = 0 — used to divide by zero; must not warn now.
+            pos, vel, acc = trajectory_cpu_fallback(thetastart, thetaend, 0.0, 10, 3)
+            self.assertEqual(pos.shape, (10, 2))
+            np.testing.assert_array_equal(vel, np.zeros((10, 2), dtype=np.float32))
+            np.testing.assert_array_equal(acc, np.zeros((10, 2), dtype=np.float32))
+            # Every sample should sit at the start configuration.
+            for row in range(10):
+                np.testing.assert_allclose(pos[row], thetastart, rtol=1e-5)
+
+            # N = 1 — same degenerate-input handling.
+            pos1, vel1, acc1 = trajectory_cpu_fallback(thetastart, thetaend, 1.0, 1, 5)
+            self.assertEqual(pos1.shape, (1, 2))
+            np.testing.assert_allclose(pos1[0], thetastart, rtol=1e-5)
+            np.testing.assert_array_equal(vel1, np.zeros((1, 2), dtype=np.float32))
+            np.testing.assert_array_equal(acc1, np.zeros((1, 2), dtype=np.float32))
+
     def test_trajectory_kernels_guard_division_by_zero_when_N_equals_one(self):
         """All trajectory kernels normalize by (N - 1). With N=1 that is
         division by zero, producing NaN/Inf. Source must guard with
