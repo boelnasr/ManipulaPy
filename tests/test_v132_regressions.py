@@ -1175,6 +1175,233 @@ class TestUrdfRegressions(unittest.TestCase):
                 "add_package() mapping must take precedence over search paths.",
             )
 
+    def test_resolver_use_ros_false_isolates_from_ros_env(self):
+        """use_ros=False must NOT scan ROS_PACKAGE_PATH or ament_index."""
+        import os
+        import tempfile
+        from unittest.mock import patch
+        from pathlib import Path
+
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ros_root = Path(tmp) / "ros_ws"
+            mesh = ros_root / "demo_pkg" / "meshes" / "base.stl"
+            mesh.parent.mkdir(parents=True)
+            mesh.write_text("ros mesh")
+
+            with patch.dict(os.environ, {"ROS_PACKAGE_PATH": str(ros_root)}, clear=False):
+                resolver = PackageResolver(use_ros=False)
+                resolved = resolver.resolve("package://demo_pkg/meshes/base.stl")
+
+            self.assertEqual(
+                resolved,
+                "package://demo_pkg/meshes/base.stl",
+                "use_ros=False should not consult ROS_PACKAGE_PATH",
+            )
+
+    def test_resolver_uses_find_ros_package_when_enabled(self):
+        """use_ros=True must consult _find_ros_package (ament/rospack/catkin)."""
+        import tempfile
+        from unittest.mock import patch
+        from pathlib import Path
+
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pkg_root = Path(tmp) / "ament_share" / "demo_pkg"
+            mesh = pkg_root / "meshes" / "base.stl"
+            mesh.parent.mkdir(parents=True)
+            mesh.write_text("ament mesh")
+
+            resolver = PackageResolver(use_ros=True)
+            with patch.object(resolver, "_find_ros_package", return_value=pkg_root):
+                resolved = resolver.resolve("package://demo_pkg/meshes/base.stl")
+
+            self.assertEqual(resolved, str(mesh))
+
+    def test_resolver_search_path_supports_flat_package_root(self):
+        """search_path/relative form must work when caller adds the package
+        root itself (e.g., add_search_path('/opt/robot_pkg')).
+        """
+        import tempfile
+        from pathlib import Path
+
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pkg_root = Path(tmp) / "robot_pkg"
+            mesh = pkg_root / "meshes" / "a.stl"
+            mesh.parent.mkdir(parents=True)
+            mesh.write_text("flat")
+
+            resolver = PackageResolver(use_ros=False)
+            resolver.add_search_path(pkg_root)
+
+            resolved = resolver.resolve("package://robot_pkg/meshes/a.stl")
+            self.assertEqual(resolved, str(mesh))
+
+    def test_resolver_rejects_path_traversal_in_package_uri(self):
+        """package://pkg/../etc/passwd must be refused."""
+        import tempfile
+        from pathlib import Path
+
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "demo_pkg").mkdir()
+            (root / "secret.txt").write_text("classified")
+
+            resolver = PackageResolver(use_ros=False)
+            resolver.add_package("demo_pkg", str(root / "demo_pkg"))
+
+            uri = "package://demo_pkg/../secret.txt"
+            with self.assertLogs("ManipulaPy.urdf.resolver", level="WARNING") as cm:
+                resolved = resolver.resolve(uri)
+
+            self.assertEqual(resolved, uri)
+            self.assertTrue(any("traversal" in msg.lower() for msg in cm.output))
+
+    def test_resolver_dedupes_symlinked_workspaces(self):
+        """Symlinked or duplicate-mounted search paths must not falsely
+        trigger ambiguity when they reference the same physical file.
+        """
+        import os
+        import tempfile
+        from pathlib import Path
+
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmp:
+            real = Path(tmp) / "real_ws"
+            mesh = real / "demo_pkg" / "meshes" / "base.stl"
+            mesh.parent.mkdir(parents=True)
+            mesh.write_text("real")
+
+            link = Path(tmp) / "link_ws"
+            try:
+                os.symlink(real, link, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink unsupported on this filesystem")
+
+            resolver = PackageResolver(use_ros=False)
+            resolver.add_search_path(real)
+            resolver.add_search_path(link)
+
+            resolved = resolver.resolve("package://demo_pkg/meshes/base.stl")
+            self.assertTrue(
+                resolved.endswith("real_ws/demo_pkg/meshes/base.stl")
+                or resolved.endswith("link_ws/demo_pkg/meshes/base.stl"),
+                f"resolved={resolved!r}",
+            )
+            self.assertFalse(
+                resolved.startswith("package://"),
+                "symlinked candidates pointing at the same file must not "
+                "trigger the ambiguity refusal",
+            )
+
+    def test_resolver_warns_on_malformed_package_uri(self):
+        """package://, package://pkg, package://pkg/ should all warn."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        resolver = PackageResolver(use_ros=False)
+        for malformed in ("package://", "package://pkg", "package://pkg/"):
+            with self.subTest(uri=malformed):
+                with self.assertLogs("ManipulaPy.urdf.resolver", level="WARNING") as cm:
+                    resolved = resolver.resolve(malformed)
+                self.assertEqual(resolved, malformed)
+                self.assertTrue(
+                    any("malformed" in msg.lower() for msg in cm.output),
+                    f"no malformed-URI warning for {malformed!r}: {cm.output}",
+                )
+
+    def test_resolver_handles_file_uri(self):
+        """file://path should round-trip through url2pathname so Windows
+        file:///C:/foo doesn't end up as /C:/foo.
+        """
+        import tempfile
+        from pathlib import Path
+
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "mesh.stl"
+            target.write_text("data")
+
+            resolver = PackageResolver(use_ros=False)
+            resolved = resolver.resolve(f"file://{target}")
+            self.assertEqual(Path(resolved), target)
+
+    def test_mesh_load_failure_does_not_flood_warnings(self):
+        """Repeated vertices/faces access on a missing mesh must warn once."""
+        import logging
+        from ManipulaPy.urdf.types import Mesh
+
+        mesh = Mesh(filename="/nonexistent/path/mesh.stl", scale=[1, 1, 1])
+        with self.assertLogs("ManipulaPy.urdf.types", level="WARNING") as cm:
+            for _ in range(5):
+                _ = mesh.vertices
+                _ = mesh.faces
+        self.assertEqual(
+            len(cm.output),
+            1,
+            f"expected exactly one warning, got {len(cm.output)}: {cm.output}",
+        )
+
+    def test_mesh_unresolved_package_uri_is_reported_distinctly(self):
+        """An unresolved package:// URI stored as filename must surface as
+        an unresolved-URI warning, not a misleading 'Mesh file not found'.
+        """
+        from ManipulaPy.urdf.types import Mesh
+
+        mesh = Mesh(filename="package://demo_pkg/meshes/base.stl", scale=[1, 1, 1])
+        with self.assertLogs("ManipulaPy.urdf.types", level="WARNING") as cm:
+            _ = mesh.vertices
+        joined = "\n".join(cm.output).lower()
+        self.assertIn("unresolved package uri", joined)
+        self.assertNotIn("file not found", joined)
+
+    def test_mesh_warning_escapes_log_injection_in_filename(self):
+        """Newlines/control chars in URDF filenames must not forge log lines."""
+        from ManipulaPy.urdf.types import Mesh
+
+        forged = "/tmp/mesh.stl\nERROR: forged log line"
+        mesh = Mesh(filename=forged, scale=[1, 1, 1])
+        with self.assertLogs("ManipulaPy.urdf.types", level="WARNING") as cm:
+            _ = mesh.vertices
+        joined = "\n".join(cm.output)
+        # The literal newline+ERROR sequence must NOT appear in any single
+        # warning record's message; the !r formatting escapes it as \n.
+        for record in cm.records:
+            self.assertNotIn("\nERROR: forged log line", record.getMessage())
+
+    def test_mesh_loader_warning_includes_full_path_not_just_basename(self):
+        """When two missing meshes share a basename, warnings must distinguish
+        them by including the full path (Codex finding: path.name truncation).
+        """
+        import builtins
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from ManipulaPy.urdf.geometry import mesh_loader
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "trimesh":
+                raise ImportError("blocked trimesh")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import), \
+             self.assertLogs("ManipulaPy.urdf.geometry.mesh_loader", level="WARNING") as cm:
+            mesh_loader._load_with_trimesh(Path("/tmp/left/robot.dae"))
+            mesh_loader._load_with_trimesh(Path("/tmp/right/robot.dae"))
+
+        joined = "\n".join(cm.output)
+        self.assertIn("/tmp/left/robot.dae", joined)
+        self.assertIn("/tmp/right/robot.dae", joined)
+
     def test_mesh_loader_import_warning_mentions_file_and_install_hint(self):
         import builtins
         from pathlib import Path

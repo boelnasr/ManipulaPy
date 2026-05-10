@@ -15,6 +15,8 @@ import logging
 import os
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 logger = logging.getLogger(__name__)
 
@@ -72,21 +74,22 @@ class PackageResolver:
 
     def _init_from_environment(self) -> None:
         """Initialize from environment variables."""
-        # ROS package paths
-        ros_package_path = os.environ.get("ROS_PACKAGE_PATH", "")
-        if ros_package_path:
-            for path_str in ros_package_path.split(os.pathsep):
-                path = Path(path_str)
-                if path.exists():
-                    self._search_paths.append(path)
+        # ROS package paths — only when ROS discovery is enabled, otherwise
+        # use_ros=False would still leak host ROS packages via search paths.
+        if self._use_ros:
+            ros_package_path = os.environ.get("ROS_PACKAGE_PATH", "")
+            if ros_package_path:
+                for path_str in ros_package_path.split(os.pathsep):
+                    path = Path(path_str)
+                    if path.exists():
+                        self._search_paths.append(path)
 
-        # Ament prefix path (ROS 2)
-        ament_prefix_path = os.environ.get("AMENT_PREFIX_PATH", "")
-        if ament_prefix_path:
-            for prefix in ament_prefix_path.split(os.pathsep):
-                share_path = Path(prefix) / "share"
-                if share_path.exists():
-                    self._search_paths.append(share_path)
+            ament_prefix_path = os.environ.get("AMENT_PREFIX_PATH", "")
+            if ament_prefix_path:
+                for prefix in ament_prefix_path.split(os.pathsep):
+                    share_path = Path(prefix) / "share"
+                    if share_path.exists():
+                        self._search_paths.append(share_path)
 
         # Custom ManipulaPy package path
         manipulapy_package_path = os.environ.get("MANIPULAPY_PACKAGE_PATH", "")
@@ -174,9 +177,9 @@ class PackageResolver:
         if uri.startswith("package://"):
             return self._resolve_package_uri(uri)
 
-        # Handle file:// URIs
+        # Handle file:// URIs (use url2pathname so file:///C:/... works on Windows)
         if uri.startswith("file://"):
-            return uri[7:]
+            return url2pathname(urlparse(uri).path)
 
         # Handle absolute paths
         if Path(uri).is_absolute():
@@ -188,18 +191,34 @@ class PackageResolver:
     def _resolve_package_uri(self, uri: str) -> Optional[str]:
         """Resolve package://pkg/path with ambiguity detection.
 
-        Collects candidates from all strategies (explicit map, search paths,
-        ROS, base path, ancestor heuristic). Returns the unambiguous match
-        if exactly one strategy produces a hit, else logs and refuses.
+        Strategy 1 (explicit ``add_package`` mapping) short-circuits — the
+        documented escape hatch must always win. Strategies 2-5 (search paths,
+        ROS lookup, base path, ancestor heuristic) collect candidates whose
+        canonical (symlink-resolved) paths are deduped before the ambiguity
+        check, so symlinked or case-insensitive workspaces don't trigger false
+        ambiguity.
         """
-        # Parse URI
         if not uri.startswith("package://"):
-            return uri  # Not a package URI, return as-is
+            return uri
         rest = uri[len("package://"):]
+        if not rest:
+            logger.warning(f"Malformed package URI {uri!r}: missing package name")
+            return uri
         parts = rest.split("/", 1)
-        if len(parts) < 2:
-            return uri  # Malformed
+        if len(parts) < 2 or not parts[0] or not parts[1]:
+            logger.warning(
+                f"Malformed package URI {uri!r}: expected 'package://<name>/<path>'"
+            )
+            return uri
         package_name, relative_path = parts[0], parts[1]
+
+        rel_parts = Path(relative_path).parts
+        if ".." in rel_parts or Path(relative_path).is_absolute():
+            logger.warning(
+                f"Refusing to resolve {uri!r}: relative path contains traversal "
+                "or is absolute"
+            )
+            return uri
 
         # Strategy 1: explicit package map (highest precedence — short-circuits
         # ambiguity detection so add_package() remains a working escape hatch).
@@ -208,52 +227,74 @@ class PackageResolver:
             if cand.exists():
                 return str(cand)
 
-        candidates = []
+        candidates: List[Path] = []
 
-        # Strategy 2: search paths
+        # Strategy 2: search paths — try both the package-rooted and the flat
+        # forms (regression: prior code only tried search_path/pkg/relative).
         for search_path in self._search_paths:
-            cand = Path(search_path) / package_name / relative_path
-            if cand.exists():
-                candidates.append(("search_path", str(cand)))
+            c1 = Path(search_path) / package_name / relative_path
+            if c1.exists():
+                candidates.append(c1)
+            c2 = Path(search_path) / relative_path
+            if c2.exists():
+                candidates.append(c2)
 
-        # Strategy 3: ROS package path env
-        ros_paths = os.environ.get("ROS_PACKAGE_PATH", "").split(os.pathsep)
-        for ros_path in ros_paths:
-            if not ros_path:
-                continue
-            cand = Path(ros_path) / package_name / relative_path
-            if cand.exists():
-                candidates.append(("ros_pkg", str(cand)))
+        # Strategy 3: ROS package discovery (only when use_ros is enabled).
+        if self._use_ros:
+            ros_pkg_root = self._find_ros_package(package_name)
+            if ros_pkg_root is not None:
+                c = ros_pkg_root / relative_path
+                if c.exists():
+                    candidates.append(c)
+            ros_paths = os.environ.get("ROS_PACKAGE_PATH", "").split(os.pathsep)
+            for ros_path in ros_paths:
+                if not ros_path:
+                    continue
+                c = Path(ros_path) / package_name / relative_path
+                if c.exists():
+                    candidates.append(c)
 
         # Strategy 4: base path fallback
         if self.base_path:
-            cand = Path(self.base_path) / relative_path
-            if cand.exists():
-                candidates.append(("base_path", str(cand)))
+            c = Path(self.base_path) / relative_path
+            if c.exists():
+                candidates.append(c)
 
             # Strategy 5: ancestor heuristic
             for ancestor in [self.base_path, self.base_path.parent, self.base_path.parent.parent]:
                 cand_a = ancestor / package_name / relative_path
                 if cand_a.exists():
-                    candidates.append(("ancestor", str(cand_a)))
+                    candidates.append(cand_a)
                 cand_b = ancestor / relative_path
                 if cand_b.exists():
-                    candidates.append(("ancestor_flat", str(cand_b)))
+                    candidates.append(cand_b)
 
-        # Decide
-        unique_paths = list(set(c[1] for c in candidates))
-        if len(unique_paths) == 0:
-            logger.warning(f"Package URI '{uri}' could not be resolved (no candidates)")
-            return uri  # Preserve original behavior: return URI unchanged
+        # Dedup by canonical (symlink/case-resolved) path before ambiguity check.
+        seen_canonical = set()
+        unique_paths: List[str] = []
+        for cand in candidates:
+            try:
+                canonical = cand.resolve(strict=True)
+            except (OSError, RuntimeError):
+                canonical = cand.absolute()
+            key = str(canonical)
+            if key in seen_canonical:
+                continue
+            seen_canonical.add(key)
+            unique_paths.append(str(cand))
+
+        if not unique_paths:
+            logger.warning(f"Package URI {uri!r} could not be resolved (no candidates)")
+            return uri
         if len(unique_paths) == 1:
             return unique_paths[0]
-        # Multiple distinct paths — log and refuse
+
         logger.warning(
-            f"Multiple package paths matched for '{uri}': {unique_paths}. "
+            f"Multiple package paths matched for {uri!r}: {sorted(unique_paths)}. "
             "Refusing to auto-resolve to avoid the wrong choice. Add explicit "
             "package mapping with resolver.add_package(name, path)."
         )
-        return uri  # Preserve original "unresolved" return shape (URI unchanged)
+        return uri
 
 
     def _resolve_relative_path(self, path: str) -> str:

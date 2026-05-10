@@ -297,6 +297,7 @@ class Mesh:
     _vertices: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
     _faces: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
     _trimesh: Optional[object] = field(default=None, repr=False, compare=False)
+    _load_attempted: bool = field(default=False, repr=False, compare=False)
 
     def __post_init__(self):
         self.scale = np.asarray(self.scale, dtype=np.float64)
@@ -305,21 +306,30 @@ class Mesh:
 
     @property
     def vertices(self) -> Optional[np.ndarray]:
-        """Mesh vertices (lazy-loaded)."""
-        if self._vertices is None and self.filename:
+        """Mesh vertices (lazy-loaded; load is attempted at most once)."""
+        if self._vertices is None and self.filename and not self._load_attempted:
             self._load_mesh()
         return self._vertices
 
     @property
     def faces(self) -> Optional[np.ndarray]:
-        """Mesh faces (lazy-loaded)."""
-        if self._faces is None and self.filename:
+        """Mesh faces (lazy-loaded; load is attempted at most once)."""
+        if self._faces is None and self.filename and not self._load_attempted:
             self._load_mesh()
         return self._faces
 
     def _load_mesh(self) -> None:
+        # Filename and exception text are interpolated with !r so newlines or
+        # control characters in user-supplied URDFs cannot forge log lines.
+        self._load_attempted = True
+        if self.filename.startswith("package://"):
+            logger.warning(
+                f"Mesh has unresolved package URI: {self.filename!r}. "
+                "Configure PackageResolver.add_package(name, path) before loading meshes."
+            )
+            return
         if not Path(self.filename).is_file():
-            logger.warning(f"Mesh file not found: {self.filename}")
+            logger.warning(f"Mesh file not found: {self.filename!r}")
             return
         try:
             import trimesh
@@ -329,11 +339,11 @@ class Mesh:
             self._trimesh = mesh
         except ImportError:
             logger.warning(
-                f"trimesh not installed — cannot load mesh '{self.filename}'. "
+                f"trimesh not installed — cannot load mesh {self.filename!r}. "
                 "Install with: pip install trimesh"
             )
         except Exception as e:
-            logger.warning(f"Failed to load mesh '{self.filename}': {e}")
+            logger.warning(f"Failed to load mesh {self.filename!r}: {e!r}")
 
     def __eq__(self, other):
         if not isinstance(other, Mesh):
