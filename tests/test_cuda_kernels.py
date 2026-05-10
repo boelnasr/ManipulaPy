@@ -17,35 +17,35 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-# Import ManipulaPy modules
+# Import ManipulaPy modules. Top-level ManipulaPy uses lazy __getattr__ that
+# only exposes high-level classes (SerialManipulator, ManipulatorController, …);
+# CUDA helpers must be imported from ManipulaPy.cuda_kernels directly.
 try:
-    from ManipulaPy import (
+    from ManipulaPy.cuda_kernels import (
         CUDA_AVAILABLE,
         CUPY_AVAILABLE,
+        _best_2d_config,
+        _h2d_pinned,
+        auto_select_optimal_kernel,
         benchmark_kernel_performance,
         check_cuda_availability,
         check_cupy_availability,
         get_cuda_array,
         get_gpu_properties,
+        get_memory_pool_stats,
+        get_optimal_kernel_config,
         make_1d_grid,
         make_2d_grid,
         optimized_batch_trajectory_generation,
         optimized_potential_field,
         optimized_trajectory_generation,
-        return_cuda_array,
-        trajectory_cpu_fallback,
-    )
-    from ManipulaPy.cuda_kernels import (
-        _best_2d_config,
-        _h2d_pinned,
-        auto_select_optimal_kernel,
-        get_memory_pool_stats,
-        get_optimal_kernel_config,
         optimized_trajectory_generation_monitored,
         print_performance_recommendations,
         profile_start,
         profile_stop,
+        return_cuda_array,
         setup_cuda_environment_for_40x_speedup,
+        trajectory_cpu_fallback,
     )
 
     MANIPULAPY_AVAILABLE = True

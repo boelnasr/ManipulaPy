@@ -625,10 +625,8 @@ class ManipulatorController:
         thetalist: Union[NDArray[np.float64], List[float]],
         dthetalist: Union[NDArray[np.float64], List[float]],
         tau: Union[NDArray[np.float64], List[float]],
-        joint_limits: Union[cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]],
-        torque_limits: Union[
-            cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]
-        ],
+        joint_limits: Union[NDArray[np.float64], List[Tuple[float, float]]],
+        torque_limits: Union[NDArray[np.float64], List[Tuple[float, float]]],
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         """
         Enforce joint and torque limits.

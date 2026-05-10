@@ -1431,6 +1431,89 @@ class TestCudaKernelRegressions(unittest.TestCase):
     where they exist, or by re-implementing the kernel math in pure Python
     and asserting it matches the corrected formula.
     """
+    def test_trajectory_cpu_fallback_matches_quintic_reference(self):
+        """CPU fallback locks in the per-timestep formula used by CUDA kernels."""
+        from ManipulaPy.cuda_kernels import trajectory_cpu_fallback
+
+        N = 100
+        Tf = 2.0
+        thetastart = np.zeros(6)
+        thetaend = np.array([1.0, 0.5, 0.3, 0.2, 0.1, 0.0])
+
+        expected = np.zeros((N, 6))
+        for t in range(N):
+            tau = t / (N - 1.0)
+            s = 10 * tau**3 - 15 * tau**4 + 6 * tau**5
+            for j in range(6):
+                expected[t, j] = thetastart[j] + s * (thetaend[j] - thetastart[j])
+
+        pos, vel, acc = trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method=5)
+
+        np.testing.assert_allclose(pos, expected, rtol=1e-6, atol=1e-6)
+        np.testing.assert_array_almost_equal(pos[0], thetastart, decimal=6)
+        np.testing.assert_array_almost_equal(pos[-1], thetaend, decimal=6)
+        np.testing.assert_array_almost_equal(vel[0], np.zeros(6), decimal=6)
+        np.testing.assert_array_almost_equal(vel[-1], np.zeros(6), decimal=6)
+        np.testing.assert_array_almost_equal(acc[0], np.zeros(6), decimal=6)
+        np.testing.assert_array_almost_equal(acc[-1], np.zeros(6), decimal=6)
+
+
+    def test_trajectory_cpu_fallback_linear_method_is_linear(self):
+        """method=1 must be true linear scaling, not cubic fall-through."""
+        from ManipulaPy.cuda_kernels import trajectory_cpu_fallback
+
+        pos, vel, acc = trajectory_cpu_fallback(
+            np.array([0.0, 1.0]),
+            np.array([1.0, 3.0]),
+            Tf=2.0,
+            N=5,
+            method=1,
+        )
+
+        expected_pos = np.array(
+            [
+                [0.0, 1.0],
+                [0.25, 1.5],
+                [0.5, 2.0],
+                [0.75, 2.5],
+                [1.0, 3.0],
+            ],
+            dtype=np.float32,
+        )
+        np.testing.assert_allclose(pos, expected_pos, rtol=1e-6, atol=1e-6)
+        np.testing.assert_allclose(vel, np.array([[0.5, 1.0]] * 5), rtol=1e-6, atol=1e-6)
+        np.testing.assert_array_equal(acc, np.zeros_like(acc))
+
+
+    def test_cuda_kernel_variants_handle_linear_method(self):
+        """All trajectory kernel variants must implement linear method (method=1)."""
+        import inspect
+        from ManipulaPy import cuda_kernels
+
+        src = inspect.getsource(cuda_kernels)
+        # Without GPU CI this structural guard verifies all production variants
+        # have a linear branch instead of falling through to cubic for method=1.
+        for kernel_name in [
+            "trajectory_kernel",
+            "trajectory_kernel_vectorized",
+            "trajectory_kernel_memory_optimized",
+            "trajectory_kernel_warp_optimized",
+            "trajectory_kernel_cache_friendly",
+        ]:
+            # Find the function source
+            pattern = f"def {kernel_name}("
+            if pattern not in src:
+                continue
+            start = src.index(pattern)
+            end = src.index("\n    @cuda.jit", start) if "\n    @cuda.jit" in src[start:] else len(src)
+            kernel_src = src[start:end]
+            # Should have a "Linear" branch or s = tau assignment with no transformation
+            has_linear = ("# Linear" in kernel_src or "else:  # Linear" in kernel_src
+                        or "s = tau\n" in kernel_src)
+            self.assertTrue(
+                has_linear,
+                f"{kernel_name} missing linear method branch — non-quintic falls through to cubic"
+            )
 
 
 if __name__ == "__main__":

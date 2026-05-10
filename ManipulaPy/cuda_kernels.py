@@ -570,58 +570,37 @@ if CUDA_AVAILABLE:
     def trajectory_kernel(
         thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
     ):
-        """
-        FIXED: Standard trajectory kernel with correct 8-parameter signature.
-        Enhanced with better shared memory usage and reduced register pressure.
-        """
+        """Each thread computes its own time scaling — no shared memory race."""
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
 
         if t_idx >= N or j_idx >= thetastart.shape[0]:
             return
 
-        # Shared memory for time-scaling coefficients
-        shared_scaling = cuda.shared.array(3, dtype=float32)
+        tau = t_idx / (N - 1.0)
 
-        # One thread per block computes time scaling
-        if cuda.threadIdx.x == 0 and cuda.threadIdx.y == 0:
-            tau = t_idx / (N - 1.0)
+        if method == 3:  # Cubic
+            tau2 = tau * tau
+            tau3 = tau2 * tau
+            s = 3.0 * tau2 - 2.0 * tau3
+            s_dot = 6.0 * tau * (1.0 - tau) / Tf
+            s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
+        elif method == 5:  # Quintic
+            tau2 = tau * tau
+            tau3 = tau2 * tau
+            tau4 = tau2 * tau2
+            tau5 = tau4 * tau
+            s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5
+            s_dot = (30.0 * tau2 - 60.0 * tau3 + 30.0 * tau4) / Tf
+            s_ddot = (60.0 * tau - 180.0 * tau2 + 120.0 * tau3) / (Tf * Tf)
+        else:  # Linear
+            s = tau
+            s_dot = 1.0 / Tf
+            s_ddot = 0.0
 
-            if method == 3:  # Cubic
-                tau2 = tau * tau
-                tau3 = tau2 * tau
-                s = 3.0 * tau2 - 2.0 * tau3
-                s_dot = 6.0 * tau * (1.0 - tau) / Tf
-                s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
-            elif method == 5:  # Quintic
-                tau2 = tau * tau
-                tau3 = tau2 * tau
-                tau4 = tau2 * tau2
-                tau5 = tau4 * tau
-                s = 10.0 * tau3 - 15.0 * tau4 + 6.0 * tau5
-                s_dot = (30.0 * tau2 - 60.0 * tau3 + 30.0 * tau4) / Tf
-                s_ddot = (60.0 * tau - 180.0 * tau2 + 120.0 * tau3) / (Tf * Tf)
-            else:  # Linear
-                s = tau
-                s_dot = 1.0 / Tf
-                s_ddot = 0.0
-
-            shared_scaling[0] = s
-            shared_scaling[1] = s_dot
-            shared_scaling[2] = s_ddot
-
-        cuda.syncthreads()
-
-        # All threads read from shared memory
-        s = shared_scaling[0]
-        s_dot = shared_scaling[1]
-        s_ddot = shared_scaling[2]
-
-        # Register-based computation
         start_angle = thetastart[j_idx]
         delta_angle = thetaend[j_idx] - start_angle
 
-        # Compute and store results
         traj_pos[t_idx, j_idx] = start_angle + s * delta_angle
         traj_vel[t_idx, j_idx] = s_dot * delta_angle
         traj_acc[t_idx, j_idx] = s_ddot * delta_angle
@@ -676,11 +655,15 @@ if CUDA_AVAILABLE:
                 s = tau3 * (10.0 - 15.0 * tau + 6.0 * tau2)
                 s_dot = tau2 * (30.0 - 60.0 * tau + 30.0 * tau2) / Tf
                 s_ddot = tau * (60.0 - 180.0 * tau + 120.0 * tau2) / (Tf * Tf)
-            else:  # Cubic or other
+            elif method == 3:  # Cubic
                 tau2 = tau * tau
                 s = tau2 * (3.0 - 2.0 * tau)
                 s_dot = 6.0 * tau * (1.0 - tau) / Tf
                 s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
+            else:  # Linear
+                s = tau
+                s_dot = 1.0 / Tf
+                s_ddot = 0.0
 
             # Store results
             traj_pos[t_idx, j_idx] = start_angle + s * delta_angle
@@ -729,11 +712,15 @@ if CUDA_AVAILABLE:
                     s = tau_cb * (10.0 + tau * (-15.0 + 6.0 * tau))
                     s_dot = tau_sq * (30.0 + tau * (-60.0 + 30.0 * tau)) / Tf
                     s_ddot = tau * (60.0 + tau * (-180.0 + 120.0 * tau)) / (Tf * Tf)
-                else:  # Cubic
+                elif method == 3:  # Cubic
                     tau_sq = tau * tau
                     s = tau_sq * (3.0 - 2.0 * tau)
                     s_dot = 6.0 * tau * (1.0 - tau) / Tf
                     s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
+                else:  # Linear
+                    s = tau
+                    s_dot = 1.0 / Tf
+                    s_ddot = 0.0
 
                 # Use shared memory data if available
                 if local_j < 32 and j_idx < thetastart.shape[0]:
@@ -793,11 +780,15 @@ if CUDA_AVAILABLE:
                 s = tau3 * (10.0 - 15.0 * tau + 6.0 * tau2)
                 s_dot = tau2 * (30.0 - 60.0 * tau + 30.0 * tau2) / Tf
                 s_ddot = tau * (60.0 - 180.0 * tau + 120.0 * tau2) / (Tf * Tf)
-            else:  # Cubic
+            elif method == 3:  # Cubic
                 tau2 = tau * tau
                 s = tau2 * (3.0 - 2.0 * tau)
                 s_dot = 6.0 * tau * (1.0 - tau) / Tf
                 s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
+            else:  # Linear
+                s = tau
+                s_dot = 1.0 / Tf
+                s_ddot = 0.0
 
             # Coalesced memory writes
             traj_pos[t_idx, j_idx] = start_angle + s * delta_angle
@@ -847,11 +838,15 @@ if CUDA_AVAILABLE:
                 s = tau3 * (10.0 - 15.0 * tau + 6.0 * tau2)
                 s_dot = tau2 * (30.0 - 60.0 * tau + 30.0 * tau2) / Tf
                 s_ddot = tau * (60.0 - 180.0 * tau + 120.0 * tau2) / (Tf * Tf)
-            else:  # Cubic
+            elif method == 3:  # Cubic
                 tau2 = tau * tau
                 s = tau2 * (3.0 - 2.0 * tau)
                 s_dot = 6.0 * tau * (1.0 - tau) / Tf
                 s_ddot = 6.0 * (1.0 - 2.0 * tau) / (Tf * Tf)
+            else:  # Linear
+                s = tau
+                s_dot = 1.0 / Tf
+                s_ddot = 0.0
 
             shared_time[t_local, 0] = s
             shared_time[t_local, 1] = s_dot
