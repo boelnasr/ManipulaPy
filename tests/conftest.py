@@ -307,13 +307,44 @@ def create_smart_mock(module_name):
 
     elif module_name == "torch":
         torch_mock = MockModule("torch")
-        torch_mock.tensor = lambda *args, **kwargs: Mock()
-        torch_mock.zeros = lambda *args, **kwargs: Mock()
-        torch_mock.ones = lambda *args, **kwargs: Mock()
-        torch_mock.eye = lambda *args, **kwargs: Mock()
+
+        # torch.Tensor must be a class so that issubclass(x, torch.Tensor)
+        # works the way production code expects. The previous Mock() based
+        # placeholders made isinstance/issubclass either return True for
+        # everything (false positives) or raise TypeError (false skips).
+        class _MockTensor:
+            def __init__(self, data=None, *args, **kwargs):
+                self._data = (
+                    np.asarray(data) if data is not None else np.array([])
+                )
+                self.shape = self._data.shape
+                self.dtype = self._data.dtype
+                self.device = "cpu"
+                self.requires_grad = False
+
+            def numpy(self):
+                return self._data
+
+            def cpu(self):
+                return self
+
+            def detach(self):
+                return self
+
+            def __array__(self):
+                return self._data
+
+            def __repr__(self):
+                return f"MockTensor({self._data!r})"
+
+        torch_mock.Tensor = _MockTensor
+        torch_mock.tensor = lambda *args, **kwargs: _MockTensor(*args, **kwargs)
+        torch_mock.zeros = lambda *args, **kwargs: _MockTensor(np.zeros(*args, **kwargs))
+        torch_mock.ones = lambda *args, **kwargs: _MockTensor(np.ones(*args, **kwargs))
+        torch_mock.eye = lambda n, *args, **kwargs: _MockTensor(np.eye(n))
         torch_mock.cuda = MockModule("torch.cuda")
         torch_mock.cuda.is_available = lambda: False
-        torch_mock.device = lambda x: Mock()
+        torch_mock.device = lambda x: x
         torch_mock.float32 = np.float32
         torch_mock.float64 = np.float64
         return torch_mock

@@ -2069,9 +2069,8 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
 
     def _get_memory_info(self):
         """Get current memory usage (simplified)."""
-        import psutil
-
         try:
+            import psutil
             process = psutil.Process()
             return process.memory_info().rss
         except ImportError:

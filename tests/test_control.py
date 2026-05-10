@@ -6,7 +6,14 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 import unittest
 from unittest.mock import MagicMock, patch
 
-import cupy as cp
+try:
+    import cupy as cp
+
+    CUPY_AVAILABLE = True
+except ImportError:
+    cp = None
+    CUPY_AVAILABLE = False
+
 import matplotlib.pyplot as plt
 import numpy as np
 

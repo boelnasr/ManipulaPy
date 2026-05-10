@@ -1836,6 +1836,84 @@ class TestCudaKernelRegressions(unittest.TestCase):
                 os.environ[key] = previous
 
 
+class TestTestInfraRegressions(unittest.TestCase):
+    """Regressions for test infrastructure issues (Tasks 42-44)."""
+
+    def test_torch_smart_mock_tensor_is_array_like_class(self):
+        """torch_mock.Tensor must be a class, not a Mock(), so that
+        isinstance(x, torch.Tensor) and issubclass checks behave correctly.
+        """
+        from tests.conftest import create_smart_mock
+
+        torch_mock = create_smart_mock("torch")
+        tensor = torch_mock.tensor([1.0, 2.0, 3.0])
+
+        self.assertIsInstance(tensor, torch_mock.Tensor)
+        self.assertEqual(tensor.shape, (3,))
+        np.testing.assert_array_equal(tensor.numpy(), np.array([1.0, 2.0, 3.0]))
+        np.testing.assert_array_equal(np.asarray(tensor), np.array([1.0, 2.0, 3.0]))
+        # Class-ness: issubclass must work without raising TypeError.
+        self.assertTrue(issubclass(torch_mock.Tensor, object))
+
+    def test_trajectory_planning_has_no_top_level_psutil_import(self):
+        """psutil is optional. A module-level 'import psutil' breaks
+        collection on systems without psutil installed; the import must
+        live inside the try/except block where it's actually used.
+        """
+        import ast
+        from pathlib import Path
+
+        source = Path(__file__).parent.joinpath("test_trajectory_planning.py").read_text()
+        tree = ast.parse(source)
+
+        top_level_psutil = []
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                top_level_psutil.extend(
+                    a.name for a in node.names if a.name == "psutil"
+                )
+            elif isinstance(node, ast.ImportFrom) and node.module == "psutil":
+                top_level_psutil.append(node.module)
+
+        self.assertEqual(
+            top_level_psutil, [],
+            "tests/test_trajectory_planning.py must not import psutil at "
+            "module level — it breaks collection without psutil installed.",
+        )
+
+    def test_test_control_module_imports_without_cupy(self):
+        """tests/test_control.py used to do bare 'import cupy as cp' at
+        module scope. On a CPU-only contributor machine without cupy,
+        that broke collection. Wrapped in try/except now.
+        """
+        import os
+        import subprocess
+        import sys
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        code = (
+            "import sys; "
+            "sys.modules['cupy'] = None; "
+            "import importlib.util; "
+            f"spec = importlib.util.spec_from_file_location("
+            f"'test_control', r'{os.path.join(repo_root, 'tests', 'test_control.py')}'); "
+            "mod = importlib.util.module_from_spec(spec); "
+            "spec.loader.exec_module(mod)"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            cwd=repo_root,
+            env={**os.environ, "PYTHONPATH": repo_root},
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"test_control.py failed to import without cupy:\n"
+            f"stdout: {result.stdout}\nstderr: {result.stderr}",
+        )
+
+
 class TestXacroRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/urdf/xacro.py — security audit (Task 41)."""
 
