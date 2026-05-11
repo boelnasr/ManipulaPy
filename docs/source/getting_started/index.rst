@@ -34,8 +34,8 @@ The fastest way to get started:
    As of v1.3.2, the default install is intentionally lightweight — it
    pulls only the core numerical/plotting stack (NumPy, SciPy, matplotlib,
    numba, pillow). Heavier or platform-specific dependencies such as
-   ``pybullet``, ``opencv-python``, ``torch``, ``scikit-learn``, ``trimesh``,
-   and ``urchin`` now live in optional extras (see below) so that the base
+   ``pybullet``, ``opencv-python``, ``torch``, ``scikit-learn``, and ``trimesh``
+   now live in optional extras (see below) so that the base
    install succeeds on minimal images and platforms without prebuilt wheels
    (e.g., Apple Silicon).
 
@@ -68,7 +68,7 @@ If you want to contribute or modify the library:
 .. note::
    **System Requirements:**
 
-   - Python 3.8 or higher
+   - Python 3.9 or higher
    - Core (auto-installed): NumPy, SciPy, matplotlib, numba, pillow
    - Optional extras (install on demand):
 

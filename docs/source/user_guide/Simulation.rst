@@ -26,7 +26,7 @@ Before using the Simulation module, ensure you have the following dependencies:
 
 .. code-block:: bash
 
-   pip install ManipulaPy[simulation] pybullet>=3.2.5 matplotlib>=3.5 numpy>=1.21
+   pip install ManipulaPy[simulation] pybullet>=3.2.5 matplotlib>=3.9 "numpy>=2.0,<3.0"
 
 **GPU Acceleration (Optional but Recommended)**
 
@@ -38,9 +38,8 @@ Before using the Simulation module, ensure you have the following dependencies:
 
 **URDF Processing**
 
-.. code-block:: bash
-
-   pip install urchin>=0.0.27
+The native URDF parser is included with ManipulaPy. Install
+``ManipulaPy[urdf]`` only when you need optional ``trimesh`` mesh loading.
 
 Verification
 ~~~~~~~~~~~~

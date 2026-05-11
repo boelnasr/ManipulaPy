@@ -1,10 +1,10 @@
 Dynamics User Guide
 ===================
 
-This comprehensive guide covers robot dynamics computations in ManipulaPy, compatible with Python 3.8 through 3.12.
+This comprehensive guide covers robot dynamics computations in ManipulaPy, compatible with Python 3.9 through 3.12.
 
 .. note::
-   This guide is compatible with Python 3.8 through 3.12 and includes performance improvements that work across supported versions.
+   This guide is compatible with Python 3.9 through 3.12 and includes performance improvements that work across supported versions.
 
 Introduction to Robot Dynamics
 -------------------------------

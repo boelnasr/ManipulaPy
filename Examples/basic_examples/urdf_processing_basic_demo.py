@@ -448,7 +448,7 @@ def test_manipulapy_visualization_support(urdf_processor):
     try:
         # Test visualization method (note: won't actually display in headless mode)
         print(f"🖼️  Visualization Methods:")
-        print(f"   • visualize_robot(): Uses urchin.robot.show()")
+        print(f"   • visualize_robot(): Uses ManipulaPy's native URDF model")
         print(f"   • visualize_trajectory(): Supports numpy arrays and dictionaries")
         
         # Create a sample trajectory for testing format conversion
@@ -550,7 +550,7 @@ def main():
         print("=" * 60)
         print("🎉 All ManipulaPy features tested successfully!")
         print("💡 Key ManipulaPy Features Demonstrated:")
-        print("   • URDF loading with urchin integration")
+        print("   • Native URDF loading")
         print("   • Automatic screw axis computation")
         print("   • PyBullet joint limits extraction")
         print("   • SerialManipulator object creation")

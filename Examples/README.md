@@ -44,7 +44,7 @@ pip install ultralytics opencv-python
 pip install scikit-learn matplotlib seaborn
 
 # For simulation examples
-pip install pybullet urchin
+pip install pybullet
 ```
 
 ## 📚 Example Categories

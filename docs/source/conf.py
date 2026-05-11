@@ -20,7 +20,7 @@ MOCK_MODULES = [
     "pycuda", "pycuda.driver", "pycuda.autoinit", "tensorflow",
     
     # Robotics / Simulation
-    "pybullet", "pybullet_data", "urchin", "urchin.urdf",
+    "pybullet", "pybullet_data",
     
     # Computer Vision
     "cv2", "ultralytics", "opencv-python",

@@ -19,7 +19,7 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
                <img src="https://img.shields.io/pypi/v/manipulapy?style=for-the-badge&logo=pypi&logoColor=white&label=PyPI&color=blue" alt="PyPI Version">
             </a>
             <a href="https://www.python.org/downloads/">
-               <img src="https://img.shields.io/badge/python-3.8%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python Versions">
+               <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python Versions">
             </a>
             <a href="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa">
                <img src="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg?style=for-the-badge" alt="JOSS Paper">
@@ -431,7 +431,7 @@ Installation Options
    # Add PyBullet-based simulation
    pip install "manipulapy[simulation]"
 
-   # Add legacy URDF backend (urchin) and trimesh-based mesh loading
+   # Add trimesh-based mesh loading
    pip install "manipulapy[urdf]"
 
    # Add OpenCV / ultralytics / torch for vision and perception

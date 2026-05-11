@@ -80,7 +80,7 @@ System Requirements
 
 - NVIDIA GPU drivers (latest recommended)
 - CUDA Toolkit 11.0+ or 12.0+
-- Python 3.8+
+- Python 3.9+
 
 Installation Options
 ~~~~~~~~~~~~~~~~~~~~~~~

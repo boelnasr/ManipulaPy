@@ -10,9 +10,9 @@ sphinx-copybutton>=0.5.0,<1.0.0
 # For mathematical expressions
 sphinxcontrib-katex>=0.8.6,<1.0.0
 
-# Basic scientific computing (lighter versions for docs)
-numpy>=1.20.0,<2.0.0
-matplotlib>=3.3.0,<4.0.0
+# Basic scientific computing (NumPy 2-compatible docs build)
+numpy>=2.0,<3.0
+matplotlib>=3.9.0,<4.0.0
 
 # Required for proper documentation build
 packaging>=21.0

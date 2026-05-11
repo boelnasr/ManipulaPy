@@ -176,7 +176,7 @@ def create_visualization_urdf():
 
 def demonstrate_robot_visualization(urdf_processor):
     """
-    Demonstrate basic robot model visualization using ManipulaPy and urchin.
+    Demonstrate basic robot model visualization using ManipulaPy.
     
     Args:
         urdf_processor (URDFToSerialManipulator): The ManipulaPy URDF processor instance
@@ -192,7 +192,7 @@ def demonstrate_robot_visualization(urdf_processor):
     
     try:
         print(f"\n🖼️  Attempting robot visualization...")
-        print(f"   Note: This will open a 3D visualization window using urchin")
+        print(f"   Note: This will open a 3D visualization window")
         print(f"   Press 'q' in the visualization window to close it")
         
         # Demonstrate the visualize_robot method
@@ -1231,7 +1231,7 @@ def main():
         print("   • complete_robot_analysis.png - Comprehensive summary")
         print()
         print("💡 Key Visualization Features Demonstrated:")
-        print("   • Robot model 3D visualization (urchin integration)")
+        print("   • Robot model 3D visualization")
         print("   • Trajectory animation with multiple formats")
         print("   • Workspace analysis and plotting")
         print("   • Manipulability ellipsoid analysis")

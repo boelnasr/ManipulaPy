@@ -3,7 +3,7 @@
 <div align="center">
 
 [![PyPI](https://img.shields.io/pypi/v/ManipulaPy)](https://pypi.org/project/ManipulaPy/)
-[![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 ![CI](https://github.com/boelnasr/ManipulaPy/actions/workflows/test.yml/badge.svg?branch=main)
 ![Test Status](https://img.shields.io/badge/tests-passing-brightgreen)
@@ -23,7 +23,7 @@
 ManipulaPy is a modern, comprehensive framework that bridges the gap between basic robotics libraries and sophisticated research tools. It provides seamless integration of kinematics, dynamics, control, and perception systems with optional CUDA acceleration for real-time applications.
 
 ### What's New in 1.3.2
-- **Modular optional extras**: default `pip install ManipulaPy` is now lightweight (numpy, scipy, matplotlib, numba, pillow). Add `[simulation]` for PyBullet, `[urdf]` for urchin/trimesh, `[vision]` for OpenCV/ultralytics/torch, `[ml]` for scikit-learn, `[cuda]` for CuPy, or `[all]` for everything
+- **Modular optional extras**: default `pip install ManipulaPy` is now lightweight (numpy 2.x, scipy, matplotlib, numba, pillow). Add `[simulation]` for PyBullet, `[urdf]` for native URDF mesh loading with trimesh, `[vision]` for OpenCV/ultralytics/torch, `[ml]` for scikit-learn, `[cuda]` for CuPy, or `[all]` for everything
 - **Native NumPy 2.0-compatible URDF parser** (`ManipulaPy.urdf.URDF`) with `PackageResolver` supporting `package://`, `file://`, ROS package discovery, and explicit-mapping precedence
 - **PEP 561 `py.typed` marker** ships in the wheel — mypy/pyright now treat ManipulaPy as a typed package
 - **Python 3.12 support** added to the CI matrix and PyPI classifiers
@@ -88,9 +88,9 @@ ManipulaPy automatically enables features based on available dependencies. Here'
 
 | Feature | CPU Performance | Dependencies | Notes |
 |---------|----------------|--------------|-------|
-| **Kinematics** | Excellent | numpy, scipy | Forward/inverse kinematics, Jacobians |
-| **Basic Dynamics** | Good | numpy, scipy | Mass matrix, Coriolis, gravity |
-| **Control Systems** | Excellent | numpy, scipy | PID, computed torque, adaptive |
+| **Kinematics** | Excellent | numpy 2.x, scipy | Forward/inverse kinematics, Jacobians |
+| **Basic Dynamics** | Good | numpy 2.x, scipy | Mass matrix, Coriolis, gravity |
+| **Control Systems** | Excellent | numpy 2.x, scipy | PID, computed torque, adaptive |
 | **URDF Processing** | Fast | numpy only (native) | Robot model conversion, NumPy 2.0+ |
 | **Small Trajectories** | Good | numba | N < 1000 points, auto-optimized |
 
@@ -1049,10 +1049,10 @@ If you use ManipulaPy in your research, please cite:
 ### Dependencies
 
 All dependencies are AGPL-3.0 compatible:
-- **Core**: `numpy`, `scipy`, `matplotlib` (BSD)
+- **Core**: `numpy>=2.0`, `scipy`, `matplotlib` (BSD)
 - **Vision**: `opencv-python` (Apache 2.0), `ultralytics` (AGPL-3.0)
 - **GPU**: `cupy` (MIT), `numba` (BSD)
-- **Simulation**: `pybullet` (Zlib), `urchin` (MIT)
+- **Simulation**: `pybullet` (Zlib)
 
 ---
 

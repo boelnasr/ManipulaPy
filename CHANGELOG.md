@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.3.2] — 2026-05-10
 
 > **Status:** Functional fix tasks 1–48 are complete on
-> `release/v1.3.2-fix-patch`. Task 49 documentation sync is in progress
-> (this changelog has been reconciled); Task 50 release ritual remains:
-> bump `pyproject.toml` and `ManipulaPy.__version__`, update `STATUS.md`,
-> tag, and publish after final verification.
+> `release/v1.3.2-fix-patch`. Task 49 documentation sync is partially
+> complete: this changelog has been reconciled, while
+> ARCHITECTURE/CONTRIBUTING/RST docs and docs-build verification remain.
+> Task 50 is also partially complete: `pyproject.toml`,
+> `ManipulaPy.__version__`, `setup.py`, and this changelog are synced to
+> `1.3.2`; `STATUS.md`, final verification, tag, PR, and publish remain.
 >
 > **Summary:** Comprehensive stability and correctness patch addressing bugs
 > across utilities, dynamics, kinematics, path planning, control, singularity
@@ -344,7 +346,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `t_idx` instead of reading `thetamat[t_idx − 1]` from rows that
   parallel threads at lower `t_idx` may not have written yet. Cost
   is `O(t_idx · intRes)` per thread now, but correctness no longer
-  depends on warp scheduling.
+  depends on warp scheduling. The kernel now preserves row 0 as the
+  initial state and starts per-thread integration at step 1, matching
+  the CPU trajectory path.
 - **`fused_potential_gradient_kernel`** repulsive gradient sign
   corrected. The kernel had dropped the leading minus from
   `∇U_rep = (1/d − 1/d₀)(−1/d³)(q − q_obs)`, so `−∇U` (the force
@@ -379,7 +383,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`perception.py` sklearn import guarded** so the module imports
   without scikit-learn; `cluster_obstacles` raises a clear
   `ImportError` with install hint when invoked without `[ml]`.
-- **Python 3.12 classifier** added to `pyproject.toml`. 3.13 deferred
+- **Python 3.12 classifier and CI matrix entry** added. 3.13 deferred
   pending CI verification.
 - **PEP 561 `py.typed` marker** ships in the wheel so downstream type
   checkers (mypy, pyright, pylance) honor inline type hints.
@@ -388,10 +392,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the PyPI wheel. Anyone hitting visualization paths on a PyPI
   install gets per-mesh "not found" warnings rather than silent
   placeholder geometry with no diagnostic.
-- **`setup.py`** version field synced to `1.3.2` (was stale at
-  `1.2.0`). `pyproject.toml` is canonical for `pip` and
-  `python -m build`; setup.py duplication is kept synced for any
-  legacy tooling that still parses it.
+- **`setup.py`** synced with the v1.3.2 packaging contract: version
+  matches `pyproject.toml`, core `install_requires` stays lightweight,
+  heavy dependencies live in extras, and package-data globs no longer
+  contradict the URDF-only wheel decision.
 
 ### Fixed — test infrastructure
 - **`tests/conftest.py`** torch mock now exposes `_MockTensor` as a
