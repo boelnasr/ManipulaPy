@@ -2021,7 +2021,7 @@ class TestPackagingRegressions(unittest.TestCase):
         }
         heavy = {
             "cupy-cuda11x", "cupy-cuda12x", "pycuda", "pybullet", "torch",
-            "torchvision", "opencv-python", "ultralytics", "trimesh", "urchin",
+            "torchvision", "opencv-python", "ultralytics", "trimesh",
             "scikit-learn",
         }
         self.assertFalse(

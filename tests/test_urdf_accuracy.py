@@ -10,7 +10,10 @@ Copyright (c) 2025 Mohamed Aboelnasr
 """
 
 import json
+import tempfile
 import time
+import types
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
@@ -19,7 +22,12 @@ import pytest
 # Test fixtures directory
 FIXTURES_DIR = Path(__file__).parent / "urdf_fixtures"
 UR5_URDF = (
-    Path(__file__).parent.parent / "ManipulaPy" / "ManipulaPy_data" / "ur5" / "ur5.urdf"
+    Path(__file__).parent.parent
+    / "ManipulaPy"
+    / "ManipulaPy_data"
+    / "universal_robots"
+    / "ur5"
+    / "ur5.urdf"
 )
 
 
@@ -28,7 +36,7 @@ def has_pybullet():
     try:
         import pybullet
 
-        return True
+        return isinstance(pybullet, types.ModuleType)
     except ImportError:
         return False
 
@@ -39,14 +47,19 @@ class PyBulletReference:
     def __init__(self, urdf_path):
         import pybullet as p
         import pybullet_data
+        from ManipulaPy.urdf.resolver import PackageResolver
 
         self.p = p
+        self._temp_urdf = None
         self.physics_client = p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        resolved_urdf_path = self._resolve_urdf_for_pybullet(
+            Path(urdf_path), PackageResolver
+        )
 
         # Load robot
         self.robot_id = p.loadURDF(
-            str(urdf_path),
+            str(resolved_urdf_path),
             basePosition=[0, 0, 0],
             baseOrientation=[0, 0, 0, 1],
             useFixedBase=True,
@@ -74,6 +87,33 @@ class PyBulletReference:
             # Types: REVOLUTE=0, PRISMATIC=1, SPHERICAL=2, PLANAR=3, FIXED=4
             if joint_type in [0, 1]:  # Revolute or Prismatic
                 self.actuated_joints.append(i)
+
+    def _resolve_urdf_for_pybullet(self, urdf_path, resolver_cls):
+        """Write a temporary URDF with package:// mesh paths resolved."""
+        data_root = Path(__file__).parent.parent / "ManipulaPy" / "ManipulaPy_data"
+        resolver = resolver_cls(base_path=urdf_path.parent, use_ros=False)
+        resolver.add_package("ur_description", data_root / "universal_robots")
+
+        tree = ET.parse(urdf_path)
+        changed = False
+        for mesh in tree.iter("mesh"):
+            filename = mesh.get("filename")
+            if not filename:
+                continue
+            resolved = resolver.resolve(filename)
+            if resolved != filename and Path(resolved).exists():
+                mesh.set("filename", resolved)
+                changed = True
+
+        if not changed:
+            return urdf_path
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb", suffix=".urdf", delete=False
+        ) as temp_urdf:
+            tree.write(temp_urdf, encoding="utf-8", xml_declaration=True)
+            self._temp_urdf = Path(temp_urdf.name)
+            return self._temp_urdf
 
     def set_configuration(self, config):
         """Set robot to given configuration."""
@@ -157,6 +197,8 @@ class PyBulletReference:
     def disconnect(self):
         """Disconnect from PyBullet."""
         self.p.disconnect()
+        if self._temp_urdf is not None:
+            self._temp_urdf.unlink(missing_ok=True)
 
 
 @pytest.mark.skipif(not has_pybullet(), reason="pybullet not installed")

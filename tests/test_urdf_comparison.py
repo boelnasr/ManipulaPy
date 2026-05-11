@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """
-URDF Parser Comparison Tests
+Native URDF Parser Tests
 
-Compare native ManipulaPy URDF parser against urchin backend
-to verify identical results.
+Exercise the built-in ManipulaPy URDF parser without legacy parser backends.
 
 Phase 7: Final Integration Testing
 
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -21,90 +19,15 @@ import pytest
 FIXTURES_DIR = Path(__file__).parent / "urdf_fixtures"
 
 
-def has_urchin():
-    """Check if urchin is available."""
-    try:
-        import urchin
-
-        return True
-    except ImportError:
-        return False
-
-
-@pytest.mark.skipif(not has_urchin(), reason="urchin not installed")
-class TestURDFComparison:
-    """Compare native parser with urchin for identical results."""
-
-    @pytest.fixture
-    def load_both(self):
-        """Factory to load URDF with both backends."""
-        from ManipulaPy.urdf import URDF
-
-        def _load(urdf_path):
-            native = URDF.load(urdf_path, backend="builtin")
-            try:
-                urchin_robot = URDF.load(urdf_path, backend="urchin")
-            except Exception as e:
-                pytest.skip(f"urchin failed to load: {e}")
-            return native, urchin_robot
-
-        return _load
-
-    def test_link_count_match(self, load_both):
-        """Verify link count is identical."""
-        native, urchin = load_both(FIXTURES_DIR / "simple_arm.urdf")
-        assert len(native.links) == len(urchin.links)
-
-    def test_joint_count_match(self, load_both):
-        """Verify joint count is identical."""
-        native, urchin = load_both(FIXTURES_DIR / "simple_arm.urdf")
-        assert len(native.joints) == len(urchin.joints)
-
-    def test_num_dofs_match(self, load_both):
-        """Verify DOF count is identical."""
-        native, urchin = load_both(FIXTURES_DIR / "simple_arm.urdf")
-        assert native.num_dofs == urchin.num_dofs
-
-    def test_fk_matches_at_zero(self, load_both):
-        """Verify FK at zero configuration matches."""
-        native, urchin = load_both(FIXTURES_DIR / "simple_arm.urdf")
-
-        cfg = np.zeros(native.num_dofs)
-
-        fk_native = native.link_fk(cfg, use_names=True)
-        fk_urchin = urchin.link_fk(cfg, use_names=True)
-
-        for link in native.links:
-            if link.name in fk_native and link.name in fk_urchin:
-                np.testing.assert_allclose(
-                    fk_native[link.name],
-                    fk_urchin[link.name],
-                    atol=1e-10,
-                    err_msg=f"FK mismatch for {link.name} at zero config",
-                )
-
-    def test_fk_matches_random_configs(self, load_both):
-        """Verify FK matches at random configurations."""
-        native, urchin = load_both(FIXTURES_DIR / "simple_arm.urdf")
-
-        for _ in range(20):
-            cfg = np.random.uniform(-np.pi, np.pi, native.num_dofs)
-
-            fk_native = native.link_fk(cfg, use_names=True)
-            fk_urchin = urchin.link_fk(cfg, use_names=True)
-
-            for link in native.links:
-                if link.name in fk_native and link.name in fk_urchin:
-                    np.testing.assert_allclose(
-                        fk_native[link.name],
-                        fk_urchin[link.name],
-                        atol=1e-8,
-                        err_msg=f"FK mismatch for {link.name} at random config",
-                    )
-
-
 class TestNativeParserStandalone:
     """Test native parser functionality without comparison."""
+
+    def test_legacy_urchin_backend_rejected(self):
+        """The removed legacy backend should not be accepted."""
+        from ManipulaPy.urdf import URDF
+
+        with pytest.raises(ValueError, match="builtin.*pybullet"):
+            URDF.load(FIXTURES_DIR / "simple_arm.urdf", backend="urchin")
 
     def test_simple_arm_fk_consistency(self):
         """Test FK is internally consistent."""

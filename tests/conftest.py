@@ -14,9 +14,12 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 """
 
 import os
+import shutil
+import subprocess
 import sys
 import types
 import warnings
+from pathlib import Path
 from unittest.mock import MagicMock, Mock
 
 # Set up matplotlib for headless testing
@@ -35,10 +38,60 @@ warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
 # Add the package to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# Force CPU-only execution
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-os.environ["NUMBA_DISABLE_CUDA"] = "1"
-os.environ["MANIPULAPY_FORCE_CPU"] = "1"
+
+def _env_truthy(value):
+    """Return True for common truthy environment values."""
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _cuda_hidden_by_user():
+    """Detect explicit user-level CUDA hiding without treating unset as hidden."""
+    value = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if value is None:
+        return False
+    return value.strip().lower() in {"", "-1", "none", "no"}
+
+
+def _nvidia_device_visible():
+    """Detect whether an NVIDIA GPU is visible to this test process."""
+    if _cuda_hidden_by_user():
+        return False
+
+    if Path("/dev/nvidiactl").exists() or any(Path("/dev").glob("nvidia[0-9]*")):
+        return True
+
+    nvidia_smi = shutil.which("nvidia-smi")
+    if not nvidia_smi:
+        return False
+
+    try:
+        result = subprocess.run(
+            [nvidia_smi, "-L"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=2,
+        )
+    except Exception:
+        return False
+
+    return result.returncode == 0 and "GPU" in result.stdout
+
+
+_USER_FORCED_CPU = (
+    _env_truthy(os.environ.get("MANIPULAPY_FORCE_CPU"))
+    or _env_truthy(os.environ.get("NUMBA_DISABLE_CUDA"))
+    or _cuda_hidden_by_user()
+)
+NVIDIA_VISIBLE = _nvidia_device_visible()
+FORCE_CPU_ONLY = _USER_FORCED_CPU or not NVIDIA_VISIBLE
+
+if FORCE_CPU_ONLY:
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    os.environ["NUMBA_DISABLE_CUDA"] = "1"
+    os.environ["MANIPULAPY_FORCE_CPU"] = "1"
+
 os.environ["TORCH_USE_CUDA_DSA"] = "0"
 # Files/dirs pytest should skip during collection
 collect_ignore = [
@@ -47,7 +100,6 @@ collect_ignore = [
     "build",
     "dist",
     "test_error_computation.py",
-    "test_cuda_kernels.py",  # GPU-only tests
 ]
 
 # IK convergence tests in parent directory (not in tests/)
@@ -290,8 +342,8 @@ class CuPyMock:
 def test_module_availability(module_name):
     """Test if a module is available and can be imported."""
     try:
-        __import__(module_name)
-        return True
+        module = __import__(module_name, fromlist=["*"])
+        return isinstance(module, types.ModuleType)
     except ImportError:
         return False
     except Exception as e:
@@ -513,32 +565,6 @@ def create_smart_mock(module_name):
 
         return pb_mock
 
-    elif module_name in ["urchin", "urchin.urdf"]:
-        urchin_mock = MockModule("urchin")
-
-        class MockURDF:
-            def __init__(self):
-                self.links = []
-                self.joints = []
-                self.actuated_joints = []
-
-            @staticmethod
-            def load(urdf_path):
-                return MockURDF()
-
-            def show(self):
-                pass
-
-            def animate(self, *args, **kwargs):
-                pass
-
-            def link_fk(self, cfg=None):
-                return {}
-
-        urchin_mock.urdf = MockModule("urchin.urdf")
-        urchin_mock.urdf.URDF = MockURDF
-        return urchin_mock
-
     else:
         return MockModule(module_name)
 
@@ -547,14 +573,23 @@ def create_smart_mock(module_name):
 # Intelligent Mocking Setup
 # ============================================================================
 
-# GPU-only modules that should always be mocked
+# GPU-only modules are mocked only in CPU-only test runs. On NVIDIA hosts the
+# real CuPy/Numba CUDA paths are allowed to load and decide availability.
+GPU_ONLY_MOCKS = (
+    [
+        "cupy",
+        "numba.cuda",
+        "numba.cuda.random",
+    ]
+    if FORCE_CPU_ONLY
+    else []
+)
+
 ALWAYS_MOCK = [
-    "cupy",
+    *GPU_ONLY_MOCKS,
     "pycuda",
     "pycuda.driver",
     "pycuda.autoinit",
-    "numba.cuda",
-    "numba.cuda.random",
     "torchvision",
     "torchvision.ops",
     "torchvision.transforms",
@@ -564,8 +599,6 @@ ALWAYS_MOCK = [
 # Simulation/complex modules that are problematic in CI
 MOCK_IN_CI = [
     "pybullet",
-    "urchin",
-    "urchin.urdf",
 ]
 
 # CPU libraries that should be tested when available
@@ -601,8 +634,33 @@ for module_name in TEST_WHEN_AVAILABLE:
 # Dependency Availability Checks for Test Markers
 # ============================================================================
 
-CUDA_AVAILABLE = False  # Always false due to mocking
-CUPY_AVAILABLE = False  # Always false due to mocking
+
+def _numba_cuda_available():
+    """Return True only when Numba can see a usable CUDA runtime."""
+    if FORCE_CPU_ONLY:
+        return False
+    try:
+        from numba import cuda
+
+        return bool(cuda.is_available())
+    except Exception:
+        return False
+
+
+def _cupy_runtime_available():
+    """Return True only when CuPy can see at least one CUDA device."""
+    if FORCE_CPU_ONLY:
+        return False
+    try:
+        import cupy as cp
+
+        return cp.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
+
+
+CUDA_AVAILABLE = _numba_cuda_available()
+CUPY_AVAILABLE = _cupy_runtime_available()
 OPENCV_AVAILABLE = test_module_availability("cv2")
 PYBULLET_AVAILABLE = test_module_availability("pybullet") and not in_ci
 YOLO_AVAILABLE = test_module_availability("ultralytics")
@@ -610,7 +668,10 @@ SKLEARN_AVAILABLE = test_module_availability("sklearn")
 TORCH_AVAILABLE = test_module_availability("torch")
 
 # Environment flags from CI
-SKIP_CUDA_TESTS = True  # Always skip due to mocking
+SKIP_CUDA_TESTS = (
+    os.environ.get("SKIP_CUDA_TESTS", "false").lower() == "true"
+    or not CUDA_AVAILABLE
+)
 SKIP_VISION_TESTS = os.environ.get("SKIP_VISION_TESTS", "false").lower() == "true"
 SKIP_SIMULATION_TESTS = (
     os.environ.get("SKIP_SIMULATION_TESTS", "false").lower() == "true" or in_ci
@@ -626,7 +687,7 @@ def pytest_addoption(parser):
     parser.addoption(
         "--skip-cuda",
         action="store_true",
-        default=True,  # Always skip CUDA
+        default=SKIP_CUDA_TESTS,
         help="Skip tests that require CUDA/GPU",
     )
     parser.addoption(
@@ -674,7 +735,7 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     """Modify test collection based on available dependencies and options."""
     # Skip markers
-    skip_cuda = pytest.mark.skip(reason="CUDA not available (always skipped in tests)")
+    skip_cuda = pytest.mark.skip(reason="CUDA not available or skipped")
     skip_vision = pytest.mark.skip(
         reason="Vision dependencies not available or skipped"
     )
@@ -684,8 +745,10 @@ def pytest_collection_modifyitems(config, items):
     skip_slow = pytest.mark.skip(reason="Slow tests skipped (use --run-slow to run)")
 
     for item in items:
-        # Skip CUDA tests (always)
-        if "cuda" in item.keywords or "gpu" in item.keywords:
+        # Skip CUDA tests only when CUDA is unavailable or explicitly skipped.
+        if ("cuda" in item.keywords or "gpu" in item.keywords) and (
+            not CUDA_AVAILABLE or config.getoption("--skip-cuda")
+        ):
             item.add_marker(skip_cuda)
 
         # Skip vision tests if not available
@@ -876,8 +939,8 @@ def assert_array_almost_equal(actual, expected, tolerance=1e-6, msg=""):
 def requires_dependency(dependency_name):
     """Decorator to skip tests if dependency is not available."""
     availability_map = {
-        "cuda": False,  # Always false
-        "cupy": False,  # Always false
+        "cuda": CUDA_AVAILABLE and not SKIP_CUDA_TESTS,
+        "cupy": CUPY_AVAILABLE and not SKIP_CUDA_TESTS,
         "opencv": OPENCV_AVAILABLE and not SKIP_VISION_TESTS,
         "pybullet": PYBULLET_AVAILABLE and not SKIP_SIMULATION_TESTS,
         "yolo": YOLO_AVAILABLE and not SKIP_VISION_TESTS,
@@ -977,8 +1040,8 @@ def pytest_sessionstart(session):
 
     # Dependency status
     deps = [
-        ("CUDA/Numba", False),  # Always false due to mocking
-        ("CuPy", False),  # Always false due to mocking
+        ("CUDA/Numba", CUDA_AVAILABLE and not SKIP_CUDA_TESTS),
+        ("CuPy", CUPY_AVAILABLE and not SKIP_CUDA_TESTS),
         ("OpenCV", OPENCV_AVAILABLE and not SKIP_VISION_TESTS),
         ("PyBullet", PYBULLET_AVAILABLE and not SKIP_SIMULATION_TESTS),
         ("YOLO", YOLO_AVAILABLE and not SKIP_VISION_TESTS),
@@ -1024,8 +1087,8 @@ Simulation Tests:
   - test_sim.py                    : PyBullet simulation tests
   - test_urdf_processor.py         : URDF file processing
 
-GPU/CUDA Tests (always skipped in test environment):
-  - test_cuda_kernels.py           : GPU kernel tests (skipped)
+GPU/CUDA Tests:
+  - test_cuda_kernels.py           : CUDA kernels and CPU fallback tests
   - test_cuda_kernels_cpu.py       : CPU fallback for CUDA kernels
 
 Smoke Tests:
@@ -1043,7 +1106,7 @@ Total Test Count:
   - All tests: 150+ tests across all modules
 
 Test Markers:
-  @pytest.mark.cuda           : Requires CUDA/GPU (always skipped)
+  @pytest.mark.cuda           : Requires CUDA/GPU
   @pytest.mark.gpu            : Alias for cuda marker
   @pytest.mark.vision         : Requires OpenCV/vision dependencies
   @pytest.mark.simulation     : Requires PyBullet
