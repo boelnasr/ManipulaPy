@@ -18,7 +18,7 @@ System Requirements
    * - Component
      - Requirement
    * - Python
-     - 3.8 -- 3.12 (3.12 added in v1.3.2)
+     - 3.9 -- 3.12 (3.12 added in v1.3.2)
    * - OS
      - Linux, macOS, Windows
    * - GPU (optional)
@@ -33,13 +33,13 @@ Default install
 
    pip install ManipulaPy
 
-This pulls in only **NumPy, SciPy, Matplotlib, Numba, and Pillow**.
+This pulls in only **NumPy 2.x, SciPy, Matplotlib, Numba, and Pillow**.
 Kinematics, dynamics, control, native URDF parsing, and CPU trajectory
 generation work out of the box.
 
 .. versionchanged:: 1.3.2
    The default install is now lightweight. Previous versions installed
-   PyBullet, OpenCV, scikit-learn, urchin, and trimesh by default;
+   PyBullet, OpenCV, scikit-learn, and trimesh by default;
    these are now opt-in via extras.
 
 Optional extras
@@ -58,9 +58,6 @@ Optional extras
    * - ``[urdf]``
      - ``trimesh`` mesh loading for the native URDF backend
      - ``pip install "ManipulaPy[urdf]"``
-   * - ``[urdf-legacy]``
-     - Legacy ``urchin`` URDF backend (pins NumPy < 2.0)
-     - ``pip install "ManipulaPy[urdf-legacy]"``
    * - ``[vision]``
      - OpenCV, Ultralytics (YOLO), and PyTorch
      - ``pip install "ManipulaPy[vision]"``
@@ -71,10 +68,13 @@ Optional extras
      - PyTorch + scikit-learn (DBSCAN clustering for perception)
      - ``pip install "ManipulaPy[ml]"``
    * - ``[cuda]``
-     - CuPy 11.x for GPU-accelerated kernels (default)
+     - CuPy 12.x for GPU-accelerated kernels (default, driver >= 525)
      - ``pip install "ManipulaPy[cuda]"``
+   * - ``[gpu-cuda11]``
+     - CuPy 11.x for legacy CUDA 11.x toolchains (driver 470 - 524)
+     - ``pip install "ManipulaPy[gpu-cuda11]"``
    * - ``[gpu-cuda12]``
-     - CuPy 12.x for newer NVIDIA drivers
+     - Explicit CUDA 12.x alias for ``[cuda]``
      - ``pip install "ManipulaPy[gpu-cuda12]"``
    * - ``[gpu-rocm]``
      - CuPy ROCm 4.3 build for AMD GPUs
@@ -107,17 +107,18 @@ Combine extras with a comma:
 GPU extras detail
 =================
 
-The default ``[cuda]`` extra installs ``cupy-cuda11x``, which works
-with CUDA 11.x toolchains (driver >= 470). For CUDA 12.x (driver >=
-535), use the ``[gpu-cuda12]`` extra instead:
+The default ``[cuda]`` extra installs ``cupy-cuda12x`` — the version
+that ships with Ubuntu 22.04's NVIDIA apt repos and is what v1.3.2
+was validated against on driver 580. For older CUDA 11.x toolchains
+(driver 470 – 524), use the ``[gpu-cuda11]`` extra:
 
 .. code-block:: bash
 
-   # CUDA 11.x (driver >= 470) -- the default `[cuda]` extra
+   # CUDA 12.x (driver >= 525) -- the default `[cuda]` extra
    pip install "ManipulaPy[cuda]"
 
-   # CUDA 12.x (driver >= 535)
-   pip install "ManipulaPy[gpu-cuda12]"
+   # Legacy CUDA 11.x (driver 470 - 524)
+   pip install "ManipulaPy[gpu-cuda11]"
 
    # AMD ROCm 4.3
    pip install "ManipulaPy[gpu-rocm]"
@@ -155,7 +156,7 @@ Upgrading
 When upgrading from 1.3.1 or earlier, run
 ``ManipulaPy.check_dependencies()`` after install to see which extras
 you may now need to request explicitly -- several previously bundled
-dependencies (PyBullet, OpenCV, scikit-learn, urchin, trimesh) are now
+dependencies (PyBullet, OpenCV, scikit-learn, trimesh) are now
 opt-in.
 
 Verifying the install

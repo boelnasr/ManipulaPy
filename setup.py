@@ -19,97 +19,95 @@ setup(
     # FIXED: Properly find all packages including ManipulaPy_data
     packages=find_packages(include=['ManipulaPy', 'ManipulaPy.*']),
     
-    # Core dependencies - required for basic functionality
+    # Legacy setup.py path mirrors pyproject.toml's lightweight core install.
+    # Heavy/platform-specific dependencies live in extras below.
     install_requires=[
-        "numpy>=1.20.0,<2.0",         # Core numerical operations
-        "scipy>=1.7.0,<2.0",          # Scientific computing
-        "matplotlib>=3.3.0,<4.0",     # Plotting and visualization
-        "pybullet>=3.2.5,<4.0",       # Physics simulation
-        "urchin>=0.0.27,<1.0",        # URDF processing
-        "trimesh>=3.15.0,<5.0",       # 3D mesh processing
-        "opencv-python>=4.5.0,<5.0",  # Computer vision
-        "scikit-learn>=1.0.0,<2.0",   # Machine learning (clustering)
-        "numba>=0.56.0,<1.0",         # JIT compilation for performance
+        "numpy>=2.0,<3.0",
+        "scipy>=1.14",
+        "matplotlib>=3.9",
+        "numba>=0.60",
+        "pillow>=8.0.0",
     ],
-    
-    # Optional dependencies for enhanced functionality
+
+    # Optional dependencies for enhanced functionality. Keep ultralytics at
+    # 8.4.0+ so the vision extra works with the NumPy 2.x runtime range.
     extras_require={
-        # GPU acceleration with CUDA 11.x
-        "gpu-cuda11": [
-            "cupy-cuda11x>=10.0.0,<13.0",  # CUDA arrays and kernels
+        "minimal": [
+            "numpy>=2.0,<3.0",
+            "scipy>=1.14",
+            "matplotlib>=3.9",
+            "numba>=0.60",
+            "pybullet>=3.2.5,<4.0",
         ],
-        
-        # GPU acceleration with CUDA 12.x  
-        "gpu-cuda12": [
-            "cupy-cuda12x>=12.0.0,<13.0",  # CUDA arrays and kernels
+        "simulation": [
+            "pybullet>=3.2.5,<4.0",
         ],
-        
-        # Legacy GPU support
-        "gpu": [
-            "cupy-cuda11x>=10.0.0,<13.0",  # Default to CUDA 11.x
-            "pycuda>=2021.1,<2025.0",      # Legacy PyCUDA support
+        "urdf": [
+            "trimesh>=3.9.14",
         ],
-        
-        # Vision and perception capabilities
         "vision": [
-            "ultralytics>=8.0.0,<9.0",     # YOLO object detection
-            "torch>=1.8.0,<3.0",           # Required by ultralytics
-            "torchvision>=0.9.0,<1.0",     # Computer vision models
+            "opencv-python>=4.5",
+            "ultralytics>=8.4.0",
+            "torch>=1.8.0",
         ],
-        
-        # Development and testing tools
-        "dev": [
-            "pytest>=7.0.0,<8.0",
-            "pytest-cov>=4.0.0,<5.0", 
-            "pytest-benchmark>=4.0.0,<5.0",
-            "black>=22.0.0,<24.0",
-            "flake8>=5.0.0,<7.0",
-            "isort>=5.10.0,<6.0",
-            "mypy>=0.990,<2.0",
-            "pre-commit>=2.20.0,<4.0",
+        "ml": [
+            "torch>=1.8.0",
+            "scikit-learn>=1.0",
         ],
-        
-        # Documentation generation
-        "docs": [
-            "sphinx>=5.0.0,<8.0",
-            "sphinx-rtd-theme>=1.0.0,<3.0",
-            "myst-parser>=0.18.0,<3.0",
-            "sphinx-autodoc-typehints>=1.19.0,<2.0",
+        # Default GPU extra targets CUDA 12.x (Ubuntu 22.04 + modern
+        # NVIDIA apt repos, driver 525+). Pinned to 13.x because CuPy
+        # 14.x raised its numpy floor to 2.2 and breaks ultralytics.
+        "cuda": [
+            "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
         ],
-        
-        # Benchmarking and performance analysis
-        "benchmark": [
-            "psutil>=5.8.0,<6.0",          # System monitoring
-            "tabulate>=0.9.0,<1.0",        # Table formatting
-            "seaborn>=0.11.0,<1.0",        # Statistical plotting
-            "memory-profiler>=0.60.0,<1.0", # Memory usage analysis
-        ],
-        
-        # Complete installation with all features
         "all": [
-            # GPU support (CUDA 12.x preferred)
-            "cupy-cuda12x>=12.0.0,<13.0",
-            "pycuda>=2021.1,<2025.0",
-            
-            # Vision capabilities
-            "ultralytics>=8.0.0,<9.0",
-            "torch>=1.8.0,<3.0",
-            "torchvision>=0.9.0,<1.0",
-            
-            # Development tools
-            "pytest>=7.0.0,<8.0",
-            "pytest-cov>=4.0.0,<5.0",
-            "black>=22.0.0,<24.0",
-            "flake8>=5.0.0,<7.0",
-            
-            # Documentation
-            "sphinx>=5.0.0,<8.0",
-            "sphinx-rtd-theme>=1.0.0,<3.0",
-            
-            # Benchmarking
-            "psutil>=5.8.0,<6.0",
-            "tabulate>=0.9.0,<1.0",
-            "seaborn>=0.11.0,<1.0",
+            "pybullet>=3.2.5,<4.0",
+            "trimesh>=3.9.14",
+            "opencv-python>=4.5",
+            "ultralytics>=8.4.0",
+            "torch>=1.8.0",
+            "scikit-learn>=1.0",
+            "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+        ],
+        "gpu-cuda11": [
+            "cupy-cuda11x>=13.0,<14.0; sys_platform != 'darwin'",
+        ],
+        "gpu-cuda12": [
+            "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+        ],
+        "gpu-rocm": [
+            "cupy-rocm-4-3>=10.0.0",
+        ],
+        "gpu-pycuda": [
+            "pycuda>=2021.1",
+        ],
+        "vision-headless": [
+            "opencv-python-headless>=4.5",
+            "ultralytics>=8.4.0",
+            "pillow>=8.0.0",
+        ],
+        "dev": [
+            "pytest>=6.0.0",
+            "pytest-cov>=3.0.0",
+            "pytest-mock>=3.6.0",
+            "pytest-xvfb>=2.0.0",
+            "pytest-timeout>=2.1.0",
+            "pytest-benchmark>=4.0.0",
+            "coverage[toml]>=6.0.0",
+            "black>=22.0.0",
+            "flake8>=4.0.0",
+            "isort>=5.10.0",
+            "mypy>=0.950",
+            "pre-commit>=2.15.0",
+            "tox>=4.0.0",
+        ],
+        "docs": [
+            "sphinx>=4.0.0",
+            "sphinx-rtd-theme>=1.0.0",
+            "myst-parser>=0.15.0",
+            "sphinx-autodoc-typehints>=1.12.0",
+            "nbsphinx>=0.8.0",
+            "jupyter>=1.0.0",
         ],
     },
     
@@ -122,7 +120,6 @@ setup(
         "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9", 
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
@@ -136,21 +133,17 @@ setup(
     ],
     
     # Python version requirements
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     
-    # FIXED: Simplified and working package data configuration
+    # Legacy package-data path follows MANIFEST.in: URDF/docs only, not meshes.
     include_package_data=True,
     package_data={
         "ManipulaPy": [
-            "ManipulaPy_data/*",
-            "ManipulaPy_data/*/*",
-            "ManipulaPy_data/*/*/*",
-            "ManipulaPy_data/*/*/*/*",
-            "ManipulaPy_data/*/*/*/*/*",
-            "ManipulaPy_data/ur5/ur5.urdf",
-            "ManipulaPy_data/ur5/visual/*.dae",
-            "ManipulaPy_data/xarm/xarm6_robot.urdf",
-            "ManipulaPy_data/xarm/visual/*.dae"
+            "py.typed",
+            "ManipulaPy_data/*.md",
+            "ManipulaPy_data/*/*.urdf",
+            "ManipulaPy_data/*/*/*.urdf",
+            "ManipulaPy_data/*/*/*/*.urdf",
         ],
     },
     
