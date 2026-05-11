@@ -4,7 +4,7 @@
 URDF Data Types
 
 Dataclass definitions for URDF elements, optimized for ManipulaPy.
-Combines the best design patterns from yourdfpy, urchin, and urdfpy.
+Designed for ManipulaPy's native URDF parser.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 """

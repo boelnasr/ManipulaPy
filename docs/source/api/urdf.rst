@@ -32,9 +32,6 @@ Use :meth:`URDF.load` to parse a URDF (or Xacro) file from disk. The
 
 - ``"builtin"`` *(default)* — the native ManipulaPy parser. NumPy 2.0
   compatible, no extra installs required.
-- ``"urchin"`` — legacy ``urchin`` backend. Requires the ``[urdf]``
-  extra (``pip install ManipulaPy[urdf]``). Not compatible with NumPy
-  2.0 and emits a ``DeprecationWarning``.
 - ``"pybullet"`` — PyBullet-based loader. Requires the ``[simulation]``
   extra (``pip install ManipulaPy[simulation]``).
 
@@ -130,8 +127,8 @@ Examples
    resolver.add_package("ur_description", "/opt/ros/jazzy/share/ur_description")
    resolved = resolver.resolve("package://ur_description/meshes/ur5/visual/base.dae")
 
-   # Force the legacy urchin backend (requires `pip install ManipulaPy[urdf]`)
-   robot = URDF.load("custom.urdf", backend="urchin")
+   # Use PyBullet's loader when simulation interoperability is needed
+   robot = URDF.load("custom.urdf", backend="pybullet")
 
 See also
 --------

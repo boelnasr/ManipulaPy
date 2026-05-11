@@ -107,7 +107,6 @@ class CollisionChecker:
 
     Supports multiple URDF parser backends:
         - "builtin": Native ManipulaPy parser (NumPy 2.0 compatible, default)
-        - "urchin": Legacy urchin parser (requires urchin, not NumPy 2.0 compatible)
         - "pybullet": PyBullet-based parser (requires pybullet)
     """
 
@@ -117,7 +116,7 @@ class CollisionChecker:
 
         Args:
             urdf_path (str): The path to the URDF file.
-            backend (str): Parser backend - "builtin" (default), "urchin", or "pybullet"
+            backend (str): Parser backend - "builtin" (default) or "pybullet"
             load_meshes (bool): Whether to load mesh geometry data (default: True)
         """
         self.robot = URDF.load(urdf_path, backend=backend, load_meshes=load_meshes)

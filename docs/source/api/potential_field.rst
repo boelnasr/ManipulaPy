@@ -153,7 +153,7 @@ CollisionChecker Class
 
    **Initialization Process:**
    
-   1. Loads URDF using urchin.urdf.URDF.load()
+   1. Loads URDF using ManipulaPy's native URDF parser
    2. Extracts visual geometry from robot links
    3. Generates convex hulls for collision approximation
    4. Stores hull dictionary indexed by link names
@@ -269,7 +269,7 @@ Each ConvexHull object contains:
 Forward Kinematics Integration
 -----------------------------
 
-Integration with urchin URDF processing:
+Integration with ManipulaPy URDF processing:
 
 - **Input**: Joint configuration (thetalist)
 
@@ -450,6 +450,5 @@ See Also
 External Dependencies
 =====================
 
-* `urchin <https://github.com/fishbotics/urchin>`_ -- URDF processing library
 * `scipy.spatial <https://docs.scipy.org/doc/scipy/reference/spatial.html>`_ -- Convex hull computations
 * `NumPy <https://numpy.org/doc/stable/>`_ -- Numerical array operations

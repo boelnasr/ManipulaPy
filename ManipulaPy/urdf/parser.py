@@ -3,8 +3,7 @@
 """
 URDF XML Parser
 
-Robust XML parsing for URDF files, combining best practices from
-yourdfpy, urchin, and urdfpy. Handles malformed XML gracefully.
+Robust XML parsing for URDF files. Handles malformed XML gracefully.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 """

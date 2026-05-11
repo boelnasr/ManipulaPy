@@ -4,9 +4,7 @@ URDF Processor User Guide
 This guide covers URDF (Unified Robot Description Format) loading in ManipulaPy.
 As of v1.3.2 the recommended entry point is the **native URDF parser** under
 ``ManipulaPy.urdf``, which converts URDF files directly into ``SerialManipulator``
-and ``ManipulatorDynamics`` objects with no external URDF dependency. The legacy
-``URDFToSerialManipulator`` class (built on ``urchin``) is still shipped for
-backward compatibility and is documented further down.
+and ``ManipulatorDynamics`` objects with no external URDF dependency.
 
 Introduction
 ------------
@@ -21,7 +19,7 @@ builds the objects used elsewhere in ManipulaPy for robotics analysis.
 - Automatic parameter extraction from URDF files
 - Kinematic chain analysis and screw axis computation
 - Inertial property extraction for dynamics
-- Pluggable backends (``builtin``, ``urchin``, ``pybullet``)
+- Pluggable backends (``builtin``, ``pybullet``)
 - Robust ``package://`` and ``file://`` resolution via ``PackageResolver``
 - Conversion to ``SerialManipulator`` and ``ManipulatorDynamics`` objects
 
@@ -29,7 +27,7 @@ Native URDF parser (v1.3.2+, recommended)
 -----------------------------------------
 
 The ``ManipulaPy.urdf`` package provides a native URDF parser that does not
-require ``urchin`` or any other external URDF library. It is NumPy 2.0
+require an external URDF library. It is NumPy 2.0
 compatible, supports lazy mesh loading, and can convert directly to ManipulaPy's
 kinematics and dynamics classes.
 
@@ -68,10 +66,6 @@ corresponding extras.
 
    # Default: native parser, NumPy 2.0 compatible, no extra installs
    robot = URDF.load(get_robot_urdf("ur5"), backend="builtin")
-
-   # Legacy urchin backend (requires the [urdf] extra)
-   #   pip install "ManipulaPy[urdf]"
-   robot = URDF.load(get_robot_urdf("ur5"), backend="urchin")
 
    # PyBullet-based parser (requires the [simulation] extra)
    #   pip install "ManipulaPy[simulation]"
@@ -157,10 +151,7 @@ Legacy backend: ``URDFToSerialManipulator``
 
 .. note::
 
-   The ``URDFToSerialManipulator`` class is still supported for backward
-   compatibility, but new code should prefer the native parser shown above.
-   ``URDFToSerialManipulator`` depends on ``urchin``, which is not compatible
-   with NumPy 2.0+.
+   New code should prefer the native parser shown above.
 
 Basic Usage
 ~~~~~~~~~~~
@@ -232,7 +223,7 @@ Class Constructor
 - ``dynamics``: ManipulatorDynamics object for dynamics
 - ``robot_data``: Dictionary containing extracted parameters
 - ``urdf_name``: Path to the loaded URDF file
-- ``robot``: Loaded URDF object from urchin library
+- ``robot``: Loaded ManipulaPy URDF object
 
 Extracted Parameters
 ^^^^^^^^^^^^^^^^^^^^
@@ -429,7 +420,7 @@ Visualization Methods
 
    processor = URDFToSerialManipulator(get_robot_urdf("xarm"))
 
-   # Visualize robot using urchin (matplotlib)
+   # Visualize robot
    processor.visualize_robot()
 
    # Visualize trajectory animation
@@ -699,10 +690,10 @@ ManipulaPy's analytical framework:
 3. ``robot.to_manipulator_dynamics()`` for dynamics
 4. ``PackageResolver`` for ``package://`` mesh resolution
 
-**Legacy path (still supported):**
+**Processor path:**
 
 - ``URDFToSerialManipulator(get_robot_urdf(...))`` from
-  ``ManipulaPy.urdf_processor`` — depends on ``urchin`` and (optionally)
+  ``ManipulaPy.urdf_processor`` uses the native parser and can optionally use
   PyBullet for joint limits.
 
 **Best Practices:**

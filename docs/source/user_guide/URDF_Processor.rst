@@ -74,7 +74,7 @@ Class Constructor
 - ``dynamics``: ManipulatorDynamics object for dynamics  
 - ``robot_data``: Dictionary containing extracted parameters
 - ``urdf_name``: Path to the loaded URDF file
-- ``robot``: Loaded URDF object from urchin library
+- ``robot``: Loaded ManipulaPy URDF object
 
 Extracted Parameters
 ~~~~~~~~~~~~~~~~~~~~
@@ -247,7 +247,7 @@ Visualization Methods
 
    processor = URDFToSerialManipulator("robot.urdf")
 
-   # Visualize robot using urchin (matplotlib)
+   # Visualize robot
    processor.visualize_robot()
    
    # Visualize trajectory animation

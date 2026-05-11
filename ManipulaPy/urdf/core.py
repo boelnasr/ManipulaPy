@@ -116,27 +116,24 @@ class URDF:
             filename: Path to URDF or XACRO file
             load_meshes: Load mesh geometry data
             mesh_dir: Base directory for mesh file resolution
-            backend: Parser backend - "builtin" (default), "urchin", or "pybullet"
+            backend: Parser backend - "builtin" (default) or "pybullet"
 
         Returns:
             URDF object
 
         Note:
             - "builtin": Native ManipulaPy parser (NumPy 2.0 compatible)
-            - "urchin": Legacy urchin parser (requires urchin package)
             - "pybullet": PyBullet-based parser (requires pybullet package)
         """
         if backend == "builtin":
             return cls._load_builtin(
                 filename, load_meshes=load_meshes, mesh_dir=mesh_dir
             )
-        elif backend == "urchin":
-            return cls._load_urchin(filename)
         elif backend == "pybullet":
             return cls._load_pybullet(filename)
         else:
             raise ValueError(
-                f"Unknown backend: {backend}. Use 'builtin', 'urchin', or 'pybullet'"
+                f"Unknown backend: {backend}. Use 'builtin' or 'pybullet'"
             )
 
     @classmethod
@@ -153,215 +150,6 @@ class URDF:
         return URDFParser.parse_file(
             filename, load_meshes=load_meshes, mesh_dir=mesh_path
         )
-
-    @classmethod
-    def _load_urchin(cls, filename: Union[str, Path]) -> "URDF":
-        """
-        Load URDF using urchin parser (legacy fallback).
-
-        Requires: pip install urchin
-        Note: urchin is not compatible with NumPy 2.0+
-        """
-        try:
-            import urchin
-        except ImportError:
-            raise ImportError(
-                "urchin package not installed. Install with: pip install urchin\n"
-                "Note: urchin is not compatible with NumPy 2.0+. "
-                "Consider using backend='builtin' instead."
-            )
-
-        import warnings
-
-        warnings.warn(
-            "Using urchin backend which is not compatible with NumPy 2.0+. "
-            "Consider using backend='builtin' for better compatibility.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-        # Load with urchin
-        urchin_robot = urchin.URDF.load(str(filename))
-
-        # Convert to our URDF format
-        return cls._convert_from_urchin(urchin_robot)
-
-    @classmethod
-    def _convert_from_urchin(cls, urchin_robot) -> "URDF":
-        """Convert urchin URDF to native URDF."""
-        from .types import (
-            Box,
-            Collision,
-            Cylinder,
-            Inertial,
-            Joint,
-            JointDynamics,
-            JointLimit,
-            JointMimic,
-            JointType,
-            Link,
-            Material,
-            Mesh,
-            Origin,
-            Sphere,
-            Visual,
-        )
-
-        # Convert links
-        links = []
-        for ulink in urchin_robot.links:
-            # Convert inertial
-            inertial = None
-            if ulink.inertial is not None:
-                origin = Origin(
-                    xyz=(
-                        np.array(ulink.inertial.origin.xyz)
-                        if ulink.inertial.origin
-                        else np.zeros(3)
-                    ),
-                    rpy=(
-                        np.array(ulink.inertial.origin.rpy)
-                        if ulink.inertial.origin
-                        else np.zeros(3)
-                    ),
-                )
-                inertial = Inertial(
-                    mass=ulink.inertial.mass,
-                    inertia=(
-                        ulink.inertial.inertia
-                        if hasattr(ulink.inertial, "inertia")
-                        else np.eye(3)
-                    ),
-                    origin=origin,
-                )
-
-            # Convert visuals
-            visuals = []
-            for uvis in ulink.visuals or []:
-                vis_origin = Origin(
-                    xyz=np.array(uvis.origin.xyz) if uvis.origin else np.zeros(3),
-                    rpy=np.array(uvis.origin.rpy) if uvis.origin else np.zeros(3),
-                )
-                geometry = (
-                    cls._convert_urchin_geometry(uvis.geometry)
-                    if uvis.geometry
-                    else None
-                )
-                visuals.append(Visual(origin=vis_origin, geometry=geometry))
-
-            # Convert collisions
-            collisions = []
-            for ucol in ulink.collisions or []:
-                col_origin = Origin(
-                    xyz=np.array(ucol.origin.xyz) if ucol.origin else np.zeros(3),
-                    rpy=np.array(ucol.origin.rpy) if ucol.origin else np.zeros(3),
-                )
-                geometry = (
-                    cls._convert_urchin_geometry(ucol.geometry)
-                    if ucol.geometry
-                    else None
-                )
-                collisions.append(Collision(origin=col_origin, geometry=geometry))
-
-            links.append(
-                Link(
-                    name=ulink.name,
-                    inertial=inertial,
-                    visuals=visuals,
-                    collisions=collisions,
-                )
-            )
-
-        # Convert joints
-        joints = []
-        for ujoint in urchin_robot.joints:
-            # Map joint type
-            jtype_map = {
-                "revolute": JointType.REVOLUTE,
-                "continuous": JointType.CONTINUOUS,
-                "prismatic": JointType.PRISMATIC,
-                "fixed": JointType.FIXED,
-                "floating": JointType.FLOATING,
-                "planar": JointType.PLANAR,
-            }
-            joint_type = jtype_map.get(ujoint.joint_type, JointType.FIXED)
-
-            origin = Origin(
-                xyz=np.array(ujoint.origin.xyz) if ujoint.origin else np.zeros(3),
-                rpy=np.array(ujoint.origin.rpy) if ujoint.origin else np.zeros(3),
-            )
-
-            axis = (
-                np.array(ujoint.axis)
-                if ujoint.axis is not None
-                else np.array([0, 0, 1])
-            )
-
-            # Convert limit
-            limit = None
-            if ujoint.limit is not None:
-                limit = JointLimit(
-                    lower=ujoint.limit.lower if hasattr(ujoint.limit, "lower") else 0.0,
-                    upper=ujoint.limit.upper if hasattr(ujoint.limit, "upper") else 0.0,
-                    velocity=getattr(ujoint.limit, "velocity", None),
-                    effort=getattr(ujoint.limit, "effort", None),
-                )
-
-            # Convert dynamics
-            dynamics = None
-            if ujoint.dynamics is not None:
-                dynamics = JointDynamics(
-                    damping=getattr(ujoint.dynamics, "damping", 0.0),
-                    friction=getattr(ujoint.dynamics, "friction", 0.0),
-                )
-
-            # Convert mimic
-            mimic = None
-            if ujoint.mimic is not None:
-                mimic = JointMimic(
-                    joint=ujoint.mimic.joint,
-                    multiplier=getattr(ujoint.mimic, "multiplier", 1.0),
-                    offset=getattr(ujoint.mimic, "offset", 0.0),
-                )
-
-            joints.append(
-                Joint(
-                    name=ujoint.name,
-                    joint_type=joint_type,
-                    parent=ujoint.parent,
-                    child=ujoint.child,
-                    origin=origin,
-                    axis=axis,
-                    limit=limit,
-                    dynamics=dynamics,
-                    mimic=mimic,
-                )
-            )
-
-        return cls(
-            name=urchin_robot.name or "robot",
-            links=links,
-            joints=joints,
-        )
-
-    @classmethod
-    def _convert_urchin_geometry(cls, ugeom):
-        """Convert urchin geometry to native geometry."""
-        from .types import Box, Cylinder, Mesh, Sphere
-
-        geom_type = type(ugeom).__name__.lower()
-
-        if geom_type == "box":
-            return Box(size=np.array(ugeom.size))
-        elif geom_type == "cylinder":
-            return Cylinder(radius=ugeom.radius, length=ugeom.length)
-        elif geom_type == "sphere":
-            return Sphere(radius=ugeom.radius)
-        elif geom_type == "mesh":
-            scale = np.array(ugeom.scale) if ugeom.scale is not None else np.ones(3)
-            return Mesh(filename=ugeom.filename, scale=scale)
-
-        return None
 
     @classmethod
     def _load_pybullet(cls, filename: Union[str, Path]) -> "URDF":

@@ -60,7 +60,6 @@ class URDFToSerialManipulator:
 
     Supports multiple URDF parser backends:
         - "builtin": Native ManipulaPy parser (NumPy 2.0 compatible, default)
-        - "urchin": Legacy urchin parser (requires urchin, not NumPy 2.0 compatible)
         - "pybullet": PyBullet-based parser (requires pybullet)
 
     Features:
@@ -95,7 +94,7 @@ class URDFToSerialManipulator:
             urdf_name (str | Path): Path to the URDF file.
             use_pybullet_limits (bool): Whether to override URDF limits with PyBullet's.
                                         Default False (use URDF limits directly).
-            backend (str): Parser backend - "builtin" (default), "urchin", or "pybullet"
+            backend (str): Parser backend - "builtin" (default) or "pybullet"
             load_meshes (bool): Whether to load mesh geometry. Default False.
             validate (bool): Whether to validate URDF structure. Default False.
         """
@@ -635,7 +634,7 @@ def load_robot(
 
     Parameters:
         urdf_path: Path to URDF file
-        backend: Parser backend ("builtin", "urchin", or "pybullet")
+        backend: Parser backend ("builtin" or "pybullet")
         use_pybullet_limits: Whether to use PyBullet for joint limits
 
     Returns:
