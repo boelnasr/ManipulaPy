@@ -597,7 +597,8 @@ class TestControlRegressions(unittest.TestCase):
             importlib.import_module('ManipulaPy.control')
         """)
         result = subprocess.run([sys.executable, "-c", script],
-                                capture_output=True, text=True)
+                                capture_output=True, text=True,
+                                encoding="utf-8", errors="replace")
         self.assertEqual(result.returncode, 0,
                          f"control.py failed to import without cupy:\n{result.stderr}")
 
@@ -781,6 +782,8 @@ class TestSimRegressions(unittest.TestCase):
             [sys.executable, "-c", script],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         self.assertEqual(
             result.returncode,
@@ -1870,7 +1873,7 @@ class TestTestInfraRegressions(unittest.TestCase):
         import ast
         from pathlib import Path
 
-        source = Path(__file__).parent.joinpath("test_trajectory_planning.py").read_text()
+        source = Path(__file__).parent.joinpath("test_trajectory_planning.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
 
         top_level_psutil = []
@@ -1911,6 +1914,8 @@ class TestTestInfraRegressions(unittest.TestCase):
             [sys.executable, "-c", code],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=repo_root,
             env={**os.environ, "PYTHONPATH": repo_root},
         )
@@ -1989,7 +1994,7 @@ class TestPackagingRegressions(unittest.TestCase):
         pyproject, repo_root = self._load_pyproject()
         target = pyproject["project"]["version"]
 
-        text = (repo_root / "setup.py").read_text()
+        text = (repo_root / "setup.py").read_text(encoding="utf-8")
         m = re.search(r"^\s*version\s*=\s*['\"]([^'\"]+)['\"]", text, re.M)
         self.assertIsNotNone(m, "could not find version= in setup.py")
         self.assertEqual(
@@ -2003,7 +2008,7 @@ class TestPackagingRegressions(unittest.TestCase):
         from pathlib import Path
 
         repo_root = Path(__file__).resolve().parents[1]
-        tree = ast.parse((repo_root / "setup.py").read_text())
+        tree = ast.parse((repo_root / "setup.py").read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "setup":
                 for keyword in node.keywords:
@@ -2046,7 +2051,7 @@ class TestPackagingRegressions(unittest.TestCase):
         from pathlib import Path
 
         repo_root = Path(__file__).resolve().parents[1]
-        workflow = (repo_root / ".github" / "workflows" / "test.yml").read_text()
+        workflow = (repo_root / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
         self.assertIn("3.12", workflow)
 
     def test_init_py_version_matches_pyproject(self):
@@ -2067,7 +2072,7 @@ class TestPackagingRegressions(unittest.TestCase):
         (no lingering '[Unreleased] — targeting 1.3.2' header)."""
         from pathlib import Path
         repo_root = Path(__file__).resolve().parents[1]
-        text = (repo_root / "CHANGELOG.md").read_text()
+        text = (repo_root / "CHANGELOG.md").read_text(encoding="utf-8")
         self.assertIn("## [1.3.2]", text)
         self.assertNotIn("[Unreleased] — targeting 1.3.2", text)
 
@@ -2077,7 +2082,7 @@ class TestPackagingRegressions(unittest.TestCase):
         on a PyPI install aren't surprised."""
         from pathlib import Path
         repo_root = Path(__file__).resolve().parents[1]
-        manifest = (repo_root / "ManipulaPy" / "ManipulaPy_data" / "MANIFEST.md").read_text()
+        manifest = (repo_root / "ManipulaPy" / "ManipulaPy_data" / "MANIFEST.md").read_text(encoding="utf-8")
         # The wheel-note callout must be present
         self.assertIn("PyPI wheel", manifest)
         self.assertIn("NOT bundled", manifest)

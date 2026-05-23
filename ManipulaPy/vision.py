@@ -33,6 +33,7 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 import logging
+import os
 import warnings
 from typing import Any, Dict, Optional, Union
 
@@ -570,6 +571,27 @@ class Vision:
         try:
             self.logger.info(f"Loading YOLO model ({self._yolo_model_path})...")
             self.yolo_model = YOLO(self._yolo_model_path)
+            # When MANIPULAPY_YOLO_DEVICE is set (e.g. "cpu"), pin the
+            # model to that device. Ultralytics otherwise auto-selects
+            # CUDA, which can SIGABRT inside torch's conv forward when
+            # another library (cupy, numba) already owns a CUDA context
+            # in the same process. Default unset = ultralytics chooses.
+            forced_device = os.environ.get("MANIPULAPY_YOLO_DEVICE")
+            if forced_device:
+                try:
+                    self.yolo_model.to(forced_device)
+                    self.logger.info(
+                        "YOLO model pinned to device %r via "
+                        "MANIPULAPY_YOLO_DEVICE.",
+                        forced_device,
+                    )
+                except Exception as exc:  # pragma: no cover - device-specific
+                    self.logger.warning(
+                        "Could not pin YOLO model to %r (%s); leaving "
+                        "ultralytics auto-selection.",
+                        forced_device,
+                        exc,
+                    )
             self.logger.info("✅ YOLO model loaded successfully.")
             return True
         except Exception as e:

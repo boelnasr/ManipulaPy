@@ -79,7 +79,18 @@ def test_optimized_trajectory_generation_uses_cpu_when_no_cuda(monkeypatch):
     assert np.allclose(result_acc, cpu_acc)
 
 
-def test_gpu_only_entrypoints_raise_when_no_cuda():
+@pytest.mark.skipif(
+    cuda_kernels.CUDA_AVAILABLE,
+    reason=(
+        "cuda_kernels.py picks GPU vs mock function bodies at import time. "
+        "Monkeypatching CUDA_AVAILABLE=False after a real-CUDA import flips "
+        "the boolean but not the dispatched callables, so these tests can "
+        "only exercise the no-CUDA branch when the module was imported "
+        "without a working GPU."
+    ),
+)
+def test_gpu_only_entrypoints_raise_when_no_cuda(monkeypatch):
+    monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     assert check_cuda_availability() is False
 
     positions = np.zeros((2, 3), dtype=np.float32)
@@ -102,6 +113,11 @@ def test_gpu_only_entrypoints_raise_when_no_cuda():
         )
 
 
-def test_kernel_selection_fallbacks_when_no_cuda():
+@pytest.mark.skipif(
+    cuda_kernels.CUDA_AVAILABLE,
+    reason="See test_gpu_only_entrypoints_raise_when_no_cuda — same import-time dispatch limitation.",
+)
+def test_kernel_selection_fallbacks_when_no_cuda(monkeypatch):
+    monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     assert auto_select_optimal_kernel(100, 6) == "none"
     assert get_optimal_kernel_config(100, 6) is None

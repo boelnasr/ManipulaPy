@@ -316,12 +316,16 @@ class ManipulatorController:
         g = _to_numpy(g)
         Ftip = _to_numpy(Ftip)
         disturbance_estimate = _to_numpy(disturbance_estimate)
+        adaptation_gain = _to_numpy(adaptation_gain)
 
-        # Dynamics computations (no GPU↔CPU transfers)
-        M = self.dynamics.mass_matrix(thetalist)
-        c = self.dynamics.velocity_quadratic_forces(thetalist, dthetalist)
-        g_forces = self.dynamics.gravity_forces(thetalist, g)
-        J_transpose = self.dynamics.jacobian(thetalist).T
+        # Dynamics computations — _to_numpy guards keep us on the CPU
+        # path even when the dynamics backend would otherwise hand back
+        # CuPy arrays. Mixing the two raises TypeError on a real CuPy
+        # install (previously masked by the CPU-only test mock).
+        M = _to_numpy(self.dynamics.mass_matrix(thetalist))
+        c = _to_numpy(self.dynamics.velocity_quadratic_forces(thetalist, dthetalist))
+        g_forces = _to_numpy(self.dynamics.gravity_forces(thetalist, g))
+        J_transpose = _to_numpy(self.dynamics.jacobian(thetalist)).T
         tau = (
             M @ ddthetalist
             + c
@@ -438,13 +442,18 @@ class ManipulatorController:
         thetalist_pred = (
             self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist) :] * dt
         )
+        # forward_dynamics may return a CuPy array when the backend is
+        # CuPy; coerce so x_hat stays NumPy throughout the filter cycle
+        # (otherwise the update step's H @ x_hat raises TypeError).
         dthetalist_pred = (
-            self.dynamics.forward_dynamics(
-                self.x_hat[: len(thetalist)],
-                self.x_hat[len(thetalist) :],
-                taulist,
-                g,
-                Ftip,
+            _to_numpy(
+                self.dynamics.forward_dynamics(
+                    self.x_hat[: len(thetalist)],
+                    self.x_hat[len(thetalist) :],
+                    taulist,
+                    g,
+                    Ftip,
+                )
             )
             * dt
             + self.x_hat[len(thetalist) :]
@@ -480,11 +489,18 @@ class ManipulatorController:
                 "kalman_filter_update called before kalman_filter_predict; "
                 "x_hat has not been initialized"
             )
+        self.x_hat = _to_numpy(self.x_hat)
         n = self.x_hat.shape[0]
-        if self.P is None or getattr(self.P, "shape", None) != (n, n):
+        if self.P is None:
             raise ValueError(
                 f"P must be initialized with shape ({n}, {n}) before update; "
-                f"got {None if self.P is None else self.P.shape}"
+                "got None"
+            )
+        self.P = _to_numpy(self.P)
+        if getattr(self.P, "shape", None) != (n, n):
+            raise ValueError(
+                f"P must be initialized with shape ({n}, {n}) before update; "
+                f"got {self.P.shape}"
             )
         if z.shape != (n,):
             raise ValueError(

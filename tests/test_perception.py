@@ -592,7 +592,24 @@ class TestPerceptionIntegration(unittest.TestCase):
 
             # Override capture_image to return our test data
             original_capture = vision.capture_image
+            original_detect = vision.detect_obstacles
             vision.capture_image = lambda **kwargs: (test_rgb, test_depth)
+            vision.detect_obstacles = Mock(
+                return_value=(
+                    np.array(
+                        [
+                            [0.0, 0.0, 1.0],
+                            [0.01, 0.0, 1.0],
+                            [0.0, 0.01, 1.0],
+                            [1.0, 1.0, 0.8],
+                            [1.01, 1.0, 0.8],
+                            [1.0, 1.01, 0.8],
+                        ],
+                        dtype=np.float32,
+                    ),
+                    np.zeros(6, dtype=np.int32),
+                )
+            )
 
             # Create perception
             perception = Perception(vision_instance=vision)
@@ -608,6 +625,7 @@ class TestPerceptionIntegration(unittest.TestCase):
 
             # Restore original method
             vision.capture_image = original_capture
+            vision.detect_obstacles = original_detect
 
             print("✅ End-to-end obstacle detection pipeline working")
 

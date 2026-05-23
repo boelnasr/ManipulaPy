@@ -93,6 +93,13 @@ if FORCE_CPU_ONLY:
     os.environ["MANIPULAPY_FORCE_CPU"] = "1"
 
 os.environ["TORCH_USE_CUDA_DSA"] = "0"
+# Pin YOLO to CPU for the test process regardless of GPU presence.
+# When CUDA is visible, ultralytics auto-selects a CUDA device for the
+# torch backend, and the first conv-forward warmup SIGABRTs inside torch
+# whenever another library (numba, cupy) already owns a CUDA context in
+# the same process. Tests don't need GPU-accelerated YOLO — they
+# exercise the perception pipeline shape, not detection speed.
+os.environ.setdefault("MANIPULAPY_YOLO_DEVICE", "cpu")
 # Files/dirs pytest should skip during collection
 collect_ignore = [
     "setup.py",
