@@ -180,7 +180,7 @@ Clustering Analysis
 
    3. **Fitting**: dbscan_model.fit(points) on 3D coordinates
 
-   4. **Label Extraction**: dbscan_model.labels_ array
+   4. **Label Extraction**: ``dbscan_model.labels_`` array
 
    5. **Statistics Computation**: Unique label counting and noise analysis
 

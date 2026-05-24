@@ -282,7 +282,6 @@ OptimizedTrajectoryPlanning Class
    .. rubric:: Visualization Methods
 
    .. automethod:: plot_trajectory
-      :staticmethod:
 
       **Parameters:**
 

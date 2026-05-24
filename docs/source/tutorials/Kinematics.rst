@@ -202,11 +202,10 @@ Symptom           Fix
 ================  ===========================================
 IK fails to       * Check if the target pose is outside joint
 converge            limits or workspace.
-                  * Provide a better initial guess; use the
-                    *smart_initial_guess* helper below.
+                  * Provide a better initial guess; use the *smart_initial_guess* helper below.
 Numerical         * Call IK with ``damping`` > 1e‑4 or switch to
 instability         ``lm_inverse_kinematics``.
-Joint limit       * Run :pyfunc:`ManipulaPy.kinematics.utils.enforce_joint_limits`.
+Joint limit       * Run :py:func:`ManipulaPy.kinematics.utils.enforce_joint_limits`.
 violation
 ================  ===========================================
 
@@ -219,5 +218,3 @@ violation
        except AttributeError:
            # fallback: mid‑range of each joint
            return np.mean(robot.joint_limits, axis=1)
-
---------------------------------------------------------------

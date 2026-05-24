@@ -166,7 +166,6 @@ URDFToSerialManipulator Class
    .. rubric:: Static Utility Methods
 
    .. automethod:: transform_to_xyz
-      :staticmethod:
 
       **Parameters:**
 
@@ -179,7 +178,6 @@ URDFToSerialManipulator Class
       **Purpose:** Extract position from homogeneous transformation matrix.
 
    .. automethod:: get_link
-      :staticmethod:
 
       **Parameters:**
 
@@ -193,7 +191,6 @@ URDFToSerialManipulator Class
       **Purpose:** Find specific link by name in URDF structure.
 
    .. automethod:: w_p_to_slist
-      :staticmethod:
 
       **Parameters:**
 

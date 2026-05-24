@@ -58,7 +58,7 @@ Primary Detection Methods
 
    **Returns:**
    
-   - **bool** -- True if at singularity (|det(J)| < 1e-4), False otherwise
+   - **bool** -- True if at singularity (``|det(J)|`` < 1e-4), False otherwise
 
 .. automethod:: Singularity.near_singularity_detection
 
