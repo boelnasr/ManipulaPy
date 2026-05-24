@@ -179,3 +179,10 @@ ik_new_branch/
 ik_test_branch_2/
 CLAUDE.md
 .codebuddy
+
+# Local-only GIF recorder scripts — keep on disk for re-runs, but don't
+# ship them in the public repo. The generated GIFs in
+# docs/source/_static/gifs/ are tracked; the recorders are the user's
+# personal tooling.
+scripts/record_readme_gifs.py
+scripts/record_robot_gifs.py
