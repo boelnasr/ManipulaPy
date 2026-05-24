@@ -176,11 +176,12 @@ PID Control
 .. note::
 
    Both ``pid_control`` and ``computed_torque_control`` accept an optional ``i_clamp``
-   keyword argument (default: ``None``, behavior identical to v1.3.1). When provided,
-   it accepts a scalar or a per-joint array and bounds the magnitude of the integral
-   error term to ``[-i_clamp, +i_clamp]`` per joint, preventing accumulator windup
-   during sustained tracking error. Invalid clamp values (negative, zero, ``nan``,
-   non-finite) raise ``ValueError``.
+   keyword argument (default: ``None``, behavior identical to v1.3.1) that caps the
+   integral error term to prevent windup during sustained tracking error. When
+   provided, it must be a **positive scalar** — every joint's integral term is
+   independently clamped to ``[-i_clamp, +i_clamp]``. Passing an array raises
+   ``ValueError`` ("i_clamp must be a scalar"), as do negative, zero, ``nan``, or
+   otherwise non-finite values.
 
 **Example**:
 

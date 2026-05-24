@@ -629,10 +629,13 @@ Configure multiple simulation instances for parallel processing:
 
 .. note::
 
-   Calling ``sim.initialize_robot()`` after construction is redundant when
-   ``physics_client=`` is passed — the constructor already loads the robot
-   on both paths (the v1.3.2 fix to ``Simulation.__init__``). Kept here for
-   explicit clarity in worker setups; safe to remove in new code.
+   In the worker pattern above (calling only ``run_trajectory`` or
+   ``run_controller``), ``sim.initialize_robot()`` is redundant — the
+   constructor already loads the robot when ``physics_client=`` is
+   passed. Workers that subsequently call
+   ``initialize_planner_and_controller()`` still need ``initialize_robot()``
+   first, because the planner/controller setup reads ``self.robot`` and
+   ``self.dynamics``.
 
 Troubleshooting Guide
 -------------------------

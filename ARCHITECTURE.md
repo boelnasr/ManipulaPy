@@ -82,7 +82,7 @@ from URDF joint topology (parent↔child and grandparent↔grandchild pairs) via
 is sourced from `link.collisions` in preference to `link.visuals`.
 
 Note: the simplified SAT in `_points_intersect` is intentionally conservative
-for v1.3.2. FCL-backed exact collision is scheduled for v1.5.0.
+for v1.3.2; FCL-backed exact collision is planned for a future release.
 
 ## Code Conventions
 
@@ -96,7 +96,7 @@ for v1.3.2. FCL-backed exact collision is scheduled for v1.5.0.
 `tests/conftest.py` implements a smart mocking system:
 - **Unconditionally mocked**: `pycuda`, `pycuda.driver`, `pycuda.autoinit`, `torchvision` (plus `torchvision.ops`/`transforms`/`io`)
 - **Mocked when `FORCE_CPU_ONLY` is active** (no GPU detected via `/dev/nvidiactl` + `nvidia-smi`, or `MANIPULAPY_FORCE_CPU=1` set): `cupy`, `numba.cuda`, `numba.cuda.random`
-- **Mocked in CI** (no GPU hardware): `pybullet`
+- **Mocked in CI or when unavailable locally**: `pybullet` (triggered when the `CI` env var is truthy, or when `pybullet` isn't importable on the host)
 - **Tested when available**: `torch`, `cv2`, `sklearn`, `ultralytics`, `numba`
 
 `FORCE_CPU_ONLY` is determined at conftest load time: if `/dev/nvidiactl` or `/dev/nvidia[0-9]*` devices are absent and `nvidia-smi` is not on `$PATH`, the flag is set and `MANIPULAPY_FORCE_CPU=1` is written to the environment. Users can also set `MANIPULAPY_FORCE_CPU=1` explicitly to force CPU mode regardless of hardware. On NVIDIA hosts the real CuPy / Numba CUDA paths are allowed to load and decide availability for themselves. Never import cupy/pycuda directly in tests — conftest handles it.
