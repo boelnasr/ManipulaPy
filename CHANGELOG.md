@@ -7,13 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.2] — 2026-05-10
 
-> **Status:** Functional fix tasks 1–49 are complete on
-> `release/v1.3.2-fix-patch`. Self-collision support (allowed-collision
+> **Status:** All functional fixes and documentation reconciliation for
+> v1.3.2 are landed on `release/v1.3.2-fix-patch`. The CHANGELOG below
+> is current and includes the self-collision work (allowed-collision
 > matrix, collision-mesh source preference, opt-in PyBullet
-> `URDF_USE_SELF_COLLISION` flag, and `check_collisions` return contract)
-> has landed. Task 50 documentation sync is in progress:
-> ARCHITECTURE/CONTRIBUTING/RST docs are being reconciled; `STATUS.md`,
-> final verification, tag, PR, and publish remain.
+> `URDF_USE_SELF_COLLISION` flag, and the `check_collisions` return
+> contract). The release ritual (STATUS.md sync, final test-suite
+> verification, version tag, PR, PyPI publish) is the only remaining
+> step before tagging v1.3.2.
 >
 > **Summary:** Comprehensive stability and correctness patch addressing bugs
 > across utilities, dynamics, kinematics, path planning, control, singularity

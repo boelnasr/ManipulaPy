@@ -94,11 +94,12 @@ for v1.3.2. FCL-backed exact collision is scheduled for v1.5.0.
 ## Test Infrastructure
 
 `tests/conftest.py` implements a smart mocking system:
-- **Always mocked** (GPU-only): `cupy`, `pycuda`, `numba.cuda`, `torchvision`
+- **Unconditionally mocked**: `pycuda`, `pycuda.driver`, `pycuda.autoinit`, `torchvision` (plus `torchvision.ops`/`transforms`/`io`)
+- **Mocked when `FORCE_CPU_ONLY` is active** (no GPU detected via `/dev/nvidiactl` + `nvidia-smi`, or `MANIPULAPY_FORCE_CPU=1` set): `cupy`, `numba.cuda`, `numba.cuda.random`
 - **Mocked in CI** (no GPU hardware): `pybullet`
 - **Tested when available**: `torch`, `cv2`, `sklearn`, `ultralytics`, `numba`
 
-CPU-only mode is detected at conftest load time: if `/dev/nvidiactl` or `/dev/nvidia[0-9]*` devices are absent and `nvidia-smi` is not on `$PATH`, `FORCE_CPU_ONLY` is set and `MANIPULAPY_FORCE_CPU=1` is written to the environment. Users can also set `MANIPULAPY_FORCE_CPU=1` explicitly to force CPU mode regardless of hardware. Never import cupy/pycuda directly in tests — conftest handles it.
+`FORCE_CPU_ONLY` is determined at conftest load time: if `/dev/nvidiactl` or `/dev/nvidia[0-9]*` devices are absent and `nvidia-smi` is not on `$PATH`, the flag is set and `MANIPULAPY_FORCE_CPU=1` is written to the environment. Users can also set `MANIPULAPY_FORCE_CPU=1` explicitly to force CPU mode regardless of hardware. On NVIDIA hosts the real CuPy / Numba CUDA paths are allowed to load and decide availability for themselves. Never import cupy/pycuda directly in tests — conftest handles it.
 
 ### Module-to-Test Mapping
 

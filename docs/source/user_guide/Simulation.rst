@@ -579,7 +579,7 @@ Configure multiple simulation instances for parallel processing:
        sim = Simulation(urdf_file_path=urdf_path,
                        joint_limits=joint_limits,
                        physics_client=client)
-       sim.initialize_robot()  # Calling initialize_robot() after construction is redundant when physics_client= is passed — both paths now load the robot. Kept here for clarity.
+       sim.initialize_robot()  # redundant when physics_client= is passed; see note below
        
        while True:
            try:
@@ -626,6 +626,13 @@ Configure multiple simulation instances for parallel processing:
            worker.join()
        
        return results
+
+.. note::
+
+   Calling ``sim.initialize_robot()`` after construction is redundant when
+   ``physics_client=`` is passed — the constructor already loads the robot
+   on both paths (the v1.3.2 fix to ``Simulation.__init__``). Kept here for
+   explicit clarity in worker setups; safe to remove in new code.
 
 Troubleshooting Guide
 -------------------------
