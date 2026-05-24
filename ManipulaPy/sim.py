@@ -215,8 +215,9 @@ class Simulation:
             # Even if self.robot_id is already set from setup_simulation(),
             # we need to process the URDF to set self.robot and self.dynamics.
             if not (hasattr(self, "robot_id") and self.robot_id is not None):
+                load_flags = p.URDF_USE_SELF_COLLISION if self.enable_self_collision else 0
                 self.robot_id = p.loadURDF(
-                    self.urdf_file_path, [0, 0, 0.1], useFixedBase=True
+                    self.urdf_file_path, [0, 0, 0.1], useFixedBase=True, flags=load_flags
                 )
             # Process the URDF to generate the robot model and dynamics.
             from ManipulaPy.urdf_processor import URDFToSerialManipulator
