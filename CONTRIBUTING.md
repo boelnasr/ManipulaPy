@@ -68,6 +68,43 @@ see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
+## Regression Test Discipline
+
+Every bug fix follows a RED→GREEN workflow:
+
+1. Write the failing test first. Run it and confirm it fails with the bug's actual
+   symptom (not an unrelated error). Commit the failing test on its own or together
+   with the fix in a single commit whose message names the symptom.
+2. Apply the fix. The test must turn green. Do not merge a fix whose test is still
+   red or that only passes because the assertion was weakened.
+3. Each fix gets its own focused commit. Bundling unrelated changes into the same
+   commit makes bisect and revert harder.
+
+The canonical regression file is `tests/test_v132_regressions.py`. Add new test
+classes there for new modules or subsystems.
+
+**Optional-dependency behavior** (sim and control importable without cupy/pybullet)
+is tested with a subprocess-style probe so the check is side-effect-free:
+
+```python
+def test_sim_module_imports_without_pybullet(self):
+    """ManipulaPy.sim must import even when pybullet is missing."""
+    import subprocess, sys
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "import sys; sys.modules['pybullet'] = None; import ManipulaPy.sim"],
+        capture_output=True, text=True,
+    )
+    self.assertEqual(result.returncode, 0,
+                     f"sim import failed: {result.stderr}")
+```
+
+Use this pattern (not in-process `sys.modules` mutation) for any test that needs
+to simulate a missing optional dependency — in-process reloads leak across test
+modules and corrupt shared state.
+
+---
+
 ## AI Usage Policy
 
 We value transparency and responsibility in software development. While generative AI tools (e.g., GitHub Copilot, ChatGPT, CodeWhisperer) can be helpful in drafting and brainstorming, **all contributions must be human-verified and reviewed**.

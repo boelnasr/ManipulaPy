@@ -135,7 +135,7 @@ Simulation Class
 Constructor Parameters
 ^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:method:: __init__(urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0, physics_client=None)
+.. py:method:: __init__(urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0, physics_client=None, enable_self_collision=False, disable_pairs=None)
 
    Initialize the simulation environment.
 
@@ -145,6 +145,8 @@ Constructor Parameters
    :param float time_step: Physics simulation time step in seconds (default: 0.01)
    :param float real_time_factor: Playback speed multiplier (1.0 = real-time, 0.5 = half-speed)
    :param int physics_client: Existing PyBullet client ID, or None to create new GUI client
+   :param bool enable_self_collision: When True, passes PyBullet's ``URDF_USE_SELF_COLLISION`` flag to ``loadURDF``, enabling self-contact detection (default: False)
+   :param list disable_pairs: Optional list of ``(link_name_a, link_name_b)`` tuples whose collision response is disabled via ``setCollisionFilterPair`` after loading (default: None)
 
    :raises FileNotFoundError: If URDF file doesn't exist
    :raises ValueError: If joint_limits and URDF DOF don't match
@@ -575,9 +577,9 @@ Configure multiple simulation instances for parallel processing:
        client = p.connect(p.DIRECT)
        
        sim = Simulation(urdf_file_path=urdf_path,
-                       joint_limits=joint_limits, 
+                       joint_limits=joint_limits,
                        physics_client=client)
-       sim.initialize_robot()
+       sim.initialize_robot()  # Calling initialize_robot() after construction is redundant when physics_client= is passed — both paths now load the robot. Kept here for clarity.
        
        while True:
            try:

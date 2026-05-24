@@ -7,13 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.2] — 2026-05-10
 
-> **Status:** Functional fix tasks 1–48 are complete on
-> `release/v1.3.2-fix-patch`. Task 49 documentation sync is partially
-> complete: this changelog has been reconciled, while
-> ARCHITECTURE/CONTRIBUTING/RST docs and docs-build verification remain.
-> Task 50 is also partially complete: `pyproject.toml`,
-> `ManipulaPy.__version__`, `setup.py`, and this changelog are synced to
-> `1.3.2`; `STATUS.md`, final verification, tag, PR, and publish remain.
+> **Status:** Functional fix tasks 1–49 are complete on
+> `release/v1.3.2-fix-patch`. Self-collision support (allowed-collision
+> matrix, collision-mesh source preference, opt-in PyBullet
+> `URDF_USE_SELF_COLLISION` flag, and `check_collisions` return contract)
+> has landed. Task 50 documentation sync is in progress:
+> ARCHITECTURE/CONTRIBUTING/RST docs are being reconciled; `STATUS.md`,
+> final verification, tag, PR, and publish remain.
 >
 > **Summary:** Comprehensive stability and correctness patch addressing bugs
 > across utilities, dynamics, kinematics, path planning, control, singularity
@@ -259,6 +259,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `full_matrices=True` plus right-padding the singular value vector
   produces a shape-consistent ellipsoid surface instead of raising a
   broadcasting error.
+
+### Fixed — sim.py (self-collision)
+- **`Simulation.__init__` gains opt-in self-collision support** via two
+  new constructor parameters: `enable_self_collision=False` wires PyBullet's
+  `URDF_USE_SELF_COLLISION` flag when `True`, and `disable_pairs=None`
+  accepts a list of `(link_name_a, link_name_b)` tuples that are excluded
+  from collision detection via `setCollisionFilterPair`. Both parameters
+  default to values that preserve v1.3.1 behavior.
+- **`Simulation.check_collisions()` now returns a list of contact tuples**
+  `(linkA, linkB, position)` rather than returning nothing. The query uses
+  `getContactPoints(robot_id, robot_id)` without a per-joint filter so that
+  base-link contacts (link index −1) are included — the most common
+  self-collision site on folded arms. An empty list is returned when no
+  contacts exist or before the simulation has started.
+
+### Fixed — potential_field.py (self-collision)
+- **`CollisionChecker` derives an Allowed Collision Matrix (ACM) from URDF
+  joint topology** via `build_link_adjacency`. Parent↔child pairs and
+  grandparent↔grandchild pairs are suppressed by default, matching the SRDF
+  convention for serial arms and eliminating adjacent-link false positives.
+- **`CollisionChecker` prefers `link.collisions` over `link.visuals`** for
+  mesh geometry. When a link has no collision geometry, visual geometry is
+  used as a conservative fallback. Previously only visual geometry was used,
+  causing inflated bounding volumes and spurious near-body detections.
 
 ### Fixed — potential_field.py
 - **Repulsive gradient at exact obstacle contact** now applies the

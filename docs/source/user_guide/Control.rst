@@ -173,6 +173,15 @@ PID Control
 
 .. automethod:: ManipulaPy.control.ManipulatorController.pid_control
 
+.. note::
+
+   Both ``pid_control`` and ``computed_torque_control`` accept an optional ``i_clamp``
+   keyword argument (default: ``None``, behavior identical to v1.3.1). When provided,
+   it accepts a scalar or a per-joint array and bounds the magnitude of the integral
+   error term to ``[-i_clamp, +i_clamp]`` per joint, preventing accumulator windup
+   during sustained tracking error. Invalid clamp values (negative, zero, ``nan``,
+   non-finite) raise ``ValueError``.
+
 **Example**:
 
 .. code-block:: python
@@ -412,6 +421,12 @@ Ziegler-Nichols Tuning
 
 .. automethod:: ManipulaPy.control.ManipulatorController.ziegler_nichols_tuning
 
+.. note::
+
+   Since v1.3.2, passing ``Tu=0`` to the PI or PID branches raises ``ValueError``
+   with a descriptive message instead of silently producing ``inf`` gains. The
+   P-only branch ignores ``Tu``, so ``Tu=0`` remains valid there.
+
 **Example**:
 
 .. code-block:: python
@@ -491,6 +506,17 @@ Calculate control performance metrics:
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_percent_overshoot
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_settling_time
+
+.. note::
+
+   **v1.3.2 semantics:** ``calculate_settling_time`` returns the *first* time the
+   response enters and stays within the tolerance band around the setpoint — using
+   ``abs(set_point) * tolerance`` as the half-width so the band is correct for
+   negative setpoints. The previous implementation used the signed
+   ``set_point * tolerance`` threshold (wrong sign for negative targets) and returned
+   the index of the last in-band sample rather than the first settled time
+   (off-by-one for oscillatory responses). Callers upgrading from v1.3.1 may see
+   different numeric return values for negative setpoints or oscillatory traces.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_steady_state_error
 
