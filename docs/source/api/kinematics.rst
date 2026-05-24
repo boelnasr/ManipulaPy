@@ -164,9 +164,9 @@ SerialManipulator Class
       **Convergence:** ||V_trans|| < ev AND ||V_rot|| < eomg
 
 
--------------
+--------------
 Usage Examples
--------------
+--------------
 
 **Basic Setup**::
 

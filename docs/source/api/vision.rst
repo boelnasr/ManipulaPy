@@ -65,7 +65,7 @@ Camera Management
 =================
 
 Configuration Methods
---------------------
+---------------------
 
 .. automethod:: Vision._configure_camera
 
@@ -98,7 +98,7 @@ Configuration Methods
    - intrinsic_matrix, distortion_coeffs, translation, rotation
 
 Extrinsic Matrix Computation
----------------------------
+----------------------------
 
 .. automethod:: Vision._make_extrinsic_matrix
 
@@ -136,7 +136,7 @@ Image Acquisition
 =================
 
 PyBullet Integration
--------------------
+--------------------
 
 .. automethod:: Vision.capture_image
 
@@ -166,7 +166,7 @@ Object Detection
 ================
 
 YOLO Integration
----------------
+----------------
 
 .. automethod:: Vision.detect_obstacles
 
@@ -216,10 +216,10 @@ YOLO Integration
 ---
 
 Stereo Vision Pipeline
-=====================
+======================
 
 Rectification Setup
-------------------
+-------------------
 
 .. automethod:: Vision.compute_stereo_rectification_maps
 
@@ -244,7 +244,7 @@ Rectification Setup
    6. **Q Matrix Storage**: Disparity-to-depth transformation matrix
 
 Image Processing
----------------
+----------------
 
 .. automethod:: Vision.rectify_stereo_images
 
@@ -288,7 +288,7 @@ Image Processing
    - Fixed-point scaling: division by 16.0
 
 3D Reconstruction
-----------------
+-----------------
 
 .. automethod:: Vision.disparity_to_pointcloud
 
@@ -330,10 +330,10 @@ Image Processing
 ---
 
 PyBullet Debug Interface
-=======================
+========================
 
 Debug Slider Setup
------------------
+------------------
 
 .. automethod:: Vision._setup_pybullet_debug_sliders
 
@@ -375,10 +375,10 @@ Debug Slider Setup
 ---
 
 Resource Management
-==================
+===================
 
 Cleanup Methods
---------------
+---------------
 
 .. automethod:: Vision.release
 
@@ -405,7 +405,7 @@ Cleanup Methods
 ---
 
 Utility Functions
-================
+=================
 
 .. currentmodule:: ManipulaPy.vision
 
@@ -431,7 +431,7 @@ Data Structures and Configuration
 =================================
 
 Internal Storage Format
-----------------------
+-----------------------
 
 **Camera Storage (self.cameras):**
 
@@ -471,7 +471,7 @@ Internal Storage Format
    self.stereo_matcher: cv2.StereoSGBM
 
 Default Camera Configuration
----------------------------
+----------------------------
 
 When no camera_configs provided, uses:
 
@@ -498,7 +498,7 @@ Error Handling and Validation
 =============================
 
 YOLO Model Management
---------------------
+---------------------
 
 - **Loading Failure**: Sets yolo_model = None, continues operation
 
@@ -525,7 +525,7 @@ OpenCV Device Handling
 - **Resource Cleanup**: Automatic release in destructor and explicit method
 
 PyBullet Integration Safety
---------------------------
+---------------------------
 
 - **Parameter Reading**: Safe handling of missing debug parameters
 
@@ -539,7 +539,7 @@ Performance Considerations
 ==========================
 
 Memory Management
-----------------
+-----------------
 
 - **Image Arrays**: Contiguous memory layout for OpenCV operations
 
@@ -548,7 +548,7 @@ Memory Management
 - **Point Clouds**: Filtered arrays to reduce memory footprint
 
 Computational Efficiency
------------------------
+------------------------
 
 - **YOLO Inference**: Single forward pass per image
 
@@ -557,7 +557,7 @@ Computational Efficiency
 - **Depth Scaling**: Vectorized operations for range conversion
 
 Threading Considerations
------------------------
+------------------------
 
 - **OpenCV Capture**: Single-threaded device access
 

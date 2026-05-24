@@ -17,9 +17,9 @@ Quick Navigation
    :local:
    :depth: 2
 
-------------------------
+---------------------------------
 OptimizedTrajectoryPlanning Class
-------------------------
+---------------------------------
 
 .. currentmodule:: ManipulaPy.path_planning
 
@@ -391,9 +391,9 @@ Utility Functions
 
      - **dict** -- Comparison results including timing and accuracy metrics
 
--------------------
+--------------------------
 CPU Optimization Functions
--------------------
+--------------------------
 
 .. autofunction:: _trajectory_cpu_fallback
 
@@ -429,9 +429,9 @@ CPU Optimization Functions
 
      - **tuple** -- (positions, velocities, accelerations) arrays
 
--------------
+--------------
 Usage Examples
--------------
+--------------
 
 **Optimized Trajectory Planning**::
 
@@ -671,9 +671,9 @@ Key Features
   - Automatic recovery from GPU memory issues
   - Extensive logging for debugging and optimization
 
------------------
+---------------------------
 Performance Characteristics
------------------
+---------------------------
 
 **GPU Acceleration Thresholds:**
 
@@ -699,9 +699,9 @@ Performance Characteristics
 
   - **Dynamics computation**: 3-15× for long trajectories
 
------------------
+------------------------
 Configuration Guidelines
------------------
+------------------------
 
 **GPU Memory Pool Sizing:**
 

@@ -298,7 +298,7 @@ Open-Loop Position Tracking
    final_pos = sim.run_controller(desired_positions)
 
 Collision Monitoring
--------------------
+--------------------
 
 .. code-block:: python
 
@@ -315,7 +315,7 @@ Collision Monitoring
        sim.step_simulation()
 
 Data Logging and Analysis
-------------------------
+-------------------------
 
 .. code-block:: python
 
@@ -338,7 +338,7 @@ Data Logging and Analysis
    sim.plot_trajectory_in_scene(joint_trajectory, ee_trajectory)
 
 Complete Simulation Loop
------------------------
+------------------------
 
 .. code-block:: python
 
@@ -366,7 +366,7 @@ Configuration Options
 =====================
 
 Simulation Parameters
---------------------
+---------------------
 
 The simulation can be configured with various parameters:
 
@@ -422,7 +422,7 @@ Performance Considerations
 ==========================
 
 GPU Acceleration
----------------
+----------------
 
 The simulation module integrates with CuPy for GPU-accelerated computations:
 
@@ -431,7 +431,7 @@ The simulation module integrates with CuPy for GPU-accelerated computations:
 - Memory management is handled automatically
 
 Real-time Performance
---------------------
+---------------------
 
 For optimal real-time performance:
 
@@ -446,7 +446,7 @@ Error Handling
 ==============
 
 Common Issues and Solutions
---------------------------
+---------------------------
 
 .. note::
    The simulation module includes comprehensive error handling for common issues:
@@ -481,7 +481,7 @@ Integration with Other Modules
 ==============================
 
 Path Planning Integration
-------------------------
+-------------------------
 
 .. code-block:: python
 
@@ -521,7 +521,7 @@ Open-Loop Tracking Integration
    sim.run_controller(positions)
 
 Vision System Integration
-------------------------
+-------------------------
 
 .. code-block:: python
 

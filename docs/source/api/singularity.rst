@@ -74,7 +74,7 @@ Primary Detection Methods
    - **bool** -- True if near singularity (condition number > threshold), False otherwise
 
 Condition Analysis
------------------
+------------------
 
 .. automethod:: Singularity.condition_number
 
@@ -91,10 +91,10 @@ Condition Analysis
 ---
 
 Manipulability Analysis
-======================
+=======================
 
 Ellipsoid Visualization
-----------------------
+-----------------------
 
 .. automethod:: Singularity.manipulability_ellipsoid
 
@@ -155,7 +155,7 @@ Mathematical Implementation
 ===========================
 
 Jacobian Analysis
-----------------
+-----------------
 
 All methods rely on the Jacobian matrix computation from the SerialManipulator:
 
@@ -166,7 +166,7 @@ All methods rely on the Jacobian matrix computation from the SerialManipulator:
 - **Components**: Upper 3 rows (linear), lower 3 rows (angular)
 
 Determinant Computation
-----------------------
+-----------------------
 
 Singularity detection uses numpy.linalg.det() with absolute value comparison:
 
@@ -177,7 +177,7 @@ Singularity detection uses numpy.linalg.det() with absolute value comparison:
 - **Precision**: Double precision floating point
 
 Condition Number Calculation
----------------------------
+----------------------------
 
 Uses numpy.linalg.cond() which implements:
 
@@ -188,7 +188,7 @@ Uses numpy.linalg.cond() which implements:
 - **Stability**: Numerically stable for ill-conditioned matrices
 
 SVD Implementation
------------------
+------------------
 
 Manipulability ellipsoid generation uses numpy.linalg.svd():
 
@@ -199,7 +199,7 @@ Manipulability ellipsoid generation uses numpy.linalg.svd():
 - **Transformation**: Ellipsoid points = U @ diag(radii) @ sphere_points
 
 Convex Hull Generation
----------------------
+----------------------
 
 Workspace visualization uses scipy.spatial.ConvexHull:
 
@@ -240,7 +240,7 @@ Computational Complexity
      - k×forward_kinematics + convex_hull
 
 Memory Requirements
-------------------
+-------------------
 
 CUDA kernel memory allocation:
 
@@ -251,7 +251,7 @@ CUDA kernel memory allocation:
 - **device_joint_limits**: num_joints × 2 × float32
 
 Thread Configuration
--------------------
+--------------------
 
 CUDA kernel execution parameters:
 
@@ -264,10 +264,10 @@ CUDA kernel execution parameters:
 ---
 
 Data Flow Architecture
-=====================
+======================
 
 Singularity Analysis Pipeline
-----------------------------
+-----------------------------
 
 1. **Input**: Joint angles (numpy.ndarray)
 
@@ -320,7 +320,7 @@ Input Validation
 - **Thresholds**: Checked for positive numeric values
 
 Numerical Stability
-------------------
+-------------------
 
 - **Singular matrices**: Handled gracefully in condition number computation
 
@@ -329,7 +329,7 @@ Numerical Stability
 - **Ill-conditioned systems**: SVD provides robust decomposition
 
 CUDA Error Management
---------------------
+---------------------
 
 - **Memory allocation**: Automatic cleanup on kernel completion
 

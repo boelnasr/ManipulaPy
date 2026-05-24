@@ -123,7 +123,7 @@ Mass Matrix Computation
 The mass matrix represents the robot's inertial properties and varies with configuration.
 
 Computing Mass Matrix
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -180,7 +180,7 @@ The mass matrix changes with robot configuration:
    plt.show()
 
 Caching for Performance
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 For real-time applications, cache mass matrix computations:
 
@@ -229,7 +229,7 @@ Computing Velocity Forces
    print(f"Force magnitude: {np.linalg.norm(c)}")
 
 Analyzing Velocity Effects
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -631,7 +631,7 @@ For large-scale simulations, use GPU acceleration:
        print("CuPy not available - GPU acceleration not supported")
 
 Parallel Processing
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Use multiprocessing for CPU parallelization:
 
@@ -683,7 +683,7 @@ Advanced Topics
 ---------------
 
 Energy Analysis
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 Analyze kinetic and potential energy:
 
@@ -715,7 +715,7 @@ Analyze kinetic and potential energy:
    print(f"Total energy: {energy['total']:.3f} J")
 
 Linearization
-~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 Linearize dynamics about an operating point:
 
@@ -769,7 +769,7 @@ Linearize dynamics about an operating point:
    print(f"Mass matrix at operating point:\n{linearization['M_0']}")
 
 Model Identification
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 Estimate robot parameters from experimental data:
 
@@ -855,7 +855,7 @@ Estimate robot parameters from experimental data:
    parameter_identification_demo()
 
 Manipulator Inertia Ellipsoid
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Visualize the manipulator's inertial characteristics:
 
@@ -1097,7 +1097,7 @@ Integrate dynamics with control systems:
    print(f"Control torques: {tau_control}")
 
 Simulation Integration
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Integrate with physics simulators:
 
@@ -1394,7 +1394,7 @@ Troubleshooting
 ---------------
 
 Common Issues
-~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 **Numerical Instability**
 
@@ -1568,7 +1568,7 @@ Best Practices
 --------------
 
 Code Organization
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1623,7 +1623,7 @@ Code Organization
    print(f"Verification error: {results['verification_error']:.6f}")
 
 Error Handling
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1696,7 +1696,7 @@ Error Handling
        print(f"Recommendation: {result['recommendation']}")
 
 Documentation Standards
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1801,7 +1801,7 @@ Documentation Standards
        }
 
 Testing and Validation
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1921,7 +1921,7 @@ Testing and Validation
    validation_results = validate_dynamics_implementation(dynamics)
 
 ManipulatorDynamics Class Reference
-----------------------------------
+-----------------------------------
 
 The ManipulatorDynamics Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2010,7 +2010,7 @@ Computes resulting accelerations from applied torques:
    # Returns: np.ndarray, shape (n,) - Joint accelerations
 
 Implementation Details
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 **Caching System**
 
@@ -2048,7 +2048,7 @@ The velocity_quadratic_forces method uses numerical differentiation:
        return (M_plus[i, j] - M_minus[i, j]) / (2 * epsilon)
 
 Mathematical Foundation
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 The implementation is based on the Newton-Euler formulation of robot dynamics:
 

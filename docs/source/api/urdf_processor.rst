@@ -17,9 +17,9 @@ Quick Navigation
    :local:
    :depth: 2
 
-------------
+-----------------------------
 URDFToSerialManipulator Class
-------------
+-----------------------------
 
 .. currentmodule:: ManipulaPy.urdf_processor
 
@@ -209,9 +209,9 @@ URDFToSerialManipulator Class
 
       **Purpose:** Convert joint parameters to screw axis representation.
 
--------------
+--------------
 Usage Examples
--------------
+--------------
 
 **Basic URDF Loading**::
 

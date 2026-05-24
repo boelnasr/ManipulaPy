@@ -96,7 +96,7 @@ Basic Setup with Optimizations
    print(f"GPU properties: {planner.gpu_properties}")
 
 Backward Compatibility
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 The optimized planner maintains full backward compatibility:
 
@@ -120,7 +120,7 @@ The optimized planner maintains full backward compatibility:
    )
 
 Performance-Optimized Methods
-----------------------------
+-----------------------------
 
 joint_trajectory() with Adaptive Execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -177,7 +177,7 @@ The optimized `joint_trajectory()` method automatically selects the best executi
    demo_trajectory = optimized_trajectory_demo()
 
 batch_joint_trajectory() for Multiple Trajectories
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Process multiple trajectories simultaneously with optimized batch kernels:
 
@@ -247,10 +247,10 @@ Process multiple trajectories simultaneously with optimized batch kernels:
    batch_trajs, speedup = batch_trajectory_demo()
 
 Advanced Performance Features
-----------------------------
+-----------------------------
 
 Memory Pool Management
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Optimize memory allocation for better performance:
 
@@ -318,7 +318,7 @@ Optimize memory allocation for better performance:
    memory_times = memory_optimization_demo()
 
 Performance Benchmarking
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Built-in benchmarking capabilities for performance analysis:
 
@@ -385,10 +385,10 @@ Built-in benchmarking capabilities for performance analysis:
    bench_results, comp_results = comprehensive_benchmark()
 
 Optimized Dynamics Integration
------------------------------
+------------------------------
 
 Enhanced inverse_dynamics_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 GPU-accelerated dynamics computation with optimized memory management:
 
@@ -457,7 +457,7 @@ GPU-accelerated dynamics computation with optimized memory management:
    demo_torques, demo_time = optimized_dynamics_demo()
 
 Enhanced forward_dynamics_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Optimized forward dynamics simulation with adaptive execution:
 
@@ -548,10 +548,10 @@ Optimized forward dynamics simulation with adaptive execution:
    sim_results, sim_time = optimized_forward_dynamics_demo()
 
 Optimized Cartesian Trajectories
--------------------------------
+--------------------------------
 
 Enhanced cartesian_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 GPU-accelerated Cartesian trajectory generation with adaptive execution:
 
@@ -633,10 +633,10 @@ GPU-accelerated Cartesian trajectory generation with adaptive execution:
    cartesian_demo = optimized_cartesian_demo()
 
 Real-World Application Examples
-------------------------------
+-------------------------------
 
 High-Performance Pick-and-Place
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Optimized trajectory planning for industrial pick-and-place operations:
 
@@ -819,7 +819,7 @@ Optimized trajectory planning for industrial pick-and-place operations:
    pick_place_traj, segments = optimized_pick_and_place()
 
 Multi-Robot Trajectory Coordination
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Optimized trajectory planning for multiple robots with collision avoidance:
 
@@ -964,10 +964,10 @@ Optimized trajectory planning for multiple robots with collision avoidance:
    multi_robot_results = multi_robot_coordination()
 
 Advanced Optimization Techniques
--------------------------------
+--------------------------------
 
 Adaptive Performance Tuning
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The planner automatically adapts its execution strategy based on performance history:
 
@@ -1033,7 +1033,7 @@ The planner automatically adapts its execution strategy based on performance his
    tuning_stats = adaptive_tuning_demo()
 
 Memory Profiling and Optimization
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Monitor and optimize memory usage for sustained performance:
 
@@ -1123,10 +1123,10 @@ Monitor and optimize memory usage for sustained performance:
    memory_profile = memory_profiling_demo()
 
 Performance Visualization and Analysis
-------------------------------------
+--------------------------------------
 
 Advanced Performance Monitoring
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Comprehensive performance analysis and visualization:
 
@@ -1241,7 +1241,7 @@ Deployment Best Practices
 -------------------------
 
 Production Deployment Guidelines
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Guidelines for deploying optimized trajectory planning in production environments:
 
@@ -1344,7 +1344,7 @@ Guidelines for deploying optimized trajectory planning in production environment
    prod_planner, prod_results = production_deployment_guide()
 
 Error Handling and Debugging
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Comprehensive error handling and debugging tools for production use:
 
@@ -1451,10 +1451,10 @@ Comprehensive error handling and debugging tools for production use:
    error_test_result = error_handling_demo()
 
 Summary and Migration Guide
---------------------------
+---------------------------
 
 Migration from Original TrajectoryPlanning
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Step-by-step migration guide for existing code:
 
@@ -1552,7 +1552,7 @@ Step-by-step migration guide for existing code:
    migration_complete = migration_guide()
 
 Advanced Configuration Examples
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Real-world configuration examples for different use cases:
 
@@ -1685,7 +1685,7 @@ Real-world configuration examples for different use cases:
    config_planners = advanced_configuration_examples()
 
 Conclusion and Best Practices
-----------------------------
+-----------------------------
 
 **Performance Summary:**
 

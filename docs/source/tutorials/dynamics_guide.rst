@@ -30,7 +30,7 @@ Mass Matrix Computation
     M = dynamics.mass_matrix(joint_angles)
 
 Inverse Dynamics
----------------
+----------------
 
 .. code-block:: python
 
@@ -52,7 +52,7 @@ Inverse Dynamics
     )
 
 Forward Dynamics
----------------
+----------------
 
 .. code-block:: python
 

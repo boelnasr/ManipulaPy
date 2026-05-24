@@ -47,7 +47,7 @@ Potential Field Computations
 ============================
 
 Attractive Potential
--------------------
+--------------------
 
 .. automethod:: PotentialField.compute_attractive_potential
 
@@ -70,7 +70,7 @@ Attractive Potential
    Where ξ is the attractive_gain parameter.
 
 Repulsive Potential
-------------------
+-------------------
 
 .. automethod:: PotentialField.compute_repulsive_potential
 
@@ -98,7 +98,7 @@ Repulsive Potential
    - Scaling factor of 10 applied to final result
 
 Gradient Computation
--------------------
+--------------------
 
 .. automethod:: PotentialField.compute_gradient
 
@@ -164,7 +164,7 @@ Collision Detection Methods
 ===========================
 
 Hull Generation
---------------
+---------------
 
 .. automethod:: CollisionChecker._create_convex_hulls
 
@@ -183,7 +183,7 @@ Hull Generation
    5. Associates hulls with link names
 
 Geometric Transformation
------------------------
+------------------------
 
 .. automethod:: CollisionChecker._transform_convex_hull
 
@@ -209,7 +209,7 @@ Geometric Transformation
    - P represents point coordinates
 
 Collision Detection
-------------------
+-------------------
 
 .. automethod:: CollisionChecker.check_collision
 
@@ -241,7 +241,7 @@ Data Structures and Internal Representation
 ===========================================
 
 Convex Hull Storage
-------------------
+-------------------
 
 Internal convex_hulls dictionary structure:
 
@@ -254,7 +254,7 @@ Internal convex_hulls dictionary structure:
    }
 
 ConvexHull Properties
---------------------
+---------------------
 
 Each ConvexHull object contains:
 
@@ -267,7 +267,7 @@ Each ConvexHull object contains:
 - **equations**: Hyperplane equations for faces
 
 Forward Kinematics Integration
------------------------------
+------------------------------
 
 Integration with ManipulaPy URDF processing:
 
@@ -283,7 +283,7 @@ Computational Complexity Analysis
 =================================
 
 Potential Field Methods
-----------------------
+-----------------------
 
 .. list-table::
    :header-rows: 1
@@ -303,7 +303,7 @@ Potential Field Methods
      - k obstacles × gradient calculation
 
 Collision Detection Methods
---------------------------
+---------------------------
 
 .. list-table::
    :header-rows: 1
@@ -332,7 +332,7 @@ Where:
 ---
 
 Numerical Implementation Details
-===============================
+================================
 
 Potential Field Scaling
 -----------------------
@@ -346,7 +346,7 @@ Applied scaling factors in implementation:
 - **Distance threshold**: influence_distance parameter cutoff
 
 Distance Computations
---------------------
+---------------------
 
 All distance calculations use numpy.linalg.norm():
 
@@ -357,7 +357,7 @@ All distance calculations use numpy.linalg.norm():
 - **Precision**: Double precision floating point
 
 Matrix Operations
-----------------
+-----------------
 
 Convex hull transformations use optimized NumPy operations:
 
@@ -368,7 +368,7 @@ Convex hull transformations use optimized NumPy operations:
 - **Memory layout**: Contiguous arrays for efficient computation
 
 Intersection Detection
----------------------
+----------------------
 
 Hull intersection testing relies on scipy.spatial.ConvexHull:
 
@@ -413,10 +413,10 @@ Potential Field Singularities
 ---
 
 Memory Management
-================
+=================
 
 Convex Hull Storage
-------------------
+-------------------
 
 Memory allocation for collision checking:
 

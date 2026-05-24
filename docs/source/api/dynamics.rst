@@ -113,9 +113,9 @@ Full Equations
      \mathbf{F}_{\text{ext}}
    \Bigr)
 
--------------
+--------------
 Usage Examples
--------------
+--------------
 
 **Basic set-up**
 

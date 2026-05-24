@@ -88,10 +88,10 @@ Obstacle Detection Pipeline
 ---
 
 Stereo Vision Integration
-========================
+=========================
 
 Disparity Computation
---------------------
+---------------------
 
 .. automethod:: Perception.compute_stereo_disparity
 
@@ -113,7 +113,7 @@ Disparity Computation
    - Delegates to vision.compute_disparity()
 
 Point Cloud Generation
----------------------
+----------------------
 
 .. automethod:: Perception.get_stereo_point_cloud
 
@@ -140,7 +140,7 @@ Machine Learning Components
 ===========================
 
 Clustering Analysis
-------------------
+-------------------
 
 .. automethod:: Perception.cluster_obstacles
 
@@ -190,7 +190,7 @@ Resource Management
 ===================
 
 Cleanup Methods
---------------
+---------------
 
 .. automethod:: Perception.release
 
@@ -215,10 +215,10 @@ Cleanup Methods
 ---
 
 Logging Infrastructure
-=====================
+======================
 
 Logger Configuration
--------------------
+--------------------
 
 .. automethod:: Perception._setup_logger
 
@@ -260,10 +260,10 @@ Error Handling Hierarchy
 ---
 
 Dependencies and Integration
-===========================
+============================
 
 Required Dependencies
---------------------
+---------------------
 
 .. list-table::
    :header-rows: 1
@@ -294,7 +294,7 @@ Required Dependencies
 
 
 Vision Module Interface
-----------------------
+-----------------------
 
 Perception requires Vision instance with specific methods:
 
