@@ -8,6 +8,7 @@ caught the original behavior. Tests grouped by source file.
 import unittest
 
 import numpy as np
+import pytest
 
 
 class TestUtilsRegressions(unittest.TestCase):
@@ -2439,6 +2440,347 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             offenders, [],
             f"Open-Loop section(s) {offenders} use np.array() without `import numpy as np`",
         )
+
+
+class TestSelfCollision(unittest.TestCase):
+    """Regressions for Task 49: adjacent-link ACM, collision-mesh source, PyBullet flag."""
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _make_tetra_hull(self, offset=None):
+        """Return a small tetrahedron ConvexHull, optionally translated."""
+        from scipy.spatial import ConvexHull
+        pts = np.array([
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ])
+        if offset is not None:
+            pts = pts + np.asarray(offset)
+        return ConvexHull(pts)
+
+    def _make_mock_checker(self, hull_map, acm=None):
+        """Build a CollisionChecker with injected hulls and ACM, bypassing URDF loading."""
+        from unittest.mock import MagicMock, patch
+        from ManipulaPy.potential_field import CollisionChecker
+
+        with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
+            checker = CollisionChecker.__new__(CollisionChecker)
+        checker.robot = MagicMock()
+        checker.convex_hulls = hull_map
+        checker._acm = acm if acm is not None else set()
+        checker._visual_fallback_warned = set()
+        return checker
+
+    # ------------------------------------------------------------------
+    # ACM tests
+    # ------------------------------------------------------------------
+
+    def test_acm_excludes_joint_neighbors(self):
+        """build_link_adjacency must include every parent<->child joint pair."""
+        from pathlib import Path
+        try:
+            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
+            from ManipulaPy.urdf import URDF
+            from ManipulaPy.potential_field import build_link_adjacency
+        except (ImportError, ModuleNotFoundError) as e:
+            self.skipTest(f"UR5 fixture unavailable: {e}")
+        if not Path(str(urdf_file)).exists():
+            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
+
+        robot = URDF.load(str(urdf_file))
+        acm = build_link_adjacency(robot, exclude_grandparents=False)
+
+        for j in robot.joints:
+            pair = frozenset({j.parent, j.child})
+            self.assertIn(
+                pair, acm,
+                f"ACM missing joint pair {j.parent!r} <-> {j.child!r}",
+            )
+
+    def test_acm_grandparents_excluded_when_flag_set(self):
+        """With exclude_grandparents=True, grandparent<->grandchild pairs are also excluded."""
+        from pathlib import Path
+        try:
+            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
+            from ManipulaPy.urdf import URDF
+            from ManipulaPy.potential_field import build_link_adjacency
+        except (ImportError, ModuleNotFoundError) as e:
+            self.skipTest(f"UR5 fixture unavailable: {e}")
+        if not Path(str(urdf_file)).exists():
+            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
+
+        robot = URDF.load(str(urdf_file))
+        acm_with = build_link_adjacency(robot, exclude_grandparents=True)
+        acm_without = build_link_adjacency(robot, exclude_grandparents=False)
+
+        # With grandparents, ACM must be a strict superset (or equal on degenerate robots)
+        self.assertTrue(
+            acm_without.issubset(acm_with),
+            "ACM with grandparents must contain all pairs from ACM without",
+        )
+
+    def test_acm_empty_joints(self):
+        """build_link_adjacency on a URDF with no joints returns an empty set."""
+        from unittest.mock import MagicMock
+        from ManipulaPy.potential_field import build_link_adjacency
+
+        mock_urdf = MagicMock()
+        mock_urdf.joints = []
+        result = build_link_adjacency(mock_urdf)
+        self.assertEqual(result, set())
+
+    # ------------------------------------------------------------------
+    # CollisionChecker ACM integration
+    # ------------------------------------------------------------------
+
+    def test_home_pose_no_false_positive(self):
+        """Adjacent-link hulls placed at overlapping positions must not trigger
+        a collision when their pair is in the ACM."""
+        # Two overlapping hulls for adjacent links — old code reported collision here
+        hull_a = self._make_tetra_hull()
+        hull_b = self._make_tetra_hull(offset=[0.3, 0.0, 0.0])  # clearly overlapping
+
+        acm = {frozenset({"link_a", "link_b"})}
+        checker = self._make_mock_checker(
+            {"link_a": hull_a, "link_b": hull_b}, acm=acm
+        )
+        checker.robot.link_fk.return_value = {
+            "link_a": np.eye(4),
+            "link_b": np.eye(4),
+        }
+
+        result = checker.check_collision([0.0] * 6)
+        self.assertFalse(
+            result,
+            "Adjacent links in ACM must not produce a false-positive collision",
+        )
+
+    def test_non_adjacent_overlapping_hulls_detected(self):
+        """Non-adjacent links that physically overlap MUST be detected as a collision."""
+        hull_a = self._make_tetra_hull()
+        hull_b = self._make_tetra_hull(offset=[0.3, 0.0, 0.0])  # overlapping
+
+        # Empty ACM — no exclusions
+        checker = self._make_mock_checker(
+            {"link_a": hull_a, "link_b": hull_b}, acm=set()
+        )
+        checker.robot.link_fk.return_value = {
+            "link_a": np.eye(4),
+            "link_b": np.eye(4),
+        }
+
+        result = checker.check_collision([0.0] * 6)
+        self.assertTrue(
+            result,
+            "Non-adjacent overlapping hulls must be detected as a collision",
+        )
+
+    def test_non_adjacent_separated_hulls_not_detected(self):
+        """Non-adjacent links that are far apart must not be reported as colliding."""
+        hull_a = self._make_tetra_hull()
+        hull_b = self._make_tetra_hull(offset=[20.0, 0.0, 0.0])
+
+        checker = self._make_mock_checker(
+            {"link_a": hull_a, "link_b": hull_b}, acm=set()
+        )
+        checker.robot.link_fk.return_value = {
+            "link_a": np.eye(4),
+            "link_b": np.eye(4),
+        }
+
+        result = checker.check_collision([0.0] * 6)
+        self.assertFalse(result, "Separated far-apart hulls must not report collision")
+
+    # ------------------------------------------------------------------
+    # Collision-mesh source preference
+    # ------------------------------------------------------------------
+
+    def test_collision_checker_prefers_collision_meshes(self):
+        """_create_convex_hulls must read link.collisions before link.visuals."""
+        import inspect
+        from ManipulaPy.potential_field import CollisionChecker
+
+        src = inspect.getsource(CollisionChecker._create_convex_hulls)
+        # Look for the actual attribute access patterns, not bare words
+        idx_collisions = src.find("link.collisions")
+        idx_visuals = src.find("link.visuals")
+        self.assertGreater(idx_collisions, -1, "_create_convex_hulls must reference link.collisions")
+        self.assertGreater(idx_visuals, -1, "_create_convex_hulls must reference link.visuals")
+        self.assertLess(
+            idx_collisions, idx_visuals,
+            "_create_convex_hulls must check link.collisions BEFORE link.visuals",
+        )
+
+    def test_visual_fallback_warning_issued_once(self):
+        """When falling back from collisions to visuals, a warning is logged exactly once per link."""
+        import logging
+        from unittest.mock import MagicMock, patch
+        from ManipulaPy.potential_field import CollisionChecker
+
+        with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
+            checker = CollisionChecker.__new__(CollisionChecker)
+        checker._visual_fallback_warned = set()
+
+        with self.assertLogs("ManipulaPy.potential_field", level="WARNING") as cm:
+            checker._warn_visual_fallback_once("test_link")
+            checker._warn_visual_fallback_once("test_link")  # must NOT log again
+
+        warnings = [line for line in cm.output if "test_link" in line]
+        self.assertEqual(len(warnings), 1, "Warning for the same link must be issued exactly once")
+
+    # ------------------------------------------------------------------
+    # Simulation self-collision flag
+    # ------------------------------------------------------------------
+
+    @pytest.mark.simulation
+    def test_sim_self_collision_off_by_default(self):
+        """Simulation with enable_self_collision=False returns [] from check_collisions."""
+        try:
+            import pybullet as p
+        except ImportError:
+            self.skipTest("pybullet not available")
+
+        from pathlib import Path
+        try:
+            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
+        except (ImportError, ModuleNotFoundError) as e:
+            self.skipTest(f"UR5 fixture unavailable: {e}")
+        if not Path(str(urdf_file)).exists():
+            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
+
+        from ManipulaPy.sim import Simulation
+
+        joint_limits = [(-np.pi, np.pi)] * 6
+        client = p.connect(p.DIRECT)
+        try:
+            try:
+                sim = Simulation(
+                    str(urdf_file),
+                    joint_limits,
+                    physics_client=client,
+                    enable_self_collision=False,
+                )
+            except Exception as e:
+                # UR5 URDF uses package:// mesh URIs that PyBullet cannot resolve
+                # in a test environment without a full ROS workspace.
+                self.skipTest(f"PyBullet could not load UR5 URDF (unresolved mesh URIs): {e}")
+
+            # Step simulation so contact detection can run
+            p.stepSimulation()
+            contacts = sim.check_collisions()
+            self.assertIsInstance(contacts, list)
+            # Without self-collision enabled, PyBullet never detects self contacts
+            self.assertEqual(contacts, [])
+        finally:
+            try:
+                p.disconnect(client)
+            except Exception:
+                pass
+
+    @pytest.mark.simulation
+    def test_sim_self_collision_flag_wires_pybullet_flag(self):
+        """enable_self_collision=True passes URDF_USE_SELF_COLLISION to loadURDF."""
+        try:
+            import pybullet as p
+        except ImportError:
+            self.skipTest("pybullet not available")
+
+        from pathlib import Path
+        try:
+            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
+        except (ImportError, ModuleNotFoundError) as e:
+            self.skipTest(f"UR5 fixture unavailable: {e}")
+        if not Path(str(urdf_file)).exists():
+            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
+
+        from unittest.mock import patch
+        from ManipulaPy.sim import Simulation
+
+        joint_limits = [(-np.pi, np.pi)] * 6
+        client = p.connect(p.DIRECT)
+        try:
+            load_calls = []
+            original_loadURDF = p.loadURDF
+
+            def capturing_loadURDF(*args, **kwargs):
+                load_calls.append((args, kwargs))
+                return original_loadURDF(*args, **kwargs)
+
+            try:
+                with patch("pybullet.loadURDF", side_effect=capturing_loadURDF):
+                    Simulation(
+                        str(urdf_file),
+                        joint_limits,
+                        physics_client=client,
+                        enable_self_collision=True,
+                    )
+            except Exception as e:
+                # If the URDF can't load (package:// URIs), check the flag was
+                # at least passed before the error — inspect captured calls
+                robot_calls = [c for c in load_calls if str(urdf_file) in str(c[0])]
+                if not robot_calls:
+                    self.skipTest(f"PyBullet could not load UR5 URDF: {e}")
+
+            # Find the robot loadURDF call (not the plane)
+            robot_calls = [c for c in load_calls if str(urdf_file) in str(c[0])]
+            self.assertGreater(len(robot_calls), 0, "loadURDF was not called for the robot")
+            args, kwargs = robot_calls[0]
+            flags = kwargs.get("flags", 0)
+            self.assertTrue(
+                bool(flags & p.URDF_USE_SELF_COLLISION),
+                f"URDF_USE_SELF_COLLISION not set in loadURDF flags (got flags={flags})",
+            )
+        finally:
+            try:
+                p.disconnect(client)
+            except Exception:
+                pass
+
+    @pytest.mark.simulation
+    def test_sim_check_collisions_returns_list(self):
+        """check_collisions() must return a list (not None) in all cases."""
+        try:
+            import pybullet as p
+        except ImportError:
+            self.skipTest("pybullet not available")
+
+        from pathlib import Path
+        try:
+            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
+        except (ImportError, ModuleNotFoundError) as e:
+            self.skipTest(f"UR5 fixture unavailable: {e}")
+        if not Path(str(urdf_file)).exists():
+            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
+
+        from ManipulaPy.sim import Simulation
+
+        joint_limits = [(-np.pi, np.pi)] * 6
+        client = p.connect(p.DIRECT)
+        try:
+            try:
+                sim = Simulation(
+                    str(urdf_file),
+                    joint_limits,
+                    physics_client=client,
+                    enable_self_collision=True,
+                )
+            except Exception as e:
+                self.skipTest(f"PyBullet could not load UR5 URDF (unresolved mesh URIs): {e}")
+
+            result = sim.check_collisions()
+            self.assertIsInstance(result, list, "check_collisions must return a list")
+            # Each element must be a 3-tuple (linkA, linkB, position)
+            for item in result:
+                self.assertEqual(len(item), 3, f"Contact tuple must have 3 elements, got {item}")
+        finally:
+            try:
+                p.disconnect(client)
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

@@ -24,12 +24,37 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
+import itertools
+import logging
+
 import numpy as np
 from scipy.spatial import ConvexHull
 
 from .urdf import URDF  # Use native parser
 
-# Import CUDA kernel functions (assuming these are defined in cuda_kernels.py)
+_logger = logging.getLogger(__name__)
+
+
+def build_link_adjacency(urdf, exclude_grandparents: bool = True) -> set:
+    """Pairs of link names excluded from self-collision checks.
+
+    Always includes parent<->child pairs joined by any URDF joint. Optionally
+    extends to grandparent<->grandchild, matching SRDF convention for arms whose
+    successive-link geometry overlaps slightly even when not coincident.
+
+    Returns a set of frozenset({name_a, name_b}) so callers can do
+    order-independent ``frozenset(pair) in acm`` checks.
+    """
+    excluded = set()
+    parent_of = {j.child: j.parent for j in urdf.joints}
+    for j in urdf.joints:
+        excluded.add(frozenset({j.parent, j.child}))
+    if exclude_grandparents:
+        for child, parent in parent_of.items():
+            grandparent = parent_of.get(parent)
+            if grandparent:
+                excluded.add(frozenset({grandparent, child}))
+    return excluded
 
 
 class PotentialField:
@@ -120,11 +145,24 @@ class CollisionChecker:
             load_meshes (bool): Whether to load mesh geometry data (default: True)
         """
         self.robot = URDF.load(urdf_path, backend=backend, load_meshes=load_meshes)
+        # ACM derived from URDF topology to avoid adjacent-link false positives
+        self._acm = build_link_adjacency(self.robot, exclude_grandparents=True)
+        self._visual_fallback_warned = set()
         self.convex_hulls = self._create_convex_hulls()
+
+    def _warn_visual_fallback_once(self, link_name: str) -> None:
+        if link_name not in self._visual_fallback_warned:
+            self._visual_fallback_warned.add(link_name)
+            _logger.warning(
+                "Link %r has no collision geometry; falling back to visual geometry "
+                "for collision checking — results may be inaccurate.",
+                link_name,
+            )
 
     def _create_convex_hulls(self):
         """
-        Creates a dictionary of convex hulls for each visual mesh in the robot's links.
+        Creates a dictionary of convex hulls for each link, preferring collision
+        geometry and falling back to visual geometry with a one-shot warning.
 
         Returns:
             dict: A dictionary where the keys are the names of the robot links
@@ -132,35 +170,40 @@ class CollisionChecker:
         """
         convex_hulls = {}
         for link in self.robot.links:
-            if link.visuals:
-                for visual in link.visuals:
-                    if visual.geometry is None:
-                        continue
+            # Prefer collision geometry; fall back to visuals with a warning
+            sources = link.collisions if link.collisions else None
+            if sources is None and link.visuals:
+                self._warn_visual_fallback_once(link.name)
+                sources = link.visuals
+            if not sources:
+                continue
 
-                    # Handle different geometry types
-                    geom = visual.geometry
+            for geom_element in sources:
+                if geom_element.geometry is None:
+                    continue
 
-                    # Check if it's a mesh with loaded vertices
-                    if hasattr(geom, "mesh_data") and geom.mesh_data is not None:
-                        vertices = geom.mesh_data.vertices
-                        if vertices is not None and len(vertices) >= 4:
+                geom = geom_element.geometry
+
+                # Check if it's a mesh with loaded vertices
+                if hasattr(geom, "mesh_data") and geom.mesh_data is not None:
+                    vertices = geom.mesh_data.vertices
+                    if vertices is not None and len(vertices) >= 4:
+                        try:
+                            convex_hull = ConvexHull(vertices)
+                            convex_hulls[link.name] = convex_hull
+                        except Exception:
+                            pass
+                # Fallback for legacy mesh attribute
+                elif hasattr(geom, "mesh") and geom.mesh is not None:
+                    mesh = geom.mesh
+                    if hasattr(mesh, "vertices") and mesh.vertices is not None:
+                        vertices = np.array(mesh.vertices)
+                        if len(vertices) >= 4:
                             try:
                                 convex_hull = ConvexHull(vertices)
                                 convex_hulls[link.name] = convex_hull
                             except Exception:
-                                # Skip if convex hull fails (degenerate geometry)
                                 pass
-                    # Fallback for legacy mesh attribute
-                    elif hasattr(geom, "mesh") and geom.mesh is not None:
-                        mesh = geom.mesh
-                        if hasattr(mesh, "vertices") and mesh.vertices is not None:
-                            vertices = np.array(mesh.vertices)
-                            if len(vertices) >= 4:
-                                try:
-                                    convex_hull = ConvexHull(vertices)
-                                    convex_hulls[link.name] = convex_hull
-                                except Exception:
-                                    pass
 
         return convex_hulls
 
@@ -190,35 +233,54 @@ class CollisionChecker:
         Returns:
             bool: True if collision detected, False otherwise
         """
-        # Use native parser's link_fk with use_names=True for string keys
         fk_results = self.robot.link_fk(cfg=thetalist, use_names=True)
 
-        for link_name, transform in fk_results.items():
-            if link_name in self.convex_hulls:
-                transformed_hull = self._transform_convex_hull(
-                    self.convex_hulls[link_name], transform
-                )
-                for other_link_name, other_transform in fk_results.items():
-                    if (
-                        link_name != other_link_name
-                        and other_link_name in self.convex_hulls
-                    ):
-                        other_transformed_hull = self._transform_convex_hull(
-                            self.convex_hulls[other_link_name], other_transform
-                        )
-                        # Check intersection using convex hull overlap
-                        if self._hulls_intersect(
-                            transformed_hull, other_transformed_hull
-                        ):
-                            return True
+        hull_names = [n for n in self.convex_hulls if n in fk_results]
+        for name_a, name_b in itertools.combinations(hull_names, 2):
+            # Skip adjacent-link pairs — they always overlap at joints
+            if frozenset({name_a, name_b}) in self._acm:
+                continue
+
+            T_a = fk_results[name_a]
+            T_b = fk_results[name_b]
+            pts_a = (
+                T_a[:3, :3] @ self.convex_hulls[name_a].points.T
+                + T_a[:3, 3:4]
+            ).T
+            pts_b = (
+                T_b[:3, :3] @ self.convex_hulls[name_b].points.T
+                + T_b[:3, 3:4]
+            ).T
+            if self._points_intersect(pts_a, pts_b):
+                return True
         return False
+
+    def _points_intersect(self, pts_a, pts_b):
+        """
+        Check if two point clouds' bounding boxes intersect.
+
+        This is a simplified check — for production use, consider a proper
+        collision detection library like fcl or trimesh.
+
+        Args:
+            pts_a: (N, 3) array of points
+            pts_b: (M, 3) array of points
+
+        Returns:
+            bool: True if bounding boxes overlap
+        """
+        min_a = np.min(pts_a, axis=0)
+        max_a = np.max(pts_a, axis=0)
+        min_b = np.min(pts_b, axis=0)
+        max_b = np.max(pts_b, axis=0)
+        return bool(np.all(max_a >= min_b) and np.all(max_b >= min_a))
 
     def _hulls_intersect(self, hull1, hull2):
         """
-        Check if two convex hulls intersect using separating axis theorem.
+        Check if two convex hulls intersect.
 
-        This is a simplified check - for production use, consider using
-        a proper collision detection library like fcl or trimesh.
+        Thin wrapper around _points_intersect for backwards compatibility
+        with external callers that pass ConvexHull objects.
 
         Args:
             hull1: First ConvexHull
@@ -227,11 +289,4 @@ class CollisionChecker:
         Returns:
             bool: True if hulls potentially intersect
         """
-        # Simple bounding box overlap check
-        min1 = np.min(hull1.points, axis=0)
-        max1 = np.max(hull1.points, axis=0)
-        min2 = np.min(hull2.points, axis=0)
-        max2 = np.max(hull2.points, axis=0)
-
-        # Check if bounding boxes overlap
-        return np.all(max1 >= min2) and np.all(max2 >= min1)
+        return self._points_intersect(hull1.points, hull2.points)

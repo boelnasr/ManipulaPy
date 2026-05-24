@@ -93,6 +93,8 @@ class Simulation:
         time_step=0.01,
         real_time_factor=1.0,
         physics_client=None,
+        enable_self_collision: bool = False,
+        disable_pairs=None,
     ):
         if not _PYBULLET_AVAILABLE:
             raise ImportError(
@@ -104,6 +106,8 @@ class Simulation:
         self.torque_limits = torque_limits
         self.time_step = time_step
         self.real_time_factor = real_time_factor
+        self.enable_self_collision = enable_self_collision
+        self._disable_pairs = disable_pairs or []
         self.logger = self.setup_logger()
         self.physics_client = physics_client
         self.joint_params = []
@@ -169,8 +173,9 @@ class Simulation:
         # Load the ground plane
         self.plane_id = p.loadURDF("plane.urdf")
 
-        # Load the robot
-        self.robot_id = p.loadURDF(self.urdf_file_path, useFixedBase=True)
+        # Load the robot, enabling self-collision detection if requested
+        load_flags = p.URDF_USE_SELF_COLLISION if self.enable_self_collision else 0
+        self.robot_id = p.loadURDF(self.urdf_file_path, useFixedBase=True, flags=load_flags)
 
         # Identify non-fixed joints
         self.non_fixed_joints = [
@@ -179,6 +184,24 @@ class Simulation:
             if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
         ]
         self.home_position = np.zeros(len(self.non_fixed_joints))
+
+        # Apply per-pair collision filter exclusions when self-collision is on
+        if self.enable_self_collision and self._disable_pairs:
+            # Build link-name -> pybullet link index map; joint info[12] is child link name
+            link_name_to_idx = {
+                p.getJointInfo(self.robot_id, i)[12].decode(): i
+                for i in range(p.getNumJoints(self.robot_id))
+            }
+            for name_a, name_b in self._disable_pairs:
+                idx_a = link_name_to_idx.get(name_a)
+                idx_b = link_name_to_idx.get(name_b)
+                if idx_a is not None and idx_b is not None:
+                    p.setCollisionFilterPair(self.robot_id, self.robot_id, idx_a, idx_b, 0)
+                else:
+                    self.logger.warning(
+                        "disable_pairs: could not resolve link names %r / %r to indices",
+                        name_a, name_b,
+                    )
 
     def initialize_robot(self):
         """
@@ -717,22 +740,29 @@ class Simulation:
         self.disconnect_simulation()
         self.logger.info("Simulation closed.")
 
-    def check_collisions(self):
+    def check_collisions(self) -> list:
         """
-        Checks for collisions in the simulation and logs them.
+        Checks for self-collisions in the simulation and returns contacts.
+
+        Returns:
+            list of (linkA, linkB, position) tuples for each contact point.
+            Empty list if no collisions or simulation not started.
         """
         _check_pybullet_available()
         if self.robot_id is None:
             self.logger.warning(
                 "Cannot check for collisions before simulation is started."
             )
-            return
+            return []
+        contacts = []
         for i in self.non_fixed_joints:
-            contact_points = p.getContactPoints(self.robot_id, self.robot_id, i)
-            if contact_points:
-                self.logger.warning(f"Collision detected at joint {i}.")
-                for point in contact_points:
-                    self.logger.warning(f"Contact point: {point}")
+            for pt in p.getContactPoints(self.robot_id, self.robot_id, i):
+                link_a, link_b, position = pt[3], pt[4], pt[5]
+                contacts.append((link_a, link_b, position))
+                self.logger.warning(
+                    "Self-collision: link %s <-> link %s at %s", link_a, link_b, position
+                )
+        return contacts
 
     def step_simulation(self):
         """
