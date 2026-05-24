@@ -208,15 +208,13 @@ class CollisionChecker:
         return convex_hulls
 
     def _transform_convex_hull(self, convex_hull, transform):
-        """
-        Transform convex hull vertices by a 4x4 transformation matrix.
+        """Apply a 4x4 transform to a ConvexHull and return a NEW ConvexHull.
 
-        Args:
-            convex_hull: ConvexHull object
-            transform: 4x4 transformation matrix
-
-        Returns:
-            ConvexHull: Transformed convex hull
+        Retained for backwards compatibility with existing tests
+        (test_potential_field_coverage.py, test_potential_field_extended.py)
+        that call this method directly. Internal callers in check_collision
+        transform cached vertices directly via matrix multiply and skip the
+        ConvexHull rebuild — prefer that path for new code.
         """
         transformed_points = transform[:3, :3] @ convex_hull.points.T + transform[
             :3, 3

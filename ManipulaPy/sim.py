@@ -756,13 +756,15 @@ class Simulation:
             )
             return []
         contacts = []
-        for i in self.non_fixed_joints:
-            for pt in p.getContactPoints(self.robot_id, self.robot_id, i):
-                link_a, link_b, position = pt[3], pt[4], pt[5]
-                contacts.append((link_a, link_b, position))
-                self.logger.warning(
-                    "Self-collision: link %s <-> link %s at %s", link_a, link_b, position
-                )
+        # PyBullet's per-joint linkIndexA filter excludes base-link contacts
+        # (base index is -1, never a non-fixed joint). Query without filter to
+        # catch base<->link pairs (the most common self-collision on folded arms).
+        for pt in (p.getContactPoints(self.robot_id, self.robot_id) or []):
+            link_a, link_b, position = pt[3], pt[4], pt[5]
+            contacts.append((link_a, link_b, position))
+            self.logger.warning(
+                "Self-collision: link %s <-> link %s at %s", link_a, link_b, position
+            )
         return contacts
 
     def step_simulation(self):

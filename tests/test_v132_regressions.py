@@ -2623,24 +2623,103 @@ class TestSelfCollision(unittest.TestCase):
         result = checker.check_collision([0.0] * 6)
         self.assertFalse(result, "Separated far-apart hulls must not report collision")
 
+    def test_check_collision_applies_fk_translation_to_cached_vertices(self):
+        """Verify check_collision actually transforms cached hull vertices by the FK matrix
+        (not just inspecting them in body frame). A hull at origin and a translated FK should
+        place the hull's world-frame vertices in the translated location."""
+        hull_a = self._make_tetra_hull()
+        hull_b = self._make_tetra_hull()  # same body-frame geometry
+
+        checker = self._make_mock_checker(
+            {"link_a": hull_a, "link_b": hull_b}, acm=set()
+        )
+
+        # Place A at origin, B 100m away — must NOT collide
+        T_a = np.eye(4)
+        T_b = np.eye(4); T_b[:3, 3] = [100.0, 0.0, 0.0]
+        checker.robot.link_fk.return_value = {"link_a": T_a, "link_b": T_b}
+        self.assertFalse(
+            checker.check_collision([0.0] * 6),
+            "Two identical hulls at +100m apart must not report collision",
+        )
+
+        # Now place B AT the same origin — must collide
+        T_b[:3, 3] = [0.0, 0.0, 0.0]
+        checker.robot.link_fk.return_value = {"link_a": T_a, "link_b": T_b}
+        self.assertTrue(
+            checker.check_collision([0.0] * 6),
+            "Two identical hulls co-located after FK must report collision",
+        )
+
     # ------------------------------------------------------------------
     # Collision-mesh source preference
     # ------------------------------------------------------------------
 
     def test_collision_checker_prefers_collision_meshes(self):
-        """_create_convex_hulls must read link.collisions before link.visuals."""
-        import inspect
+        """_create_convex_hulls must use link.collisions vertices when both are present,
+        and fall back to link.visuals only when collisions is empty."""
+        from unittest.mock import MagicMock, patch
         from ManipulaPy.potential_field import CollisionChecker
 
-        src = inspect.getsource(CollisionChecker._create_convex_hulls)
-        # Look for the actual attribute access patterns, not bare words
-        idx_collisions = src.find("link.collisions")
-        idx_visuals = src.find("link.visuals")
-        self.assertGreater(idx_collisions, -1, "_create_convex_hulls must reference link.collisions")
-        self.assertGreater(idx_visuals, -1, "_create_convex_hulls must reference link.visuals")
-        self.assertLess(
-            idx_collisions, idx_visuals,
-            "_create_convex_hulls must check link.collisions BEFORE link.visuals",
+        # 8-vertex cube — distinguishable vertex count for the collision mesh
+        collision_verts = np.array([
+            [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 1.0, 1.0],
+        ])
+        # 6-vertex octahedron — distinguishable vertex count for the visual mesh
+        visual_verts = np.array([
+            [1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0], [0.0, -1.0, 0.0],
+            [0.0, 0.0, 1.0], [0.0, 0.0, -1.0],
+        ])
+
+        def make_geom_element(vertices):
+            elem = MagicMock()
+            elem.geometry = MagicMock()
+            elem.geometry.mesh_data = MagicMock()
+            elem.geometry.mesh_data.vertices = vertices
+            # Ensure the "legacy mesh" branch doesn't accidentally fire
+            del elem.geometry.mesh
+            return elem
+
+        # Link with BOTH collisions and visuals — collisions must win
+        link_both = MagicMock()
+        link_both.name = "link_both"
+        link_both.collisions = [make_geom_element(collision_verts)]
+        link_both.visuals = [make_geom_element(visual_verts)]
+
+        # Link with empty collisions — visual fallback must engage
+        link_visual_only = MagicMock()
+        link_visual_only.name = "link_visual_only"
+        link_visual_only.collisions = []
+        link_visual_only.visuals = [make_geom_element(visual_verts)]
+
+        stub_robot = MagicMock()
+        stub_robot.links = [link_both, link_visual_only]
+        stub_robot.joints = []
+
+        with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
+            checker = CollisionChecker.__new__(CollisionChecker)
+        checker.robot = stub_robot
+        checker._acm = set()
+        checker._visual_fallback_warned = set()
+
+        with self.assertLogs("ManipulaPy.potential_field", level="WARNING"):
+            hulls = checker._create_convex_hulls()
+
+        self.assertIn("link_both", hulls)
+        self.assertEqual(
+            hulls["link_both"].points.shape[0], collision_verts.shape[0],
+            "When both collisions and visuals exist, collision mesh vertices must be used",
+        )
+        self.assertIn("link_visual_only", hulls)
+        self.assertEqual(
+            hulls["link_visual_only"].points.shape[0], visual_verts.shape[0],
+            "When collisions is empty, visual mesh vertices must be used as fallback",
+        )
+        self.assertIn(
+            "link_visual_only", checker._visual_fallback_warned,
+            "Visual fallback must mark the link as warned",
         )
 
     def test_visual_fallback_warning_issued_once(self):
