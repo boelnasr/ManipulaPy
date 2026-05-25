@@ -3,6 +3,9 @@
 <div align="center">
 
 [![PyPI](https://img.shields.io/pypi/v/ManipulaPy)](https://pypi.org/project/ManipulaPy/)
+[![Downloads](https://static.pepy.tech/badge/ManipulaPy)](https://pepy.tech/project/ManipulaPy)
+[![Downloads/month](https://img.shields.io/pypi/dm/ManipulaPy?label=downloads%2Fmonth&color=blue)](https://pypi.org/project/ManipulaPy/)
+[![GitHub stars](https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=flat&color=yellow)](https://github.com/boelnasr/ManipulaPy/stargazers)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 ![CI](https://github.com/boelnasr/ManipulaPy/actions/workflows/test.yml/badge.svg?branch=main)
@@ -49,6 +52,17 @@ pip install "ManipulaPy[all]"          # everything above
 
 For CUDA 11.x toolchains use `[gpu-cuda11]`; for AMD/ROCm use `[gpu-rocm]`. Full matrix in the [Installation Guide](docs/source/Installation%20Guide.rst).
 
+### Requirements
+
+| | Supported | Notes |
+|---|---|---|
+| **Python** | 3.9 – 3.12 | CI matrix runs all four; 3.12 added in v1.3.2 |
+| **OS** | Linux (primary) · macOS · Windows | CUDA extras Linux-only |
+| **CPU stack** | NumPy ≥ 2.0,<3.0 · SciPy ≥ 1.14 · Numba ≥ 0.60 · Matplotlib ≥ 3.9 · Pillow ≥ 8.0 | Installed by default |
+| **GPU stack** | CUDA 12.x via `[cuda]` · CUDA 11.x via `[gpu-cuda11]` | NVIDIA, compute capability ≥ 6.0 |
+| **Simulation** | PyBullet ≥ 3.2 | Optional, `[simulation]` extra |
+| **Vision** | OpenCV ≥ 4.5 · Ultralytics ≥ 8.4 · PyTorch ≥ 1.8 | Optional, `[vision]` extra |
+
 ### Verify
 
 ```python
@@ -88,7 +102,157 @@ print(f"trajectory: {traj['positions'].shape[0]} points")
 
 That snippet runs end-to-end on a default `pip install ManipulaPy` — no GPU required. With the `[cuda]` extra installed, the planner transparently routes large problems (≥ ~1000 waypoints) through the CUDA kernels for 40×+ speedup.
 
-### What it looks like
+---
+
+## Guided tour
+
+The same `serial` / `dynamics` objects from the demo above feed every module. The snippets below build on that setup.
+
+### Inverse kinematics — three solvers, one interface
+
+```python
+from ManipulaPy.kinematics import SerialManipulator  # already loaded as `serial`
+
+# Target pose: 30 cm forward, 20 cm up, no rotation change
+T_target = serial.forward_kinematics(np.zeros(6))
+T_target[:3, 3] += np.array([0.30, 0.0, 0.20])
+
+# 1. Damped least-squares (fast, single seed)
+q_dls, ok, _iters = serial.iterative_inverse_kinematics(
+    T_target, thetalist0=np.zeros(6),
+)
+
+# 2. Smart IK — picks an initial guess based on a workspace heuristic
+q_smart, ok, _iters = serial.smart_inverse_kinematics(
+    T_target, strategy="workspace_heuristic", theta_current=np.zeros(6),
+)
+
+# 3. Robust multi-start + SQP fallback for tough poses
+q_robust, ok, _attempts, solver_name = serial.robust_inverse_kinematics(
+    T_target, max_attempts=10,
+)
+```
+
+`smart_inverse_kinematics` picks an initial guess strategy (workspace heuristic, cached previous solution, etc.) and dispatches to the underlying DLS / SQP / TRAC-IK solver — see `ManipulaPy/ik_helpers.py`.
+
+### Dynamics — mass matrix, gravity, inverse/forward
+
+```python
+q  = np.array([0.1, 0.2, -0.3, -0.5, 0.2, 0.1])
+qd = np.zeros(6)
+qdd_des = np.array([0.1, 0.0, -0.1, 0.0, 0.0, 0.0])
+g = np.array([0.0, 0.0, -9.81])
+F_ext = np.zeros(6)
+
+M = dynamics.mass_matrix(q)                              # (n, n)
+c = dynamics.velocity_quadratic_forces(q, qd)            # (n,)
+g_forces = dynamics.gravity_forces(q, g)                 # (n,)
+tau = dynamics.inverse_dynamics(q, qd, qdd_des, g, F_ext)  # required torques
+qdd = dynamics.forward_dynamics(q, qd, tau, g, F_ext)      # resulting accel
+```
+
+### Control — PID and computed-torque in one line each
+
+```python
+from ManipulaPy.control import ManipulatorController
+
+ctrl = ManipulatorController(dynamics)
+Kp, Ki, Kd = np.full(6, 80.0), np.full(6, 1.5), np.full(6, 20.0)
+q_des = np.array([0.2, -0.1, 0.4, -0.3, 0.1, 0.0])
+
+# PID step (joint-space)
+tau_pid = ctrl.pid_control(
+    thetalistd=q_des, dthetalistd=np.zeros(6),
+    thetalist=q,      dthetalist=qd,
+    dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd,
+)
+
+# Computed-torque step (cancels the nonlinear dynamics)
+tau_ctc = ctrl.computed_torque_control(
+    thetalistd=q_des, dthetalistd=np.zeros(6), ddthetalistd=np.zeros(6),
+    thetalist=q,      dthetalist=qd,
+    g=g, dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd,
+)
+
+# Ziegler-Nichols auto-tuning from a measured ultimate gain/period
+Kp_t, Ki_t, Kd_t = ctrl.ziegler_nichols_tuning(Ku=120.0, Tu=0.65, kind="PID")
+```
+
+Also available: `robust_control`, `adaptive_control`, `feedforward_control`, `kalman_filter_control`, plus settling-time / overshoot / rise-time analysis helpers.
+
+### Simulation — PyBullet, with or without GUI
+
+```python
+from ManipulaPy.sim import Simulation
+
+sim = Simulation(
+    urdf_file_path=robot_urdf,
+    joint_limits=[(-np.pi, np.pi)] * 6,
+    torque_limits=[(-150, 150)] * 6,
+    time_step=1/240,
+)
+sim.initialize_robot()
+sim.set_robot_models(serial, dynamics)
+sim.run_trajectory(traj["positions"])     # replay the planner output
+sim.close_simulation()
+```
+
+`Simulation` works headlessly through PyBullet DIRECT mode (CI-friendly) or with the GUI sliders enabled. Trajectory replay, joint-parameter sliders, end-effector trail visualization, and a reset button are all built in.
+
+### Vision — capture, detect, cluster
+
+```python
+from ManipulaPy.vision import Vision
+from ManipulaPy.perception import Perception
+
+vision = Vision(camera_configs=[{"device_index": 0, "intrinsic_matrix": K}])
+rgb = vision.capture_image(camera_index=0)
+# `depth` here is a same-shape ndarray from a depth sensor or stereo reconstruction.
+
+# YOLOv8 detection + depth back-projection in one call (requires [vision])
+positions, labels = vision.detect_obstacles(
+    depth_image=depth, rgb_image=rgb, depth_threshold=5.0,
+)
+
+# Or go one level up: capture + detect + DBSCAN cluster (requires [vision, ml])
+perception = Perception(vision_instance=vision)
+points, cluster_labels = perception.detect_and_cluster_obstacles(
+    camera_index=0, depth_threshold=5.0, eps=0.05, min_samples=10,
+)
+```
+
+Stereo rectification, disparity, and 3D point-cloud generation live on the same `Vision` class — see `Examples/advanced_examples/perception_demo.py`.
+
+---
+
+## Package layout
+
+```
+ManipulaPy/
+├── kinematics.py        # SerialManipulator — FK, IK (DLS/SQP/TRAC-IK/smart), Jacobians
+├── dynamics.py          # ManipulatorDynamics — M, C, g, inverse / forward dynamics
+├── control.py           # ManipulatorController — PID, CTC, adaptive, robust, Kalman
+├── path_planning.py     # OptimizedTrajectoryPlanning — CPU/GPU quintic·cubic·linear
+├── singularity.py       # Manipulability ellipsoid, condition number, MC workspace
+├── potential_field.py   # Attractive + repulsive fields (sign-corrected in v1.3.2)
+├── ik_helpers.py        # smart_inverse_kinematics dispatch table + TRAC-IK glue
+├── urdf/                # Native URDF parser — package://, file://, ROS discovery
+│   ├── parser.py        #   v1.3.2: NumPy 2.0 compatible, no urchin dependency
+│   ├── resolver.py      #   PackageResolver — explicit overrides + auto-discovery
+│   └── scene.py         #   Visualization / kinematic tree introspection
+├── sim.py               # PyBullet wrapper                        [simulation]
+├── vision.py            # OpenCV + Ultralytics YOLO + stereo      [vision]
+├── perception.py        # Depth → obstacles + DBSCAN clustering   [vision, ml]
+├── cuda_kernels.py      # Numba/CuPy kernels                      [cuda]
+├── ManipulaPy_data/     # 25 bundled robot URDFs + meshes
+└── Benchmark/           # Reproducible CPU vs GPU benchmark suite
+```
+
+The library is layered: every higher-level module depends only on the ones above it in this list. You can use `kinematics` / `dynamics` / `control` / `path_planning` end-to-end with zero optional dependencies installed.
+
+---
+
+## What it looks like
 
 <table>
 <tr>
@@ -172,7 +336,7 @@ Full inventory and per-robot details in [`ManipulaPy/ManipulaPy_data/MANIFEST.md
 | **API reference** | [API docs](https://manipulapy.readthedocs.io/en/latest/api/index.html) |
 | **Installation matrix** | [`docs/source/Installation Guide.rst`](docs/source/Installation%20Guide.rst) |
 | **Runnable examples** | [`Examples/`](Examples/) — basic, intermediate, advanced tracks |
-| **Architecture** | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| **Package layout** | [README section](#package-layout) |
 | **Release history** | [`CHANGELOG.md`](CHANGELOG.md) |
 
 The `Examples/` tree is the fastest way in. Start at `Examples/basic_examples/` (no extras required), move to `Examples/intermediate_examples/`, then `Examples/advanced_examples/` for the full GPU + vision pipelines.
@@ -196,16 +360,48 @@ The full release notes are in [CHANGELOG.md](CHANGELOG.md). Highlights:
 
 ## Performance
 
-GPU vs CPU on the bundled `Benchmark/` suite, RTX 3060 + Ryzen 7, NumPy 2.2 + CuPy 13:
+Numbers below come from artifacts generated by the bundled `Benchmark/` suite. Hardware: 6-DOF xArm6, CPU path (no CUDA), Python 3.10.
 
-| Workload | Problem size | Speedup |
+### CPU latencies (per call)
+
+From a local `accuracy_benchmark_results/accuracy_benchmark_results.json` artifact generated by `python -m Benchmark.accuracy_benchmark`:
+
+| Component | Mean time | Accuracy |
 |---|---|---|
-| Joint trajectory (quintic) | N = 5,000 × 6 joints | ~45× |
-| Batch trajectory generation | 64 trajectories × N = 1,000 | ~22× |
-| Inverse dynamics over trajectory | N = 10,000 | ~110× |
-| Monte-Carlo workspace | 50,000 samples | ~12× |
+| Forward kinematics | **0.29 ms** | 100 % success, consistency error 0.0 |
+| Jacobian | **0.27 ms** | 100 % success |
+| Mass matrix + Coriolis + gravity | **1.19 ms** | consistency 2.8 × 10⁻¹⁵ |
+| Inverse dynamics | **1.19 ms** | 100 % success |
+| Forward dynamics | **1.17 ms** | 100 % success |
+| Trajectory planning (N = 200, quintic) | **0.053 ms** | boundary err 2.1 × 10⁻⁷ |
+| Trajectory planning (N = 500, cubic) | **0.060 ms** | boundary err 2.0 × 10⁻⁷ |
+| PID control step | **0.008 ms** | 100 % success |
+| Singularity detection | **0.83 ms** | 100 % known-singular detection |
 
-The planner auto-routes to CPU below the `cuda_threshold` (default 200 waypoints) so small problems don't pay PCIe transfer overhead. Reproduce locally with `python -m ManipulaPy.Benchmark.quick_benchmark`.
+### IK solver comparison (50 random reachable targets, CPU)
+
+From `Benchmark/ik_branch_benchmark_results.json` — v1.3.2 production code path:
+
+| Solver | Success rate | Median | Mean | p95 |
+|---|---:|---:|---:|---:|
+| `iterative_inverse_kinematics` (DLS) | 90 % | **11 ms** | 210 ms | 1929 ms |
+| `smart_inverse_kinematics` | 96 % | **29 ms** | 1870 ms | 5944 ms |
+| `robust_inverse_kinematics` | 96 % | **27 ms** | 908 ms | — |
+
+Median is the right number for typical poses; mean is dragged up by the long tail of hard targets that hit the max-iterations cap. `smart_inverse_kinematics` has the highest success rate but pays for it in retries — pick by your latency vs. coverage budget.
+
+### GPU acceleration
+
+With the `[cuda]` extra installed (`pip install "ManipulaPy[cuda]"`), the trajectory planner, batch trajectory generator, inverse dynamics over a trajectory, and Monte-Carlo workspace sampler all route through Numba / CuPy CUDA kernels. The planner falls back to CPU below its adaptive `N * joints` threshold so small problems don't pay PCIe transfer overhead.
+
+Speedups are workload- and GPU-dependent — reproduce on your own hardware with:
+
+```bash
+python -m Benchmark.performance_benchmark   # full CPU vs GPU sweep
+python -m Benchmark.quick_benchmark         # CI-friendly subset
+```
+
+The full benchmark suite (`Benchmark/README.MD`) covers kinematics, dynamics, trajectory planning, control, vision, and singularity analysis across problem sizes from N = 100 to N = 50,000.
 
 ---
 
@@ -216,26 +412,26 @@ Bug reports, feature requests, and pull requests welcome. The flow is documented
 1. Fork → branch → make the change → `python -m pytest tests/ -q` should be green.
 2. New behavior needs a regression test in `tests/test_v132_regressions.py` (or a sibling file).
 3. Surgical edits over speculative refactors — see CLAUDE.md if you're collaborating with an AI assistant.
-4. Open a PR against `main`. CI runs Python 3.8 – 3.12.
+4. Open a PR against `main`. CI runs Python 3.9 – 3.12.
 
 ---
 
 ## Citation
 
-If you use ManipulaPy in academic work, please cite:
+If you use ManipulaPy in academic work, please cite the JOSS paper:
 
 ```bibtex
-@software{manipulapy2026,
-  title   = {ManipulaPy: A Comprehensive Python Package for Robotic Manipulator Analysis and Control},
-  author  = {Mohamed Aboelnasr},
-  year    = {2026},
-  url     = {https://github.com/boelnasr/ManipulaPy},
-  version = {1.3.2},
-  license = {AGPL-3.0-or-later}
+@article{aboelnasr2025manipulapy,
+  title   = {ManipulaPy: A GPU-Accelerated Python Framework for Robotic Manipulation, Perception, and Control},
+  author  = {AboElNasr, M. I. M.},
+  journal = {Journal of Open Source Software},
+  year    = {2025},
+  note    = {Submission in review},
+  url     = {https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa}
 }
 ```
 
-A JOSS paper is in review — [submission status](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa).
+Paper source: [`paper/paper.md`](paper/paper.md) · review status: [JOSS submission e0e68c2](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa).
 
 ---
 
