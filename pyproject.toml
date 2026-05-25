@@ -416,7 +416,7 @@ output = "coverage.json"
 
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311"]
+target-version = ["py39", "py310", "py311", "py312"]
 include = "\\.pyi?$"
 extend-exclude = '''
 /(
@@ -479,7 +479,7 @@ skip_glob = [
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -515,7 +515,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py39"
 line-length = 88
 select = [
     "E",  # pycodestyle errors
@@ -581,7 +581,7 @@ wrap-descriptions = 88
 legacy_tox_ini = """
 [tox]
 isolated_build = true
-envlist = py38,py39,py310,py311,coverage,docs,lint
+envlist = py39,py310,py311,py312,coverage,docs,lint
 
 [testenv]
 extras = 
