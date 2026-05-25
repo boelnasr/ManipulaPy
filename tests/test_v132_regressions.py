@@ -40,6 +40,7 @@ class TestUtilsRegressions(unittest.TestCase):
 
 class TestDynamicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/dynamics.py bugs."""
+
     def test_mass_matrix_2r_planar_arm_against_analytical(self):
         """Verify mass matrix against analytical 2R planar arm.
 
@@ -59,14 +60,16 @@ class TestDynamicsRegressions(unittest.TestCase):
 
         # 2R planar arm in space frame: joints rotate about z axis
         omega_list = np.array([[0, 0, 1], [0, 0, 1]]).T  # (3, 2)
-        r_list = np.array([[0, 0, 0], [L1, 0, 0]]).T     # joint locations
+        r_list = np.array([[0, 0, 0], [L1, 0, 0]]).T  # joint locations
         M_list = np.eye(4)
         M_list[0, 3] = L1 + L2  # End-effector at full extension
 
         # Per-link CoM transforms in zero config: link 1's CoM at (L1, 0, 0),
         # link 2's CoM at (L1+L2, 0, 0)
-        M_link1_com = np.eye(4); M_link1_com[0, 3] = L1
-        M_link2_com = np.eye(4); M_link2_com[0, 3] = L1 + L2
+        M_link1_com = np.eye(4)
+        M_link1_com[0, 3] = L1
+        M_link2_com = np.eye(4)
+        M_link2_com[0, 3] = L1 + L2
         Mlist_per_link = [M_link1_com, M_link2_com]
 
         # Spatial inertia: point mass m has G = diag(0, 0, 0, m, m, m) in body frame
@@ -93,16 +96,18 @@ class TestDynamicsRegressions(unittest.TestCase):
         M = dyn.mass_matrix(theta)
 
         c2 = np.cos(theta[1])
-        M_expected = np.array([
-            [m1 * L1**2 + m2 * (L1**2 + L2**2 + 2 * L1 * L2 * c2),
-            m2 * (L2**2 + L1 * L2 * c2)],
-            [m2 * (L2**2 + L1 * L2 * c2),
-            m2 * L2**2],
-        ])
+        M_expected = np.array(
+            [
+                [
+                    m1 * L1**2 + m2 * (L1**2 + L2**2 + 2 * L1 * L2 * c2),
+                    m2 * (L2**2 + L1 * L2 * c2),
+                ],
+                [m2 * (L2**2 + L1 * L2 * c2), m2 * L2**2],
+            ]
+        )
 
         np.testing.assert_array_almost_equal(M, M_expected, decimal=4)
         self.assertTrue(np.allclose(M, M.T, atol=1e-10), "Mass matrix not symmetric")
-
 
     def test_mass_matrix_legacy_path_emits_warning(self):
         """Constructing ManipulatorDynamics without Mlist_per_link should warn."""
@@ -115,8 +120,13 @@ class TestDynamicsRegressions(unittest.TestCase):
         Glist = np.array([np.eye(6)])
 
         dyn = ManipulatorDynamics(
-            M_list=M_list, omega_list=omega_list, r_list=r_list,
-            b_list=None, S_list=None, B_list=None, Glist=Glist,
+            M_list=M_list,
+            omega_list=omega_list,
+            r_list=r_list,
+            b_list=None,
+            S_list=None,
+            B_list=None,
+            Glist=Glist,
             # Mlist_per_link omitted intentionally
         )
 
@@ -124,7 +134,7 @@ class TestDynamicsRegressions(unittest.TestCase):
             warnings.simplefilter("always")
             dyn.mass_matrix(np.array([0.0]))
             self.assertTrue(any("legacy approximation" in str(wi.message) for wi in w))
-    
+
     def test_gravity_forces_mutable_default_is_safe(self):
         import inspect
         from ManipulaPy.dynamics import ManipulatorDynamics
@@ -155,13 +165,15 @@ class TestPathPlanningRegressions(unittest.TestCase):
 
         planner = OptimizedTrajectoryPlanning.__new__(OptimizedTrajectoryPlanning)
         planner.performance_stats = {
-            "cpu_calls": 0, "gpu_calls": 0,
-            "total_cpu_time": 0.0, "total_gpu_time": 0.0,
+            "cpu_calls": 0,
+            "gpu_calls": 0,
+            "total_cpu_time": 0.0,
+            "total_gpu_time": 0.0,
             "kernel_launches": 0,
         }
         pstart = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-        pend   = np.array([1.0, 0.0, 0.0], dtype=np.float32)
-        Tf, N  = 1.0, 101  # 101 samples → endpoints at indices 0 and 100
+        pend = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        Tf, N = 1.0, 101  # 101 samples → endpoints at indices 0 and 100
 
         traj_vel, traj_acc = planner._cartesian_trajectory_cpu(
             pstart, pend, Tf, N, method=5
@@ -169,19 +181,25 @@ class TestPathPlanningRegressions(unittest.TestCase):
 
         # Boundary acceleration MUST be zero for a quintic profile
         np.testing.assert_array_almost_equal(
-            traj_acc[0], [0, 0, 0], decimal=4,
-            err_msg="Quintic s_ddot(0) != 0 — boundary condition violated")
+            traj_acc[0],
+            [0, 0, 0],
+            decimal=4,
+            err_msg="Quintic s_ddot(0) != 0 — boundary condition violated",
+        )
         np.testing.assert_array_almost_equal(
-            traj_acc[-1], [0, 0, 0], decimal=4,
-            err_msg="Quintic s_ddot(Tf) != 0 — missing +120·tau^3 term")
+            traj_acc[-1],
+            [0, 0, 0],
+            decimal=4,
+            err_msg="Quintic s_ddot(Tf) != 0 — missing +120·tau^3 term",
+        )
 
         # And boundary velocity must also be zero
         np.testing.assert_array_almost_equal(
-            traj_vel[0], [0, 0, 0], decimal=4,
-            err_msg="Quintic s_dot(0) != 0")
+            traj_vel[0], [0, 0, 0], decimal=4, err_msg="Quintic s_dot(0) != 0"
+        )
         np.testing.assert_array_almost_equal(
-            traj_vel[-1], [0, 0, 0], decimal=4,
-            err_msg="Quintic s_dot(Tf) != 0")
+            traj_vel[-1], [0, 0, 0], decimal=4, err_msg="Quintic s_dot(Tf) != 0"
+        )
 
     def test_screw_list_sign_correct_via_home_fk(self):
         """At home config, FK in BOTH frames must equal M_list (the home pose).
@@ -197,8 +215,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
         urdf_path = os.path.join(
             os.path.dirname(__file__), "urdf_fixtures", "simple_arm.urdf"
         )
-        self.assertTrue(os.path.exists(urdf_path),
-                        f"Test fixture missing: {urdf_path}")
+        self.assertTrue(os.path.exists(urdf_path), f"Test fixture missing: {urdf_path}")
 
         urdf = URDFToSerialManipulator(urdf_path)
         robot = urdf.serial_manipulator
@@ -209,11 +226,17 @@ class TestPathPlanningRegressions(unittest.TestCase):
         T_body = robot.forward_kinematics(home_config, frame="body")
 
         np.testing.assert_array_almost_equal(
-            T_space, robot.M_list, decimal=6,
-            err_msg="Space-frame FK at home != M_list — S_list sign suspect")
+            T_space,
+            robot.M_list,
+            decimal=6,
+            err_msg="Space-frame FK at home != M_list — S_list sign suspect",
+        )
         np.testing.assert_array_almost_equal(
-            T_body, robot.M_list, decimal=6,
-            err_msg="Body-frame FK at home != M_list — B_list sign suspect")
+            T_body,
+            robot.M_list,
+            decimal=6,
+            err_msg="Body-frame FK at home != M_list — B_list sign suspect",
+        )
 
         # Joint motion must actually move the EE — guards against a
         # degenerate zero-screw chain that would also satisfy T == M trivially.
@@ -222,13 +245,15 @@ class TestPathPlanningRegressions(unittest.TestCase):
         T_pert = robot.forward_kinematics(theta_test, frame="space")
         self.assertFalse(
             np.allclose(T_pert, robot.M_list, atol=1e-6),
-            "FK didn't respond to joint motion — screw chain may be degenerate")
-        
+            "FK didn't respond to joint motion — screw chain may be degenerate",
+        )
 
     def test_quintic_polynomial_endpoints(self):
         """Pure math test: quintic time-scaling endpoints."""
+
         def s(tau):
             return 10 * tau**3 - 15 * tau**4 + 6 * tau**5
+
         def s_ddot(tau, Tf=1.0):
             return (60 * tau - 180 * tau**2 + 120 * tau**3) / (Tf * Tf)
 
@@ -236,7 +261,6 @@ class TestPathPlanningRegressions(unittest.TestCase):
         self.assertAlmostEqual(s(1.0), 1.0)
         self.assertAlmostEqual(s_ddot(0.0), 0.0)
         self.assertAlmostEqual(s_ddot(1.0), 0.0)
-
 
     def test_quintic_trajectory_zero_endpoint_acceleration(self):
         from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
@@ -248,29 +272,37 @@ class TestPathPlanningRegressions(unittest.TestCase):
             pass
 
         planner = OptimizedTrajectoryPlanning(
-            MockManip(), urdf_path=None, dynamics=MockDyn(),
+            MockManip(),
+            urdf_path=None,
+            dynamics=MockDyn(),
             joint_limits=[(-3.14, 3.14)] * 6,
         )
         thetastart = np.zeros(6)
         thetaend = np.array([1.0, 0.5, 0.3, 0.2, 0.1, 0.0])
         traj = planner.joint_trajectory(thetastart, thetaend, Tf=2.0, N=100, method=5)
 
-        np.testing.assert_array_almost_equal(traj["accelerations"][0], np.zeros(6), decimal=4)
-        np.testing.assert_array_almost_equal(traj["accelerations"][-1], np.zeros(6), decimal=4)
-    
+        np.testing.assert_array_almost_equal(
+            traj["accelerations"][0], np.zeros(6), decimal=4
+        )
+        np.testing.assert_array_almost_equal(
+            traj["accelerations"][-1], np.zeros(6), decimal=4
+        )
+
     def test_plot_tcp_trajectory_does_not_shadow_time_module(self):
         import inspect
         from ManipulaPy import path_planning
 
         src = inspect.getsource(path_planning)
         self.assertNotIn(
-            "time = np.arange", src,
+            "time = np.arange",
+            src,
             "Variable 'time' shadows the time module — rename to time_array",
         )
 
 
 class TestControlRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/control.py bugs."""
+
     def test_cartesian_space_control_dimensions(self):
         from ManipulaPy.urdf_processor import URDFToSerialManipulator
         from ManipulaPy.control import ManipulatorController
@@ -330,18 +362,36 @@ class TestControlRegressions(unittest.TestCase):
 
     def test_pid_control_resets_eint_on_dof_change(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         # First call: 6-DOF
         Kp, Ki, Kd = np.eye(6), np.eye(6), np.eye(6)
-        ctrl.pid_control(np.ones(6), np.zeros(6), np.zeros(6), np.zeros(6),
-                         dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd)
+        ctrl.pid_control(
+            np.ones(6),
+            np.zeros(6),
+            np.zeros(6),
+            np.zeros(6),
+            dt=0.01,
+            Kp=Kp,
+            Ki=Ki,
+            Kd=Kd,
+        )
         self.assertEqual(ctrl.eint.shape, (6,))
         # Second call: 2-DOF
         Kp2, Ki2, Kd2 = np.eye(2), np.eye(2), np.eye(2)
-        ctrl.pid_control(np.ones(2), np.zeros(2), np.zeros(2), np.zeros(2),
-                         dt=0.01, Kp=Kp2, Ki=Ki2, Kd=Kd2)
-        self.assertEqual(ctrl.eint.shape, (2,),
-                         "eint must reset when input DOF changes")
+        ctrl.pid_control(
+            np.ones(2),
+            np.zeros(2),
+            np.zeros(2),
+            np.zeros(2),
+            dt=0.01,
+            Kp=Kp2,
+            Ki=Ki2,
+            Kd=Kd2,
+        )
+        self.assertEqual(
+            ctrl.eint.shape, (2,), "eint must reset when input DOF changes"
+        )
 
     def test_pid_control_dof_change_logs_debug_not_warning(self):
         from unittest.mock import patch
@@ -350,26 +400,46 @@ class TestControlRegressions(unittest.TestCase):
 
         ctrl = ManipulatorController(None)
         Kp, Ki, Kd = np.eye(3), np.eye(3), np.eye(3)
-        ctrl.pid_control(np.ones(3), np.zeros(3), np.zeros(3), np.zeros(3),
-                         dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd)
+        ctrl.pid_control(
+            np.ones(3),
+            np.zeros(3),
+            np.zeros(3),
+            np.zeros(3),
+            dt=0.01,
+            Kp=Kp,
+            Ki=Ki,
+            Kd=Kd,
+        )
 
-        with patch("ManipulaPy.control.logger.warning") as warning, \
-             patch("ManipulaPy.control.logger.debug") as debug:
+        with (
+            patch("ManipulaPy.control.logger.warning") as warning,
+            patch("ManipulaPy.control.logger.debug") as debug,
+        ):
             Kp2, Ki2, Kd2 = np.eye(2), np.eye(2), np.eye(2)
-            ctrl.pid_control(np.ones(2), np.zeros(2), np.zeros(2), np.zeros(2),
-                             dt=0.01, Kp=Kp2, Ki=Ki2, Kd=Kd2)
+            ctrl.pid_control(
+                np.ones(2),
+                np.zeros(2),
+                np.zeros(2),
+                np.zeros(2),
+                dt=0.01,
+                Kp=Kp2,
+                Ki=Ki2,
+                Kd=Kd2,
+            )
 
         warning.assert_not_called()
         debug.assert_called_once()
 
     def test_ziegler_nichols_tuning_rejects_zero_period(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         with self.assertRaises(ValueError):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=0.0, kind="PID")
 
     def test_ziegler_nichols_p_allows_zero_period(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
 
         Kp, Ki, Kd = ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=0.0, kind="P")
@@ -380,12 +450,14 @@ class TestControlRegressions(unittest.TestCase):
 
     def test_ziegler_nichols_tuning_rejects_negative_period(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         with self.assertRaises(ValueError):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=-1.0, kind="PID")
 
     def test_ziegler_nichols_tuning_rejects_nonfinite_period(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         with self.assertRaises(ValueError):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=float("nan"), kind="PID")
@@ -394,15 +466,28 @@ class TestControlRegressions(unittest.TestCase):
 
     def test_pid_control_integral_windup_clamped_when_set(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         desired = np.array([1.0, 1.0])
-        actual = np.array([0.0, 0.0])  # constant 1.0 rad error, controller cannot move plant
+        actual = np.array(
+            [0.0, 0.0]
+        )  # constant 1.0 rad error, controller cannot move plant
         Kp, Ki, Kd = np.eye(2), np.eye(2), np.eye(2)
         for _ in range(1000):
-            ctrl.pid_control(desired, np.zeros(2), actual, np.zeros(2),
-                             dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd, i_clamp=5.0)
-        self.assertTrue(np.all(np.abs(ctrl.eint) <= 5.0 + 1e-9),
-                        f"eint={ctrl.eint} exceeded clamp")
+            ctrl.pid_control(
+                desired,
+                np.zeros(2),
+                actual,
+                np.zeros(2),
+                dt=0.01,
+                Kp=Kp,
+                Ki=Ki,
+                Kd=Kd,
+                i_clamp=5.0,
+            )
+        self.assertTrue(
+            np.all(np.abs(ctrl.eint) <= 5.0 + 1e-9), f"eint={ctrl.eint} exceeded clamp"
+        )
 
     def test_pid_control_rejects_invalid_i_clamp(self):
         from ManipulaPy.control import ManipulatorController
@@ -411,9 +496,17 @@ class TestControlRegressions(unittest.TestCase):
         for bad_clamp in (-5.0, 0.0, float("nan"), float("inf")):
             with self.subTest(i_clamp=bad_clamp):
                 with self.assertRaises(ValueError):
-                    ctrl.pid_control(np.ones(2), np.zeros(2), np.zeros(2), np.zeros(2),
-                                     dt=0.01, Kp=np.eye(2), Ki=np.eye(2),
-                                     Kd=np.eye(2), i_clamp=bad_clamp)
+                    ctrl.pid_control(
+                        np.ones(2),
+                        np.zeros(2),
+                        np.zeros(2),
+                        np.zeros(2),
+                        dt=0.01,
+                        Kp=np.eye(2),
+                        Ki=np.eye(2),
+                        Kd=np.eye(2),
+                        i_clamp=bad_clamp,
+                    )
 
     def test_computed_torque_control_rejects_invalid_i_clamp(self):
         from ManipulaPy.control import ManipulatorController
@@ -428,22 +521,31 @@ class TestControlRegressions(unittest.TestCase):
         ctrl = ManipulatorController(Dynamics())
         with self.assertRaises(ValueError):
             ctrl.computed_torque_control(
-                np.ones(2), np.zeros(2), np.zeros(2),
-                np.zeros(2), np.zeros(2), np.array([0, 0, -9.81]),
-                dt=0.01, Kp=np.eye(2), Ki=np.eye(2), Kd=np.eye(2),
+                np.ones(2),
+                np.zeros(2),
+                np.zeros(2),
+                np.zeros(2),
+                np.zeros(2),
+                np.array([0, 0, -9.81]),
+                dt=0.01,
+                Kp=np.eye(2),
+                Ki=np.eye(2),
+                Kd=np.eye(2),
                 i_clamp=float("nan"),
             )
 
     def test_pid_control_unclamped_when_clamp_none(self):
         """Default (i_clamp=None) preserves existing accumulation behavior."""
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         desired = np.array([1.0])
         actual = np.array([0.0])
         Kp, Ki, Kd = np.eye(1), np.eye(1), np.eye(1)
         for _ in range(100):
-            ctrl.pid_control(desired, np.zeros(1), actual, np.zeros(1),
-                             dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd)
+            ctrl.pid_control(
+                desired, np.zeros(1), actual, np.zeros(1), dt=0.01, Kp=Kp, Ki=Ki, Kd=Kd
+            )
         # 100 steps x 1.0 error x 0.01 dt = 1.0 expected
         np.testing.assert_allclose(ctrl.eint, [1.0], atol=1e-9)
 
@@ -466,7 +568,9 @@ class TestControlRegressions(unittest.TestCase):
         np.testing.assert_allclose(ctrl.eint, [0.01, 0.01])
         np.testing.assert_allclose(tau, [1.01, 1.01])
 
-    def test_computed_torque_control_initializes_integral_as_float_for_integer_inputs(self):
+    def test_computed_torque_control_initializes_integral_as_float_for_integer_inputs(
+        self,
+    ):
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
@@ -496,6 +600,7 @@ class TestControlRegressions(unittest.TestCase):
 
     def test_kalman_filter_update_rejects_shape_mismatch(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         ctrl.x_hat = np.zeros(4)
         ctrl.P = np.eye(4)
@@ -507,6 +612,7 @@ class TestControlRegressions(unittest.TestCase):
 
     def test_kalman_filter_update_rejects_bad_R_shape(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         ctrl.x_hat = np.zeros(4)
         ctrl.P = np.eye(4)
@@ -518,6 +624,7 @@ class TestControlRegressions(unittest.TestCase):
 
     def test_kalman_filter_update_rejects_column_vector_z(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         ctrl.x_hat = np.zeros(4)
         ctrl.P = np.eye(4)
@@ -526,6 +633,7 @@ class TestControlRegressions(unittest.TestCase):
 
     def test_kalman_filter_predict_rejects_bad_Q_shape(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         ctrl.x_hat = np.zeros(4)
         ctrl.P = np.eye(4)
@@ -533,9 +641,13 @@ class TestControlRegressions(unittest.TestCase):
         Q_wrong = np.eye(3)
         with self.assertRaises(ValueError):
             ctrl.kalman_filter_predict(
-                np.zeros(2), np.zeros(2), np.zeros(2),
-                np.array([0, 0, -9.81]), np.zeros(6),
-                dt=0.01, Q=Q_wrong,
+                np.zeros(2),
+                np.zeros(2),
+                np.zeros(2),
+                np.array([0, 0, -9.81]),
+                np.zeros(6),
+                dt=0.01,
+                Q=Q_wrong,
             )
 
     def test_kalman_filters_explicitly_convert_real_cupy_like_arrays(self):
@@ -560,8 +672,10 @@ class TestControlRegressions(unittest.TestCase):
                 return np.zeros_like(thetalist)
 
         ctrl = ManipulatorController(Dynamics())
-        with patch.object(control, "CUPY_AVAILABLE", True), \
-             patch.object(control, "cp", SimpleNamespace(ndarray=ExplicitArray)):
+        with (
+            patch.object(control, "CUPY_AVAILABLE", True),
+            patch.object(control, "cp", SimpleNamespace(ndarray=ExplicitArray)),
+        ):
             ctrl.kalman_filter_predict(
                 ExplicitArray([0.0, 0.0]),
                 ExplicitArray([0.0, 0.0]),
@@ -586,7 +700,9 @@ class TestControlRegressions(unittest.TestCase):
         evaluated at class-body time and cp is None when cupy is missing.
         """
         import subprocess, sys, textwrap
-        script = textwrap.dedent("""
+
+        script = textwrap.dedent(
+            """
             import builtins, importlib, sys
             real = builtins.__import__
             def fake(name, *a, **k):
@@ -596,28 +712,43 @@ class TestControlRegressions(unittest.TestCase):
             builtins.__import__ = fake
             sys.modules.pop('ManipulaPy.control', None)
             importlib.import_module('ManipulaPy.control')
-        """)
-        result = subprocess.run([sys.executable, "-c", script],
-                                capture_output=True, text=True,
-                                encoding="utf-8", errors="replace")
-        self.assertEqual(result.returncode, 0,
-                         f"control.py failed to import without cupy:\n{result.stderr}")
+        """
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"control.py failed to import without cupy:\n{result.stderr}",
+        )
 
     def test_settling_time_returns_first_settled_time_not_last(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         # Monotonic settled at t=1.0 onward
         t = np.array([0.0, 1.0, 2.0, 3.0])
         r = np.array([0.0, 1.0, 1.0, 1.0])
-        self.assertAlmostEqual(ctrl.calculate_settling_time(t, r, 1.0, tolerance=0.02), 1.0)
+        self.assertAlmostEqual(
+            ctrl.calculate_settling_time(t, r, 1.0, tolerance=0.02), 1.0
+        )
 
     def test_settling_time_handles_negative_setpoint(self):
         from ManipulaPy.control import ManipulatorController
+
         ctrl = ManipulatorController(None)
         t = np.array([0.0, 1.0, 2.0, 3.0])
         r = np.array([0.0, -1.0, -1.0, -1.0])
         # Symmetric to the positive case — should return 1.0, not time[-1]
-        self.assertAlmostEqual(ctrl.calculate_settling_time(t, r, -1.0, tolerance=0.02), 1.0)
+        self.assertAlmostEqual(
+            ctrl.calculate_settling_time(t, r, -1.0, tolerance=0.02), 1.0
+        )
+
 
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""
@@ -692,7 +823,9 @@ class TestPotentialFieldRegressions(unittest.TestCase):
     def test_repulsive_potential_when_at_obstacle(self):
         from ManipulaPy.potential_field import PotentialField
 
-        pf = PotentialField(attractive_gain=1.0, repulsive_gain=1.0, influence_distance=0.5)
+        pf = PotentialField(
+            attractive_gain=1.0, repulsive_gain=1.0, influence_distance=0.5
+        )
         q = np.array([1.0, 1.0, 1.0])
         p_val = pf.compute_repulsive_potential(q, [q.copy()])
         self.assertTrue(np.isfinite(p_val))
@@ -700,7 +833,9 @@ class TestPotentialFieldRegressions(unittest.TestCase):
     def test_repulsive_gradient_when_at_obstacle(self):
         from ManipulaPy.potential_field import PotentialField
 
-        pf = PotentialField(attractive_gain=1.0, repulsive_gain=1.0, influence_distance=0.5)
+        pf = PotentialField(
+            attractive_gain=1.0, repulsive_gain=1.0, influence_distance=0.5
+        )
         q = np.array([1.0, 1.0, 1.0])
         grad = pf.compute_gradient(q, np.zeros(3), [q.copy()])
         self.assertTrue(np.all(np.isfinite(grad)))
@@ -709,16 +844,22 @@ class TestPotentialFieldRegressions(unittest.TestCase):
         """When q == obstacle exactly, gradient must be nonzero so robot can escape."""
         from ManipulaPy.potential_field import PotentialField
 
-        pf = PotentialField(attractive_gain=0.0, repulsive_gain=1.0, influence_distance=0.5)
+        pf = PotentialField(
+            attractive_gain=0.0, repulsive_gain=1.0, influence_distance=0.5
+        )
         q = np.array([1.0, 1.0, 1.0])
         grad = pf.compute_gradient(q, np.zeros(3), [q.copy()])
         # Must be nonzero so -grad gives a nonzero force
-        self.assertGreater(np.linalg.norm(grad), 0, "Robot stuck at obstacle has no escape force")
+        self.assertGreater(
+            np.linalg.norm(grad), 0, "Robot stuck at obstacle has no escape force"
+        )
 
     def test_repulsive_gradient_at_obstacle_escape_is_bounded(self):
         from ManipulaPy.potential_field import PotentialField
 
-        pf = PotentialField(attractive_gain=0.0, repulsive_gain=1.0, influence_distance=0.5)
+        pf = PotentialField(
+            attractive_gain=0.0, repulsive_gain=1.0, influence_distance=0.5
+        )
         q = np.array([1.0, 1.0, 1.0])
 
         grad = pf.compute_gradient(q, np.zeros(3), [q.copy()])
@@ -804,9 +945,11 @@ class TestSimRegressions(unittest.TestCase):
             np.array([1.0, 0, 0, 0, 0, 0]),
         ]
 
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p") as mock_p, \
-             patch("ManipulaPy.sim.time.sleep"):
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p") as mock_p,
+            patch("ManipulaPy.sim.time.sleep"),
+        ):
             mock_p.getJointState.return_value = (1.0, 0.0)  # position, velocity
             mock_p.stepSimulation = MagicMock()
             mock_p.getNumJoints.return_value = 6
@@ -824,7 +967,9 @@ class TestSimRegressions(unittest.TestCase):
 
             sim.run_controller(desired_positions)
 
-            actual_calls = [call.args[0] for call in sim.set_joint_positions.call_args_list]
+            actual_calls = [
+                call.args[0] for call in sim.set_joint_positions.call_args_list
+            ]
             self.assertEqual(len(actual_calls), len(desired_positions))
             for actual, expected in zip(actual_calls, desired_positions):
                 np.testing.assert_array_equal(actual, expected)
@@ -835,9 +980,11 @@ class TestSimRegressions(unittest.TestCase):
 
         from ManipulaPy.sim import Simulation
 
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p"), \
-             patch("ManipulaPy.sim.time.sleep"):
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p"),
+            patch("ManipulaPy.sim.time.sleep"),
+        ):
             sim = Simulation.__new__(Simulation)
             sim.logger = MagicMock()
             sim.robot_id = 1
@@ -856,9 +1003,11 @@ class TestSimRegressions(unittest.TestCase):
 
         from ManipulaPy.sim import Simulation
 
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p"), \
-             patch("ManipulaPy.sim.time.sleep"):
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p"),
+            patch("ManipulaPy.sim.time.sleep"),
+        ):
             sim = Simulation.__new__(Simulation)
             sim.logger = MagicMock()
             sim.robot_id = 1
@@ -877,9 +1026,11 @@ class TestSimRegressions(unittest.TestCase):
 
         from ManipulaPy.sim import Simulation
 
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p"), \
-             patch("ManipulaPy.sim.time.sleep"):
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p"),
+            patch("ManipulaPy.sim.time.sleep"),
+        ):
             sim = Simulation.__new__(Simulation)
             sim.logger = MagicMock()
             sim.robot_id = 1
@@ -902,9 +1053,11 @@ class TestSimRegressions(unittest.TestCase):
         second_waypoint = np.array([0.5, 0, 0, 0, 0, 0])
         desired_positions = (waypoint for waypoint in [first_waypoint, second_waypoint])
 
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p") as mock_p, \
-             patch("ManipulaPy.sim.time.sleep"):
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p") as mock_p,
+            patch("ManipulaPy.sim.time.sleep"),
+        ):
             mock_p.stepSimulation = MagicMock()
             mock_p.getNumJoints.return_value = 6
             mock_p.getLinkState.return_value = ((0, 0, 0),) * 5
@@ -967,9 +1120,11 @@ class TestSimRegressions(unittest.TestCase):
         for method_name, exercise in cases:
             with self.subTest(method=method_name):
                 sim = make_sim()
-                with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-                     patch("ManipulaPy.sim.p") as mock_p, \
-                     patch("ManipulaPy.sim.time.sleep"):
+                with (
+                    patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+                    patch("ManipulaPy.sim.p") as mock_p,
+                    patch("ManipulaPy.sim.time.sleep"),
+                ):
                     mock_p.stepSimulation.side_effect = RuntimeError("boom")
 
                     with self.assertRaisesRegex(RuntimeError, "boom"):
@@ -997,14 +1152,23 @@ class TestSimRegressions(unittest.TestCase):
         """Passing an existing physics_client must still load plane + robot."""
         from unittest.mock import patch, MagicMock
         from ManipulaPy.sim import Simulation
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p") as mock_p, \
-             patch("ManipulaPy.sim.pybullet_data") as mock_pd:
-            mock_p.loadURDF.side_effect = [101, 202]   # plane, robot
+
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p") as mock_p,
+            patch("ManipulaPy.sim.pybullet_data") as mock_pd,
+        ):
+            mock_p.loadURDF.side_effect = [101, 202]  # plane, robot
             mock_p.getNumJoints.return_value = 6
-            mock_p.getJointInfo.side_effect = lambda r, i: (i, b"j", 0)  # 0 = JOINT_REVOLUTE
+            mock_p.getJointInfo.side_effect = lambda r, i: (
+                i,
+                b"j",
+                0,
+            )  # 0 = JOINT_REVOLUTE
             mock_p.JOINT_FIXED = 4
-            sim = Simulation("robot.urdf", joint_limits=[(-1, 1)] * 6, physics_client=42)
+            sim = Simulation(
+                "robot.urdf", joint_limits=[(-1, 1)] * 6, physics_client=42
+            )
             self.assertEqual(sim.robot_id, 202)
             self.assertEqual(sim.plane_id, 101)
             self.assertEqual(len(sim.non_fixed_joints), 6)
@@ -1015,13 +1179,16 @@ class TestSimRegressions(unittest.TestCase):
         limits don't silently fail to track."""
         from unittest.mock import MagicMock, patch
         from ManipulaPy.sim import Simulation
+
         sim = Simulation.__new__(Simulation)
         sim.logger = MagicMock()
         sim.robot_id = 1
         sim.non_fixed_joints = list(range(6))
         sim.torque_limits = None
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p") as mock_p:
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p") as mock_p,
+        ):
             sim.set_joint_positions(np.zeros(6))
             kwargs = mock_p.setJointMotorControlArray.call_args.kwargs
             self.assertIn("forces", kwargs, "forces= must be supplied")
@@ -1032,17 +1199,27 @@ class TestSimRegressions(unittest.TestCase):
         import logging
         from unittest.mock import patch, MagicMock
         from ManipulaPy.sim import Simulation
+
         # Clear any leftover handlers from prior test runs
         logging.getLogger("SimulationLogger").handlers.clear()
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p"), patch("ManipulaPy.sim.pybullet_data"):
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p"),
+            patch("ManipulaPy.sim.pybullet_data"),
+        ):
             sims = [Simulation.__new__(Simulation) for _ in range(3)]
             for s in sims:
                 s.logger = s.setup_logger()
-            handler_count = len([h for h in sims[0].logger.handlers
-                                 if isinstance(h, logging.StreamHandler)])
-            self.assertEqual(handler_count, 1,
-                             f"Expected 1 stream handler, got {handler_count}")
+            handler_count = len(
+                [
+                    h
+                    for h in sims[0].logger.handlers
+                    if isinstance(h, logging.StreamHandler)
+                ]
+            )
+            self.assertEqual(
+                handler_count, 1, f"Expected 1 stream handler, got {handler_count}"
+            )
 
     def test_capsule_line_uses_inline_axis_angle_quaternion(self):
         """_capsule_line must not depend on p.getQuaternionFromAxisAngle —
@@ -1119,6 +1296,7 @@ class TestSimPybulletGuards(unittest.TestCase):
     def _make_bare_sim(self):
         from unittest.mock import MagicMock
         from ManipulaPy.sim import Simulation
+
         sim = Simulation.__new__(Simulation)
         sim.logger = MagicMock()
         sim.physics_client = 1
@@ -1134,13 +1312,16 @@ class TestSimPybulletGuards(unittest.TestCase):
 
     def test_public_methods_raise_importerror_without_pybullet(self):
         from unittest.mock import patch
+
         for method_name, args_factory in self._METHODS_AND_ARGS:
             with self.subTest(method=method_name):
                 sim = self._make_bare_sim()
                 method = getattr(sim, method_name)
                 args = args_factory()
-                with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", False), \
-                     patch("ManipulaPy.sim.p", None):
+                with (
+                    patch("ManipulaPy.sim._PYBULLET_AVAILABLE", False),
+                    patch("ManipulaPy.sim.p", None),
+                ):
                     with self.assertRaises(ImportError) as ctx:
                         method(*args)
                 self.assertIn(
@@ -1197,6 +1378,7 @@ class TestUrdfRegressions(unittest.TestCase):
         with self.assertLogs("ManipulaPy.urdf.types", level="WARNING") as cm:
             mesh._load_mesh()
         self.assertTrue(any("not found" in msg.lower() for msg in cm.output))
+
     def test_package_resolver_refuses_ambiguous_package_uri(self):
         import tempfile
         from pathlib import Path
@@ -1270,7 +1452,9 @@ class TestUrdfRegressions(unittest.TestCase):
             mesh.parent.mkdir(parents=True)
             mesh.write_text("ros mesh")
 
-            with patch.dict(os.environ, {"ROS_PACKAGE_PATH": str(ros_root)}, clear=False):
+            with patch.dict(
+                os.environ, {"ROS_PACKAGE_PATH": str(ros_root)}, clear=False
+            ):
                 resolver = PackageResolver(use_ros=False)
                 resolved = resolver.resolve("package://demo_pkg/meshes/base.stl")
 
@@ -1473,8 +1657,12 @@ class TestUrdfRegressions(unittest.TestCase):
                 raise ImportError("blocked trimesh")
             return real_import(name, *args, **kwargs)
 
-        with patch("builtins.__import__", side_effect=fake_import), \
-             self.assertLogs("ManipulaPy.urdf.geometry.mesh_loader", level="WARNING") as cm:
+        with (
+            patch("builtins.__import__", side_effect=fake_import),
+            self.assertLogs(
+                "ManipulaPy.urdf.geometry.mesh_loader", level="WARNING"
+            ) as cm,
+        ):
             mesh_loader._load_with_trimesh(Path("/tmp/left/robot.dae"))
             mesh_loader._load_with_trimesh(Path("/tmp/right/robot.dae"))
 
@@ -1496,8 +1684,12 @@ class TestUrdfRegressions(unittest.TestCase):
                 raise ImportError("blocked trimesh")
             return real_import(name, *args, **kwargs)
 
-        with patch("builtins.__import__", side_effect=fake_import), \
-            self.assertLogs("ManipulaPy.urdf.geometry.mesh_loader", level="WARNING") as cm:
+        with (
+            patch("builtins.__import__", side_effect=fake_import),
+            self.assertLogs(
+                "ManipulaPy.urdf.geometry.mesh_loader", level="WARNING"
+            ) as cm,
+        ):
             result = mesh_loader._load_with_trimesh(Path("robot.dae"))
 
         self.assertIsNone(result)
@@ -1514,6 +1706,7 @@ class TestUrdfRegressions(unittest.TestCase):
         and value invariants.
         """
         from pathlib import Path
+
         try:
             from ManipulaPy.urdf_processor import URDFToSerialManipulator
             from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
@@ -1529,7 +1722,8 @@ class TestUrdfRegressions(unittest.TestCase):
             ("manipulator_dynamics", urdf.manipulator_dynamics.omega_list),
         ):
             self.assertEqual(
-                omega.shape, (3, 6),
+                omega.shape,
+                (3, 6),
                 f"{path_label}.omega_list expected (3, 6) for UR5, got {omega.shape}",
             )
             norms = np.linalg.norm(omega, axis=0)
@@ -1550,9 +1744,17 @@ class TestUrdfRegressions(unittest.TestCase):
 
         geometry = Mesh(filename="/missing/mesh.stl", scale=[1, 1, 1])
 
-        with patch.object(trimesh_viz.trimesh, "load", side_effect=ValueError("bad mesh")), \
-             patch.object(trimesh_viz.trimesh.creation, "box", return_value=MagicMock()) as box, \
-             self.assertLogs("ManipulaPy.urdf.visualization.trimesh_viz", level="WARNING") as cm:
+        with (
+            patch.object(
+                trimesh_viz.trimesh, "load", side_effect=ValueError("bad mesh")
+            ),
+            patch.object(
+                trimesh_viz.trimesh.creation, "box", return_value=MagicMock()
+            ) as box,
+            self.assertLogs(
+                "ManipulaPy.urdf.visualization.trimesh_viz", level="WARNING"
+            ) as cm,
+        ):
             result = trimesh_viz._geometry_to_trimesh(geometry)
 
         self.assertIsNotNone(result)
@@ -1569,6 +1771,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
     where they exist, or by re-implementing the kernel math in pure Python
     and asserting it matches the corrected formula.
     """
+
     def test_trajectory_cpu_fallback_matches_quintic_reference(self):
         """CPU fallback locks in the per-timestep formula used by CUDA kernels."""
         from ManipulaPy.cuda_kernels import trajectory_cpu_fallback
@@ -1595,7 +1798,6 @@ class TestCudaKernelRegressions(unittest.TestCase):
         np.testing.assert_array_almost_equal(acc[0], np.zeros(6), decimal=6)
         np.testing.assert_array_almost_equal(acc[-1], np.zeros(6), decimal=6)
 
-
     def test_trajectory_cpu_fallback_linear_method_is_linear(self):
         """method=1 must be true linear scaling, not cubic fall-through."""
         from ManipulaPy.cuda_kernels import trajectory_cpu_fallback
@@ -1619,9 +1821,10 @@ class TestCudaKernelRegressions(unittest.TestCase):
             dtype=np.float32,
         )
         np.testing.assert_allclose(pos, expected_pos, rtol=1e-6, atol=1e-6)
-        np.testing.assert_allclose(vel, np.array([[0.5, 1.0]] * 5), rtol=1e-6, atol=1e-6)
+        np.testing.assert_allclose(
+            vel, np.array([[0.5, 1.0]] * 5), rtol=1e-6, atol=1e-6
+        )
         np.testing.assert_array_equal(acc, np.zeros_like(acc))
-
 
     def test_cuda_kernel_variants_handle_linear_method(self):
         """All trajectory kernel variants must implement linear method (method=1)."""
@@ -1643,14 +1846,21 @@ class TestCudaKernelRegressions(unittest.TestCase):
             if pattern not in src:
                 continue
             start = src.index(pattern)
-            end = src.index("\n    @cuda.jit", start) if "\n    @cuda.jit" in src[start:] else len(src)
+            end = (
+                src.index("\n    @cuda.jit", start)
+                if "\n    @cuda.jit" in src[start:]
+                else len(src)
+            )
             kernel_src = src[start:end]
             # Should have a "Linear" branch or s = tau assignment with no transformation
-            has_linear = ("# Linear" in kernel_src or "else:  # Linear" in kernel_src
-                        or "s = tau\n" in kernel_src)
+            has_linear = (
+                "# Linear" in kernel_src
+                or "else:  # Linear" in kernel_src
+                or "s = tau\n" in kernel_src
+            )
             self.assertTrue(
                 has_linear,
-                f"{kernel_name} missing linear method branch — non-quintic falls through to cubic"
+                f"{kernel_name} missing linear method branch — non-quintic falls through to cubic",
             )
 
     # ------------------------------------------------------------------
@@ -1675,7 +1885,8 @@ class TestCudaKernelRegressions(unittest.TestCase):
         """
         body = self._kernel_source("cartesian_trajectory_kernel")
         self.assertNotIn(
-            "cuda.shared.array", body,
+            "cuda.shared.array",
+            body,
             "cartesian_trajectory_kernel still uses shared-memory scaling — "
             "thread (0,0) wrote scaling for its own t_idx, other threads read it.",
         )
@@ -1685,7 +1896,8 @@ class TestCudaKernelRegressions(unittest.TestCase):
         """The quintic position formula must include 6 * tau^5, not 6 * tau * tau^3 (=tau^4)."""
         body = self._kernel_source("cartesian_trajectory_kernel")
         self.assertNotIn(
-            "6.0 * tau * tau3", body,
+            "6.0 * tau * tau3",
+            body,
             "cartesian_trajectory_kernel quintic position is using "
             "'6 * tau * tau3' (= 6 tau^4); correct quintic needs 6 tau^5.",
         )
@@ -1701,7 +1913,8 @@ class TestCudaKernelRegressions(unittest.TestCase):
         """
         body = self._kernel_source("cartesian_trajectory_kernel")
         self.assertIn(
-            "(1.0 - tau) * (1.0 - 2.0 * tau)", body,
+            "(1.0 - tau) * (1.0 - 2.0 * tau)",
+            body,
             "cartesian_trajectory_kernel quintic acceleration is missing the "
             "(1 - tau) factor — it would zero-cross at tau=0.5 incorrectly.",
         )
@@ -1709,7 +1922,8 @@ class TestCudaKernelRegressions(unittest.TestCase):
     def test_cartesian_kernel_supports_linear_method(self):
         body = self._kernel_source("cartesian_trajectory_kernel")
         self.assertIn(
-            "s = tau", body,
+            "s = tau",
+            body,
             "cartesian_trajectory_kernel else-branch must implement the linear "
             "method (method == 1) instead of falling through to s = 0.",
         )
@@ -1717,7 +1931,8 @@ class TestCudaKernelRegressions(unittest.TestCase):
     def test_batch_kernel_no_shared_memory_race(self):
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertNotIn(
-            "cuda.shared.array", body,
+            "cuda.shared.array",
+            body,
             "batch_trajectory_kernel still uses shared-memory scaling — same "
             "race as cartesian_trajectory_kernel.",
         )
@@ -1764,7 +1979,8 @@ class TestCudaKernelRegressions(unittest.TestCase):
         """
         body = self._kernel_source("forward_dynamics_kernel")
         self.assertNotIn(
-            "thetamat[t_idx - 1", body,
+            "thetamat[t_idx - 1",
+            body,
             "forward_dynamics_kernel still reads thetamat[t_idx - 1, j_idx] — "
             "temporal data race across parallel threads.",
         )
@@ -1806,8 +2022,11 @@ class TestCudaKernelRegressions(unittest.TestCase):
         # repulsive push must be in +x. Goal is also at +x, so attractive
         # also pulls in +x. Net force_x must be positive.
         force = tuple(-g for g in grad)
-        self.assertGreater(force[0], 0.0,
-            "repulsive force must push the robot in +x (away from obstacle).")
+        self.assertGreater(
+            force[0],
+            0.0,
+            "repulsive force must push the robot in +x (away from obstacle).",
+        )
         self.assertAlmostEqual(force[1], 0.0)
         self.assertAlmostEqual(force[2], 0.0)
 
@@ -1821,11 +2040,13 @@ class TestCudaKernelRegressions(unittest.TestCase):
 
         tree = ast.parse(inspect.getsource(cuda_kernels))
         bare_handlers = [
-            node.lineno for node in ast.walk(tree)
+            node.lineno
+            for node in ast.walk(tree)
             if isinstance(node, ast.ExceptHandler) and node.type is None
         ]
-        self.assertEqual(bare_handlers, [],
-                         f"bare except handlers at lines {bare_handlers}")
+        self.assertEqual(
+            bare_handlers, [], f"bare except handlers at lines {bare_handlers}"
+        )
 
     def test_setup_cuda_environment_respects_existing_user_values(self):
         """setup_cuda_environment must not clobber env vars the user set
@@ -1838,8 +2059,11 @@ class TestCudaKernelRegressions(unittest.TestCase):
         os.environ[key] = "1"
         try:
             setup_cuda_environment_for_40x_speedup()
-            self.assertEqual(os.environ[key], "1",
-                "setup_cuda_environment must not overwrite user-set values")
+            self.assertEqual(
+                os.environ[key],
+                "1",
+                "setup_cuda_environment must not overwrite user-set values",
+            )
         finally:
             if previous is None:
                 os.environ.pop(key, None)
@@ -1861,8 +2085,10 @@ class TestCudaKernelRegressions(unittest.TestCase):
         broken_cupy = types.ModuleType("cupy")
         broken_cupy.get_default_memory_pool = lambda: BrokenMemoryPool()
 
-        with patch.object(cuda_kernels, "CUPY_AVAILABLE", True), \
-             patch.dict(sys.modules, {"cupy": broken_cupy}):
+        with (
+            patch.object(cuda_kernels, "CUPY_AVAILABLE", True),
+            patch.dict(sys.modules, {"cupy": broken_cupy}),
+        ):
             cuda_kernels.setup_cuda_environment_for_40x_speedup()
 
 
@@ -1893,7 +2119,11 @@ class TestTestInfraRegressions(unittest.TestCase):
         import ast
         from pathlib import Path
 
-        source = Path(__file__).parent.joinpath("test_trajectory_planning.py").read_text(encoding="utf-8")
+        source = (
+            Path(__file__)
+            .parent.joinpath("test_trajectory_planning.py")
+            .read_text(encoding="utf-8")
+        )
         tree = ast.parse(source)
 
         top_level_psutil = []
@@ -1906,7 +2136,8 @@ class TestTestInfraRegressions(unittest.TestCase):
                 top_level_psutil.append(node.module)
 
         self.assertEqual(
-            top_level_psutil, [],
+            top_level_psutil,
+            [],
             "tests/test_trajectory_planning.py must not import psutil at "
             "module level — it breaks collection without psutil installed.",
         )
@@ -1940,7 +2171,8 @@ class TestTestInfraRegressions(unittest.TestCase):
             env={**os.environ, "PYTHONPATH": repo_root},
         )
         self.assertEqual(
-            result.returncode, 0,
+            result.returncode,
+            0,
             f"test_control.py failed to import without cupy:\n"
             f"stdout: {result.stdout}\nstderr: {result.stderr}",
         )
@@ -1998,7 +2230,8 @@ class TestTestInfraRegressions(unittest.TestCase):
             env={**os.environ, "PYTHONPATH": repo_root},
         )
         self.assertEqual(
-            result.returncode, 0,
+            result.returncode,
+            0,
             f"test_control.py accepted an unusable cupy runtime:\n"
             f"stdout: {result.stdout}\nstderr: {result.stderr}",
         )
@@ -2028,12 +2261,21 @@ class TestPackagingRegressions(unittest.TestCase):
         pyproject, _ = self._load_pyproject()
 
         core_deps = {
-            dep.split(">=")[0].split("==")[0].split(";")[0].split("[")[0].strip().lower()
+            dep.split(">=")[0]
+            .split("==")[0]
+            .split(";")[0]
+            .split("[")[0]
+            .strip()
+            .lower()
             for dep in pyproject["project"]["dependencies"]
         }
         heavy = {
-            "cupy-cuda11x", "pybullet", "torch", "opencv-python",
-            "ultralytics", "trimesh",
+            "cupy-cuda11x",
+            "pybullet",
+            "torch",
+            "opencv-python",
+            "ultralytics",
+            "trimesh",
         }
         leaked = core_deps & heavy
         self.assertFalse(
@@ -2056,6 +2298,7 @@ class TestPackagingRegressions(unittest.TestCase):
     def test_py_typed_marker_present(self):
         """PEP 561 marker so downstream type checkers honor inline hints."""
         from pathlib import Path
+
         repo_root = Path(__file__).resolve().parents[1]
         self.assertTrue(
             (repo_root / "ManipulaPy" / "py.typed").is_file(),
@@ -2076,7 +2319,8 @@ class TestPackagingRegressions(unittest.TestCase):
         m = re.search(r"^\s*version\s*=\s*['\"]([^'\"]+)['\"]", text, re.M)
         self.assertIsNotNone(m, "could not find version= in setup.py")
         self.assertEqual(
-            m.group(1), target,
+            m.group(1),
+            target,
             f"setup.py version {m.group(1)!r} != pyproject {target!r}",
         )
 
@@ -2099,12 +2343,24 @@ class TestPackagingRegressions(unittest.TestCase):
         moved behind extras. Some downstream tools still inspect setup.py."""
         install_requires = self._setup_py_keyword("install_requires")
         core_deps = {
-            dep.split(">=")[0].split("==")[0].split(";")[0].split("[")[0].strip().lower()
+            dep.split(">=")[0]
+            .split("==")[0]
+            .split(";")[0]
+            .split("[")[0]
+            .strip()
+            .lower()
             for dep in install_requires
         }
         heavy = {
-            "cupy-cuda11x", "cupy-cuda12x", "pycuda", "pybullet", "torch",
-            "torchvision", "opencv-python", "ultralytics", "trimesh",
+            "cupy-cuda11x",
+            "cupy-cuda12x",
+            "pycuda",
+            "pybullet",
+            "torch",
+            "torchvision",
+            "opencv-python",
+            "ultralytics",
+            "trimesh",
             "scikit-learn",
         }
         self.assertFalse(
@@ -2129,7 +2385,9 @@ class TestPackagingRegressions(unittest.TestCase):
         from pathlib import Path
 
         repo_root = Path(__file__).resolve().parents[1]
-        workflow = (repo_root / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
+        workflow = (repo_root / ".github" / "workflows" / "test.yml").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("3.12", workflow)
 
     def test_init_py_version_matches_pyproject(self):
@@ -2149,6 +2407,7 @@ class TestPackagingRegressions(unittest.TestCase):
         """v1.3.2 ship-ritual: CHANGELOG must have a dated [1.3.2] section
         (no lingering '[Unreleased] — targeting 1.3.2' header)."""
         from pathlib import Path
+
         repo_root = Path(__file__).resolve().parents[1]
         text = (repo_root / "CHANGELOG.md").read_text(encoding="utf-8")
         self.assertIn("## [1.3.2]", text)
@@ -2159,8 +2418,11 @@ class TestPackagingRegressions(unittest.TestCase):
         by MANIFEST.in). The data manifest must say so explicitly so users
         on a PyPI install aren't surprised."""
         from pathlib import Path
+
         repo_root = Path(__file__).resolve().parents[1]
-        manifest = (repo_root / "ManipulaPy" / "ManipulaPy_data" / "MANIFEST.md").read_text(encoding="utf-8")
+        manifest = (
+            repo_root / "ManipulaPy" / "ManipulaPy_data" / "MANIFEST.md"
+        ).read_text(encoding="utf-8")
         # The wheel-note callout must be present
         self.assertIn("PyPI wheel", manifest)
         self.assertIn("NOT bundled", manifest)
@@ -2173,8 +2435,12 @@ class TestXacroRegressions(unittest.TestCase):
         from pathlib import Path
         from ManipulaPy.urdf.xacro import XacroProcessor
 
-        for bad_key in ("--malicious-flag", "key with spaces", "key;rm -rf",
-                        "1leading_digit"):
+        for bad_key in (
+            "--malicious-flag",
+            "key with spaces",
+            "key;rm -rf",
+            "1leading_digit",
+        ):
             with self.subTest(key=bad_key):
                 with self.assertRaises(ValueError):
                     XacroProcessor._process_with_command(
@@ -2185,8 +2451,14 @@ class TestXacroRegressions(unittest.TestCase):
         from pathlib import Path
         from ManipulaPy.urdf.xacro import XacroProcessor
 
-        for bad_value in ("foo;rm -rf", "foo|cat", "$(echo)", "a`b`",
-                          "line1\nline2", "trailing\x00null"):
+        for bad_value in (
+            "foo;rm -rf",
+            "foo|cat",
+            "$(echo)",
+            "a`b`",
+            "line1\nline2",
+            "trailing\x00null",
+        ):
             with self.subTest(value=bad_value):
                 with self.assertRaises(ValueError):
                     XacroProcessor._process_with_command(
@@ -2266,7 +2538,9 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         except ValueError as e:
             self.fail(f"P shape check rejected a valid (4,4) P: {e}")
 
-    def test_connect_disconnect_initialize_robot_raise_importerror_without_pybullet(self):
+    def test_connect_disconnect_initialize_robot_raise_importerror_without_pybullet(
+        self,
+    ):
         """connect_simulation/disconnect_simulation/initialize_robot must
         all surface ImportError when pybullet is missing — previously they
         skipped _check_pybullet_available() and raised AttributeError on
@@ -2275,15 +2549,21 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         from unittest.mock import patch, MagicMock
         from ManipulaPy.sim import Simulation
 
-        for method_name in ("connect_simulation", "disconnect_simulation", "initialize_robot"):
+        for method_name in (
+            "connect_simulation",
+            "disconnect_simulation",
+            "initialize_robot",
+        ):
             with self.subTest(method=method_name):
                 sim = Simulation.__new__(Simulation)
                 sim.logger = MagicMock()
                 sim.physics_client = 1
                 sim.urdf_file_path = "/nonexistent.urdf"
                 sim.time_step = 0.01
-                with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", False), \
-                     patch("ManipulaPy.sim.p", None):
+                with (
+                    patch("ManipulaPy.sim._PYBULLET_AVAILABLE", False),
+                    patch("ManipulaPy.sim.p", None),
+                ):
                     with self.assertRaises(ImportError) as ctx:
                         getattr(sim, method_name)()
                 self.assertIn("ManipulaPy[simulation]", str(ctx.exception))
@@ -2311,8 +2591,10 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         fake_p = MagicMock()
         fake_p.setJointMotorControlArray.side_effect = fake_set_motor
         fake_p.POSITION_CONTROL = 0
-        with patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True), \
-             patch("ManipulaPy.sim.p", fake_p):
+        with (
+            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.p", fake_p),
+        ):
             sim.set_joint_positions([0.0, 0.0, 0.0])
 
         forces = captured["forces"]
@@ -2330,18 +2612,29 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         ``get_robot_urdf`` so users can copy-paste it verbatim.
         """
         from pathlib import Path
-        manifest = Path(__file__).resolve().parents[1] / "ManipulaPy" / "ManipulaPy_data" / "MANIFEST.md"
+
+        manifest = (
+            Path(__file__).resolve().parents[1]
+            / "ManipulaPy"
+            / "ManipulaPy_data"
+            / "MANIFEST.md"
+        )
         text = manifest.read_text(encoding="utf-8")
         # Every ```python block that calls get_robot_urdf(...) must first
         # import it.
         import re
+
         blocks = re.findall(r"```python\n(.*?)```", text, re.DOTALL)
         offending = []
         for i, block in enumerate(blocks):
-            if "get_robot_urdf(" in block and "from ManipulaPy.ManipulaPy_data import get_robot_urdf" not in block:
+            if (
+                "get_robot_urdf(" in block
+                and "from ManipulaPy.ManipulaPy_data import get_robot_urdf" not in block
+            ):
                 offending.append(i)
         self.assertEqual(
-            offending, [],
+            offending,
+            [],
             f"MANIFEST.md python block(s) {offending} call get_robot_urdf without importing it",
         )
 
@@ -2369,9 +2662,14 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             resolver.add_package("mypkg", str(pinned))
 
             with self.assertLogs("ManipulaPy.urdf.resolver", level="WARNING") as cm:
-                result = resolver._resolve_package_uri("package://mypkg/meshes/robot.dae")
-            self.assertEqual(result, "package://mypkg/meshes/robot.dae",
-                             "explicit-map miss must not fall through to other strategies")
+                result = resolver._resolve_package_uri(
+                    "package://mypkg/meshes/robot.dae"
+                )
+            self.assertEqual(
+                result,
+                "package://mypkg/meshes/robot.dae",
+                "explicit-map miss must not fall through to other strategies",
+            )
             joined = "\n".join(cm.output)
             self.assertIn("Explicit package mapping", joined)
 
@@ -2397,8 +2695,10 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         arr = np.zeros(8, dtype=np.float32)
         spy = MagicMock(name="pinned_array_spy")
         # Default: opt-in flag is False — pinned_array must NOT be touched.
-        with patch.object(ck, "_PINNED_MEMORY_OPT_IN", False), \
-             patch.object(ck.cuda, "pinned_array", spy):
+        with (
+            patch.object(ck, "_PINNED_MEMORY_OPT_IN", False),
+            patch.object(ck.cuda, "pinned_array", spy),
+        ):
             try:
                 ck._h2d_pinned(arr)
             except Exception:
@@ -2430,8 +2730,10 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             captured["dtype"] = dtype
             return np.zeros(shape, dtype=dtype)
 
-        with patch.object(ck, "_PINNED_MEMORY_OPT_IN", True), \
-             patch.object(ck.cuda, "pinned_array", side_effect=fake_pinned_array):
+        with (
+            patch.object(ck, "_PINNED_MEMORY_OPT_IN", True),
+            patch.object(ck.cuda, "pinned_array", side_effect=fake_pinned_array),
+        ):
             ck._h2d_pinned(arr)
         self.assertTrue(captured.get("called"))
         self.assertEqual(captured["shape"], arr.shape)
@@ -2474,22 +2776,29 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         ``0.0 if N <= 1 else t_idx / (N - 1.0)``.
         """
         from pathlib import Path
+
         src = Path(__file__).resolve().parents[1] / "ManipulaPy" / "cuda_kernels.py"
         text = src.read_text(encoding="utf-8")
 
         # The unguarded forms must not appear anywhere.
-        bad = [line for line in text.splitlines()
-               if line.strip().startswith("tau =") and "t_idx /" in line
-               and "0.0 if N <= 1 else" not in line]
+        bad = [
+            line
+            for line in text.splitlines()
+            if line.strip().startswith("tau =")
+            and "t_idx /" in line
+            and "0.0 if N <= 1 else" not in line
+        ]
         self.assertEqual(
-            bad, [],
+            bad,
+            [],
             f"unguarded N==1 division remains: {bad}",
         )
         # And the guarded form must appear at least 7 times (one per kernel
         # variant identified in the v1.3.2 patch).
         guarded_count = text.count("0.0 if N <= 1 else t_idx / (N - 1.0)")
         self.assertGreaterEqual(
-            guarded_count, 7,
+            guarded_count,
+            7,
             f"expected >=7 guarded tau assignments, got {guarded_count}",
         )
 
@@ -2498,12 +2807,20 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         explicit ``import numpy as np`` they fail when copy-pasted.
         """
         from pathlib import Path
-        rst = Path(__file__).resolve().parents[1] / "docs" / "source" / "api" / "simulation.rst"
+
+        rst = (
+            Path(__file__).resolve().parents[1]
+            / "docs"
+            / "source"
+            / "api"
+            / "simulation.rst"
+        )
         text = rst.read_text(encoding="utf-8")
 
         # Find every Open-Loop section (there are two) — each must contain
         # an ``import numpy as np`` line ahead of the np.array call.
         import re
+
         # Split by RST heading ---- underlines so we get section bodies.
         sections = re.split(r"\n(?=Open-Loop[^\n]*\n[-=~]+\n)", text)
         offenders = []
@@ -2514,7 +2831,8 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             if "np.array(" in section and "import numpy as np" not in section:
                 offenders.append(header_match.group(1))
         self.assertEqual(
-            offenders, [],
+            offenders,
+            [],
             f"Open-Loop section(s) {offenders} use np.array() without `import numpy as np`",
         )
 
@@ -2529,12 +2847,15 @@ class TestSelfCollision(unittest.TestCase):
     def _make_tetra_hull(self, offset=None):
         """Return a small tetrahedron ConvexHull, optionally translated."""
         from scipy.spatial import ConvexHull
-        pts = np.array([
-            [0.0, 0.0, 0.0],
-            [1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0],
-        ])
+
+        pts = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        )
         if offset is not None:
             pts = pts + np.asarray(offset)
         return ConvexHull(pts)
@@ -2552,6 +2873,67 @@ class TestSelfCollision(unittest.TestCase):
         checker._visual_fallback_warned = set()
         return checker
 
+    def _make_self_contact_urdf(self):
+        """Create a primitive URDF with deterministic base<->link self contact."""
+        import os
+        import tempfile
+        import textwrap
+
+        urdf = textwrap.dedent(
+            """\
+            <?xml version="1.0"?>
+            <robot name="self_contact_fixture">
+              <link name="base">
+                <collision>
+                  <geometry><box size="0.4 0.4 0.4"/></geometry>
+                </collision>
+                <inertial>
+                  <mass value="1"/>
+                  <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+                </inertial>
+              </link>
+              <link name="link1">
+                <collision>
+                  <geometry><box size="0.2 0.2 0.2"/></geometry>
+                </collision>
+                <inertial>
+                  <mass value="1"/>
+                  <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+                </inertial>
+              </link>
+              <link name="link2">
+                <collision>
+                  <origin xyz="0 0 -1.0"/>
+                  <geometry><box size="0.3 0.3 0.3"/></geometry>
+                </collision>
+                <inertial>
+                  <mass value="1"/>
+                  <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+                </inertial>
+              </link>
+              <joint name="joint1" type="revolute">
+                <parent link="base"/>
+                <child link="link1"/>
+                <origin xyz="0 0 0.5"/>
+                <axis xyz="0 0 1"/>
+                <limit lower="-3.14" upper="3.14" effort="10" velocity="10"/>
+              </joint>
+              <joint name="joint2" type="revolute">
+                <parent link="link1"/>
+                <child link="link2"/>
+                <origin xyz="0 0 0.5"/>
+                <axis xyz="0 1 0"/>
+                <limit lower="-3.14" upper="3.14" effort="10" velocity="10"/>
+              </joint>
+            </robot>
+            """
+        )
+        fd, path = tempfile.mkstemp(suffix=".urdf", prefix="manipulapy_self_contact_")
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(urdf)
+        self.addCleanup(lambda: os.path.exists(path) and os.remove(path))
+        return path
+
     # ------------------------------------------------------------------
     # ACM tests
     # ------------------------------------------------------------------
@@ -2559,6 +2941,7 @@ class TestSelfCollision(unittest.TestCase):
     def test_acm_excludes_joint_neighbors(self):
         """build_link_adjacency must include every parent<->child joint pair."""
         from pathlib import Path
+
         try:
             from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
             from ManipulaPy.urdf import URDF
@@ -2574,13 +2957,15 @@ class TestSelfCollision(unittest.TestCase):
         for j in robot.joints:
             pair = frozenset({j.parent, j.child})
             self.assertIn(
-                pair, acm,
+                pair,
+                acm,
                 f"ACM missing joint pair {j.parent!r} <-> {j.child!r}",
             )
 
     def test_acm_grandparents_excluded_when_flag_set(self):
         """With exclude_grandparents=True, grandparent<->grandchild pairs are also excluded."""
         from pathlib import Path
+
         try:
             from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
             from ManipulaPy.urdf import URDF
@@ -2622,9 +3007,7 @@ class TestSelfCollision(unittest.TestCase):
         hull_b = self._make_tetra_hull(offset=[0.3, 0.0, 0.0])  # clearly overlapping
 
         acm = {frozenset({"link_a", "link_b"})}
-        checker = self._make_mock_checker(
-            {"link_a": hull_a, "link_b": hull_b}, acm=acm
-        )
+        checker = self._make_mock_checker({"link_a": hull_a, "link_b": hull_b}, acm=acm)
         checker.robot.link_fk.return_value = {
             "link_a": np.eye(4),
             "link_b": np.eye(4),
@@ -2637,31 +3020,22 @@ class TestSelfCollision(unittest.TestCase):
         )
 
     def test_intentional_self_collision_detected(self):
-        """A deliberately folded UR5 pose must be flagged by CollisionChecker."""
-        from pathlib import Path
-        try:
-            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
-            from ManipulaPy.potential_field import CollisionChecker
-        except (ImportError, ModuleNotFoundError) as e:
-            self.skipTest(f"UR5 fixture unavailable: {e}")
-        if not Path(str(urdf_file)).exists():
-            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
+        """A deliberate non-adjacent hull overlap must be flagged."""
+        hull_base = self._make_tetra_hull()
+        hull_tool = self._make_tetra_hull(offset=[0.3, 0.0, 0.0])
 
-        checker = CollisionChecker(str(urdf_file))
+        checker = self._make_mock_checker(
+            {"base": hull_base, "tool": hull_tool},
+            acm={frozenset({"base", "link1"}), frozenset({"link1", "tool"})},
+        )
+        checker.robot.link_fk.return_value = {
+            "base": np.eye(4),
+            "tool": np.eye(4),
+        }
 
-        folded_poses = [
-            [0.0, -2.8, 2.6, 0.0, 0.0, 0.0],
-            [0.0, -3.0, 2.7, 0.0, 0.0, 0.0],
-            [0.0, -2.5, 2.9, 0.0, 1.5, 0.0],
-        ]
-
-        for pose in folded_poses:
-            if checker.check_collision(pose):
-                return
-
-        self.skipTest(
-            "could not find a UR5 pose that self-collides via the v1.3.2 "
-            "simplified SAT — pose-space is sparse; FCL replacement is v1.5.0"
+        self.assertTrue(
+            checker.check_collision([0.0] * 2),
+            "Non-adjacent overlapping links outside the ACM must report collision",
         )
 
     def test_non_adjacent_overlapping_hulls_detected(self):
@@ -2713,7 +3087,8 @@ class TestSelfCollision(unittest.TestCase):
 
         # Place A at origin, B 100m away — must NOT collide
         T_a = np.eye(4)
-        T_b = np.eye(4); T_b[:3, 3] = [100.0, 0.0, 0.0]
+        T_b = np.eye(4)
+        T_b[:3, 3] = [100.0, 0.0, 0.0]
         checker.robot.link_fk.return_value = {"link_a": T_a, "link_b": T_b}
         self.assertFalse(
             checker.check_collision([0.0] * 6),
@@ -2739,16 +3114,29 @@ class TestSelfCollision(unittest.TestCase):
         from ManipulaPy.potential_field import CollisionChecker
 
         # 8-vertex cube — distinguishable vertex count for the collision mesh
-        collision_verts = np.array([
-            [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0],
-            [0.0, 0.0, 1.0], [1.0, 0.0, 1.0], [0.0, 1.0, 1.0], [1.0, 1.0, 1.0],
-        ])
+        collision_verts = np.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [1.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [1.0, 0.0, 1.0],
+                [0.0, 1.0, 1.0],
+                [1.0, 1.0, 1.0],
+            ]
+        )
         # 6-vertex octahedron — distinguishable vertex count for the visual mesh
-        visual_verts = np.array([
-            [1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0], [0.0, -1.0, 0.0],
-            [0.0, 0.0, 1.0], [0.0, 0.0, -1.0],
-        ])
+        visual_verts = np.array(
+            [
+                [1.0, 0.0, 0.0],
+                [-1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, -1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [0.0, 0.0, -1.0],
+            ]
+        )
 
         def make_geom_element(vertices):
             elem = MagicMock()
@@ -2786,16 +3174,19 @@ class TestSelfCollision(unittest.TestCase):
 
         self.assertIn("link_both", hulls)
         self.assertEqual(
-            hulls["link_both"].points.shape[0], collision_verts.shape[0],
+            hulls["link_both"].points.shape[0],
+            collision_verts.shape[0],
             "When both collisions and visuals exist, collision mesh vertices must be used",
         )
         self.assertIn("link_visual_only", hulls)
         self.assertEqual(
-            hulls["link_visual_only"].points.shape[0], visual_verts.shape[0],
+            hulls["link_visual_only"].points.shape[0],
+            visual_verts.shape[0],
             "When collisions is empty, visual mesh vertices must be used as fallback",
         )
         self.assertIn(
-            "link_visual_only", checker._visual_fallback_warned,
+            "link_visual_only",
+            checker._visual_fallback_warned,
             "Visual fallback must mark the link as warned",
         )
 
@@ -2814,7 +3205,9 @@ class TestSelfCollision(unittest.TestCase):
             checker._warn_visual_fallback_once("test_link")  # must NOT log again
 
         warnings = [line for line in cm.output if "test_link" in line]
-        self.assertEqual(len(warnings), 1, "Warning for the same link must be issued exactly once")
+        self.assertEqual(
+            len(warnings), 1, "Warning for the same link must be issued exactly once"
+        )
 
     # ------------------------------------------------------------------
     # Simulation self-collision flag
@@ -2828,36 +3221,22 @@ class TestSelfCollision(unittest.TestCase):
         except ImportError:
             self.skipTest("pybullet not available")
 
-        from pathlib import Path
-        try:
-            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
-        except (ImportError, ModuleNotFoundError) as e:
-            self.skipTest(f"UR5 fixture unavailable: {e}")
-        if not Path(str(urdf_file)).exists():
-            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
-
         from ManipulaPy.sim import Simulation
 
-        joint_limits = [(-np.pi, np.pi)] * 6
+        urdf_file = self._make_self_contact_urdf()
+        joint_limits = [(-np.pi, np.pi)] * 2
         client = p.connect(p.DIRECT)
         try:
-            try:
-                sim = Simulation(
-                    str(urdf_file),
-                    joint_limits,
-                    physics_client=client,
-                    enable_self_collision=False,
-                )
-            except Exception as e:
-                # UR5 URDF uses package:// mesh URIs that PyBullet cannot resolve
-                # in a test environment without a full ROS workspace.
-                self.skipTest(f"PyBullet could not load UR5 URDF (unresolved mesh URIs): {e}")
+            sim = Simulation(
+                urdf_file,
+                joint_limits,
+                physics_client=client,
+                enable_self_collision=False,
+            )
 
-            # Step simulation so contact detection can run
-            p.stepSimulation()
+            p.performCollisionDetection()
             contacts = sim.check_collisions()
             self.assertIsInstance(contacts, list)
-            # Without self-collision enabled, PyBullet never detects self contacts
             self.assertEqual(contacts, [])
         finally:
             try:
@@ -2873,18 +3252,11 @@ class TestSelfCollision(unittest.TestCase):
         except ImportError:
             self.skipTest("pybullet not available")
 
-        from pathlib import Path
-        try:
-            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
-        except (ImportError, ModuleNotFoundError) as e:
-            self.skipTest(f"UR5 fixture unavailable: {e}")
-        if not Path(str(urdf_file)).exists():
-            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
-
         from unittest.mock import patch
         from ManipulaPy.sim import Simulation
 
-        joint_limits = [(-np.pi, np.pi)] * 6
+        urdf_file = self._make_self_contact_urdf()
+        joint_limits = [(-np.pi, np.pi)] * 2
         client = p.connect(p.DIRECT)
         try:
             load_calls = []
@@ -2894,24 +3266,19 @@ class TestSelfCollision(unittest.TestCase):
                 load_calls.append((args, kwargs))
                 return original_loadURDF(*args, **kwargs)
 
-            try:
-                with patch("pybullet.loadURDF", side_effect=capturing_loadURDF):
-                    Simulation(
-                        str(urdf_file),
-                        joint_limits,
-                        physics_client=client,
-                        enable_self_collision=True,
-                    )
-            except Exception as e:
-                # If the URDF can't load (package:// URIs), check the flag was
-                # at least passed before the error — inspect captured calls
-                robot_calls = [c for c in load_calls if str(urdf_file) in str(c[0])]
-                if not robot_calls:
-                    self.skipTest(f"PyBullet could not load UR5 URDF: {e}")
+            with patch("pybullet.loadURDF", side_effect=capturing_loadURDF):
+                Simulation(
+                    urdf_file,
+                    joint_limits,
+                    physics_client=client,
+                    enable_self_collision=True,
+                )
 
             # Find the robot loadURDF call (not the plane)
-            robot_calls = [c for c in load_calls if str(urdf_file) in str(c[0])]
-            self.assertGreater(len(robot_calls), 0, "loadURDF was not called for the robot")
+            robot_calls = [c for c in load_calls if urdf_file in str(c[0])]
+            self.assertGreater(
+                len(robot_calls), 0, "loadURDF was not called for the robot"
+            )
             args, kwargs = robot_calls[0]
             flags = kwargs.get("flags", 0)
             self.assertTrue(
@@ -2932,34 +3299,27 @@ class TestSelfCollision(unittest.TestCase):
         except ImportError:
             self.skipTest("pybullet not available")
 
-        from pathlib import Path
-        try:
-            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
-        except (ImportError, ModuleNotFoundError) as e:
-            self.skipTest(f"UR5 fixture unavailable: {e}")
-        if not Path(str(urdf_file)).exists():
-            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
-
         from ManipulaPy.sim import Simulation
 
-        joint_limits = [(-np.pi, np.pi)] * 6
+        urdf_file = self._make_self_contact_urdf()
+        joint_limits = [(-np.pi, np.pi)] * 2
         client = p.connect(p.DIRECT)
         try:
-            try:
-                sim = Simulation(
-                    str(urdf_file),
-                    joint_limits,
-                    physics_client=client,
-                    enable_self_collision=True,
-                )
-            except Exception as e:
-                self.skipTest(f"PyBullet could not load UR5 URDF (unresolved mesh URIs): {e}")
+            sim = Simulation(
+                urdf_file,
+                joint_limits,
+                physics_client=client,
+                enable_self_collision=True,
+            )
 
+            p.performCollisionDetection()
             result = sim.check_collisions()
             self.assertIsInstance(result, list, "check_collisions must return a list")
             # Each element must be a 3-tuple (linkA, linkB, position)
             for item in result:
-                self.assertEqual(len(item), 3, f"Contact tuple must have 3 elements, got {item}")
+                self.assertEqual(
+                    len(item), 3, f"Contact tuple must have 3 elements, got {item}"
+                )
         finally:
             try:
                 p.disconnect(client)
@@ -2968,62 +3328,38 @@ class TestSelfCollision(unittest.TestCase):
 
     @pytest.mark.simulation
     def test_sim_self_collision_returns_contacts_when_enabled(self):
-        """A folded UR5 pose with enable_self_collision=True yields non-empty contacts."""
+        """A primitive non-adjacent self contact is reported when enabled."""
         try:
             import pybullet as p
         except ImportError:
             self.skipTest("pybullet not available")
 
-        from pathlib import Path
-        try:
-            from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
-        except (ImportError, ModuleNotFoundError) as e:
-            self.skipTest(f"UR5 fixture unavailable: {e}")
-        if not Path(str(urdf_file)).exists():
-            self.skipTest(f"UR5 fixture file not found: {urdf_file}")
-
         from ManipulaPy.sim import Simulation
 
-        joint_limits = [(-np.pi, np.pi)] * 6
+        urdf_file = self._make_self_contact_urdf()
+        joint_limits = [(-np.pi, np.pi)] * 2
         client = p.connect(p.DIRECT)
         try:
-            try:
-                sim = Simulation(
-                    str(urdf_file),
-                    joint_limits,
-                    physics_client=client,
-                    enable_self_collision=True,
-                )
-            except Exception as e:
-                self.skipTest(f"PyBullet could not load UR5 URDF (unresolved mesh URIs): {e}")
-
-            folded_poses = [
-                [0.0, -2.8, 2.6, 0.0, 0.0, 0.0],
-                [0.0, -3.0, 2.7, 0.0, 0.0, 0.0],
-                [0.0, -2.5, 2.9, 0.0, 1.5, 0.0],
-            ]
-
-            for pose in folded_poses:
-                for joint_idx, value in zip(sim.non_fixed_joints, pose):
-                    p.resetJointState(sim.robot_id, joint_idx, value)
-                p.performCollisionDetection(client)
-                contacts = sim.check_collisions()
-                if contacts:
-                    for item in contacts:
-                        self.assertEqual(
-                            len(item), 3,
-                            f"Contact tuple must have 3 elements, got {item}",
-                        )
-                        link_a, link_b, position = item
-                        self.assertIsInstance(link_a, int)
-                        self.assertIsInstance(link_b, int)
-                        self.assertIsInstance(position, tuple)
-                    return
-
-            self.skipTest(
-                "UR5 self-collision not triggered at any candidate pose — "
-                "verify URDF collision geometry is loaded"
+            sim = Simulation(
+                urdf_file,
+                joint_limits,
+                physics_client=client,
+                enable_self_collision=True,
             )
+
+            p.performCollisionDetection()
+            contacts = sim.check_collisions()
+            self.assertGreater(len(contacts), 0)
+            for item in contacts:
+                self.assertEqual(
+                    len(item),
+                    3,
+                    f"Contact tuple must have 3 elements, got {item}",
+                )
+                link_a, link_b, position = item
+                self.assertIsInstance(link_a, int)
+                self.assertIsInstance(link_b, int)
+                self.assertIsInstance(position, tuple)
         finally:
             try:
                 p.disconnect(client)
