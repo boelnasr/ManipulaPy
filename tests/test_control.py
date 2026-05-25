@@ -23,9 +23,17 @@ from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 
 def is_module_available(module_name):
-    """Check if a module is available and not mocked."""
+    """Check if a module is available and usable by this test process."""
     try:
         module = __import__(module_name)
+        if module_name == "cupy":
+            try:
+                probe = module.asarray([0.0])
+                asnumpy = getattr(module, "asnumpy", None)
+                if callable(asnumpy):
+                    asnumpy(probe)
+            except Exception:
+                return False
         return (
             not hasattr(module, "_name") or module._name != f"MockModule({module_name})"
         )

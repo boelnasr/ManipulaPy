@@ -2070,13 +2070,16 @@ def setup_cuda_environment_for_40x_speedup():
     os.environ.setdefault("NUMBA_CUDA_CACHE_SIZE", "2048")  # Larger cache
     os.environ.setdefault("NUMBA_CUDA_LOW_OCCUPANCY_WARNINGS", "0")  # Reduce warnings
 
-    if CUPY_AVAILABLE:
-        import cupy as cp
+    if CUPY_AVAILABLE and CUDA_AVAILABLE:
+        try:
+            import cupy as cp
 
-        # Setup CuPy memory pool for optimal allocation
-        mempool = cp.get_default_memory_pool()
-        mempool.set_limit(size=2**30)  # 1GB limit
-        print("✅ CuPy memory pool configured")
+            # Setup CuPy memory pool for optimal allocation.
+            mempool = cp.get_default_memory_pool()
+            mempool.set_limit(size=2**30)  # 1GB limit
+            print("✅ CuPy memory pool configured")
+        except Exception as exc:
+            print(f"⚠️  CuPy memory pool not configured: {exc}")
 
     print("✅ CUDA environment optimized for maximum performance")
 

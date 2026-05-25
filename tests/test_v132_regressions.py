@@ -1846,6 +1846,25 @@ class TestCudaKernelRegressions(unittest.TestCase):
             else:
                 os.environ[key] = previous
 
+    def test_setup_cuda_environment_tolerates_unusable_cupy_runtime(self):
+        """Importable CuPy is not enough; CUDA runtime calls can still fail."""
+        import sys
+        import types
+        from unittest.mock import patch
+
+        from ManipulaPy import cuda_kernels
+
+        class BrokenMemoryPool:
+            def set_limit(self, *args, **kwargs):
+                raise RuntimeError("cudaErrorCompatNotSupportedOnDevice")
+
+        broken_cupy = types.ModuleType("cupy")
+        broken_cupy.get_default_memory_pool = lambda: BrokenMemoryPool()
+
+        with patch.object(cuda_kernels, "CUPY_AVAILABLE", True), \
+             patch.dict(sys.modules, {"cupy": broken_cupy}):
+            cuda_kernels.setup_cuda_environment_for_40x_speedup()
+
 
 class TestTestInfraRegressions(unittest.TestCase):
     """Regressions for test infrastructure issues (Tasks 42-44)."""
@@ -1923,6 +1942,64 @@ class TestTestInfraRegressions(unittest.TestCase):
         self.assertEqual(
             result.returncode, 0,
             f"test_control.py failed to import without cupy:\n"
+            f"stdout: {result.stdout}\nstderr: {result.stderr}",
+        )
+
+    def test_test_control_rejects_importable_but_unusable_cupy(self):
+        """tests/test_control.py must not select CuPy just because it imports.
+
+        Some developer machines have a cupy package installed while the CUDA
+        runtime cannot initialize on the visible hardware. In that state,
+        cupy.asarray raises at test runtime and unmarked control tests fail
+        before they reach ManipulaPy control code.
+        """
+        import os
+        import subprocess
+        import sys
+        import textwrap
+
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        test_control_path = os.path.join(repo_root, "tests", "test_control.py")
+        code = textwrap.dedent(
+            f"""
+            import importlib.util
+            import sys
+            import types
+
+            def raise_cuda_runtime_error(*args, **kwargs):
+                raise RuntimeError("cudaErrorCompatNotSupportedOnDevice")
+
+            cupy = types.ModuleType("cupy")
+            cupy.ndarray = type("ndarray", (), {{}})
+            cupy.asarray = raise_cuda_runtime_error
+            cupy.asnumpy = lambda arr: arr
+            cupy.cuda = types.SimpleNamespace(
+                runtime=types.SimpleNamespace(getDeviceCount=raise_cuda_runtime_error)
+            )
+            sys.modules["cupy"] = cupy
+
+            spec = importlib.util.spec_from_file_location(
+                "test_control", r"{test_control_path}"
+            )
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+
+            if mod.is_module_available("cupy"):
+                raise AssertionError("Broken CuPy runtime must not be selected")
+            """
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=repo_root,
+            env={**os.environ, "PYTHONPATH": repo_root},
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"test_control.py accepted an unusable cupy runtime:\n"
             f"stdout: {result.stdout}\nstderr: {result.stderr}",
         )
 
