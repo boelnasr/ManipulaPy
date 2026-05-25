@@ -110,8 +110,9 @@ class TestVisionModule(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -150,10 +151,11 @@ class TestVisionModule(unittest.TestCase):
             mock_depth = np.random.uniform(0.0, 1.0, (480, 640)).astype(np.float32)
             mock_get_camera.return_value = (None, None, mock_rgba, mock_depth, None)
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
-            ), patch("pybullet.computeViewMatrix"), patch(
-                "pybullet.computeProjectionMatrixFOV"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
+                patch("pybullet.computeViewMatrix"),
+                patch("pybullet.computeProjectionMatrixFOV"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -181,8 +183,9 @@ class TestVisionModule(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -232,8 +235,9 @@ class TestVisionObstacleDetection(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Create properly working mock YOLO
@@ -314,8 +318,9 @@ class TestVisionObstacleDetection(unittest.TestCase):
 
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Create stereo configuration for real OpenCV testing
@@ -379,8 +384,9 @@ class TestVisionObstacleDetection(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -909,8 +915,9 @@ class TestVisionPyBulletIntegration(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Test Vision initialization without debug features
@@ -960,8 +967,9 @@ class TestVisionStereoFunctionality(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Test valid stereo config
@@ -1005,8 +1013,9 @@ class TestVisionStereoFunctionality(unittest.TestCase):
 
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(
@@ -1066,8 +1075,9 @@ class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Test without YOLO (should still initialize)
@@ -1101,8 +1111,9 @@ class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -1139,8 +1150,9 @@ class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Create vision without stereo config
@@ -1249,8 +1261,9 @@ class TestModuleImportAndDependencies(unittest.TestCase):
             try:
                 from ManipulaPy.vision import Vision
 
-                with patch("pybullet.addUserDebugParameter"), patch(
-                    "pybullet.readUserDebugParameter"
+                with (
+                    patch("pybullet.addUserDebugParameter"),
+                    patch("pybullet.readUserDebugParameter"),
                 ):
 
                     # Should still be able to create Vision instance

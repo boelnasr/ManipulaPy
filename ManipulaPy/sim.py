@@ -37,8 +37,10 @@ import numpy as np
 
 try:
     import cupy as cp  # Optional: CUDA acceleration
+
     _CUPY_AVAILABLE = True
 except ImportError:
+
     class _NumpyProxy:
         # Internal fallback shim: enough of cupy's surface for sim.py's own
         # call sites (cp.array, cp.asnumpy). Not a drop-in cupy replacement —
@@ -57,6 +59,7 @@ except ImportError:
 try:
     import pybullet as p  # Required for Simulation; sim cannot run without it
     import pybullet_data
+
     _PYBULLET_AVAILABLE = True
 except ImportError:
     p = None
@@ -128,9 +131,11 @@ class Simulation:
         if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
             ch = logging.StreamHandler()
             ch.setLevel(logging.DEBUG)
-            ch.setFormatter(logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            ))
+            ch.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                )
+            )
             logger.addHandler(ch)
         return logger
 
@@ -175,7 +180,9 @@ class Simulation:
 
         # Load the robot, enabling self-collision detection if requested
         load_flags = p.URDF_USE_SELF_COLLISION if self.enable_self_collision else 0
-        self.robot_id = p.loadURDF(self.urdf_file_path, useFixedBase=True, flags=load_flags)
+        self.robot_id = p.loadURDF(
+            self.urdf_file_path, useFixedBase=True, flags=load_flags
+        )
 
         # Identify non-fixed joints
         self.non_fixed_joints = [
@@ -196,11 +203,14 @@ class Simulation:
                 idx_a = link_name_to_idx.get(name_a)
                 idx_b = link_name_to_idx.get(name_b)
                 if idx_a is not None and idx_b is not None:
-                    p.setCollisionFilterPair(self.robot_id, self.robot_id, idx_a, idx_b, 0)
+                    p.setCollisionFilterPair(
+                        self.robot_id, self.robot_id, idx_a, idx_b, 0
+                    )
                 else:
                     self.logger.warning(
                         "disable_pairs: could not resolve link names %r / %r to indices",
-                        name_a, name_b,
+                        name_a,
+                        name_b,
                     )
 
     def initialize_robot(self):
@@ -215,9 +225,14 @@ class Simulation:
             # Even if self.robot_id is already set from setup_simulation(),
             # we need to process the URDF to set self.robot and self.dynamics.
             if not (hasattr(self, "robot_id") and self.robot_id is not None):
-                load_flags = p.URDF_USE_SELF_COLLISION if self.enable_self_collision else 0
+                load_flags = (
+                    p.URDF_USE_SELF_COLLISION if self.enable_self_collision else 0
+                )
                 self.robot_id = p.loadURDF(
-                    self.urdf_file_path, [0, 0, 0.1], useFixedBase=True, flags=load_flags
+                    self.urdf_file_path,
+                    [0, 0, 0.1],
+                    useFixedBase=True,
+                    flags=load_flags,
                 )
             # Process the URDF to generate the robot model and dynamics.
             from ManipulaPy.urdf_processor import URDFToSerialManipulator
@@ -759,7 +774,7 @@ class Simulation:
         # PyBullet's per-joint linkIndexA filter excludes base-link contacts
         # (base index is -1, never a non-fixed joint). Query without filter to
         # catch base<->link pairs (the most common self-collision on folded arms).
-        for pt in (p.getContactPoints(self.robot_id, self.robot_id) or []):
+        for pt in p.getContactPoints(self.robot_id, self.robot_id) or []:
             link_a, link_b, position = pt[3], pt[4], pt[5]
             contacts.append((link_a, link_b, position))
             self.logger.warning(

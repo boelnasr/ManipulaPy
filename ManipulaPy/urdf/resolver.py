@@ -200,7 +200,7 @@ class PackageResolver:
         """
         if not uri.startswith("package://"):
             return uri
-        rest = uri[len("package://"):]
+        rest = uri[len("package://") :]
         if not rest:
             logger.warning(f"Malformed package URI {uri!r}: missing package name")
             return uri
@@ -272,7 +272,11 @@ class PackageResolver:
                 candidates.append(c)
 
             # Strategy 5: ancestor heuristic
-            for ancestor in [self.base_path, self.base_path.parent, self.base_path.parent.parent]:
+            for ancestor in [
+                self.base_path,
+                self.base_path.parent,
+                self.base_path.parent.parent,
+            ]:
                 cand_a = ancestor / package_name / relative_path
                 if cand_a.exists():
                     candidates.append(cand_a)
@@ -306,7 +310,6 @@ class PackageResolver:
             "package mapping with resolver.add_package(name, path)."
         )
         return uri
-
 
     def _resolve_relative_path(self, path: str) -> str:
         """

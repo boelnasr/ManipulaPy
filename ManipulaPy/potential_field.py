@@ -117,7 +117,7 @@ class PotentialField:
                     -40
                     * self.repulsive_gain
                     * (1.0 / d_safe - 1.0 / self.influence_distance)
-                    * (1.0 / (d_safe ** 3))
+                    * (1.0 / (d_safe**3))
                     * direction
                 )
 
@@ -241,14 +241,8 @@ class CollisionChecker:
 
             T_a = fk_results[name_a]
             T_b = fk_results[name_b]
-            pts_a = (
-                T_a[:3, :3] @ self.convex_hulls[name_a].points.T
-                + T_a[:3, 3:4]
-            ).T
-            pts_b = (
-                T_b[:3, :3] @ self.convex_hulls[name_b].points.T
-                + T_b[:3, 3:4]
-            ).T
+            pts_a = (T_a[:3, :3] @ self.convex_hulls[name_a].points.T + T_a[:3, 3:4]).T
+            pts_b = (T_b[:3, :3] @ self.convex_hulls[name_b].points.T + T_b[:3, 3:4]).T
             if self._points_intersect(pts_a, pts_b):
                 return True
         return False

@@ -20,8 +20,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-
-
 def _array_eq(a: np.ndarray, b: np.ndarray, tol: float = 1e-10) -> bool:
     """Compare numpy arrays with tolerance."""
     if a is None and b is None:
@@ -333,6 +331,7 @@ class Mesh:
             return
         try:
             import trimesh
+
             mesh = trimesh.load(self.filename, force="mesh")
             self._vertices = np.asarray(mesh.vertices, dtype=np.float64)
             self._faces = np.asarray(mesh.faces, dtype=np.int64)

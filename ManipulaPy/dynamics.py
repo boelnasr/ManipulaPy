@@ -43,7 +43,7 @@ class ManipulatorDynamics(SerialManipulator):
         S_list: NDArray[np.float64],
         B_list: NDArray[np.float64],
         Glist: Union[List[NDArray[np.float64]], NDArray[np.float64]],
-        Mlist_per_link: Optional[List[NDArray[np.float64]]] = None, # New
+        Mlist_per_link: Optional[List[NDArray[np.float64]]] = None,  # New
     ) -> None:
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
         self.Glist = Glist
@@ -82,6 +82,7 @@ class ManipulatorDynamics(SerialManipulator):
             # Legacy fallback (still wrong, but preserves old behavior for
             # callers constructing ManipulatorDynamics manually without per-link M)
             import warnings
+
             warnings.warn(
                 "mass_matrix called without Mlist_per_link — using legacy "
                 "approximation (incorrect for non-trivial robots). Construct "

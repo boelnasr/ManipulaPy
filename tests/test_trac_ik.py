@@ -32,9 +32,7 @@ class _RobotFixtureMixin:
                 [0, -1, 0, -0.089, 0, 0.817],
             ]
         ).T
-        M = np.array(
-            [[1, 0, 0, 0.817], [0, 1, 0, 0], [0, 0, 1, 0.191], [0, 0, 0, 1]]
-        )
+        M = np.array([[1, 0, 0, 0.817], [0, 1, 0, 0], [0, 0, 1, 0.191], [0, 0, 0, 1]])
         B_list = np.copy(Slist)
         joint_limits = [(-np.pi, np.pi)] * 6
 
@@ -229,8 +227,12 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
         """DLS solver should converge from a good starting point."""
         stop_event = threading.Event()
         theta, success, error = self.solver._dls_solver(
-            self.T_desired, self.theta_known, eomg=1e-3, ev=1e-3,
-            timeout=5.0, stop_event=stop_event,
+            self.T_desired,
+            self.theta_known,
+            eomg=1e-3,
+            ev=1e-3,
+            timeout=5.0,
+            stop_event=stop_event,
         )
         self.assertTrue(success)
         self.assertLess(error, 0.01)
@@ -241,8 +243,12 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
         theta_singular = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
         stop_event = threading.Event()
         theta, success, error = self.solver._dls_solver(
-            self.T_desired, theta_singular, eomg=1e-2, ev=1e-2,
-            timeout=2.0, stop_event=stop_event,
+            self.T_desired,
+            theta_singular,
+            eomg=1e-2,
+            ev=1e-2,
+            timeout=2.0,
+            stop_event=stop_event,
         )
         # Should return finite values regardless of success
         self.assertTrue(np.all(np.isfinite(theta)))
@@ -253,8 +259,12 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
         # Patch SVD to fail, forcing fallback to normal equations
         with patch("numpy.linalg.svd", side_effect=np.linalg.LinAlgError):
             theta, success, error = self.solver._dls_solver(
-                self.T_desired, self.theta_known, eomg=1e-3, ev=1e-3,
-                timeout=0.5, stop_event=stop_event,
+                self.T_desired,
+                self.theta_known,
+                eomg=1e-3,
+                ev=1e-3,
+                timeout=0.5,
+                stop_event=stop_event,
             )
         self.assertTrue(np.all(np.isfinite(theta)))
 
@@ -264,8 +274,12 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
         T_difficult = np.eye(4)
         T_difficult[:3, 3] = [0.5, 0.5, 0.5]
         theta, success, error = self.solver._dls_solver(
-            T_difficult, np.zeros(6), eomg=1e-2, ev=1e-2,
-            timeout=2.0, stop_event=stop_event,
+            T_difficult,
+            np.zeros(6),
+            eomg=1e-2,
+            ev=1e-2,
+            timeout=2.0,
+            stop_event=stop_event,
         )
         self.assertTrue(np.all(np.isfinite(theta)))
         self.assertTrue(np.all(np.isfinite(error)))
@@ -328,8 +342,13 @@ class TestDLSPerturbationRecovery(unittest.TestCase, _RobotFixtureMixin):
         T_far[:3, 3] = [50.0, 50.0, 50.0]
         stop_event = threading.Event()
         theta, success, error = self.solver._dls_solver(
-            T_far, np.zeros(6), eomg=1e-8, ev=1e-8,
-            timeout=1.0, stop_event=stop_event, max_perturbations=0,
+            T_far,
+            np.zeros(6),
+            eomg=1e-8,
+            ev=1e-8,
+            timeout=1.0,
+            stop_event=stop_event,
+            max_perturbations=0,
         )
         self.assertFalse(success)
 
@@ -339,8 +358,13 @@ class TestDLSPerturbationRecovery(unittest.TestCase, _RobotFixtureMixin):
         T_difficult = np.eye(4)
         T_difficult[:3, 3] = [0.3, 0.3, 0.3]
         theta, success, error = self.solver._dls_solver(
-            T_difficult, np.zeros(6), eomg=1e-2, ev=1e-2,
-            timeout=2.0, stop_event=stop_event, max_perturbations=5,
+            T_difficult,
+            np.zeros(6),
+            eomg=1e-2,
+            ev=1e-2,
+            timeout=2.0,
+            stop_event=stop_event,
+            max_perturbations=5,
         )
         self.assertTrue(np.all(np.isfinite(theta)))
 
@@ -359,8 +383,12 @@ class TestDLSSolver(unittest.TestCase, _RobotFixtureMixin):
     def test_dls_converges(self):
         stop_event = threading.Event()
         theta, success, error = self.solver._dls_solver(
-            self.T_desired, self.theta_known, eomg=1e-3, ev=1e-3,
-            timeout=5.0, stop_event=stop_event,
+            self.T_desired,
+            self.theta_known,
+            eomg=1e-3,
+            ev=1e-3,
+            timeout=5.0,
+            stop_event=stop_event,
         )
         self.assertTrue(success)
         self.assertLess(error, 0.01)
@@ -370,8 +398,12 @@ class TestDLSSolver(unittest.TestCase, _RobotFixtureMixin):
         stop_event = threading.Event()
         stop_event.set()  # Already signalled
         theta, success, error = self.solver._dls_solver(
-            self.T_desired, np.zeros(6), eomg=1e-6, ev=1e-6,
-            timeout=10.0, stop_event=stop_event,
+            self.T_desired,
+            np.zeros(6),
+            eomg=1e-6,
+            ev=1e-6,
+            timeout=10.0,
+            stop_event=stop_event,
         )
         # Should exit immediately without converging
         self.assertFalse(success)
@@ -382,8 +414,12 @@ class TestDLSSolver(unittest.TestCase, _RobotFixtureMixin):
         T_far = np.eye(4)
         T_far[:3, 3] = [50.0, 50.0, 50.0]
         theta, success, error = self.solver._dls_solver(
-            T_far, np.zeros(6), eomg=1e-8, ev=1e-8,
-            timeout=0.05, stop_event=stop_event,
+            T_far,
+            np.zeros(6),
+            eomg=1e-8,
+            ev=1e-8,
+            timeout=0.05,
+            stop_event=stop_event,
         )
         self.assertFalse(success)
 
@@ -402,8 +438,12 @@ class TestSQPSolver(unittest.TestCase, _RobotFixtureMixin):
     def test_sqp_converges(self):
         stop_event = threading.Event()
         theta, success, error = self.solver._sqp_solver(
-            self.T_desired, self.theta_known, eomg=1e-3, ev=1e-3,
-            timeout=5.0, stop_event=stop_event,
+            self.T_desired,
+            self.theta_known,
+            eomg=1e-3,
+            ev=1e-3,
+            timeout=5.0,
+            stop_event=stop_event,
         )
         self.assertTrue(success)
 
@@ -411,8 +451,12 @@ class TestSQPSolver(unittest.TestCase, _RobotFixtureMixin):
         stop_event = threading.Event()
         stop_event.set()
         theta, success, error = self.solver._sqp_solver(
-            self.T_desired, np.zeros(6), eomg=1e-8, ev=1e-8,
-            timeout=10.0, stop_event=stop_event,
+            self.T_desired,
+            np.zeros(6),
+            eomg=1e-8,
+            ev=1e-8,
+            timeout=10.0,
+            stop_event=stop_event,
         )
         # SQP objective returns 1e10 when stopped, so it won't converge
         self.assertFalse(success)
@@ -452,9 +496,11 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
         # Tiny rotation around z
         angle = 1e-8
         T_des[:3, :3] = np.array(
-            [[np.cos(angle), -np.sin(angle), 0],
-             [np.sin(angle), np.cos(angle), 0],
-             [0, 0, 1]]
+            [
+                [np.cos(angle), -np.sin(angle), 0],
+                [np.sin(angle), np.cos(angle), 0],
+                [0, 0, 1],
+            ]
         )
         V_err, rot_err, trans_err = self.solver._default_error_func(T_curr, T_des)
         self.assertLess(rot_err, 1e-5)
@@ -567,7 +613,9 @@ class TestSerialManipulatorTracIK(unittest.TestCase, _RobotFixtureMixin):
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
     def test_method_returns_tuple(self):
-        result = self.robot.trac_ik(self.T_desired, theta0=self.theta_known, timeout=2.0)
+        result = self.robot.trac_ik(
+            self.T_desired, theta0=self.theta_known, timeout=2.0
+        )
         self.assertIsInstance(result, tuple)
         self.assertEqual(len(result), 3)
 

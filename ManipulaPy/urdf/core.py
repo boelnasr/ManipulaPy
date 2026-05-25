@@ -132,9 +132,7 @@ class URDF:
         elif backend == "pybullet":
             return cls._load_pybullet(filename)
         else:
-            raise ValueError(
-                f"Unknown backend: {backend}. Use 'builtin' or 'pybullet'"
-            )
+            raise ValueError(f"Unknown backend: {backend}. Use 'builtin' or 'pybullet'")
 
     @classmethod
     def _load_builtin(
@@ -693,7 +691,6 @@ class URDF:
         G_list = []
         Mlist_per_link = []  # New: per-link CoM transform in zero config
 
-
         for i, joint in enumerate(actuated):
             if joint.joint_type in (JointType.PLANAR, JointType.FLOATING):
                 raise ValueError(
@@ -731,7 +728,7 @@ class URDF:
             child_link = self._links[joint.child]
             child_link_T = fk[joint.child]  # link frame in zero config
             if child_link.inertial and child_link.inertial.origin is not None:
-                #CoM offset within link frame
+                # CoM offset within link frame
                 com_local = child_link.inertial.origin.matrix
                 Mlist_per_link.append(child_link_T @ com_local)
             else:

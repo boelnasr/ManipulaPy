@@ -1739,7 +1739,9 @@ class OptimizedTrajectoryPlanning:
 
         for i, label in enumerate(["X", "Y", "Z"]):
             plt.subplot(4, 1, 1)
-            plt.plot(time_array, np.array(tcp_positions)[:, i], label=f"TCP {label} Position")
+            plt.plot(
+                time_array, np.array(tcp_positions)[:, i], label=f"TCP {label} Position"
+            )
             plt.ylabel("Position")
             plt.legend()
 
@@ -1749,7 +1751,9 @@ class OptimizedTrajectoryPlanning:
             plt.legend()
 
             plt.subplot(4, 1, 3)
-            plt.plot(time_array[:-2], acceleration[:, i], label=f"TCP {label} Acceleration")
+            plt.plot(
+                time_array[:-2], acceleration[:, i], label=f"TCP {label} Acceleration"
+            )
             plt.ylabel("Acceleration")
             plt.legend()
 

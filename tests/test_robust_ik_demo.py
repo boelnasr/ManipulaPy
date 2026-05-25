@@ -54,9 +54,7 @@ def main():
     successes_iterative = 0
     for i, T_target in enumerate(targets):
         # Use workspace heuristic for fair comparison
-        theta0 = ik_helpers.workspace_heuristic_guess(
-            T_target, 6, robot.joint_limits
-        )
+        theta0 = ik_helpers.workspace_heuristic_guess(T_target, 6, robot.joint_limits)
 
         solution, success, iters = robot.iterative_inverse_kinematics(
             T_target, theta0, eomg=eomg, ev=ev, max_iterations=max_iterations
@@ -136,8 +134,7 @@ def main():
     print("-" * 70)
     print(f"{'iterative_inverse_kinematics':<50} {rate_iterative:>5.1f}%")
     print(
-        f"{'smart_inverse_kinematics(workspace_heuristic)':<50} "
-        f"{rate_smart:>5.1f}%"
+        f"{'smart_inverse_kinematics(workspace_heuristic)':<50} " f"{rate_smart:>5.1f}%"
     )
     print(f"{'robust_inverse_kinematics (RECOMMENDED)':<50} {rate_robust:>5.1f}%")
     print("=" * 70)

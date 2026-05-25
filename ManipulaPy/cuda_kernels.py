@@ -286,9 +286,11 @@ def check_cupy_availability():
 # don't lose their Python process; opt back in with
 # MANIPULAPY_USE_PINNED_MEMORY=1 when the combo is known good (numba <=
 # 0.59 with driver 535, or numba 0.66+ with the upstream fix landed).
-_PINNED_MEMORY_OPT_IN = os.environ.get(
-    "MANIPULAPY_USE_PINNED_MEMORY", "0"
-).lower() in ("1", "true", "yes")
+_PINNED_MEMORY_OPT_IN = os.environ.get("MANIPULAPY_USE_PINNED_MEMORY", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 
 # ENHANCED MEMORY MANAGEMENT

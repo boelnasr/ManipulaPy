@@ -252,6 +252,7 @@ class TestAdaptiveMultiStartIK(unittest.TestCase):
 
     def test_all_exceptions_returns_zeros(self):
         """If best_solution is None (all exceptions), should return midpoint of []."""
+
         def always_fails(T, **kw):
             raise RuntimeError("fail")
 
@@ -261,7 +262,9 @@ class TestAdaptiveMultiStartIK(unittest.TestCase):
         self.assertFalse(success)
         self.assertIsNotNone(theta)
 
-    def test_verbose_mode(self, ):
+    def test_verbose_mode(
+        self,
+    ):
         """Verbose mode should not crash."""
         mock_solver = lambda T, **kw: (np.zeros(6), False, 10)
         theta, success, iters, strategy = adaptive_multi_start_ik(

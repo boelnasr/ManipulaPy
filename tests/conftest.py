@@ -373,9 +373,7 @@ def create_smart_mock(module_name):
         # everything (false positives) or raise TypeError (false skips).
         class _MockTensor:
             def __init__(self, data=None, *args, **kwargs):
-                self._data = (
-                    np.asarray(data) if data is not None else np.array([])
-                )
+                self._data = np.asarray(data) if data is not None else np.array([])
                 self.shape = self._data.shape
                 self.dtype = self._data.dtype
                 self.device = "cpu"
@@ -398,7 +396,9 @@ def create_smart_mock(module_name):
 
         torch_mock.Tensor = _MockTensor
         torch_mock.tensor = lambda *args, **kwargs: _MockTensor(*args, **kwargs)
-        torch_mock.zeros = lambda *args, **kwargs: _MockTensor(np.zeros(*args, **kwargs))
+        torch_mock.zeros = lambda *args, **kwargs: _MockTensor(
+            np.zeros(*args, **kwargs)
+        )
         torch_mock.ones = lambda *args, **kwargs: _MockTensor(np.ones(*args, **kwargs))
         torch_mock.eye = lambda n, *args, **kwargs: _MockTensor(np.eye(n))
         torch_mock.cuda = MockModule("torch.cuda")
@@ -676,8 +676,7 @@ TORCH_AVAILABLE = test_module_availability("torch")
 
 # Environment flags from CI
 SKIP_CUDA_TESTS = (
-    os.environ.get("SKIP_CUDA_TESTS", "false").lower() == "true"
-    or not CUDA_AVAILABLE
+    os.environ.get("SKIP_CUDA_TESTS", "false").lower() == "true" or not CUDA_AVAILABLE
 )
 SKIP_VISION_TESTS = os.environ.get("SKIP_VISION_TESTS", "false").lower() == "true"
 SKIP_SIMULATION_TESTS = (

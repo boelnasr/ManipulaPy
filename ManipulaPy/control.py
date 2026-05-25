@@ -166,7 +166,8 @@ class ManipulatorController:
             if self.eint is not None and self.eint.shape != thetalist.shape:
                 logger.debug(
                     "Controller state shape mismatch (%s vs %s); resetting integral.",
-                    self.eint.shape, thetalist.shape,
+                    self.eint.shape,
+                    thetalist.shape,
                 )
             self.eint = np.zeros_like(thetalist, dtype=float)
 
@@ -268,7 +269,8 @@ class ManipulatorController:
             if self.eint is not None and self.eint.shape != thetalist.shape:
                 logger.debug(
                     "Controller state shape mismatch (%s vs %s); resetting integral.",
-                    self.eint.shape, thetalist.shape,
+                    self.eint.shape,
+                    thetalist.shape,
                 )
             self.eint = np.zeros_like(thetalist, dtype=float)
 
@@ -503,9 +505,7 @@ class ManipulatorController:
                 f"got {self.P.shape}"
             )
         if z.shape != (n,):
-            raise ValueError(
-                f"z must have shape ({n},) to match x_hat, got {z.shape}"
-            )
+            raise ValueError(f"z must have shape ({n},) to match x_hat, got {z.shape}")
         if R.shape != (n, n):
             raise ValueError(f"R must have shape ({n}, {n}), got {R.shape}")
 
@@ -893,7 +893,9 @@ class ManipulatorController:
         J_v = self.dynamics.jacobian(current_joint_angles)[:3, :]
         cartesian_velocity = J_v @ current_joint_velocities
         Kp_term = Kp @ e if np.ndim(Kp) == 2 else Kp * e
-        Kd_term = Kd @ cartesian_velocity if np.ndim(Kd) == 2 else Kd * cartesian_velocity
+        Kd_term = (
+            Kd @ cartesian_velocity if np.ndim(Kd) == 2 else Kd * cartesian_velocity
+        )
         tau = J_v.T @ (Kp_term - Kd_term)
         return tau
 

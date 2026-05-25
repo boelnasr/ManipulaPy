@@ -581,8 +581,7 @@ class Vision:
                 try:
                     self.yolo_model.to(forced_device)
                     self.logger.info(
-                        "YOLO model pinned to device %r via "
-                        "MANIPULAPY_YOLO_DEVICE.",
+                        "YOLO model pinned to device %r via " "MANIPULAPY_YOLO_DEVICE.",
                         forced_device,
                     )
                 except Exception as exc:  # pragma: no cover - device-specific

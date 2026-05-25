@@ -297,8 +297,7 @@ class URDFToSerialManipulator:
             S_list=data["Slist"],
             B_list=data["Blist"],
             Glist=data["Glist"],
-            Mlist_per_link=data.get("Mlist_per_link"),   # ← ADD THIS LINE                                                                                                         
-
+            Mlist_per_link=data.get("Mlist_per_link"),  # ← ADD THIS LINE
         )
         return self.manipulator_dynamics
 

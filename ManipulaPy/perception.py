@@ -239,7 +239,7 @@ class Perception:
         if not _SKLEARN_AVAILABLE:
             raise ImportError(
                 "cluster_obstacles requires scikit-learn. "
-                "Install with: pip install \"ManipulaPy[ml]\""
+                'Install with: pip install "ManipulaPy[ml]"'
             )
 
         dbscan_model = DBSCAN(eps=eps, min_samples=min_samples)
