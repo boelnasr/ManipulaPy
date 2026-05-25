@@ -143,6 +143,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
             checker.convex_hulls = {"link_a": hull, "link_b": hull}
+            checker._acm = set()  # no exclusions — both links should collide
 
         self.assertTrue(checker.check_collision(np.zeros(6)))
 
@@ -167,6 +168,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
             checker.convex_hulls = {"link_a": hull1, "link_b": hull2}
+            checker._acm = set()  # no exclusions
 
         self.assertFalse(checker.check_collision(np.zeros(6)))
 
@@ -185,11 +187,12 @@ class TestCollisionCheckerMocked(unittest.TestCase):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
             checker.convex_hulls = {}  # No hulls
+            checker._acm = set()
 
         self.assertFalse(checker.check_collision(np.zeros(6)))
 
     def test_create_convex_hulls_mesh_data(self):
-        """_create_convex_hulls with mesh_data attribute."""
+        """_create_convex_hulls with mesh_data attribute (via visual fallback)."""
         from ManipulaPy.potential_field import CollisionChecker
 
         # Create mock URDF with mesh_data
@@ -206,6 +209,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         mock_link = MagicMock()
         mock_link.name = "test_link"
+        mock_link.collisions = []  # no collision meshes → falls back to visuals
         mock_link.visuals = [mock_visual]
 
         mock_robot = MagicMock()
@@ -214,12 +218,13 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
 
         hulls = checker._create_convex_hulls()
         self.assertIn("test_link", hulls)
 
     def test_create_convex_hulls_legacy_mesh(self):
-        """_create_convex_hulls with legacy mesh attribute."""
+        """_create_convex_hulls with legacy mesh attribute (via visual fallback)."""
         from ManipulaPy.potential_field import CollisionChecker
 
         vertices = np.array(
@@ -237,6 +242,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         mock_link = MagicMock()
         mock_link.name = "legacy_link"
+        mock_link.collisions = []  # no collision meshes → falls back to visuals
         mock_link.visuals = [mock_visual]
 
         mock_robot = MagicMock()
@@ -245,6 +251,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
 
         hulls = checker._create_convex_hulls()
         self.assertIn("legacy_link", hulls)
@@ -258,6 +265,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         mock_link = MagicMock()
         mock_link.name = "empty_link"
+        mock_link.collisions = []  # no collision meshes → falls back to visuals
         mock_link.visuals = [mock_visual]
 
         mock_robot = MagicMock()
@@ -266,16 +274,18 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
 
         hulls = checker._create_convex_hulls()
         self.assertEqual(len(hulls), 0)
 
     def test_create_convex_hulls_no_visuals(self):
-        """Link with no visuals should be skipped."""
+        """Link with no visuals and no collisions should be skipped."""
         from ManipulaPy.potential_field import CollisionChecker
 
         mock_link = MagicMock()
         mock_link.name = "no_vis_link"
+        mock_link.collisions = []
         mock_link.visuals = []
 
         mock_robot = MagicMock()
@@ -284,6 +294,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
 
         hulls = checker._create_convex_hulls()
         self.assertEqual(len(hulls), 0)

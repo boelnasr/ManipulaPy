@@ -636,11 +636,13 @@ class TestCollisionDetection:
         sim.check_collisions()
 
     def test_check_collisions_with_contacts(self, monkeypatch):
-        """Test collision check with detected contacts"""
-        # Mock contact points
+        """Test collision check with detected contacts returns contact list."""
+        # Mock contact points in PyBullet tuple format:
+        # index 3 = linkIndexA, index 4 = linkIndexB, index 5 = positionOnA
+        # Full tuple has 9+ fields; only 0-8 are used here for brevity.
         mock_contacts = [
-            {"contact_point": [0, 0, 0], "force": 10},
-            {"contact_point": [0.1, 0.1, 0.1], "force": 5},
+            (None, None, None, 0, 1, (0.0, 0.0, 0.0), None, None, None),
+            (None, None, None, 1, 2, (0.1, 0.1, 0.1), None, None, None),
         ]
 
         monkeypatch.setattr(
@@ -650,8 +652,11 @@ class TestCollisionDetection:
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.non_fixed_joints = [0]
 
-        # Should log warnings but not crash
-        sim.check_collisions()
+        contacts = sim.check_collisions()
+        assert isinstance(contacts, list)
+        assert len(contacts) == 2
+        assert contacts[0] == (0, 1, (0.0, 0.0, 0.0))
+        assert contacts[1] == (1, 2, (0.1, 0.1, 0.1))
 
     def test_check_collisions_no_contacts(self):
         """Test collision check with no contacts"""
