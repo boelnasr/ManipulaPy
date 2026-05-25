@@ -425,10 +425,10 @@ def adaptive_multi_start_ik(
         - Computational cost: ~3-5x single-start, but 3-5x higher success
 
     Strategy Sequence:
-        1. Workspace heuristic (conservative params) - 20-40% success
-        2. Midpoint (moderate params) - +10-20% success
-        3-5. Random exploration (varying params) - +10-20% success
-        6-10. Aggressive random (if needed) - +5-10% success
+        - Workspace heuristic (conservative params): 20-40% success
+        - Midpoint (moderate params): +10-20% success
+        - Random exploration, attempts 3-5 (varying params): +10-20% success
+        - Aggressive random, attempts 6-10 (if needed): +5-10% success
 
     Example:
         >>> from ManipulaPy.ik_helpers import adaptive_multi_start_ik
