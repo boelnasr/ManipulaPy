@@ -82,12 +82,10 @@ def extract_screw_list(omega_list, r_list):
     """
     Build a 6xn screw-axis matrix from (3xn) angular velocities 'omega_list'
     and (3xn) positions 'r_list'.
-    For each column i::
 
-        S[:3, i] = w = omega_list[:, i]
-        S[3:, i] = v = - w x r
-
-    Returns a 6xn array of [wx, wy, wz, vx, vy, vz] in each column.
+    For each column ``i``, ``S[:3, i]`` is set to ``omega_list[:, i]`` and
+    ``S[3:, i]`` is set to ``-(omega x r)``. Returns a 6xn array of
+    ``[wx, wy, wz, vx, vy, vz]`` in each column.
     """
     if omega_list is None or r_list is None:
         return None

@@ -7,7 +7,7 @@ Singularity API Reference
 This page documents **ManipulaPy.singularity**, the module for comprehensive singularity analysis of robotic manipulators including detection, visualization, and workspace analysis with optional CUDA acceleration.
 
 .. tip::
-   For conceptual explanations, see :doc:`../user_guide/Singularity_Analysis `.
+   For conceptual explanations, see :doc:`../user_guide/Singularity_Analysis`.
 
 ---
 
@@ -26,7 +26,7 @@ Singularity Class
 .. currentmodule:: ManipulaPy.singularity
 
 .. autoclass:: Singularity
-   :members:
+   :no-members:
    :show-inheritance:
 
    Main class for singularity analysis of robotic manipulators providing detection, manipulability analysis, workspace visualization, and condition number computations.
@@ -58,7 +58,7 @@ Primary Detection Methods
 
    **Returns:**
    
-   - **bool** -- True if at singularity (``|det(J)|`` < 1e-4), False otherwise
+   - **bool** -- True if at singularity (:math:`\lvert \det(J) \rvert` < 1e-4), False otherwise
 
 .. automethod:: Singularity.near_singularity_detection
 

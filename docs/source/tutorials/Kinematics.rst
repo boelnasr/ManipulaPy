@@ -4,8 +4,8 @@ Kinematics User Guide
 This chapter walks you through **everyday kinematics workflows** in ManipulaPy:
 from building a *SerialManipulator* object, to computing forward & inverse
 kinematics, Jacobians, workspace envelopes, and velocity mappings.  It assumes
-you already ran the :doc:`../installation` guide and have a working Python
-interpreter.
+you already ran the :doc:`installation guide <../Installation Guide>` and have
+a working Python interpreter.
 
 .. _ug-kinematics-prereq:
 
@@ -16,8 +16,8 @@ Prerequisites
 * ManipulaPy ≥ |release|
 * A basic grasp of screw theory / the Product‑of‑Exponentials (PoE) model.
 
-If you need a refresher, see `Modern Robotics, Ch 3`_ (free online PDF) or our
-:doc:`../theory/screw_theory` page.
+If you need a refresher, see `Modern Robotics, Ch 3`_ (free online PDF) or the
+conceptual overview in :doc:`../user_guide/Kinematics`.
 
 .. _Modern Robotics, Ch 3: http://hades.mech.northwestern.edu/index.php/Modern_Robotics
 
@@ -205,8 +205,8 @@ converge            limits or workspace.
                   * Provide a better initial guess; use the *smart_initial_guess* helper below.
 Numerical         * Call IK with ``damping`` > 1e‑4 or switch to
 instability         ``lm_inverse_kinematics``.
-Joint limit       * Run :py:func:`ManipulaPy.kinematics.utils.enforce_joint_limits`.
-violation
+Joint limit       * Clamp joint angles into ``robot.joint_limits`` before
+violation           passing them to the IK solver.
 ================  ===========================================
 
 .. code-block:: python
