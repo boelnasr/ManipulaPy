@@ -127,7 +127,8 @@ Simulation Class
 ~~~~~~~~~~~~~~~~
 
 .. autoclass:: ManipulaPy.sim.Simulation
-   :members:
+   :no-members:
+   :no-index:
    :undoc-members:
    :show-inheritance:
    :special-members: __init__
@@ -136,6 +137,7 @@ Constructor Parameters
 ^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:method:: __init__(urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0, physics_client=None, enable_self_collision=False, disable_pairs=None)
+   :no-index:
 
    Initialize the simulation environment.
 
@@ -157,6 +159,7 @@ Core Simulation Methods
 **Trajectory Execution**
 
 .. py:method:: run_trajectory(joint_trajectory) -> np.ndarray
+   :no-index:
 
    Execute a sequence of joint configurations with physics simulation and visualization.
 
@@ -181,6 +184,7 @@ Core Simulation Methods
 **Open-Loop Position Tracking**
 
 .. py:method:: run_controller(desired_positions) -> np.ndarray
+   :no-index:
 
    Execute open-loop position tracking with real-time visualization. For closed-loop torque control, drive PyBullet's ``p.TORQUE_CONTROL`` mode directly. See ``CHANGELOG.md`` for the v1.3.2 migration notes.
 
@@ -191,6 +195,7 @@ Core Simulation Methods
 **Manual Control and Interaction**
 
 .. py:method:: manual_control()
+   :no-index:
 
    Enter interactive manual control mode with GUI sliders.
 
@@ -206,6 +211,7 @@ Initialization and Setup Methods
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:method:: initialize_robot()
+   :no-index:
 
    Process URDF file and create robot dynamics model.
 
@@ -216,6 +222,7 @@ Initialization and Setup Methods
    - Identifies non-fixed joints for control
 
 .. py:method:: initialize_planner_and_controller()
+   :no-index:
 
    Initialize trajectory planning and control modules.
 
@@ -228,6 +235,7 @@ State Management and Monitoring
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:method:: get_joint_positions() -> np.ndarray
+   :no-index:
 
    Get current joint positions from simulation.
 
@@ -235,12 +243,14 @@ State Management and Monitoring
    :rtype: np.ndarray
 
 .. py:method:: set_joint_positions(joint_positions)
+   :no-index:
 
    Set target joint positions for position control.
 
    :param array_like joint_positions: Target angles in radians
 
 .. py:method:: check_collisions()
+   :no-index:
 
    Check for self-collisions and log contact points.
 
@@ -251,6 +261,7 @@ Data Logging and Analysis
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:method:: save_joint_states(filename="joint_states.csv")
+   :no-index:
 
    Save current joint states to CSV file.
 
@@ -259,6 +270,7 @@ Data Logging and Analysis
    Creates CSV with columns: Position, Velocity for each joint.
 
 .. py:method:: plot_trajectory_in_scene(joint_trajectory, end_effector_trajectory)
+   :no-index:
 
    Create 3D visualization of end-effector trajectory.
 

@@ -24,7 +24,7 @@ URDFToSerialManipulator Class
 .. currentmodule:: ManipulaPy.urdf_processor
 
 .. autoclass:: URDFToSerialManipulator
-   :members:
+   :no-members:
    :show-inheritance:
 
    Converts URDF files to SerialManipulator and ManipulatorDynamics objects with PyBullet integration.

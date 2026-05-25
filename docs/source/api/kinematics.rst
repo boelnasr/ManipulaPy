@@ -24,7 +24,7 @@ SerialManipulator Class
 .. currentmodule:: ManipulaPy.kinematics
 
 .. autoclass:: SerialManipulator
-   :members:
+   :no-members:
    :show-inheritance:
 
    Main class for serial manipulator kinematics using Product of Exponentials (PoE) formulation.
@@ -309,4 +309,4 @@ See Also
 - :doc:`dynamics` -- Dynamics computations building on kinematics
 - :doc:`control` -- Controllers using kinematic models
 - :doc:`path_planning` -- Trajectory generation with kinematic constraints
-- :doc:`../user_guide/Kinematics` -- Conceptual overview and theory what to replace here 
+- :doc:`../user_guide/Kinematics` -- Conceptual overview and theory

@@ -52,6 +52,7 @@ Welcome to the comprehensive ManipulaPy User Guide! This section provides detail
    :caption: Motion Planning & Simulation
 
    Trajectory_Planning
+   Path_Planning
    Simulation
    Singularity_Analysis
    Collision_Checker

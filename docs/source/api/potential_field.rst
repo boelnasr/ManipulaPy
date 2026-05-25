@@ -26,7 +26,7 @@ PotentialField Class
 .. currentmodule:: ManipulaPy.potential_field
 
 .. autoclass:: PotentialField
-   :members:
+   :no-members:
    :show-inheritance:
 
    Main class for artificial potential field computations including attractive and repulsive potential calculations with configurable gain parameters.
@@ -138,7 +138,7 @@ CollisionChecker Class
 ======================
 
 .. autoclass:: CollisionChecker
-   :members:
+   :no-members:
    :show-inheritance:
 
    URDF-based collision detection system using convex hull approximations for robotic manipulator self-collision and environment collision checking.

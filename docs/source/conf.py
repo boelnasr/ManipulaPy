@@ -312,7 +312,13 @@ if "sphinx.ext.autosectionlabel" in extensions:
 
 # ── Quality of life improvements ────────────────────────
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "**.ipynb_checkpoints",
+    "api/_autosummary/*",
+]
 
 # Language and locale
 language = "en"

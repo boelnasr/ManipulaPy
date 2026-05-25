@@ -28,7 +28,7 @@ ManipulatorDynamics Class
 .. currentmodule:: ManipulaPy.dynamics
 
 .. autoclass:: ManipulatorDynamics
-   :members:
+   :no-members:
    :show-inheritance:
 
    **Inheritance:**  derives from :py:class:`~ManipulaPy.kinematics.SerialManipulator`

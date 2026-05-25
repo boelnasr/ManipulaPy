@@ -26,7 +26,7 @@ Vision Class
 .. currentmodule:: ManipulaPy.vision
 
 .. autoclass:: Vision
-   :members:
+   :no-members:
    :show-inheritance:
 
    Unified vision system for monocular/stereo cameras with PyBullet integration, stereo processing pipeline, and YOLO-based object detection capabilities.

@@ -32,7 +32,7 @@ ManipulatorController Class
 .. currentmodule:: ManipulaPy.control
 
 .. autoclass:: ManipulatorController
-   :members:
+   :no-members:
    :show-inheritance:
 
    Main class for control of robotic manipulators. Backend-agnostic: works

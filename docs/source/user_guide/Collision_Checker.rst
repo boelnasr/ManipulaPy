@@ -63,7 +63,8 @@ API Reference
 .. currentmodule:: ManipulaPy.potential_field
 
 .. autoclass:: CollisionChecker
-   :members:
+   :no-members:
+   :no-index:
    :undoc-members:
    :inherited-members:
 

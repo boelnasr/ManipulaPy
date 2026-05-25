@@ -26,7 +26,7 @@ Perception Class
 .. currentmodule:: ManipulaPy.perception
 
 .. autoclass:: Perception
-   :members:
+   :no-members:
    :show-inheritance:
 
    Higher-level perception module that integrates Vision capabilities with machine learning algorithms for comprehensive environmental understanding and obstacle analysis.

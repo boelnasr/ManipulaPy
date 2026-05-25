@@ -336,6 +336,19 @@ Documentation Map
 
 .. toctree::
    :maxdepth: 2
+   :caption: 🚀 Getting Started
+
+   Installation Guide
+   getting_started/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 📘 Tutorials
+
+   tutorials/index
+
+.. toctree::
+   :maxdepth: 2
    :caption: 🛠️ API Reference
 
    api/index   
@@ -345,17 +358,6 @@ Documentation Map
    :caption: 📚 User Guides
 
    user_guide/index
-   user_guide/Kinematics
-   user_guide/Dynamics
-   user_guide/Control
-   user_guide/Trajectory_Planning
-   user_guide/Simulation
-   user_guide/URDF_Processor
-   user_guide/Singularity_Analysis 
-   user_guide/Perception
-   user_guide/Potential_Field
-   user_guide/Collision_Checker
-   user_guide/CUDA_Kernels
 
 Popular Learning Paths
 ----------------------

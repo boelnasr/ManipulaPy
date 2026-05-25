@@ -43,7 +43,7 @@ Simulation Class
 .. currentmodule:: ManipulaPy.sim
 
 .. autoclass:: Simulation
-   :members:
+   :no-members:
    :show-inheritance:
 
    Main class for PyBullet-based simulation of robotic manipulators with real-time physics, visualization, and interactive control capabilities.

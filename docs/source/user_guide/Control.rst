@@ -172,6 +172,7 @@ PID Control
 **Description**: Classic Proportional-Integral-Derivative control for joint space regulation.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.pid_control
+   :no-index:
 
 .. note::
 
@@ -207,6 +208,7 @@ PD Control
 **Description**: Proportional-Derivative control without integral term.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.pd_control
+   :no-index:
 
 **Example**:
 
@@ -229,6 +231,7 @@ Computed Torque Control
 **Description**: Model-based control that linearizes the nonlinear robot dynamics.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.computed_torque_control
+   :no-index:
 
 **Example**:
 
@@ -258,6 +261,7 @@ Feedforward Control
 **Description**: Open-loop control based on desired trajectory dynamics.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.feedforward_control
+   :no-index:
 
 **Example**:
 
@@ -280,6 +284,7 @@ PD + Feedforward Control
 **Description**: Combines feedback PD control with feedforward compensation.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.pd_feedforward_control
+   :no-index:
 
 **Example**:
 
@@ -302,6 +307,7 @@ Robust Control
 **Description**: Control with disturbance rejection capabilities.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.robust_control
+   :no-index:
 
 **Example**:
 
@@ -326,6 +332,7 @@ Adaptive Control
 **Description**: Control with online parameter adaptation.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.adaptive_control
+   :no-index:
 
 **Example**:
 
@@ -351,6 +358,7 @@ Joint and Torque Limit Enforcement
 -----------------------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.enforce_limits
+   :no-index:
 
 **Example**:
 
@@ -388,10 +396,13 @@ Kalman Filter State Estimation
 -------------------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.kalman_filter_predict
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.kalman_filter_update
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.kalman_filter_control
+   :no-index:
 
 **Example**:
 
@@ -421,6 +432,7 @@ Ziegler-Nichols Tuning
 ----------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.ziegler_nichols_tuning
+   :no-index:
 
 .. note::
 
@@ -453,8 +465,10 @@ Automatic Ultimate Gain Finding
 -------------------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.find_ultimate_gain_and_period
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.tune_controller
+   :no-index:
 
 **Example**:
 
@@ -480,6 +494,7 @@ Steady-State Response Analysis
 ------------------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.plot_steady_state_response
+   :no-index:
 
 **Example**:
 
@@ -503,10 +518,13 @@ Performance Metrics
 Calculate control performance metrics:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_rise_time
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_percent_overshoot
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_settling_time
+   :no-index:
 
 .. note::
 
@@ -520,6 +538,7 @@ Calculate control performance metrics:
    different numeric return values for negative setpoints or oscillatory traces.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_steady_state_error
+   :no-index:
 
 **Example**:
 
@@ -543,11 +562,13 @@ Joint Space Control
 -------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.joint_space_control
+   :no-index:
 
 Cartesian Space Control
 -----------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.cartesian_space_control
+   :no-index:
 
 Examples
 ========
@@ -738,7 +759,8 @@ API Reference
 =============
 
 .. autoclass:: ManipulaPy.control.ManipulatorController
-   :members:
+   :no-members:
+   :no-index:
    :undoc-members:
    :show-inheritance:
 

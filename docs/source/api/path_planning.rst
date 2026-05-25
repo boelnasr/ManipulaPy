@@ -24,7 +24,7 @@ OptimizedTrajectoryPlanning Class
 .. currentmodule:: ManipulaPy.path_planning
 
 .. autoclass:: OptimizedTrajectoryPlanning
-   :members:
+   :no-members:
    :show-inheritance:
 
    Highly optimized trajectory planning class with adaptive GPU/CPU execution, memory pooling, and batch processing capabilities.

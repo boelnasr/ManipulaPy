@@ -185,7 +185,8 @@ Singularity Class
 ~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: ManipulaPy.singularity.Singularity
-   :members:
+   :no-members:
+   :no-index:
    :undoc-members:
    :show-inheritance:
    :special-members: __init__
@@ -194,6 +195,7 @@ Core Analysis Methods
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. py:method:: __init__(serial_manipulator)
+   :no-index:
 
    Initialize singularity analysis for a given robot.
 
@@ -201,6 +203,7 @@ Core Analysis Methods
    :raises TypeError: If serial_manipulator is not a valid SerialManipulator instance
 
 .. py:method:: singularity_analysis(thetalist) -> bool
+   :no-index:
 
    Detect exact singularities using Jacobian determinant.
 
@@ -227,6 +230,7 @@ Core Analysis Methods
            print(f"Config {i+1} singular: {singular}")
 
 .. py:method:: condition_number(thetalist) -> float
+   :no-index:
 
    Calculate Jacobian condition number for singularity proximity assessment.
 
@@ -241,6 +245,7 @@ Core Analysis Methods
    - κ → ∞: At singularity
 
 .. py:method:: near_singularity_detection(thetalist, threshold=100) -> bool
+   :no-index:
 
    Detect proximity to singularities using condition number threshold.
 
@@ -259,6 +264,7 @@ Visualization Methods
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. py:method:: manipulability_ellipsoid(thetalist, ax=None)
+   :no-index:
 
    Visualize manipulability ellipsoids for linear and angular velocities.
 
@@ -278,6 +284,7 @@ Visualization Methods
    - **Orientation**: Principal motion directions
 
 .. py:method:: plot_workspace_monte_carlo(joint_limits, num_samples=10000)
+   :no-index:
 
    Generate workspace boundary using Monte Carlo sampling with optional GPU acceleration.
 
