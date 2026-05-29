@@ -185,6 +185,98 @@ class TestDynamicsRegressions(unittest.TestCase):
         g_default = sig.parameters["g"].default
         self.assertIsNone(g_default, "Mutable default detected — should use None")
 
+    def test_gravity_forces_2r_planar_analytical(self):
+        """CM-4: gravity_forces must equal the analytical holding torque.
+
+        The old implementation read the rotational inertia block
+        Glist[i][:3, :3] (all zeros for point masses) instead of the link
+        mass, and used a non-physical formula — so it returned [0, 0] for this
+        fixture regardless of gravity direction. The holding torque is
+        tau_i = d(PE)/d(theta_i) with PE = -sum_k m_k * g . p_k_com.
+
+        An explicit (correct) S_list is supplied so this test is independent of
+        the separate screw-sign fix (CM-5); gravity_forces only uses the
+        space-frame Jacobian / FK, both driven by S_list.
+        """
+        from ManipulaPy.dynamics import ManipulatorDynamics
+        from ManipulaPy.utils import extract_screw_list
+
+        L1 = L2 = 1.0
+        m1 = m2 = 1.0
+        omega_list = np.array([[0, 0, 1], [0, 0, 1]]).T  # (3, 2), both about +z
+        r_list = np.array([[0, 0, 0], [L1, 0, 0]]).T
+        S_list = extract_screw_list(omega_list, r_list)  # correct space screws
+
+        M_list = np.eye(4)
+        M_list[0, 3] = L1 + L2
+        M_link1 = np.eye(4)
+        M_link1[0, 3] = L1
+        M_link2 = np.eye(4)
+        M_link2[0, 3] = L1 + L2
+
+        Glist = np.array(
+            [np.diag([0.0, 0.0, 0.0, m, m, m]) for m in (m1, m2)]
+        )
+
+        dyn = ManipulatorDynamics(
+            M_list=M_list,
+            omega_list=omega_list,
+            r_list=r_list,
+            b_list=r_list,  # dummy; gravity uses only the space Jacobian
+            S_list=S_list,
+            B_list=None,
+            Glist=Glist,
+            Mlist_per_link=[M_link1, M_link2],
+        )
+
+        theta = np.array([0.0, np.pi / 2])
+
+        # Gravity in -x. CoM positions: p1=(0,0,0)->rot, p2 fold; holding torque
+        # tau = d(PE)/d(theta) works out to [-9.81, -9.81] (derived by hand).
+        tau_x = dyn.gravity_forces(theta, [-9.81, 0.0, 0.0])
+        np.testing.assert_array_almost_equal(tau_x, [-9.81, -9.81], decimal=4)
+
+        # Gravity in -y at the same pose -> [19.62, 0.0].
+        tau_y = dyn.gravity_forces(theta, [0.0, -9.81, 0.0])
+        np.testing.assert_array_almost_equal(tau_y, [19.62, 0.0], decimal=4)
+
+        # Planar arm in the xy-plane: vertical (-z) gravity does no work, so the
+        # holding torque is exactly zero — the value the OLD code returned for
+        # every direction.
+        tau_z = dyn.gravity_forces(theta, [0.0, 0.0, -9.81])
+        np.testing.assert_array_almost_equal(tau_z, [0.0, 0.0], decimal=6)
+
+    def test_gravity_forces_legacy_path_emits_warning(self):
+        """CM-4: without Mlist_per_link, gravity_forces warns and falls back."""
+        import warnings
+
+        from ManipulaPy.dynamics import ManipulatorDynamics
+        from ManipulaPy.utils import extract_screw_list
+
+        omega_list = np.array([[0, 0, 1]]).T
+        r_list = np.array([[0, 0, 0]]).T
+        M_list = np.eye(4)
+        Glist = np.array([np.eye(6)])
+
+        dyn = ManipulatorDynamics(
+            M_list=M_list,
+            omega_list=omega_list,
+            r_list=r_list,
+            b_list=r_list,
+            S_list=extract_screw_list(omega_list, r_list),
+            B_list=None,
+            Glist=Glist,
+            # Mlist_per_link omitted intentionally
+        )
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            dyn.gravity_forces(np.array([0.0]), [0.0, 0.0, -9.81])
+            self.assertTrue(
+                any("legacy" in str(wi.message).lower() for wi in w),
+                "gravity_forces without Mlist_per_link should emit a warning",
+            )
+
 
 class TestKinematicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/kinematics.py bugs."""

@@ -210,10 +210,57 @@ class ManipulatorDynamics(SerialManipulator):
         g: Optional[Union[NDArray[np.float64], List[float]]] = None,
     ) -> NDArray[np.float64]:
         if g is None:
-            g = [0, 0, -9.81]
+            g = [0.0, 0.0, -9.81]
+        g = np.asarray(g, dtype=np.float64)
+        n = len(thetalist)
+
+        if self.Mlist_per_link is None:
+            # Legacy fallback for callers that build ManipulatorDynamics
+            # manually without per-link CoM data. Mirrors mass_matrix.
+            import warnings
+
+            warnings.warn(
+                "gravity_forces called without Mlist_per_link — using legacy "
+                "approximation (incorrect for non-trivial robots). Construct "
+                "ManipulatorDynamics via URDFToSerialManipulator to get accurate "
+                "gravity compensation.",
+                stacklevel=2,
+            )
+            return self._gravity_forces_legacy(thetalist, g)
+
+        # g(θ)_i = Σ_k (J_k^T F_k)_i, where J_k is the body Jacobian of link k's
+        # CoM and F_k = [0; m_k R_k^T (-g)] is the gravity-balancing wrench in
+        # that CoM frame (Modern Robotics §8.3 / base accelerated by -g). The
+        # per-link CoM Jacobian construction matches mass_matrix exactly.
+        grav = np.zeros(n, dtype=np.float64)
+        J_s = self.jacobian(thetalist, frame="space")  # (6, n)
+
+        for k in range(n):
+            T_k_zero = self.Mlist_per_link[k]
+            T_k = self.forward_kinematics(thetalist[: k + 1], frame="space")
+            T_k_at_zero = self.forward_kinematics(np.zeros(k + 1), frame="space")
+            T_link_to_com = np.linalg.inv(T_k_at_zero) @ T_k_zero
+            T_k_com = T_k @ T_link_to_com
+
+            # Columns i > k stay zero: joint i is downstream of link k.
+            J_k = np.zeros((6, n), dtype=np.float64)
+            J_k[:, : k + 1] = ad(np.linalg.inv(T_k_com)) @ J_s[:, : k + 1]
+
+            # Pure force m_k * R_k^T (-g) in the CoM body frame; no moment,
+            # since the force acts through the CoM origin. [moment; force]
+            # ordering pairs with the [omega; v] twist of J_k.
+            m_k = self.Glist[k][3, 3]
+            F = np.zeros(6, dtype=np.float64)
+            F[3:6] = m_k * (T_k_com[:3, :3].T @ (-g))
+            grav += J_k.T @ F
+
+        return grav
+
+    def _gravity_forces_legacy(self, thetalist, g):
+        """Legacy gravity approximation (incorrect, kept for backward compat)."""
         n = len(thetalist)
         grav = np.zeros(n)
-        G = np.array(g)
+        G = np.asarray(g)
         for i in range(n):
             AdT = ad(self.forward_kinematics(thetalist[: i + 1], "space"))
             grav[i] = np.dot(AdT.T[:3, :3], G[:3]).dot(
