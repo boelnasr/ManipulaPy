@@ -324,6 +324,44 @@ class TestKinematicsRegressions(unittest.TestCase):
             Jb[:, -1], robot.B_list[:, -1], decimal=6
         )
 
+    def test_generate_path_screws_match_analytical_2r_off_home(self):
+        """CM-5: building from omega_list/r_list (no S_list) must give correct
+        off-home FK.
+
+        kinematics.__init__ passed -omega_list to extract_screw_list, which
+        already applies v = -omega x r — so the minus corrupted the generated
+        space screw (axis flipped). FK was only self-consistent at the home
+        pose (theta=0); off-home it produced FK_correct(-theta). Verified here
+        against the closed-form 2R planar arm. The URDF path is unaffected
+        because it always passes explicit S_list/B_list.
+        """
+        from ManipulaPy.kinematics import SerialManipulator
+
+        L1 = L2 = 1.0
+        omega_list = np.array([[0, 0, 1], [0, 0, 1]]).T
+        r_list = np.array([[0, 0, 0], [L1, 0, 0]]).T
+        M_list = np.eye(4)
+        M_list[0, 3] = L1 + L2  # home pose: EE at full extension
+
+        # Generate path: omega_list/r_list only, no S_list or B_list.
+        robot = SerialManipulator(
+            M_list=M_list, omega_list=omega_list, r_list=r_list
+        )
+
+        theta = np.array([0.3, 0.5])
+        T = robot.forward_kinematics(theta, frame="space")
+
+        s = theta[0] + theta[1]
+        T_expected = np.array(
+            [
+                [np.cos(s), -np.sin(s), 0, L1 * np.cos(theta[0]) + L2 * np.cos(s)],
+                [np.sin(s), np.cos(s), 0, L1 * np.sin(theta[0]) + L2 * np.sin(s)],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1],
+            ]
+        )
+        np.testing.assert_array_almost_equal(T, T_expected, decimal=6)
+
 
 class TestPathPlanningRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/path_planning.py bugs."""

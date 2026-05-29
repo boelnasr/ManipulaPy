@@ -69,11 +69,14 @@ class SerialManipulator:
         # Extract b_list from B_list if not provided
         self.b_list = b_list if b_list is not None else utils.extract_r_list(B_list)
 
-        # Generate S_list if not provided
+        # Generate S_list if not provided. extract_screw_list already applies
+        # the standard v = -omega x r, so omega_list is passed positively;
+        # negating it here corrupted the generated space screw (axis flipped),
+        # making FK correct only at the home pose.
         self.S_list = (
             S_list
             if S_list is not None
-            else utils.extract_screw_list(-omega_list, self.r_list)
+            else utils.extract_screw_list(omega_list, self.r_list)
         )
 
         # Generate B_list if not provided
