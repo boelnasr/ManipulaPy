@@ -174,7 +174,7 @@ def _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method):
 
 
 # Thin wrapper – unchanged signature, now just calls the new kernel above
-@njit(parallel=True, fastmath=True)
+@njit(fastmath=True)
 def _traj_cpu_njit(thetastart, thetaend, Tf, N, method):
     return _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
 
