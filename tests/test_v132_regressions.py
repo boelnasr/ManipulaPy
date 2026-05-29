@@ -189,6 +189,49 @@ class TestDynamicsRegressions(unittest.TestCase):
 class TestKinematicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/kinematics.py bugs."""
 
+    def _load_simple_arm(self):
+        import os
+
+        from ManipulaPy.urdf_processor import URDFToSerialManipulator
+
+        urdf_path = os.path.join(
+            os.path.dirname(__file__), "urdf_fixtures", "simple_arm.urdf"
+        )
+        self.assertTrue(
+            os.path.exists(urdf_path), f"Test fixture missing: {urdf_path}"
+        )
+        return URDFToSerialManipulator(urdf_path).serial_manipulator
+
+    def test_body_jacobian_satisfies_adjoint_identity(self):
+        """CM-3: jacobian(frame="body") must satisfy Js = Ad_{T_sb} @ Jb.
+
+        The body branch seeded its accumulator from the full body FK
+        (M times the joint product) instead of identity, so the last column
+        was Ad(T_full^-1) @ B_n rather than B_n, and the whole body Jacobian
+        violated the space/body adjoint identity. This contaminates body-frame
+        end_effector_velocity and joint_velocity.
+        """
+        from ManipulaPy.utils import adjoint_transform
+
+        robot = self._load_simple_arm()
+        n = robot.S_list.shape[1]
+        theta = np.linspace(0.1, 0.1 + 0.15 * (n - 1), n)
+
+        Js = robot.jacobian(theta, frame="space")
+        Jb = robot.jacobian(theta, frame="body")
+        T_sb = robot.forward_kinematics(theta, frame="space")
+
+        np.testing.assert_array_almost_equal(
+            Js,
+            adjoint_transform(T_sb) @ Jb,
+            decimal=5,
+            err_msg="Js != Ad_{T_sb} @ Jb — body Jacobian is inconsistent",
+        )
+        # Last column of the body Jacobian must equal B_n exactly (Ad(I) @ B_n).
+        np.testing.assert_array_almost_equal(
+            Jb[:, -1], robot.B_list[:, -1], decimal=6
+        )
+
 
 class TestPathPlanningRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/path_planning.py bugs."""

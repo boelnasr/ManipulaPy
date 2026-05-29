@@ -212,17 +212,20 @@ class SerialManipulator:
                     T, utils.transform_from_twist(self.S_list[:, i], thetalist[i])
                 )
         elif frame == "body":
-            T = self.forward_kinematics(thetalist, frame="body")
-            for i in reversed(range(len(thetalist))):
-                J[:, i] = np.dot(
-                    utils.adjoint_transform(np.linalg.inv(T)), self.B_list[:, i]
-                )
+            # Modern Robotics JacobianBody: start from identity, accumulate
+            # e^{-[B_{i+1}]theta_{i+1}} to the right. The last column is B_n
+            # (Ad(I) @ B_n); each earlier column is Ad of the trailing product.
+            n = len(thetalist)
+            J[:, n - 1] = self.B_list[:, n - 1]
+            T = np.eye(4)
+            for i in range(n - 2, -1, -1):
                 T = np.dot(
                     T,
-                    np.linalg.inv(
-                        utils.transform_from_twist(self.B_list[:, i], thetalist[i])
+                    utils.transform_from_twist(
+                        self.B_list[:, i + 1], -thetalist[i + 1]
                     ),
                 )
+                J[:, i] = np.dot(utils.adjoint_transform(T), self.B_list[:, i])
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return J
