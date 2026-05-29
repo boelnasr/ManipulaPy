@@ -79,6 +79,43 @@ class TestUtilsRegressions(unittest.TestCase):
         T_recon = MatrixExp6(VecTose3(S_theta))
         np.testing.assert_array_almost_equal(T_recon, T, decimal=6)
 
+    def test_rotation_logm_recovers_axis_at_180_degrees(self):
+        """CM-6: rotation_logm must recover the axis at theta = pi.
+
+        A 180-degree rotation matrix is symmetric, so R - R^T = 0 and
+        sin(theta) -> 0; the generic 1/(2 sin theta) * (R - R^T) formula
+        collapses to the zero vector and loses the axis. Mirror the
+        MatrixLog3 theta~pi handling so exp(log(R)) reconstructs R.
+        """
+        from ManipulaPy.utils import MatrixExp3, VecToso3, rotation_logm
+
+        axes = [
+            np.array([0.0, 0.0, 1.0]),
+            np.array([1.0, 1.0, 0.0]) / np.sqrt(2),
+            np.array([1.0, 2.0, 2.0]) / 3.0,
+        ]
+        for n in axes:
+            R = 2.0 * np.outer(n, n) - np.eye(3)  # 180-degree rotation about n
+            omega, theta = rotation_logm(R)
+            self.assertFalse(np.any(np.isnan(omega)), f"NaN axis for n={n}")
+            self.assertAlmostEqual(theta, np.pi, places=6)
+            R_recon = MatrixExp3(VecToso3(omega * theta))
+            np.testing.assert_array_almost_equal(
+                R_recon, R, decimal=6, err_msg=f"exp(log(R)) != R for n={n}"
+            )
+
+        # Just below pi (generic branch) must stay accurate too — the pi-branch
+        # threshold is intentionally tight so this range uses the exact formula.
+        for ang in (np.pi - 1e-4, np.pi - 1e-2):
+            n = np.array([0.0, 1.0, 0.0])
+            R = MatrixExp3(VecToso3(n * ang))
+            omega, theta = rotation_logm(R)
+            self.assertAlmostEqual(theta, ang, places=6)
+            R_recon = MatrixExp3(VecToso3(omega * theta))
+            np.testing.assert_array_almost_equal(
+                R_recon, R, decimal=6, err_msg=f"exp(log(R)) != R at angle {ang}"
+            )
+
 
 class TestDynamicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/dynamics.py bugs."""

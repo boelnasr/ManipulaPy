@@ -299,6 +299,28 @@ def rotation_logm(R):
     # Check if rotation is very small (identity or near-identity)
     if theta_scalar < 1e-6:
         return np.zeros(3), theta_scalar
+    elif theta_scalar > np.pi - 1e-6:
+        # theta ~ pi: R is (near-)symmetric so R - R^T -> 0 while 1/(2 sin theta)
+        # blows up, collapsing the generic formula to the zero vector. Extract
+        # the axis from the most positive diagonal term instead (mirrors
+        # MatrixLog3 / Modern Robotics). The threshold is kept tight (1e-6):
+        # the generic formula stays accurate until extremely close to pi, and
+        # the diagonal extraction assumes exactly theta = pi, so widening the
+        # band would trade a smaller floating-point error for a larger
+        # axis-approximation error.
+        if not NearZero(1 + R[2, 2]):
+            omega = (1.0 / np.sqrt(2 * (1 + R[2, 2]))) * np.array(
+                [R[0, 2], R[1, 2], 1 + R[2, 2]]
+            )
+        elif not NearZero(1 + R[1, 1]):
+            omega = (1.0 / np.sqrt(2 * (1 + R[1, 1]))) * np.array(
+                [R[0, 1], 1 + R[1, 1], R[2, 1]]
+            )
+        else:
+            omega = (1.0 / np.sqrt(2 * (1 + R[0, 0]))) * np.array(
+                [1 + R[0, 0], R[1, 0], R[2, 0]]
+            )
+        return omega, theta_scalar
     else:
         omega = (
             1
