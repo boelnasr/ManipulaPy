@@ -45,7 +45,7 @@ class URDF:
         materials: Optional[Dict[str, Material]] = None,
         transmissions: Optional[List[Transmission]] = None,
         filename_handler: Optional[Callable[[str], str]] = None,
-    ):
+    ) -> None:
         """
         Initialize URDF.
 
@@ -291,7 +291,7 @@ class URDF:
         )
 
     @classmethod
-    def from_xml_string(cls, xml_string: str, **kwargs) -> "URDF":
+    def from_xml_string(cls, xml_string: str, **kwargs: object) -> "URDF":
         """Load URDF from XML string."""
         from .parser import URDFParser
 
@@ -406,7 +406,7 @@ class URDF:
         )
 
     @cfg.setter
-    def cfg(self, value: Union[np.ndarray, List[float], Dict[str, float]]):
+    def cfg(self, value: Union[np.ndarray, List[float], Dict[str, float]]) -> None:
         """Set current configuration."""
         self.update_cfg(value)
 
@@ -883,6 +883,7 @@ class URDF:
         return copy.deepcopy(self)
 
     def __repr__(self) -> str:
+        """Return a compact debug representation."""
         return (
             f"URDF(name='{self.name}', "
             f"links={len(self._links)}, "
@@ -891,6 +892,7 @@ class URDF:
         )
 
     def __str__(self) -> str:
+        """Return a human-readable URDF summary."""
         lines = [
             f"URDF: {self.name}",
             f"  Links: {len(self._links)}",

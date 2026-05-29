@@ -34,6 +34,8 @@ from .utils import adjoint_transform as ad
 
 
 class ManipulatorDynamics(SerialManipulator):
+    """Serial manipulator model with mass, Coriolis, gravity, and dynamics APIs."""
+
     def __init__(
         self,
         M_list: NDArray[np.float64],
@@ -45,6 +47,19 @@ class ManipulatorDynamics(SerialManipulator):
         Glist: Union[List[NDArray[np.float64]], NDArray[np.float64]],
         Mlist_per_link: Optional[List[NDArray[np.float64]]] = None,  # New
     ) -> None:
+        """
+        Initialize manipulator dynamics data and finite-difference caches.
+
+        Args:
+            M_list: Home transforms for the manipulator.
+            omega_list: Joint angular velocity axes.
+            r_list: Space-frame screw-axis position vectors.
+            b_list: Body-frame screw-axis position vectors.
+            S_list: Space-frame screw axes.
+            B_list: Body-frame screw axes.
+            Glist: Spatial inertia matrices per link.
+            Mlist_per_link: Optional CoM transforms per link.
+        """
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
         self.Glist = Glist
         self.Mlist_per_link = Mlist_per_link  # NEW
@@ -123,7 +138,9 @@ class ManipulatorDynamics(SerialManipulator):
         self._mass_matrix_cache[thetalist_key] = M
         return M
 
-    def _mass_matrix_legacy(self, thetalist):
+    def _mass_matrix_legacy(
+        self, thetalist: Union[NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
         """Legacy mass matrix (incorrect, kept for backward compat). DO NOT USE."""
         thetalist_key = tuple(thetalist)
         n = len(thetalist)
@@ -187,6 +204,16 @@ class ManipulatorDynamics(SerialManipulator):
         thetalist: Union[NDArray[np.float64], List[float]],
         dthetalist: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
+        """
+        Compute Coriolis and centripetal generalized forces.
+
+        Args:
+            thetalist: Joint angles.
+            dthetalist: Joint velocities.
+
+        Returns:
+            Joint-space velocity quadratic force vector.
+        """
         n = len(thetalist)
         dtheta = np.asarray(dthetalist, dtype=np.float64)
         if np.allclose(dtheta, 0.0):
@@ -209,6 +236,16 @@ class ManipulatorDynamics(SerialManipulator):
         thetalist: Union[NDArray[np.float64], List[float]],
         g: Optional[Union[NDArray[np.float64], List[float]]] = None,
     ) -> NDArray[np.float64]:
+        """
+        Compute joint torques needed to compensate gravity.
+
+        Args:
+            thetalist: Joint angles.
+            g: Gravity vector. Defaults to ``[0, 0, -9.81]``.
+
+        Returns:
+            Joint-space gravity compensation torques.
+        """
         if g is None:
             g = [0.0, 0.0, -9.81]
         g = np.asarray(g, dtype=np.float64)
@@ -256,7 +293,11 @@ class ManipulatorDynamics(SerialManipulator):
 
         return grav
 
-    def _gravity_forces_legacy(self, thetalist, g):
+    def _gravity_forces_legacy(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+    ) -> NDArray[np.float64]:
         """Legacy gravity approximation (incorrect, kept for backward compat)."""
         n = len(thetalist)
         grav = np.zeros(n)
@@ -276,6 +317,19 @@ class ManipulatorDynamics(SerialManipulator):
         g: Union[NDArray[np.float64], List[float]],
         Ftip: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
+        """
+        Compute joint torques for the requested motion and end-effector wrench.
+
+        Args:
+            thetalist: Joint angles.
+            dthetalist: Joint velocities.
+            ddthetalist: Joint accelerations.
+            g: Gravity vector.
+            Ftip: End-effector wrench.
+
+        Returns:
+            Required joint torques.
+        """
         n = len(thetalist)
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
@@ -292,6 +346,19 @@ class ManipulatorDynamics(SerialManipulator):
         g: Union[NDArray[np.float64], List[float]],
         Ftip: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
+        """
+        Solve joint accelerations from applied torques and external loads.
+
+        Args:
+            thetalist: Joint angles.
+            dthetalist: Joint velocities.
+            taulist: Applied joint torques.
+            g: Gravity vector.
+            Ftip: End-effector wrench.
+
+        Returns:
+            Joint accelerations.
+        """
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)

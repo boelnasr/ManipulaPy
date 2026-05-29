@@ -28,7 +28,7 @@ class MeshData:
     normals: Optional[np.ndarray] = None
 
 
-def load_mesh(filename: str, scale: np.ndarray = None) -> Optional[MeshData]:
+def load_mesh(filename: str, scale: Optional[np.ndarray] = None) -> Optional[MeshData]:
     """
     Load mesh from file.
 

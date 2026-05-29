@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from .types import Origin
+from .types import Geometry, Origin
 
 
 @dataclass
@@ -33,7 +33,7 @@ class RobotInstance:
     )
     namespace: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.base_transform = np.asarray(self.base_transform, dtype=np.float64)
         if self.base_transform.shape != (4, 4):
             raise ValueError("base_transform must be a 4x4 matrix")
@@ -68,7 +68,7 @@ class Scene:
         >>> world_fk = scene.world_link_fk({"robot1": [0]*6, "robot2": [0]*6})
     """
 
-    def __init__(self, name: str = "scene"):
+    def __init__(self, name: str = "scene") -> None:
         """
         Initialize an empty scene.
 
@@ -403,7 +403,7 @@ class Scene:
         return np.all(max1 >= min2) and np.all(max2 >= min1)
 
     def _get_geometry_bbox(
-        self, geometry, transform: np.ndarray
+        self, geometry: Geometry, transform: np.ndarray
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
         """Get axis-aligned bounding box for geometry in world frame."""
         from .types import Box, Cylinder, Mesh, Sphere
@@ -477,5 +477,6 @@ class Scene:
         return scene
 
     def __repr__(self) -> str:
+        """Return a compact scene representation."""
         robot_list = ", ".join(self.robot_names)
         return f"Scene(name='{self.name}', robots=[{robot_list}])"

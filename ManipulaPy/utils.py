@@ -34,11 +34,14 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
+from typing import Optional, Tuple
+
 import numpy as np
+from numpy.typing import NDArray
 from scipy.linalg import expm
 
 
-def extract_r_list(Slist):
+def extract_r_list(Slist) -> NDArray[np.float64]:
     """
     Extracts the r_list from the given Slist.
 
@@ -65,7 +68,7 @@ def extract_r_list(Slist):
     return np.array(r_list)
 
 
-def extract_omega_list(Slist):
+def extract_omega_list(Slist) -> NDArray[np.float64]:
     """
     Extracts the first three elements from each sublist in the given list and returns them as a numpy array.
 
@@ -78,7 +81,7 @@ def extract_omega_list(Slist):
     return np.array(Slist)[:, :3]
 
 
-def extract_screw_list(omega_list, r_list):
+def extract_screw_list(omega_list, r_list) -> Optional[NDArray[np.float64]]:
     """
     Build a 6xn screw-axis matrix from (3xn) angular velocities 'omega_list'
     and (3xn) positions 'r_list'.
@@ -161,7 +164,7 @@ def extract_screw_list(omega_list, r_list):
     return S
 
 
-def NearZero(z):
+def NearZero(z: float) -> bool:
     """
     Determines if a given number is near zero.
 
@@ -174,7 +177,7 @@ def NearZero(z):
     return abs(z) < 1e-6
 
 
-def skew_symmetric(v):
+def skew_symmetric(v) -> NDArray[np.float64]:
     """
     Returns the skew symmetric matrix of a 3D vector.
 
@@ -187,7 +190,7 @@ def skew_symmetric(v):
     return np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
 
 
-def transform_from_twist(S, theta):
+def transform_from_twist(S, theta: float) -> NDArray[np.float64]:
     """
     Computes the transformation matrix from a twist and a joint angle.
 
@@ -220,7 +223,7 @@ def transform_from_twist(S, theta):
         return np.vstack((np.hstack((R, p.reshape(-1, 1))), [0, 0, 0, 1]))
 
 
-def adjoint_transform(T):
+def adjoint_transform(T) -> NDArray[np.float64]:
     """
     Computes the adjoint transformation matrix for a given transformation matrix.
 
@@ -236,7 +239,7 @@ def adjoint_transform(T):
     return np.vstack((np.hstack((R, np.zeros((3, 3)))), np.hstack((skew_p @ R, R))))
 
 
-def logm(T):
+def logm(T) -> NDArray[np.float64]:
     """
     Computes the logarithm of a transformation matrix.
 
@@ -261,7 +264,7 @@ def logm(T):
     return np.hstack((omega * theta, v))
 
 
-def rotation_logm(R):
+def rotation_logm(R) -> Tuple[NDArray[np.float64], float]:
     """
     Computes the logarithm of a rotation matrix.
 
@@ -330,7 +333,7 @@ def rotation_logm(R):
         return omega, theta_scalar
 
 
-def logm_to_twist(logm):
+def logm_to_twist(logm) -> NDArray[np.float64]:
     """
     Convert the logarithm of a transformation matrix to a twist vector.
 
@@ -349,7 +352,7 @@ def logm_to_twist(logm):
     return np.hstack((omega, v))
 
 
-def skew_symmetric_to_vector(skew_symmetric):
+def skew_symmetric_to_vector(skew_symmetric) -> NDArray[np.float64]:
     """
     Convert a skew-symmetric matrix to a vector.
 
@@ -362,7 +365,7 @@ def skew_symmetric_to_vector(skew_symmetric):
     return np.array([skew_symmetric[2, 1], skew_symmetric[0, 2], skew_symmetric[1, 0]])
 
 
-def se3ToVec(se3_matrix):
+def se3ToVec(se3_matrix) -> NDArray[np.float64]:
     """
     Convert an se(3) matrix to a twist vector.
 
@@ -380,7 +383,7 @@ def se3ToVec(se3_matrix):
     return np.hstack((omega, v))
 
 
-def TransToRp(T):
+def TransToRp(T) -> Tuple[NDArray[np.float64], NDArray[np.float64]]:
     """
     Converts a homogeneous transformation matrix into a rotation matrix and position vector.
 
@@ -395,7 +398,7 @@ def TransToRp(T):
     return R, p
 
 
-def TransInv(T):
+def TransInv(T) -> NDArray[np.float64]:
     """
     Inverts a homogeneous transformation matrix.
 
@@ -410,7 +413,7 @@ def TransInv(T):
     return np.vstack((np.hstack((Rt, -Rt @ p.reshape(-1, 1))), [0, 0, 0, 1]))
 
 
-def MatrixLog6(T):
+def MatrixLog6(T) -> NDArray[np.float64]:
     """
     Compute the matrix logarithm of a given transformation matrix T.
 
@@ -444,7 +447,7 @@ def MatrixLog6(T):
     return np.vstack((np.hstack((omega_mat_scaled, v.reshape(-1, 1))), [0, 0, 0, 0]))
 
 
-def MatrixExp6(se3mat):
+def MatrixExp6(se3mat) -> NDArray[np.float64]:
     """
     Computes the matrix exponential of a matrix in se(3).
 
@@ -487,7 +490,7 @@ def MatrixExp6(se3mat):
     return T
 
 
-def MatrixLog3(R):
+def MatrixLog3(R) -> NDArray[np.float64]:
     """
     Computes the matrix logarithm of a rotation matrix.
 
@@ -519,7 +522,7 @@ def MatrixLog3(R):
         return theta / 2.0 / np.sin(theta) * (R - np.array(R).T)
 
 
-def VecToso3(omega):
+def VecToso3(omega) -> NDArray[np.float64]:
     """
     Converts a 3D angular velocity vector to a skew-symmetric matrix.
 
@@ -534,7 +537,7 @@ def VecToso3(omega):
     )
 
 
-def VecTose3(V):
+def VecTose3(V) -> NDArray[np.float64]:
     """
     Converts a spatial velocity vector to an se(3) matrix.
 
@@ -547,7 +550,7 @@ def VecTose3(V):
     return np.r_[np.c_[VecToso3(V[:3]), V[3:].reshape(3, 1)], np.zeros((1, 4))]
 
 
-def MatrixExp3(so3mat):
+def MatrixExp3(so3mat) -> NDArray[np.float64]:
     """
     Computes the matrix exponential of a matrix in so(3).
 
@@ -560,7 +563,7 @@ def MatrixExp3(so3mat):
     return expm(so3mat)
 
 
-def CubicTimeScaling(Tf, t):
+def CubicTimeScaling(Tf: float, t: float) -> float:
     """
     Compute the cubic time scaling factor.
 
@@ -574,7 +577,7 @@ def CubicTimeScaling(Tf, t):
     return 3 * (t / Tf) ** 2 - 2 * (t / Tf) ** 3
 
 
-def QuinticTimeScaling(Tf, t):
+def QuinticTimeScaling(Tf: float, t: float) -> float:
     """
     Compute the quintic time scaling factor.
 
@@ -588,7 +591,7 @@ def QuinticTimeScaling(Tf, t):
     return 10 * (t / Tf) ** 3 - 15 * (t / Tf) ** 4 + 6 * (t / Tf) ** 5
 
 
-def rotation_matrix_to_euler_angles(R):
+def rotation_matrix_to_euler_angles(R) -> NDArray[np.float64]:
     """
     Convert a rotation matrix to Euler angles (roll, pitch, yaw).
 
@@ -615,7 +618,7 @@ def rotation_matrix_to_euler_angles(R):
     return np.array([x, y, z])
 
 
-def euler_to_rotation_matrix(euler_deg):
+def euler_to_rotation_matrix(euler_deg) -> NDArray[np.float64]:
     """
     Convert Euler angles (roll_deg, pitch_deg, yaw_deg) in degrees
     to a 3x3 rotation matrix.

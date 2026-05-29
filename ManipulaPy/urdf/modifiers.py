@@ -11,13 +11,24 @@ Copyright (c) 2025 Mohamed Aboelnasr
 
 import json
 import logging
+import xml.etree.ElementTree as ET
 from copy import deepcopy
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import numpy as np
 
-from .types import Inertial, Joint, JointLimit, JointType, Link, Origin
+from .types import (
+    Collision,
+    Geometry,
+    Inertial,
+    Joint,
+    JointLimit,
+    JointType,
+    Link,
+    Origin,
+    Visual,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +49,7 @@ class URDFModifier:
         >>> calibrated_urdf = modifier.urdf
     """
 
-    def __init__(self, urdf: "URDF"):
+    def __init__(self, urdf: "URDF") -> None:
         """
         Create modifier for URDF.
 
@@ -616,7 +627,7 @@ class URDFModifier:
         self._indent_xml(root)
         return ET.tostring(root, encoding="unicode")
 
-    def _export_origin(self, parent, origin: Origin) -> None:
+    def _export_origin(self, parent: ET.Element, origin: Origin) -> None:
         """Export origin element."""
         import xml.etree.ElementTree as ET
 
@@ -624,7 +635,7 @@ class URDFModifier:
         rpy = " ".join(f"{x:.6g}" for x in origin.rpy)
         ET.SubElement(parent, "origin", xyz=xyz, rpy=rpy)
 
-    def _export_visual(self, parent, visual) -> None:
+    def _export_visual(self, parent: ET.Element, visual: Visual) -> None:
         """Export visual element."""
         import xml.etree.ElementTree as ET
 
@@ -644,7 +655,7 @@ class URDFModifier:
             if visual.material.name:
                 ET.SubElement(vis_elem, "material", name=visual.material.name)
 
-    def _export_collision(self, parent, collision) -> None:
+    def _export_collision(self, parent: ET.Element, collision: Collision) -> None:
         """Export collision element."""
         import xml.etree.ElementTree as ET
 
@@ -658,7 +669,7 @@ class URDFModifier:
             geom_elem = ET.SubElement(col_elem, "geometry")
             self._export_geometry(geom_elem, collision.geometry)
 
-    def _export_geometry(self, parent, geometry) -> None:
+    def _export_geometry(self, parent: ET.Element, geometry: Geometry) -> None:
         """Export geometry element."""
         import xml.etree.ElementTree as ET
 
@@ -683,7 +694,7 @@ class URDFModifier:
                 attrs["scale"] = " ".join(f"{x:.6g}" for x in geometry.scale)
             ET.SubElement(parent, "mesh", **attrs)
 
-    def _indent_xml(self, elem, level: int = 0) -> None:
+    def _indent_xml(self, elem: ET.Element, level: int = 0) -> None:
         """Add indentation to XML element."""
         indent = "\n" + "  " * level
         if len(elem):

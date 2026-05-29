@@ -28,7 +28,7 @@ import os
 import warnings
 from functools import lru_cache
 from time import perf_counter
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 import numpy as np
 from numba import config as _nb_cfg
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 
 # ENHANCED CUDA DETECTION WITH COMPREHENSIVE ERROR HANDLING
-def _detect_cuda_capability():
+def _detect_cuda_capability() -> Tuple[bool, Any, Any, Any, Optional[str]]:
     """
     Comprehensive CUDA detection with detailed diagnostics and error handling.
 
@@ -219,7 +219,7 @@ except ImportError:
 float_t = float32
 
 
-def check_cuda_availability():
+def check_cuda_availability() -> bool:
     """Enhanced CUDA availability check with detailed diagnostics."""
     if CUDA_AVAILABLE:
         try:
@@ -267,7 +267,7 @@ def check_cuda_availability():
         return False
 
 
-def check_cupy_availability():
+def check_cupy_availability() -> bool:
     """Check CuPy availability for additional GPU operations."""
     if not CUPY_AVAILABLE:
         warnings.warn(
@@ -294,7 +294,7 @@ _PINNED_MEMORY_OPT_IN = os.environ.get("MANIPULAPY_USE_PINNED_MEMORY", "0").lowe
 
 
 # ENHANCED MEMORY MANAGEMENT
-def _h2d_pinned(arr):
+def _h2d_pinned(arr: np.ndarray) -> Any:
     """Host-to-device transfer with optional pinned-memory acceleration.
 
     Pinned memory delivers ~3x peak transfer bandwidth on large arrays, but
@@ -326,7 +326,9 @@ def _h2d_pinned(arr):
 
 
 # OPTIMAL GRID CONFIGURATION FOR 40x+ SPEEDUP
-def make_1d_grid(size, threads=256):
+def make_1d_grid(
+    size: int, threads: int = 256
+) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
     """Create optimal 1D grid for maximum GPU utilization."""
     if size <= 0:
         return (1,), (1,)
@@ -343,7 +345,9 @@ def make_1d_grid(size, threads=256):
     return (blocks,), (threads,)
 
 
-def make_2d_grid(N: int, num_joints: int, block_size: Tuple[int, int] = (128, 8)):
+def make_2d_grid(
+    N: int, num_joints: int, block_size: Tuple[int, int] = (128, 8)
+) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     """
     Create 2D grid configuration for CUDA kernel launch (backward compatibility).
 
@@ -361,6 +365,7 @@ def make_2d_grid(N: int, num_joints: int, block_size: Tuple[int, int] = (128, 8)
     threads_y = max(4, 1 << int(math.log2(max(1, min(threads_y, num_joints)))))
 
     def grid_dims(tx: int, ty: int) -> Tuple[int, int]:
+        """Compute block counts for a candidate 2D thread shape."""
         return ((N + tx - 1) // tx, (num_joints + ty - 1) // ty)
 
     blocks_x, blocks_y = grid_dims(threads_x, threads_y)
@@ -404,7 +409,9 @@ def make_2d_grid(N: int, num_joints: int, block_size: Tuple[int, int] = (128, 8)
     return (blocks_x, blocks_y), (threads_x, threads_y)
 
 
-def make_2d_grid_optimized(N: int, num_joints: int, target_occupancy: float = 0.75):
+def make_2d_grid_optimized(
+    N: int, num_joints: int, target_occupancy: float = 0.75
+) -> Tuple[Tuple[int, int], Tuple[int, int]]:
     """
     Create optimal 2D grid configuration targeting specific occupancy for 40x+ speedup.
 
@@ -474,7 +481,7 @@ def make_2d_grid_optimized(N: int, num_joints: int, target_occupancy: float = 0.
     return ((blocks_x, blocks_y), (threads_x, threads_y))
 
 
-def get_gpu_properties():
+def get_gpu_properties() -> Optional[Dict[str, Any]]:
     """Get comprehensive GPU properties for optimization."""
     if not CUDA_AVAILABLE:
         return None
@@ -496,7 +503,13 @@ def get_gpu_properties():
 
 
 # CPU FALLBACK IMPLEMENTATION
-def trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method):
+def trajectory_cpu_fallback(
+    thetastart: np.ndarray,
+    thetaend: np.ndarray,
+    Tf: float,
+    N: int,
+    method: int,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Optimized CPU fallback using NumPy vectorization."""
     num_joints = len(thetastart)
 
@@ -1161,6 +1174,7 @@ if CUDA_AVAILABLE:
         method,
         batch_size,
     ):
+        """Generate position, velocity, and acceleration for a batch of trajectories."""
         # Compute global indices
         batch_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         t_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -1205,14 +1219,14 @@ if CUDA_AVAILABLE:
     class _GlobalCudaMemoryPool:
         """Enhanced memory pool with size tracking and performance optimization."""
 
-        def __init__(self):
+        def __init__(self) -> None:
             self.pool = {}
             self.max_pool_size = 200  # Increased for better caching
             self.total_allocated = 0
             self.cache_hits = 0
             self.cache_misses = 0
 
-        def get_array(self, shape, dtype=np.float32):
+        def get_array(self, shape: Tuple[int, ...], dtype: Any = np.float32) -> Any:
             key = (shape, dtype)
             if key in self.pool and len(self.pool[key]) > 0:
                 self.cache_hits += 1
@@ -1222,7 +1236,7 @@ if CUDA_AVAILABLE:
                 self.total_allocated += np.prod(shape) * np.dtype(dtype).itemsize
                 return cuda.device_array(shape, dtype=dtype)
 
-        def return_array(self, array):
+        def return_array(self, array: Any) -> None:
             key = (array.shape, array.dtype)
             if key not in self.pool:
                 self.pool[key] = []
@@ -1230,7 +1244,7 @@ if CUDA_AVAILABLE:
             if len(self.pool[key]) < self.max_pool_size:
                 self.pool[key].append(array)
 
-        def get_stats(self):
+        def get_stats(self) -> Dict[str, Any]:
             total_requests = self.cache_hits + self.cache_misses
             hit_rate = self.cache_hits / total_requests if total_requests > 0 else 0
             return {
@@ -1239,7 +1253,7 @@ if CUDA_AVAILABLE:
                 "pool_sizes": {str(k): len(v) for k, v in self.pool.items()},
             }
 
-        def clear(self):
+        def clear(self) -> None:
             self.pool.clear()
             self.total_allocated = 0
             self.cache_hits = 0
@@ -1247,15 +1261,15 @@ if CUDA_AVAILABLE:
 
     _cuda_memory_pool = _GlobalCudaMemoryPool()
 
-    def get_cuda_array(shape, dtype=np.float32):
+    def get_cuda_array(shape: Tuple[int, ...], dtype: Any = np.float32) -> Any:
         """Get optimized CUDA array from memory pool."""
         return _cuda_memory_pool.get_array(shape, dtype)
 
-    def return_cuda_array(array):
+    def return_cuda_array(array: Any) -> None:
         """Return CUDA array to memory pool."""
         _cuda_memory_pool.return_array(array)
 
-    def get_memory_pool_stats():
+    def get_memory_pool_stats() -> Dict[str, Any]:
         """Get memory pool performance statistics."""
         return _cuda_memory_pool.get_stats()
 
@@ -1263,11 +1277,17 @@ if CUDA_AVAILABLE:
     class CUDAPerformanceMonitor:
         """Advanced performance monitoring for CUDA kernels."""
 
-        def __init__(self):
+        def __init__(self) -> None:
             self.kernel_stats = {}
             self.memory_stats = {}
 
-        def record_kernel_launch(self, kernel_name, grid, block, shared_mem=0):
+        def record_kernel_launch(
+            self,
+            kernel_name: str,
+            grid: Tuple[int, ...],
+            block: Tuple[int, ...],
+            shared_mem: int = 0,
+        ) -> None:
             if kernel_name not in self.kernel_stats:
                 self.kernel_stats[kernel_name] = {
                     "launches": 0,
@@ -1286,7 +1306,7 @@ if CUDA_AVAILABLE:
             )
             stats["total_shared_mem"] += shared_mem
 
-        def get_stats(self):
+        def get_stats(self) -> Dict[str, Any]:
             return {
                 "kernel_stats": self.kernel_stats,
                 "memory_pool_stats": get_memory_pool_stats(),
@@ -1297,7 +1317,7 @@ if CUDA_AVAILABLE:
     # KERNEL CONFIGURATION OPTIMIZATION
     def get_optimal_kernel_config(
         N: int, num_joints: int, kernel_type: str = "auto"
-    ) -> Dict[str, Any]:
+    ) -> Optional[Dict[str, Any]]:
         """
         Automatically select optimal kernel and configuration for 40x+ speedup.
 
@@ -1405,7 +1425,9 @@ if CUDA_AVAILABLE:
 
     # AUTO-TUNING FOR MAXIMUM PERFORMANCE
     @lru_cache(maxsize=64)
-    def _best_2d_config(N, J):
+    def _best_2d_config(
+        N: int, J: int
+    ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         """
         Auto-tune 2D CUDA kernel launch configuration for optimal performance.
 
@@ -1423,7 +1445,9 @@ if CUDA_AVAILABLE:
         return make_2d_grid(N, J)
 
     @lru_cache(maxsize=64)
-    def _auto_tune_kernel_config(N, num_joints):
+    def _auto_tune_kernel_config(
+        N: int, num_joints: int
+    ) -> Optional[Dict[str, Any]]:
         """Auto-tune kernel configuration for specific problem size."""
         if not CUDA_AVAILABLE:
             return None
@@ -1488,15 +1512,15 @@ if CUDA_AVAILABLE:
 
     # HIGH-LEVEL OPTIMIZED FUNCTIONS
     def optimized_trajectory_generation_monitored(
-        thetastart,
-        thetaend,
-        Tf,
-        N,
-        method,
-        use_pinned=True,
-        kernel_type="auto",
-        enable_monitoring=True,
-    ):
+        thetastart: Any,
+        thetaend: Any,
+        Tf: float,
+        N: int,
+        method: int,
+        use_pinned: bool = True,
+        kernel_type: str = "auto",
+        enable_monitoring: bool = True,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Generate trajectory with comprehensive performance monitoring.
 
@@ -1671,7 +1695,7 @@ if CUDA_AVAILABLE:
             return "cache_friendly"  # Memory-bound scenarios
 
     # PROFILING AND BENCHMARKING UTILITIES
-    def profile_start():
+    def profile_start() -> None:
         """Start CUDA profiling with enhanced monitoring."""
         try:
             cuda.profile_start()
@@ -1679,7 +1703,7 @@ if CUDA_AVAILABLE:
         except Exception:
             pass
 
-    def profile_stop():
+    def profile_stop() -> Dict[str, Any]:
         """Stop CUDA profiling and return statistics."""
         try:
             cuda.profile_stop()
@@ -1687,7 +1711,9 @@ if CUDA_AVAILABLE:
         except Exception:
             return {}
 
-    def benchmark_kernel_performance(kernel_name, *args, num_runs=10, warmup_runs=2):
+    def benchmark_kernel_performance(
+        kernel_name: str, *args: Any, num_runs: int = 10, warmup_runs: int = 2
+    ) -> Optional[Dict[str, Any]]:
         """Enhanced kernel benchmarking with detailed statistics."""
         if not CUDA_AVAILABLE:
             print(f"Cannot benchmark {kernel_name} - CUDA not available")
@@ -1755,99 +1781,129 @@ if CUDA_AVAILABLE:
 else:
     # CPU-only fallback implementations
     class _MockMemoryPool:
-        def get_array(self, *args, **kwargs):
+        def get_array(self, *args: Any, **kwargs: Any) -> Any:
             raise RuntimeError("CUDA memory pool not available")
 
-        def return_array(self, *args, **kwargs):
+        def return_array(self, *args: Any, **kwargs: Any) -> None:
             raise RuntimeError("CUDA memory pool not available")
 
-        def clear(self):
+        def clear(self) -> None:
             pass
 
-        def get_stats(self):
+        def get_stats(self) -> Dict[str, Any]:
             return {}
 
     _cuda_memory_pool = _MockMemoryPool()
 
     class CUDAPerformanceMonitor:
-        def __init__(self):
+        """CPU-only no-op performance monitor used when CUDA is unavailable."""
+
+        def __init__(self) -> None:
             pass
 
-        def record_kernel_launch(self, *args):
+        def record_kernel_launch(self, *args: Any) -> None:
             pass
 
-        def get_stats(self):
+        def get_stats(self) -> Dict[str, Any]:
             return {}
 
     _perf_monitor = CUDAPerformanceMonitor()
 
     # Mock functions for API compatibility
-    def trajectory_kernel(*args, **kwargs):
+    def trajectory_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA trajectory kernel is unavailable."""
         raise RuntimeError("CUDA trajectory kernel not available")
 
-    def trajectory_kernel_vectorized(*args, **kwargs):
+    def trajectory_kernel_vectorized(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA vectorized trajectory kernel is unavailable."""
         raise RuntimeError("CUDA vectorized trajectory kernel not available")
 
-    def trajectory_kernel_memory_optimized(*args, **kwargs):
+    def trajectory_kernel_memory_optimized(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA memory-optimized trajectory kernel is unavailable."""
         raise RuntimeError("CUDA memory-optimized trajectory kernel not available")
 
-    def trajectory_kernel_warp_optimized(*args, **kwargs):
+    def trajectory_kernel_warp_optimized(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA warp-optimized trajectory kernel is unavailable."""
         raise RuntimeError("CUDA warp-optimized trajectory kernel not available")
 
-    def trajectory_kernel_cache_friendly(*args, **kwargs):
+    def trajectory_kernel_cache_friendly(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA cache-friendly trajectory kernel is unavailable."""
         raise RuntimeError("CUDA cache-friendly trajectory kernel not available")
 
-    def inverse_dynamics_kernel(*args, **kwargs):
+    def inverse_dynamics_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA inverse dynamics kernel is unavailable."""
         raise RuntimeError("CUDA inverse dynamics kernel not available")
 
-    def forward_dynamics_kernel(*args, **kwargs):
+    def forward_dynamics_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA forward dynamics kernel is unavailable."""
         raise RuntimeError("CUDA forward dynamics kernel not available")
 
-    def cartesian_trajectory_kernel(*args, **kwargs):
+    def cartesian_trajectory_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA Cartesian trajectory kernel is unavailable."""
         raise RuntimeError("CUDA Cartesian trajectory kernel not available")
 
-    def fused_potential_gradient_kernel(*args, **kwargs):
+    def fused_potential_gradient_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA potential field kernel is unavailable."""
         raise RuntimeError("CUDA potential field kernel not available")
 
-    def batch_trajectory_kernel(*args, **kwargs):
+    def batch_trajectory_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA batch trajectory kernel is unavailable."""
         raise RuntimeError("CUDA batch trajectory kernel not available")
 
-    def get_cuda_array(*args, **kwargs):
+    def get_cuda_array(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA memory pool is unavailable."""
         raise RuntimeError("CUDA memory pool not available")
 
-    def return_cuda_array(*args, **kwargs):
+    def return_cuda_array(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise because the CUDA memory pool is unavailable."""
         raise RuntimeError("CUDA memory pool not available")
 
-    def get_memory_pool_stats():
+    def get_memory_pool_stats() -> Dict[str, Any]:
+        """Return empty memory-pool stats when CUDA is unavailable."""
         return {}
 
-    def get_optimal_kernel_config(*args, **kwargs):
+    def get_optimal_kernel_config(*args: Any, **kwargs: Any) -> Optional[Dict[str, Any]]:
+        """Return no kernel configuration when CUDA is unavailable."""
         return None
 
-    def auto_select_optimal_kernel(*args, **kwargs):
+    def auto_select_optimal_kernel(*args: Any, **kwargs: Any) -> str:
+        """Report that no CUDA kernel can be selected."""
         return "none"
 
-    def optimized_trajectory_generation_monitored(*args, **kwargs):
+    def optimized_trajectory_generation_monitored(
+        *args: Any, **kwargs: Any
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Use the CPU trajectory fallback when CUDA is unavailable."""
         return trajectory_cpu_fallback(args[0], args[1], args[2], args[3], args[4])
 
-    def _best_2d_config(*args, **kwargs):
+    def _best_2d_config(*args: Any, **kwargs: Any) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+        """Return a minimal launch shape when CUDA is unavailable."""
         return ((1, 1), (1, 1))
 
-    def profile_start():
+    def profile_start() -> None:
+        """No-op CUDA profiler start for CPU-only environments."""
         pass
 
-    def profile_stop():
+    def profile_stop() -> Dict[str, Any]:
+        """Return empty CUDA profiler stats in CPU-only environments."""
         return {}
 
-    def benchmark_kernel_performance(*args, **kwargs):
+    def benchmark_kernel_performance(*args: Any, **kwargs: Any) -> Optional[Dict[str, Any]]:
+        """Report that CUDA benchmarking is unavailable."""
         print("CUDA benchmarking not available")
         return None
 
 
 # HIGH-LEVEL WRAPPER FUNCTIONS
 def optimized_trajectory_generation(
-    thetastart, thetaend, Tf, N, method, use_pinned=True, kernel_type="auto"
-):
+    thetastart: Any,
+    thetaend: Any,
+    Tf: float,
+    N: int,
+    method: int,
+    use_pinned: bool = True,
+    kernel_type: str = "auto",
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Main entry point for optimized trajectory generation.
 
@@ -1875,8 +1931,12 @@ def optimized_trajectory_generation(
 
 
 def optimized_potential_field(
-    positions, goal, obstacles, influence_distance, use_pinned=True
-):
+    positions: np.ndarray,
+    goal: np.ndarray,
+    obstacles: np.ndarray,
+    influence_distance: float,
+    use_pinned: bool = True,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Optimized potential field computation with CUDA acceleration."""
     if not CUDA_AVAILABLE:
         raise RuntimeError("CUDA not available for potential field computation")
@@ -1923,8 +1983,13 @@ def optimized_potential_field(
 
 
 def optimized_batch_trajectory_generation(
-    thetastart_batch, thetaend_batch, Tf, N, method, use_pinned=True
-):
+    thetastart_batch: np.ndarray,
+    thetaend_batch: np.ndarray,
+    Tf: float,
+    N: int,
+    method: int,
+    use_pinned: bool = True,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Optimized batch trajectory generation for multiple trajectories."""
     if not CUDA_AVAILABLE:
         raise RuntimeError("CUDA not available for batch trajectory generation")
@@ -1985,7 +2050,7 @@ def optimized_batch_trajectory_generation(
 
 
 # LEGACY COMPATIBILITY FUNCTIONS
-def attractive_potential_kernel(*args, **kwargs):
+def attractive_potential_kernel(*args: Any, **kwargs: Any) -> NoReturn:
     """Legacy function - use fused_potential_gradient_kernel instead."""
     raise RuntimeError(
         "Legacy attractive_potential_kernel is deprecated.\n"
@@ -1993,7 +2058,7 @@ def attractive_potential_kernel(*args, **kwargs):
     )
 
 
-def repulsive_potential_kernel(*args, **kwargs):
+def repulsive_potential_kernel(*args: Any, **kwargs: Any) -> NoReturn:
     """Legacy function - use fused_potential_gradient_kernel instead."""
     raise RuntimeError(
         "Legacy repulsive_potential_kernel is deprecated.\n"
@@ -2001,7 +2066,7 @@ def repulsive_potential_kernel(*args, **kwargs):
     )
 
 
-def gradient_kernel(*args, **kwargs):
+def gradient_kernel(*args: Any, **kwargs: Any) -> NoReturn:
     """Legacy function - use fused_potential_gradient_kernel instead."""
     raise RuntimeError(
         "Legacy gradient_kernel is deprecated.\n"
@@ -2010,7 +2075,7 @@ def gradient_kernel(*args, **kwargs):
 
 
 # PERFORMANCE UTILITIES
-def print_performance_recommendations(N: int, num_joints: int):
+def print_performance_recommendations(N: int, num_joints: int) -> None:
     """Print recommendations for achieving 40x+ speedup."""
     total_work = N * num_joints
 
@@ -2056,7 +2121,7 @@ def print_performance_recommendations(N: int, num_joints: int):
         print(f"   🎯 Recommended kernel: {optimal_kernel}")
 
 
-def setup_cuda_environment_for_40x_speedup():
+def setup_cuda_environment_for_40x_speedup() -> None:
     """Setup CUDA environment variables for maximum performance."""
     import os
 

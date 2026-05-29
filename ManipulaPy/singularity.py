@@ -25,15 +25,20 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
+from typing import Any, List, Optional, Tuple, Union
+
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 from numba import cuda
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
 from scipy.spatial import ConvexHull
 
 
 class Singularity:
-    def __init__(self, serial_manipulator):
+    """Singularity and manipulability analysis for a serial manipulator."""
+
+    def __init__(self, serial_manipulator: Any) -> None:
         """
         Initialize the Singularity class with a SerialManipulator object.
 
@@ -42,13 +47,19 @@ class Singularity:
         """
         self.serial_manipulator = serial_manipulator
 
-    def singularity_analysis(self, thetalist):
+    def singularity_analysis(
+        self, thetalist: Union[NDArray[np.float64], List[float]]
+    ) -> bool:
         """Detect singularity using smallest singular value (works for any Jacobian shape)."""
         J = self.serial_manipulator.jacobian(thetalist, frame="space")
         singular_values = np.linalg.svd(J, compute_uv=False)
         return bool(singular_values[-1] < 1e-4)
 
-    def manipulability_ellipsoid(self, thetalist, ax=None):
+    def manipulability_ellipsoid(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        ax: Optional[Any] = None,
+    ) -> None:
         """
         Plot the manipulability ellipsoid for a given set of joint angles.
 
@@ -110,7 +121,9 @@ class Singularity:
         if ax is None:
             plt.show()
 
-    def plot_workspace_monte_carlo(self, joint_limits, num_samples=10000):
+    def plot_workspace_monte_carlo(
+        self, joint_limits: List[Tuple[float, float]], num_samples: int = 10000
+    ) -> None:
         """
         Estimate the robot workspace using Monte Carlo sampling.
 
@@ -176,7 +189,9 @@ class Singularity:
         ax.set_title("Robot Workspace (Smooth Convex Hull)")
         plt.show()
 
-    def condition_number(self, thetalist):
+    def condition_number(
+        self, thetalist: Union[NDArray[np.float64], List[float]]
+    ) -> float:
         """
         Calculate the condition number of the Jacobian for a given set of joint angles.
 
@@ -189,7 +204,11 @@ class Singularity:
         J = self.serial_manipulator.jacobian(thetalist, frame="space")
         return np.linalg.cond(J)
 
-    def near_singularity_detection(self, thetalist, threshold=1e-2):
+    def near_singularity_detection(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        threshold: float = 1e-2,
+    ) -> bool:
         """
         Detect if the manipulator is near a singularity by comparing the condition number with a threshold.
 

@@ -44,7 +44,7 @@ class PackageResolver:
         package_map: Optional[Dict[str, Union[str, Path]]] = None,
         search_paths: Optional[List[Union[str, Path]]] = None,
         use_ros: bool = True,
-    ):
+    ) -> None:
         """
         Initialize PackageResolver.
 

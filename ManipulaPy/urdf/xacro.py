@@ -175,7 +175,7 @@ class XacroProcessor:
         # Handle includes
         include_pattern = re.compile(r'<include\s+filename="([^"]+)"\s*/>')
 
-        def replace_include(match):
+        def replace_include(match: re.Match) -> str:
             include_file = match.group(1)
 
             # Resolve relative path

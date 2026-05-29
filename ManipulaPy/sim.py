@@ -31,6 +31,7 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 import logging
 import time
+from typing import Any, List, Optional, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,15 +43,18 @@ try:
 except ImportError:
 
     class _NumpyProxy:
+        """Small subset of CuPy's array interface backed by NumPy."""
+
         # Internal fallback shim: enough of cupy's surface for sim.py's own
         # call sites (cp.array, cp.asnumpy). Not a drop-in cupy replacement —
         # cp.cuda.*, cp.ndarray identity (isinstance), and asnumpy keyword
         # arguments are unsupported. Do NOT import this as ManipulaPy.sim.cp
         # from external code; depend on cupy directly if you need GPU semantics.
-        def __getattr__(self, name):
+        def __getattr__(self, name: str) -> Any:
             return getattr(np, name)
 
-        def asnumpy(self, x):
+        def asnumpy(self, x: Any) -> np.ndarray:
+            """Convert fallback arrays to NumPy arrays."""
             return np.asarray(x)
 
     cp = _NumpyProxy()
@@ -67,7 +71,7 @@ except ImportError:
     _PYBULLET_AVAILABLE = False
 
 
-def _check_pybullet_available():
+def _check_pybullet_available() -> None:
     """Raise a clear ImportError if pybullet is unavailable.
 
     __init__ already does this, but every public method that touches p.*
@@ -88,17 +92,19 @@ from ManipulaPy.path_planning import TrajectoryPlanning as tp
 
 
 class Simulation:
+    """PyBullet-backed simulation and visualization helper for manipulators."""
+
     def __init__(
         self,
-        urdf_file_path,
-        joint_limits,
-        torque_limits=None,
-        time_step=0.01,
-        real_time_factor=1.0,
-        physics_client=None,
+        urdf_file_path: str,
+        joint_limits: Sequence[Tuple[float, float]],
+        torque_limits: Optional[Sequence[Any]] = None,
+        time_step: float = 0.01,
+        real_time_factor: float = 1.0,
+        physics_client: Optional[int] = None,
         enable_self_collision: bool = False,
-        disable_pairs=None,
-    ):
+        disable_pairs: Optional[Sequence[Tuple[str, str]]] = None,
+    ) -> None:
         if not _PYBULLET_AVAILABLE:
             raise ImportError(
                 "Simulation requires pybullet. Install with: "
@@ -122,7 +128,7 @@ class Simulation:
 
         self.setup_simulation()
 
-    def setup_logger(self):
+    def setup_logger(self) -> logging.Logger:
         """
         Sets up the logger for the simulation.
         """
@@ -139,7 +145,7 @@ class Simulation:
             logger.addHandler(ch)
         return logger
 
-    def connect_simulation(self):
+    def connect_simulation(self) -> None:
         """
         Connects to the PyBullet simulation.
         """
@@ -152,7 +158,7 @@ class Simulation:
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(self.time_step)
 
-    def disconnect_simulation(self):
+    def disconnect_simulation(self) -> None:
         """
         Disconnects from the PyBullet simulation.
         """
@@ -163,7 +169,7 @@ class Simulation:
             self.physics_client = None
             self.logger.info("Disconnected successfully.")
 
-    def setup_simulation(self):
+    def setup_simulation(self) -> None:
         """
         Sets up the simulation environment.
         """
@@ -213,7 +219,7 @@ class Simulation:
                         name_b,
                     )
 
-    def initialize_robot(self):
+    def initialize_robot(self) -> None:
         """
         Initializes the robot using the URDF processor.
         """
@@ -248,7 +254,7 @@ class Simulation:
             ]
             self.home_position = np.zeros(len(self.non_fixed_joints))
 
-    def set_robot_models(self, robot, dynamics):
+    def set_robot_models(self, robot: Any, dynamics: Any) -> None:
         """
         Set pre-existing robot models to avoid reprocessing.
 
@@ -260,7 +266,7 @@ class Simulation:
         self.dynamics = dynamics
         self.logger.info("Pre-existing robot models set successfully.")
 
-    def initialize_planner_and_controller(self):
+    def initialize_planner_and_controller(self) -> None:
         """
         Initializes the trajectory planner and the manipulator controller.
         """
@@ -273,7 +279,7 @@ class Simulation:
         )
         self.controller = ManipulatorController(self.dynamics)
 
-    def add_joint_parameters(self):
+    def add_joint_parameters(self) -> None:
         """
         Adds GUI sliders for each joint.
         """
@@ -288,7 +294,7 @@ class Simulation:
                 )
                 self.joint_params.append(param_id)
 
-    def add_reset_button(self):
+    def add_reset_button(self) -> None:
         """
         Adds a reset button to the simulation.
         """
@@ -299,7 +305,9 @@ class Simulation:
             except Exception as e:
                 self.logger.error(f"Failed to add reset button: {e}")
 
-    def set_joint_positions(self, joint_positions, forces=None):
+    def set_joint_positions(
+        self, joint_positions: Sequence[float], forces: Optional[Sequence[float]] = None
+    ) -> None:
         """
         Sets the joint positions of the robot.
         """
@@ -326,7 +334,7 @@ class Simulation:
             forces=forces,
         )
 
-    def get_joint_positions(self):
+    def get_joint_positions(self) -> np.ndarray:
         """
         Gets the current joint positions of the robot.
         """
@@ -336,7 +344,13 @@ class Simulation:
         ]
         return np.array(joint_positions)
 
-    def _capsule_line(self, a, b, radius=0.006, rgba=(1, 0.5, 0, 1)):
+    def _capsule_line(
+        self,
+        a: Sequence[float],
+        b: Sequence[float],
+        radius: float = 0.006,
+        rgba: Sequence[float] = (1, 0.5, 0, 1),
+    ) -> int:
         """
         Create a thin capsule between point a and b; returns body-id.
         This creates REAL GEOMETRY that appears in getCameraImage() screenshots.
@@ -415,7 +429,12 @@ class Simulation:
             self.logger.error(f"Failed to create capsule line: {e}")
             return -1
 
-    def plot_trajectory(self, ee_positions, line_width=3, color=None):
+    def plot_trajectory(
+        self,
+        ee_positions: Sequence[Sequence[float]],
+        line_width: int = 3,
+        color: Optional[List[float]] = None,
+    ) -> List[int]:
         """
         Plots the end-effector trajectory in PyBullet using REAL GEOMETRY.
 
@@ -497,7 +516,9 @@ class Simulation:
 
         return trajectory_bodies
 
-    def _add_trajectory_markers(self, ee_positions, color):
+    def _add_trajectory_markers(
+        self, ee_positions: Sequence[Sequence[float]], color: Sequence[float]
+    ) -> List[int]:
         """
         Add START/END markers using real geometry.
 
@@ -586,7 +607,7 @@ class Simulation:
 
         return marker_bodies
 
-    def clear_trajectory_visualization(self):
+    def clear_trajectory_visualization(self) -> None:
         """
         Clear all trajectory visualization bodies from the simulation.
         """
@@ -609,7 +630,9 @@ class Simulation:
 
             self.trajectory_body_ids = []
 
-    def run_trajectory(self, joint_trajectory):
+    def run_trajectory(
+        self, joint_trajectory: Sequence[Sequence[float]]
+    ) -> Tuple[float, float, float]:
         """
         Runs a joint trajectory in the simulation.
         """
@@ -632,7 +655,9 @@ class Simulation:
         self.logger.info("Trajectory completed.")
         return ee_positions[-1]  # Return the last end-effector position
 
-    def run_controller(self, desired_positions):
+    def run_controller(
+        self, desired_positions: Sequence[Sequence[float]]
+    ) -> Tuple[float, float, float]:
         """
         Drive the robot through ``desired_positions`` in open-loop position
         control, one configuration per simulation step.
@@ -682,14 +707,16 @@ class Simulation:
         self.logger.info("Controller run completed.")
         return ee_positions[-1]  # Return the last end-effector position
 
-    def get_joint_parameters(self):
+    def get_joint_parameters(self) -> List[float]:
         """
         Gets the current values of the GUI sliders.
         """
         _check_pybullet_available()
         return [p.readUserDebugParameter(param_id) for param_id in self.joint_params]
 
-    def simulate_robot_motion(self, desired_angles_trajectory):
+    def simulate_robot_motion(
+        self, desired_angles_trajectory: Sequence[Sequence[float]]
+    ) -> Tuple[float, float, float]:
         """
         Simulates the robot's motion using a given trajectory of desired joint angles.
         """
@@ -712,7 +739,9 @@ class Simulation:
         self.logger.info("Robot motion simulation completed.")
         return ee_positions[-1]  # Return the last end-effector position
 
-    def simulate_robot_with_desired_angles(self, desired_angles):
+    def simulate_robot_with_desired_angles(
+        self, desired_angles: Sequence[float]
+    ) -> None:
         """
         Simulates the robot using PyBullet with desired joint angles.
 
@@ -744,7 +773,7 @@ class Simulation:
             self.close_simulation()
             raise
 
-    def close_simulation(self):
+    def close_simulation(self) -> None:
         """
         Closes the simulation.
         """
@@ -756,7 +785,7 @@ class Simulation:
         self.disconnect_simulation()
         self.logger.info("Simulation closed.")
 
-    def check_collisions(self) -> list:
+    def check_collisions(self) -> List[Tuple[int, int, Tuple[float, float, float]]]:
         """
         Checks for self-collisions in the simulation and returns contacts.
 
@@ -782,7 +811,7 @@ class Simulation:
             )
         return contacts
 
-    def step_simulation(self):
+    def step_simulation(self) -> None:
         """
         Steps the simulation forward by one time step.
         """
@@ -791,7 +820,7 @@ class Simulation:
         self.connect_simulation()
         self.add_additional_parameters()
 
-    def add_additional_parameters(self):
+    def add_additional_parameters(self) -> None:
         """
         Adds additional GUI parameters for controlling physics properties like gravity and time step.
         """
@@ -803,7 +832,7 @@ class Simulation:
                 "Time Step", 0.001, 0.1, self.time_step
             )
 
-    def update_simulation_parameters(self):
+    def update_simulation_parameters(self) -> None:
         """
         Updates simulation parameters from GUI controls.
         """
@@ -814,7 +843,7 @@ class Simulation:
         p.setTimeStep(time_step)
         self.time_step = time_step
 
-    def manual_control(self):
+    def manual_control(self) -> None:
         """
         Allows manual control of the robot through the PyBullet UI sliders.
         """
@@ -857,7 +886,7 @@ class Simulation:
             self.close_simulation()
             raise
 
-    def save_joint_states(self, filename="joint_states.csv"):
+    def save_joint_states(self, filename: str = "joint_states.csv") -> None:
         """
         Saves the joint states to a CSV file.
 
@@ -877,7 +906,11 @@ class Simulation:
         )
         self.logger.info(f"Joint states saved to {filename}.")
 
-    def plot_trajectory_in_scene(self, joint_trajectory, end_effector_trajectory):
+    def plot_trajectory_in_scene(
+        self,
+        joint_trajectory: Sequence[Sequence[float]],
+        end_effector_trajectory: Sequence[Sequence[float]],
+    ) -> None:
         """
         Plots the trajectory in the simulation scene.
         """
@@ -902,7 +935,7 @@ class Simulation:
         self.run_trajectory(joint_trajectory)
         self.logger.info("Trajectory plotted and simulation completed.")
 
-    def run(self, joint_trajectory):
+    def run(self, joint_trajectory: Sequence[Sequence[float]]) -> None:
         """
         Main loop for running the simulation.
         """
@@ -940,7 +973,7 @@ class Simulation:
             self.close_simulation()
             raise
 
-    def __del__(self):
+    def __del__(self) -> None:
         """
         Destructor to clean up trajectory visualization when simulation is destroyed.
         """

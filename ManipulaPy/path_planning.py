@@ -21,7 +21,7 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 
 import time
 import warnings
-from typing import Optional
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -77,47 +77,60 @@ if CUDA_AVAILABLE:
     )
 else:
     # Create dummy functions for when CUDA is not available
-    def trajectory_kernel(*args, **kwargs):
+    def trajectory_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for the standard trajectory kernel."""
         raise RuntimeError("CUDA not available")
 
-    def trajectory_kernel_vectorized(*args, **kwargs):
+    def trajectory_kernel_vectorized(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for the vectorized trajectory kernel."""
         raise RuntimeError("CUDA not available")
 
-    def trajectory_kernel_memory_optimized(*args, **kwargs):
+    def trajectory_kernel_memory_optimized(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for the memory-optimized kernel."""
         raise RuntimeError("CUDA not available")
 
-    def trajectory_kernel_warp_optimized(*args, **kwargs):
+    def trajectory_kernel_warp_optimized(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for the warp-optimized kernel."""
         raise RuntimeError("CUDA not available")
 
-    def trajectory_kernel_cache_friendly(*args, **kwargs):
+    def trajectory_kernel_cache_friendly(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for the cache-friendly kernel."""
         raise RuntimeError("CUDA not available")
 
-    def inverse_dynamics_kernel(*args, **kwargs):
+    def inverse_dynamics_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for inverse dynamics kernels."""
         raise RuntimeError("CUDA not available")
 
-    def forward_dynamics_kernel(*args, **kwargs):
+    def forward_dynamics_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for forward dynamics kernels."""
         raise RuntimeError("CUDA not available")
 
-    def cartesian_trajectory_kernel(*args, **kwargs):
+    def cartesian_trajectory_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for Cartesian trajectory kernels."""
         raise RuntimeError("CUDA not available")
 
-    def fused_potential_gradient_kernel(*args, **kwargs):
+    def fused_potential_gradient_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for potential field kernels."""
         raise RuntimeError("CUDA not available")
 
-    def batch_trajectory_kernel(*args, **kwargs):
+    def batch_trajectory_kernel(*args: Any, **kwargs: Any) -> NoReturn:
+        """Raise a CUDA availability error for batch trajectory kernels."""
         raise RuntimeError("CUDA not available")
 
     class MockCuda:
         @staticmethod
-        def to_device(*args, **kwargs):
+        def to_device(*args: Any, **kwargs: Any) -> NoReturn:
+            """Raise a CUDA availability error for device transfers."""
             raise RuntimeError("CUDA not available")
 
         @staticmethod
-        def device_array(*args, **kwargs):
+        def device_array(*args: Any, **kwargs: Any) -> NoReturn:
+            """Raise a CUDA availability error for device allocations."""
             raise RuntimeError("CUDA not available")
 
         @staticmethod
-        def synchronize():
+        def synchronize() -> None:
+            """No-op synchronization placeholder when CUDA is unavailable."""
             pass
 
     cuda = MockCuda()
@@ -176,6 +189,7 @@ def _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method):
 # Thin wrapper – unchanged signature, now just calls the new kernel above
 @njit(fastmath=True)
 def _traj_cpu_njit(thetastart, thetaend, Tf, N, method):
+    """Dispatch to the optimized CPU fallback kernel."""
     return _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
 
 
@@ -200,7 +214,7 @@ class OptimizedTrajectoryPlanning:
         auto_optimize: bool = True,
         kernel_type: str = "auto",
         target_speedup: float = 40.0,
-    ):
+    ) -> None:
         """
         Enhanced trajectory planner with advanced CUDA optimizations.
 
@@ -370,7 +384,9 @@ class OptimizedTrajectoryPlanning:
                 self.gpu_properties["max_threads_per_block"],
             )
 
-    def _get_or_resize_gpu_array(self, array_name, shape, dtype=np.float32):
+    def _get_or_resize_gpu_array(
+        self, array_name: str, shape: Tuple[int, ...], dtype: Any = np.float32
+    ) -> Any:
         """
         Return a pooled CUDA array with the requested shape / dtype.
         Enhanced with better memory management.
@@ -389,7 +405,7 @@ class OptimizedTrajectoryPlanning:
 
         return arr
 
-    def _should_use_gpu(self, N, num_joints):
+    def _should_use_gpu(self, N: int, num_joints: int) -> bool:
         """Enhanced GPU selection logic with performance prediction."""
         if not self.cuda_available:
             return False
@@ -413,7 +429,9 @@ class OptimizedTrajectoryPlanning:
 
         return True
 
-    def _get_optimal_kernel_config(self, N, num_joints):
+    def _get_optimal_kernel_config(
+        self, N: int, num_joints: int
+    ) -> Optional[Dict[str, Any]]:
         """Get or compute optimal kernel configuration with caching."""
         # Ensure required attributes exist
         if not hasattr(self, "_kernel_cache"):
@@ -445,7 +463,7 @@ class OptimizedTrajectoryPlanning:
         method,
         kernel_type=None,
         enable_monitoring=None,
-    ):
+    ) -> Dict[str, np.ndarray]:
         """
         Enhanced joint trajectory generation with advanced CUDA optimizations.
 
@@ -493,7 +511,7 @@ class OptimizedTrajectoryPlanning:
 
     def _joint_trajectory_gpu(
         self, thetastart, thetaend, Tf, N, method, kernel_type, enable_monitoring
-    ):
+    ) -> Dict[str, np.ndarray]:
         """Enhanced GPU trajectory generation with optimal kernel selection."""
         start_time = time.time()
 
@@ -567,7 +585,9 @@ class OptimizedTrajectoryPlanning:
             )
             return self._joint_trajectory_cpu(thetastart, thetaend, Tf, N, method)
 
-    def _joint_trajectory_cpu(self, thetastart, thetaend, Tf, N, method):
+    def _joint_trajectory_cpu(
+        self, thetastart, thetaend, Tf, N, method
+    ) -> Dict[str, np.ndarray]:
         """CPU-based joint trajectory generation with performance tracking."""
         start_time = time.time()
 
@@ -603,7 +623,9 @@ class OptimizedTrajectoryPlanning:
             "accelerations": traj_acc,
         }
 
-    def _apply_collision_avoidance_gpu(self, traj_pos, thetaend):
+    def _apply_collision_avoidance_gpu(
+        self, traj_pos: np.ndarray, thetaend: np.ndarray
+    ) -> np.ndarray:
         """Apply GPU-accelerated potential field-based collision avoidance."""
         if not self.cuda_available:
             return self._apply_collision_avoidance_cpu(traj_pos, thetaend)
@@ -657,7 +679,9 @@ class OptimizedTrajectoryPlanning:
             logger.warning(f"GPU collision avoidance failed: {e}, falling back to CPU")
             return self._apply_collision_avoidance_cpu(traj_pos, thetaend)
 
-    def _apply_collision_avoidance_cpu(self, traj_pos, thetaend):
+    def _apply_collision_avoidance_cpu(
+        self, traj_pos: np.ndarray, thetaend: np.ndarray
+    ) -> np.ndarray:
         """Apply CPU-based potential field collision avoidance."""
         q_goal = thetaend
         obstacles = []  # Define obstacles here as needed
@@ -678,7 +702,7 @@ class OptimizedTrajectoryPlanning:
 
     def batch_joint_trajectory(
         self, thetastart_batch, thetaend_batch, Tf, N, method, kernel_type=None
-    ):
+    ) -> Dict[str, np.ndarray]:
         """
         Enhanced batch trajectory generation with optimal kernel selection.
 
@@ -760,7 +784,7 @@ class OptimizedTrajectoryPlanning:
 
     def _batch_joint_trajectory_cpu(
         self, thetastart_batch, thetaend_batch, Tf, N, method
-    ):
+    ) -> Dict[str, np.ndarray]:
         """CPU fallback for batch trajectory generation."""
         start_time = time.time()
 
@@ -808,7 +832,7 @@ class OptimizedTrajectoryPlanning:
         ddthetalist_trajectory,
         gravity_vector=None,
         Ftip=None,
-    ):
+    ) -> np.ndarray:
         """
         Compute joint torques with enhanced CUDA acceleration.
 
@@ -867,7 +891,7 @@ class OptimizedTrajectoryPlanning:
         ddthetalist_trajectory,
         gravity_vector,
         Ftip,
-    ):
+    ) -> np.ndarray:
         """GPU-accelerated inverse dynamics computation with fixed kernel signature."""
         start_time = time.time()
 
@@ -1040,7 +1064,7 @@ class OptimizedTrajectoryPlanning:
         ddthetalist_trajectory,
         gravity_vector,
         Ftip,
-    ):
+    ) -> np.ndarray:
         """CPU-based inverse dynamics computation."""
         start_time = time.time()
 
@@ -1078,7 +1102,7 @@ class OptimizedTrajectoryPlanning:
 
     def forward_dynamics_trajectory(
         self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
-    ):
+    ) -> Dict[str, np.ndarray]:
         """
         Enhanced forward dynamics trajectory computation.
 
@@ -1121,7 +1145,7 @@ class OptimizedTrajectoryPlanning:
 
     def _forward_dynamics_gpu(
         self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
-    ):
+    ) -> Dict[str, np.ndarray]:
         """Enhanced GPU forward dynamics with optimal configuration."""
         start_time = time.time()
 
@@ -1226,7 +1250,7 @@ class OptimizedTrajectoryPlanning:
 
     def _forward_dynamics_cpu(
         self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
-    ):
+    ) -> Dict[str, np.ndarray]:
         """CPU-based forward dynamics computation."""
         start_time = time.time()
 
@@ -1284,7 +1308,7 @@ class OptimizedTrajectoryPlanning:
             "accelerations": ddthetamat,
         }
 
-    def cartesian_trajectory(self, Xstart, Xend, Tf, N, method):
+    def cartesian_trajectory(self, Xstart, Xend, Tf, N, method) -> Dict[str, np.ndarray]:
         """
         Enhanced Cartesian trajectory generation with optimal kernel selection.
 
@@ -1347,7 +1371,9 @@ class OptimizedTrajectoryPlanning:
             "orientations": orientations,
         }
 
-    def _cartesian_trajectory_gpu(self, pstart, pend, Tf, N, method):
+    def _cartesian_trajectory_gpu(
+        self, pstart, pend, Tf, N, method
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Enhanced GPU Cartesian trajectory computation."""
         start_time = time.time()
 
@@ -1404,7 +1430,9 @@ class OptimizedTrajectoryPlanning:
             if "traj_pos_dummy" in locals():
                 return_cuda_array(traj_pos_dummy)
 
-    def _cartesian_trajectory_cpu(self, pstart, pend, Tf, N, method):
+    def _cartesian_trajectory_cpu(
+        self, pstart, pend, Tf, N, method
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """CPU-based Cartesian trajectory computation."""
         start_time = time.time()
 
@@ -1439,7 +1467,7 @@ class OptimizedTrajectoryPlanning:
 
         return traj_vel, traj_acc
 
-    def get_performance_stats(self):
+    def get_performance_stats(self) -> Dict[str, Any]:
         """
         Enhanced performance statistics with speedup analysis.
 
@@ -1488,7 +1516,7 @@ class OptimizedTrajectoryPlanning:
 
         return stats
 
-    def reset_performance_stats(self):
+    def reset_performance_stats(self) -> None:
         """Reset performance statistics."""
         self.performance_stats = {
             "gpu_calls": 0,
@@ -1501,7 +1529,7 @@ class OptimizedTrajectoryPlanning:
             "best_kernel_used": "none",
         }
 
-    def cleanup_gpu_memory(self):
+    def cleanup_gpu_memory(self) -> None:
         """Enhanced GPU memory cleanup."""
         if self.cuda_available:
             # Clean up per-instance cache
@@ -1525,7 +1553,9 @@ class OptimizedTrajectoryPlanning:
 
             logger.info("GPU memory cleaned up")
 
-    def benchmark_all_kernels(self, N=5000, num_joints=6, num_runs=5):
+    def benchmark_all_kernels(
+        self, N: int = 5000, num_joints: int = 6, num_runs: int = 5
+    ) -> Dict[str, Dict[str, Any]]:
         """
         Comprehensive benchmarking of all available kernels.
 
@@ -1637,7 +1667,7 @@ class OptimizedTrajectoryPlanning:
 
         return results
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Enhanced destructor with better error handling."""
         try:
             if (
@@ -1660,7 +1690,7 @@ class OptimizedTrajectoryPlanning:
         title="Joint Trajectory",
         labels=None,
         performance_stats=None,
-    ):
+    ) -> None:
         """Enhanced trajectory plotting with performance information."""
         positions = trajectory_data["positions"]
         velocities = trajectory_data["velocities"]
@@ -1709,7 +1739,7 @@ class OptimizedTrajectoryPlanning:
         plt.tight_layout()
         plt.show()
 
-    def plot_tcp_trajectory(self, trajectory, dt):
+    def plot_tcp_trajectory(self, trajectory, dt) -> None:
         """
         Enhanced TCP trajectory plotting with performance monitoring.
 
@@ -1768,7 +1798,7 @@ class OptimizedTrajectoryPlanning:
 
     def plot_cartesian_trajectory(
         self, trajectory_data, Tf, title="Cartesian Trajectory", performance_stats=None
-    ):
+    ) -> None:
         """
         Enhanced Cartesian trajectory plotting with performance information.
 
@@ -1822,7 +1852,9 @@ class OptimizedTrajectoryPlanning:
         plt.tight_layout()
         plt.show()
 
-    def calculate_derivatives(self, positions, dt):
+    def calculate_derivatives(
+        self, positions, dt
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Calculate the velocity, acceleration, and jerk of a trajectory.
 
@@ -1841,7 +1873,9 @@ class OptimizedTrajectoryPlanning:
         jerk = np.diff(acceleration, axis=0) / dt
         return velocity, acceleration, jerk
 
-    def plot_ee_trajectory(self, trajectory_data, Tf, title="End-Effector Trajectory"):
+    def plot_ee_trajectory(
+        self, trajectory_data, Tf, title="End-Effector Trajectory"
+    ) -> None:
         """
         Enhanced end-effector trajectory plotting.
 
@@ -1934,7 +1968,9 @@ class OptimizedTrajectoryPlanning:
         ax.legend()
         plt.show()
 
-    def plan_trajectory(self, start_position, target_position, obstacle_points):
+    def plan_trajectory(
+        self, start_position, target_position, obstacle_points
+    ) -> List[List[float]]:
         """
         Enhanced trajectory planning with collision avoidance.
 
@@ -1980,7 +2016,9 @@ class OptimizedTrajectoryPlanning:
         logger.info(f"Planned trajectory with {len(joint_trajectory)} waypoints")
         return joint_trajectory
 
-    def benchmark_performance(self, test_cases=None, include_cpu_comparison=True):
+    def benchmark_performance(
+        self, test_cases=None, include_cpu_comparison: bool = True
+    ) -> Dict[str, Dict[str, Any]]:
         """
         Enhanced performance benchmarking with detailed analysis.
 
@@ -2119,7 +2157,8 @@ class TrajectoryPlanning(OptimizedTrajectoryPlanning):
     access to all optimizations.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the compatibility wrapper with the optimized planner."""
         super().__init__(*args, **kwargs)
         logger.info("Using OptimizedTrajectoryPlanning (backward compatibility mode)")
 
@@ -2135,7 +2174,7 @@ def create_optimized_planner(
     gpu_memory_mb=None,
     enable_profiling=False,
     kernel_type="auto",
-):
+) -> OptimizedTrajectoryPlanning:
     """
     Enhanced factory function to create an optimized trajectory planner.
 
@@ -2205,7 +2244,7 @@ def compare_implementations(
     joint_limits,
     test_params=None,
     detailed_analysis=True,
-):
+) -> Dict[str, Any]:
     """
     Enhanced implementation comparison with detailed kernel analysis.
 
@@ -2361,7 +2400,7 @@ def compare_implementations(
 
 def benchmark_kernel_performance_comprehensive(
     serial_manipulator, urdf_path, dynamics, joint_limits, test_sizes=None, num_runs=5
-):
+) -> Dict[str, Dict[str, Any]]:
     """
     Comprehensive kernel performance benchmarking across multiple problem sizes.
 

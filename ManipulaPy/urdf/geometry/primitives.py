@@ -207,7 +207,7 @@ def _subdivide_icosphere(
     new_vertices = list(vertices)
     new_faces = []
 
-    def get_midpoint(i1, i2):
+    def get_midpoint(i1: int, i2: int) -> int:
         """Get or create midpoint vertex index."""
         key = (min(i1, i2), max(i1, i2))
         if key in edge_midpoints:

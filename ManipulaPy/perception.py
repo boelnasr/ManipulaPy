@@ -26,6 +26,7 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
 import logging
+from typing import Any, Tuple
 
 import numpy as np
 
@@ -55,7 +56,9 @@ class Perception:
         Logger for debugging and status messages.
     """
 
-    def __init__(self, vision_instance=None, logger_name="PerceptionLogger"):
+    def __init__(
+        self, vision_instance: Any = None, logger_name: str = "PerceptionLogger"
+    ) -> None:
         """
         Initialize the Perception system with a Vision instance.
 
@@ -73,7 +76,7 @@ class Perception:
         self.vision = vision_instance
         self.logger.info("Perception initialized successfully.")
 
-    def _setup_logger(self, name):
+    def _setup_logger(self, name: str) -> logging.Logger:
         """
         Configure and return a logger for this Perception module.
         """
@@ -93,8 +96,13 @@ class Perception:
     # Primary Methods
     # --------------------------------------------------------------------------
     def detect_and_cluster_obstacles(
-        self, camera_index=0, depth_threshold=5.0, step=2, eps=0.1, min_samples=3
-    ):
+        self,
+        camera_index: int = 0,
+        depth_threshold: float = 5.0,
+        step: int = 2,
+        eps: float = 0.1,
+        min_samples: int = 3,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Capture an image from the Vision instance, detect 3D obstacle points,
         and then cluster those points using DBSCAN.
@@ -159,7 +167,9 @@ class Perception:
     # --------------------------------------------------------------------------
     # Stereo Methods
     # --------------------------------------------------------------------------
-    def compute_stereo_disparity(self, left_img, right_img):
+    def compute_stereo_disparity(
+        self, left_img: np.ndarray, right_img: np.ndarray
+    ) -> np.ndarray:
         """
         Compute a stereo disparity map from two images.
 
@@ -182,7 +192,9 @@ class Perception:
         self.logger.debug("Stereo disparity computed.")
         return disparity
 
-    def get_stereo_point_cloud(self, left_img, right_img):
+    def get_stereo_point_cloud(
+        self, left_img: np.ndarray, right_img: np.ndarray
+    ) -> np.ndarray:
         """
         Generate a 3D point cloud from a stereo pair of images.
 
@@ -210,7 +222,9 @@ class Perception:
     # --------------------------------------------------------------------------
     # Clustering
     # --------------------------------------------------------------------------
-    def cluster_obstacles(self, points, eps=0.1, min_samples=3):
+    def cluster_obstacles(
+        self, points: np.ndarray, eps: float = 0.1, min_samples: int = 3
+    ) -> Tuple[np.ndarray, int]:
         """
         Cluster the 3D points using DBSCAN.
 
@@ -256,7 +270,7 @@ class Perception:
     # --------------------------------------------------------------------------
     # Resource Management
     # --------------------------------------------------------------------------
-    def release(self):
+    def release(self) -> None:
         """
         Release resources held by the Vision instance.
         """
@@ -267,7 +281,7 @@ class Perception:
             except Exception as e:
                 self.logger.error(f"Error releasing Vision resources: {e}")
 
-    def __del__(self):
+    def __del__(self) -> None:
         """
         Destructor to ensure Vision resources are released.
         """

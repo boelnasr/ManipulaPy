@@ -26,8 +26,10 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 import itertools
 import logging
+from typing import Any, Dict, Iterable, Set
 
 import numpy as np
+from numpy.typing import NDArray
 from scipy.spatial import ConvexHull
 
 from .urdf import URDF  # Use native parser
@@ -35,7 +37,9 @@ from .urdf import URDF  # Use native parser
 _logger = logging.getLogger(__name__)
 
 
-def build_link_adjacency(urdf, exclude_grandparents: bool = True) -> set:
+def build_link_adjacency(
+    urdf: Any, exclude_grandparents: bool = True
+) -> Set[frozenset]:
     """Pairs of link names excluded from self-collision checks.
 
     Always includes parent<->child pairs joined by any URDF joint. Optionally
@@ -58,20 +62,37 @@ def build_link_adjacency(urdf, exclude_grandparents: bool = True) -> set:
 
 
 class PotentialField:
+    """Artificial potential field for attractive and repulsive joint-space costs."""
+
     def __init__(
-        self, attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
-    ):
+        self,
+        attractive_gain: float = 1.0,
+        repulsive_gain: float = 100.0,
+        influence_distance: float = 0.5,
+    ) -> None:
+        """
+        Initialize potential gains and obstacle influence distance.
+
+        Args:
+            attractive_gain: Weight for attraction toward the goal.
+            repulsive_gain: Weight for obstacle repulsion.
+            influence_distance: Distance threshold for obstacle repulsion.
+        """
         self.attractive_gain = attractive_gain
         self.repulsive_gain = repulsive_gain
         self.influence_distance = influence_distance
 
-    def compute_attractive_potential(self, q, q_goal):
+    def compute_attractive_potential(
+        self, q: NDArray[np.float64], q_goal: NDArray[np.float64]
+    ) -> float:
         """
         Compute the attractive potential.
         """
         return 0.5 * self.attractive_gain * np.sum((q - q_goal) ** 2)
 
-    def compute_repulsive_potential(self, q, obstacles):
+    def compute_repulsive_potential(
+        self, q: NDArray[np.float64], obstacles: Iterable[NDArray[np.float64]]
+    ) -> float:
         """
         Compute the repulsive potential.
         """
@@ -87,7 +108,12 @@ class PotentialField:
                 )
         return 10 * repulsive_potential
 
-    def compute_gradient(self, q, q_goal, obstacles):
+    def compute_gradient(
+        self,
+        q: NDArray[np.float64],
+        q_goal: NDArray[np.float64],
+        obstacles: Iterable[NDArray[np.float64]],
+    ) -> NDArray[np.float64]:
         """
         Compute the gradient of the potential field.
         """
@@ -135,7 +161,9 @@ class CollisionChecker:
         - "pybullet": PyBullet-based parser (requires pybullet)
     """
 
-    def __init__(self, urdf_path, backend: str = "builtin", load_meshes: bool = True):
+    def __init__(
+        self, urdf_path: str, backend: str = "builtin", load_meshes: bool = True
+    ) -> None:
         """
         Initializes a CollisionChecker object.
 
@@ -151,6 +179,7 @@ class CollisionChecker:
         self.convex_hulls = self._create_convex_hulls()
 
     def _warn_visual_fallback_once(self, link_name: str) -> None:
+        """Log one visual-geometry fallback warning per link."""
         if link_name not in self._visual_fallback_warned:
             self._visual_fallback_warned.add(link_name)
             _logger.warning(
@@ -159,7 +188,7 @@ class CollisionChecker:
                 link_name,
             )
 
-    def _create_convex_hulls(self):
+    def _create_convex_hulls(self) -> Dict[str, ConvexHull]:
         """
         Creates a dictionary of convex hulls for each link, preferring collision
         geometry and falling back to visual geometry with a one-shot warning.
@@ -207,7 +236,9 @@ class CollisionChecker:
 
         return convex_hulls
 
-    def _transform_convex_hull(self, convex_hull, transform):
+    def _transform_convex_hull(
+        self, convex_hull: ConvexHull, transform: NDArray[np.float64]
+    ) -> ConvexHull:
         """Apply a 4x4 transform to a ConvexHull and return a NEW ConvexHull.
 
         Retained for backwards compatibility with existing tests
@@ -221,7 +252,7 @@ class CollisionChecker:
         ].reshape(-1, 1)
         return ConvexHull(transformed_points.T)
 
-    def check_collision(self, thetalist):
+    def check_collision(self, thetalist: Any) -> bool:
         """
         Check for self-collision at a given joint configuration.
 
@@ -247,7 +278,9 @@ class CollisionChecker:
                 return True
         return False
 
-    def _points_intersect(self, pts_a, pts_b):
+    def _points_intersect(
+        self, pts_a: NDArray[np.float64], pts_b: NDArray[np.float64]
+    ) -> bool:
         """
         Check if two point clouds' bounding boxes intersect.
 
@@ -267,7 +300,7 @@ class CollisionChecker:
         max_b = np.max(pts_b, axis=0)
         return bool(np.all(max_a >= min_b) and np.all(max_b >= min_a))
 
-    def _hulls_intersect(self, hull1, hull2):
+    def _hulls_intersect(self, hull1: ConvexHull, hull2: ConvexHull) -> bool:
         """
         Check if two convex hulls intersect.
 

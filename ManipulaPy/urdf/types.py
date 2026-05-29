@@ -20,7 +20,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _array_eq(a: np.ndarray, b: np.ndarray, tol: float = 1e-10) -> bool:
+def _array_eq(
+    a: Optional[np.ndarray], b: Optional[np.ndarray], tol: float = 1e-10
+) -> bool:
     """Compare numpy arrays with tolerance."""
     if a is None and b is None:
         return True
@@ -64,7 +66,7 @@ class Origin:
 
     _matrix_cache: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.xyz = np.asarray(self.xyz, dtype=np.float64)
         self.rpy = np.asarray(self.rpy, dtype=np.float64)
 
@@ -127,12 +129,12 @@ class Origin:
         """Create identity transform."""
         return cls()
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Origin):
             return NotImplemented
         return _array_eq(self.xyz, other.xyz) and _array_eq(self.rpy, other.rpy)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((tuple(self.xyz), tuple(self.rpy)))
 
 
@@ -150,7 +152,7 @@ class Inertial:
         default_factory=lambda: np.zeros((3, 3), dtype=np.float64)
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.inertia = np.asarray(self.inertia, dtype=np.float64)
 
     @property
@@ -208,7 +210,9 @@ class Inertial:
         return G
 
     @classmethod
-    def from_spatial_inertia(cls, G: np.ndarray, origin: Origin = None) -> "Inertial":
+    def from_spatial_inertia(
+        cls, G: np.ndarray, origin: Optional[Origin] = None
+    ) -> "Inertial":
         """Create Inertial from 6x6 spatial inertia matrix."""
         inertia = G[0:3, 0:3].copy()
         mass = G[3, 3]
@@ -253,15 +257,15 @@ class Box:
 
     size: np.ndarray = field(default_factory=lambda: np.ones(3, dtype=np.float64))
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.size = np.asarray(self.size, dtype=np.float64)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Box):
             return NotImplemented
         return _array_eq(self.size, other.size)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(tuple(self.size))
 
 
@@ -297,7 +301,7 @@ class Mesh:
     _trimesh: Optional[object] = field(default=None, repr=False, compare=False)
     _load_attempted: bool = field(default=False, repr=False, compare=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.scale = np.asarray(self.scale, dtype=np.float64)
         if self.scale.size == 1:
             self.scale = np.full(3, self.scale.item(), dtype=np.float64)
@@ -344,12 +348,12 @@ class Mesh:
         except Exception as e:
             logger.warning(f"Failed to load mesh {self.filename!r}: {e!r}")
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Mesh):
             return NotImplemented
         return self.filename == other.filename and _array_eq(self.scale, other.scale)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.filename, tuple(self.scale)))
 
 
@@ -365,11 +369,11 @@ class Material:
     color: Optional[np.ndarray] = None  # RGBA
     texture: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.color is not None:
             self.color = np.asarray(self.color, dtype=np.float64)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Material):
             return NotImplemented
         return (
@@ -378,7 +382,7 @@ class Material:
             and self.texture == other.texture
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         color_tuple = tuple(self.color) if self.color is not None else None
         return hash((self.name, color_tuple, self.texture))
 
@@ -489,10 +493,10 @@ class Transmission:
     joints: List[TransmissionJoint] = field(default_factory=list)
     actuators: List[Actuator] = field(default_factory=list)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Transmission):
             return NotImplemented
         return self.name == other.name
@@ -514,10 +518,10 @@ class Link:
     visuals: List[Visual] = field(default_factory=list)
     collisions: List[Collision] = field(default_factory=list)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Link):
             return NotImplemented
         return self.name == other.name
@@ -543,7 +547,7 @@ class Joint:
     safety: Optional[SafetyController] = None
     calibration: Optional[JointCalibration] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.axis = np.asarray(self.axis, dtype=np.float64)
         # Normalize axis
         norm = np.linalg.norm(self.axis)
@@ -560,7 +564,12 @@ class Joint:
         """Check if joint mimics another."""
         return self.mimic is not None
 
-    def get_child_pose(self, q=None) -> np.ndarray:
+    def get_child_pose(
+        self,
+        q: Optional[
+            Union[float, np.ndarray, List[float], Tuple[float, ...]]
+        ] = None,
+    ) -> np.ndarray:
         """
         Compute child link pose relative to parent for given configuration.
 
@@ -740,10 +749,10 @@ class Joint:
 
         return R
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         if not isinstance(other, Joint):
             return NotImplemented
         return self.name == other.name

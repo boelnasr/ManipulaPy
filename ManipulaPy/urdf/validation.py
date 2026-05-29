@@ -12,9 +12,13 @@ Copyright (c) 2025 Mohamed Aboelnasr
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from .core import URDF
+    from .types import Joint, Transmission
 
 
 class ValidationSeverity(Enum):
@@ -35,6 +39,7 @@ class ValidationIssue:
     element_name: str = ""  # Name of the problematic element
 
     def __str__(self) -> str:
+        """Return a single-line issue summary."""
         location = (
             f" in {self.element_type} '{self.element_name}'"
             if self.element_name
@@ -80,6 +85,7 @@ class ValidationResult:
         return [i for i in self.issues if i.severity == ValidationSeverity.WARNING]
 
     def __str__(self) -> str:
+        """Return a human-readable validation report."""
         if not self.issues:
             return "URDF is valid"
 
@@ -273,7 +279,7 @@ class URDFValidator:
 
     def _validate_joint(
         self,
-        joint,
+        joint: "Joint",
         joint_name: str,
         result: ValidationResult,
     ) -> None:
@@ -321,7 +327,7 @@ class URDFValidator:
 
     def _validate_transmission(
         self,
-        trans,
+        trans: "Transmission",
         trans_name: str,
         joints: Dict[str, object],
         result: ValidationResult,
@@ -354,7 +360,7 @@ class URDFValidator:
                 )
 
 
-def validate_urdf(urdf) -> ValidationResult:
+def validate_urdf(urdf: "URDF") -> ValidationResult:
     """
     Convenience function to validate a URDF object.
 

@@ -38,10 +38,15 @@ import threading
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
+
+ErrorFunction = Callable[
+    [NDArray[np.float64], NDArray[np.float64]],
+    Tuple[NDArray[np.float64], float, float],
+]
 
 
 class TracIKSolver:
@@ -75,8 +80,8 @@ class TracIKSolver:
         jacobian_func: Callable[[NDArray[np.float64]], NDArray[np.float64]],
         joint_limits: List[Tuple[Optional[float], Optional[float]]],
         n_joints: int,
-        error_func: Optional[Callable] = None,
-    ):
+        error_func: Optional[ErrorFunction] = None,
+    ) -> None:
         """
         Initialize TRAC-IK solver.
 
@@ -151,7 +156,9 @@ class TracIKSolver:
         best_result = {"theta": None, "success": False, "error": float("inf")}
         stop_event = threading.Event()
 
-        def update_result(theta, success, error):
+        def update_result(
+            theta: NDArray[np.float64], success: bool, error: float
+        ) -> None:
             """Thread-safe result update with error-based selection."""
             with result_lock:
                 if success:
@@ -164,7 +171,8 @@ class TracIKSolver:
                     best_result["theta"] = theta
                     best_result["error"] = error
 
-        def _remaining():
+        def _remaining() -> float:
+            """Return remaining solve budget in seconds."""
             return max(0, timeout - (time.perf_counter() - start_time))
 
         if use_parallel:
@@ -503,7 +511,7 @@ class TracIKSolver:
         """
         start_time = time.perf_counter()
 
-        def objective(theta):
+        def objective(theta: NDArray[np.float64]) -> float:
             """Objective function: minimize pose error."""
             if stop_event.is_set():
                 return 1e10
@@ -514,7 +522,7 @@ class TracIKSolver:
             V_err, rot_err, trans_err = self.error_func(T_curr, T_desired)
             return rot_err**2 + trans_err**2
 
-        def jacobian_objective(theta):
+        def jacobian_objective(theta: NDArray[np.float64]) -> NDArray[np.float64]:
             """Gradient of objective function."""
             if stop_event.is_set():
                 return np.zeros(self.n_joints)
@@ -672,7 +680,7 @@ class TracIKSolver:
 
 
 def trac_ik_solve(
-    robot,
+    robot: Any,
     T_desired: NDArray[np.float64],
     theta0: Optional[NDArray[np.float64]] = None,
     timeout: float = 0.2,

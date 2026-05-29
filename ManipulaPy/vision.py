@@ -35,7 +35,7 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 import logging
 import os
 import warnings
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import cv2
 import matplotlib.pyplot as plt
@@ -164,7 +164,7 @@ def clear_yolo_cache(model_path: Optional[str] = None) -> int:
         return 0
 
 
-def process_image(image):
+def process_image(image: Union[np.ndarray, str]) -> Any:
     """
     Basic image processing function.
 
@@ -200,7 +200,7 @@ __all__ = [
 ]
 
 
-def read_debug_parameters(dbg_params):
+def read_debug_parameters(dbg_params: Dict[str, int]) -> Dict[str, float]:
     """
     Utility to read current slider values from PyBullet debug interface.
     """
@@ -250,13 +250,13 @@ class Vision:
 
     def __init__(
         self,
-        camera_configs=None,
-        stereo_configs=None,
-        use_pybullet_debug=False,
-        show_plot=True,
-        logger_name="VisionSystemLogger",
-        physics_client=None,
-    ):
+        camera_configs: Optional[List[Dict[str, Any]]] = None,
+        stereo_configs: Optional[Tuple[Dict[str, Any], Dict[str, Any]]] = None,
+        use_pybullet_debug: bool = False,
+        show_plot: bool = True,
+        logger_name: str = "VisionSystemLogger",
+        physics_client: Optional[int] = None,
+    ) -> None:
         """
         Initializes the Vision system with optional monocular/stereo cameras, PyBullet debug tools, and YOLO object detection.
 
@@ -351,7 +351,8 @@ class Vision:
     # --------------------------------------------------------------------------
     # Logger
     # --------------------------------------------------------------------------
-    def _setup_logger(self, name):
+    def _setup_logger(self, name: str) -> logging.Logger:
+        """Configure and return a logger for the vision system."""
         logger = logging.getLogger(name)
         if not logger.handlers:
             logger.setLevel(logging.DEBUG)
@@ -367,7 +368,7 @@ class Vision:
     # --------------------------------------------------------------------------
     # Camera Config
     # --------------------------------------------------------------------------
-    def _configure_camera(self, idx, cfg):
+    def _configure_camera(self, idx: int, cfg: Dict[str, Any]) -> None:
         """
         Store a camera configuration and open an OpenCV capture device if requested.
         """
@@ -410,7 +411,9 @@ class Vision:
                 self.logger.error(msg)
                 raise RuntimeError(msg)
 
-    def _validate_stereo_config(self, left_cfg, right_cfg):
+    def _validate_stereo_config(
+        self, left_cfg: Dict[str, Any], right_cfg: Dict[str, Any]
+    ) -> None:
         """
         Basic validation that each stereo cam config has required keys.
         """
@@ -425,7 +428,11 @@ class Vision:
     # --------------------------------------------------------------------------
     # Extrinsic & Rotation Utility
     # --------------------------------------------------------------------------
-    def _make_extrinsic_matrix(self, translation, rotation_deg):
+    def _make_extrinsic_matrix(
+        self,
+        translation: Union[List[float], np.ndarray],
+        rotation_deg: Union[List[float], np.ndarray],
+    ) -> np.ndarray:
         """
         Create a 4x4 extrinsic matrix from translation and Euler angles in degrees.
         Uses cv2.Rodrigues for improved numerical stability.
@@ -439,7 +446,9 @@ class Vision:
         T[:3, 3] = translation
         return T
 
-    def _euler_to_rotation_matrix(self, euler_deg):
+    def _euler_to_rotation_matrix(
+        self, euler_deg: Union[List[float], np.ndarray]
+    ) -> np.ndarray:
         """
         Convert [roll_deg, pitch_deg, yaw_deg] to a rotation matrix via manual multiplication,
         or you can chain cv2.Rodrigues calls. We'll do a direct approach here for clarity.
@@ -475,7 +484,7 @@ class Vision:
     # --------------------------------------------------------------------------
     # PyBullet Debug Camera
     # --------------------------------------------------------------------------
-    def _setup_pybullet_debug_sliders(self):
+    def _setup_pybullet_debug_sliders(self) -> None:
         """
         Creates PyBullet debug sliders for a single 'virtual' camera.
         """
@@ -505,7 +514,7 @@ class Vision:
         self.dbg_params["print"] = pb.addUserDebugParameter("print_params", 1, 0, 1)
         self.old_print_val = 1
 
-    def _get_pybullet_view_proj(self):
+    def _get_pybullet_view_proj(self) -> Tuple[Any, Any, int, int]:
         """
         Reads debug sliders, returns (view_mtx, proj_mtx, width, height).
         """
@@ -549,7 +558,7 @@ class Vision:
     # --------------------------------------------------------------------------
     # YOLO Lazy Loading
     # --------------------------------------------------------------------------
-    def _ensure_yolo_loaded(self):
+    def _ensure_yolo_loaded(self) -> bool:
         """
         Lazy load YOLO model on first use.
 
@@ -600,7 +609,9 @@ class Vision:
     # --------------------------------------------------------------------------
     # Image Capture
     # --------------------------------------------------------------------------
-    def capture_image(self, camera_index=0):
+    def capture_image(
+        self, camera_index: int = 0
+    ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         """
         Captures an RGB and depth image from PyBullet cameras.
         """
@@ -649,7 +660,7 @@ class Vision:
         depth_threshold: float = 5.0,
         camera_index: int = 0,
         step: int = 5,
-    ):
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Detect obstacles with YOLO (if available) and estimate 3D positions via depth.
 
@@ -743,7 +754,10 @@ class Vision:
     # Stereo Methods
     # --------------------------------------------------------------------------
 
-    def compute_stereo_rectification_maps(self, image_size=(640, 480)):
+    def compute_stereo_rectification_maps(
+        self, image_size: Tuple[int, int] = (640, 480)
+    ) -> None:
+        """Compute and cache stereo rectification maps for configured cameras."""
         if not self.stereo_enabled:
             self.logger.warning("Stereo not enabled.")
             return
@@ -795,7 +809,9 @@ class Vision:
         self.Q = Q
         self.logger.info("Stereo rectification maps computed successfully.")
 
-    def rectify_stereo_images(self, left_img, right_img):
+    def rectify_stereo_images(
+        self, left_img: np.ndarray, right_img: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Remap left and right images to their rectified forms.
         """
@@ -814,7 +830,9 @@ class Vision:
         )
         return left_rect, right_rect
 
-    def compute_disparity(self, left_rect, right_rect):
+    def compute_disparity(
+        self, left_rect: np.ndarray, right_rect: np.ndarray
+    ) -> np.ndarray:
         """
         Compute a disparity map from rectified stereo images using StereoSGBM (or BM).
         """
@@ -838,7 +856,7 @@ class Vision:
 
         return disparity
 
-    def disparity_to_pointcloud(self, disparity):
+    def disparity_to_pointcloud(self, disparity: np.ndarray) -> np.ndarray:
         """
         Reproject a disparity map to 3D points using the Q matrix from stereoRectify.
         """
@@ -858,7 +876,9 @@ class Vision:
 
         return cloud_filtered
 
-    def get_stereo_point_cloud(self, left_img, right_img):
+    def get_stereo_point_cloud(
+        self, left_img: np.ndarray, right_img: np.ndarray
+    ) -> np.ndarray:
         """
         High-level pipeline: rectify, compute disparity, reproject to 3D.
         """
@@ -875,7 +895,7 @@ class Vision:
     # --------------------------------------------------------------------------
     # Cleanup
     # --------------------------------------------------------------------------
-    def release(self):
+    def release(self) -> None:
         """
         Release resources (e.g., OpenCV capture devices).
         """
@@ -886,7 +906,7 @@ class Vision:
 
     # Replace the __del__ method in ManipulaPy/vision.py (around line 648)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """
         Destructor: ensure we release resources gracefully.
         """

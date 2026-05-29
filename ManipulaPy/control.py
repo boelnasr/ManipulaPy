@@ -51,7 +51,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def _to_numpy(arr):
+def _to_numpy(arr: Any) -> NDArray[Any]:
     """
     Safely convert array to NumPy, handling both NumPy and CuPy arrays.
 
@@ -98,6 +98,8 @@ def _validate_i_clamp(i_clamp: Optional[float]) -> Optional[float]:
 
 
 class ManipulatorController:
+    """CPU-based manipulator controller implementations and tuning utilities."""
+
     def __init__(self, dynamics: Any) -> None:
         """
         Initialize the ManipulatorController with the dynamics of the manipulator.
@@ -675,8 +677,12 @@ class ManipulatorController:
         return thetalist, dthetalist, tau
 
     def plot_steady_state_response(
-        self, time, response, set_point, title="Steady State Response"
-    ):
+        self,
+        time: Union[NDArray[np.float64], List[float]],
+        response: Union[NDArray[np.float64], List[float]],
+        set_point: float,
+        title: str = "Steady State Response",
+    ) -> None:
         """
         Plot the steady-state response of the controller.
 
@@ -732,7 +738,12 @@ class ManipulatorController:
         plt.grid(True)
         plt.show()
 
-    def calculate_rise_time(self, time, response, set_point):
+    def calculate_rise_time(
+        self,
+        time: Union[NDArray[np.float64], List[float]],
+        response: Union[NDArray[np.float64], List[float]],
+        set_point: float,
+    ) -> float:
         """
         Calculate the rise time.
 
@@ -755,7 +766,9 @@ class ManipulatorController:
             return float("inf")
         return time[end_idx[0]] - time[start_idx[0]]
 
-    def calculate_percent_overshoot(self, response, set_point):
+    def calculate_percent_overshoot(
+        self, response: Union[NDArray[np.float64], List[float]], set_point: float
+    ) -> float:
         """
         Calculate the percent overshoot.
 
@@ -772,7 +785,13 @@ class ManipulatorController:
         max_response = np.max(response)
         return ((max_response - set_point) / set_point) * 100
 
-    def calculate_settling_time(self, time, response, set_point, tolerance=0.02):
+    def calculate_settling_time(
+        self,
+        time: Union[NDArray[np.float64], List[float]],
+        response: Union[NDArray[np.float64], List[float]],
+        set_point: float,
+        tolerance: float = 0.02,
+    ) -> float:
         """
         Calculate the settling time.
 
@@ -808,7 +827,9 @@ class ManipulatorController:
         first_settled_idx = last_excursion + 1
         return float(time[first_settled_idx])
 
-    def calculate_steady_state_error(self, response, set_point):
+    def calculate_steady_state_error(
+        self, response: Union[NDArray[np.float64], List[float]], set_point: float
+    ) -> float:
         """
         Calculate the steady-state error.
 
@@ -900,7 +921,27 @@ class ManipulatorController:
         return tau
 
     # ------------------------------------------------------------------------
-    def ziegler_nichols_tuning(self, Ku, Tu, kind="PID"):
+    def ziegler_nichols_tuning(
+        self,
+        Ku: Union[float, NDArray[np.float64], List[float]],
+        Tu: Union[float, NDArray[np.float64], List[float]],
+        kind: str = "PID",
+    ) -> Tuple[
+        Union[float, NDArray[np.float64]],
+        Union[float, NDArray[np.float64]],
+        Union[float, NDArray[np.float64]],
+    ]:
+        """
+        Compute Ziegler-Nichols controller gains.
+
+        Args:
+            Ku: Ultimate gain as a scalar or vector.
+            Tu: Ultimate period as a scalar or vector.
+            kind: Controller type: ``"P"``, ``"PI"``, or ``"PID"``.
+
+        Returns:
+            Tuple of ``(Kp, Ki, Kd)`` gains.
+        """
         Ku = _to_numpy(Ku).astype(float)
         kind = kind.upper()
 
@@ -930,7 +971,16 @@ class ManipulatorController:
         return Kp, Ki, Kd
 
     # ------------------------------------------------------------------------
-    def tune_controller(self, Ku, Tu, kind="PID"):
+    def tune_controller(
+        self,
+        Ku: Union[float, NDArray[np.float64], List[float]],
+        Tu: Union[float, NDArray[np.float64], List[float]],
+        kind: str = "PID",
+    ) -> Tuple[
+        Union[float, NDArray[np.float64]],
+        Union[float, NDArray[np.float64]],
+        Union[float, NDArray[np.float64]],
+    ]:
         """
         Convenience wrapper that logs and returns NumPy arrays (length = DOF).
         """

@@ -36,6 +36,8 @@ from . import utils
 
 
 class SerialManipulator:
+    """Kinematic model for serial manipulators using screw-axis operations."""
+
     def __init__(
         self,
         M_list: NDArray[np.float64],
@@ -277,7 +279,9 @@ class SerialManipulator:
         stall_count = 0
         max_stall = 20
 
-        def compute_geometric_error(T_curr, T_target):
+        def compute_geometric_error(
+            T_curr: NDArray[np.float64], T_target: NDArray[np.float64]
+        ) -> Tuple[NDArray[np.float64], float, float]:
             """Compute geometric error without adjoint amplification."""
             # Position error
             pos_err = T_target[:3, 3] - T_curr[:3, 3]
@@ -327,7 +331,11 @@ class SerialManipulator:
             V_err = np.concatenate([omega_err_space, pos_err])
             return V_err, rot_err, trans_err
 
-        def svd_robust_solve(J, V_err, damping_val):
+        def svd_robust_solve(
+            J: NDArray[np.float64],
+            V_err: NDArray[np.float64],
+            damping_val: float,
+        ) -> NDArray[np.float64]:
             """SVD-based damped least squares for near-singular Jacobians."""
             try:
                 U, s, Vt = np.linalg.svd(J, full_matrices=False)
@@ -340,7 +348,7 @@ class SerialManipulator:
                 lambda_I = (damping_val**2) * np.eye(JTJ.shape[0])
                 return np.linalg.solve(JTJ + lambda_I, J.T @ V_err)
 
-        def clip_to_limits(th):
+        def clip_to_limits(th: NDArray[np.float64]) -> NDArray[np.float64]:
             """Clip joint angles to limits."""
             th_clipped = th.copy()
             for i, (mn, mx) in enumerate(self.joint_limits):
@@ -474,7 +482,9 @@ class SerialManipulator:
         return theta, success, k + 1
 
     @staticmethod
-    def _pose_error(T_curr, T_desired):
+    def _pose_error(
+        T_curr: NDArray[np.float64], T_desired: NDArray[np.float64]
+    ) -> float:
         """Compute combined position + orientation error between two poses."""
         pos_err = np.linalg.norm(T_curr[:3, 3] - T_desired[:3, 3])
         R_err = T_curr[:3, :3].T @ T_desired[:3, :3]
@@ -540,7 +550,7 @@ class SerialManipulator:
                 f"Unknown strategy '{strategy}'. Choose from: {valid_strategies}"
             )
 
-        def get_initial_guess(strat):
+        def get_initial_guess(strat: str) -> Optional[NDArray[np.float64]]:
             """Generate initial guess for given strategy."""
             if strat == "workspace_heuristic":
                 return ik_helpers.workspace_heuristic_guess(
@@ -568,7 +578,9 @@ class SerialManipulator:
             else:
                 return None
 
-        def try_ik(theta0):
+        def try_ik(
+            theta0: NDArray[np.float64],
+        ) -> Tuple[NDArray[np.float64], bool, int]:
             """Try IK with given initial guess."""
             return self.iterative_inverse_kinematics(
                 T_desired,

@@ -11,7 +11,7 @@ Copyright (c) 2025 Mohamed Aboelnasr
 import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Union
 
 import numpy as np
 
@@ -118,7 +118,7 @@ class URDFParser:
         base_path: Optional[Path] = None,
         mesh_dir: Optional[Path] = None,
         load_meshes: bool = False,
-        filename_handler=None,
+        filename_handler: Optional[Callable[[str], str]] = None,
     ) -> "URDF":
         """
         Parse URDF from XML string.
@@ -216,7 +216,7 @@ class URDFParser:
     @classmethod
     def _create_filename_handler(
         cls, base_path: Optional[Path], mesh_dir: Optional[Path]
-    ):
+    ) -> Callable[[str], str]:
         """Create a filename resolution handler."""
 
         def handler(filename: str) -> str:
@@ -320,7 +320,7 @@ class URDFParser:
     def _parse_geometry(
         cls,
         elem: Optional[ET.Element],
-        filename_handler=None,
+        filename_handler: Optional[Callable[[str], str]] = None,
         load_mesh: bool = False,
     ) -> Optional[Geometry]:
         """Parse <geometry> element."""
@@ -400,7 +400,7 @@ class URDFParser:
         cls,
         elem: ET.Element,
         materials: Dict[str, Material],
-        filename_handler=None,
+        filename_handler: Optional[Callable[[str], str]] = None,
         load_mesh: bool = False,
     ) -> Visual:
         """Parse <visual> element."""
@@ -425,7 +425,7 @@ class URDFParser:
     def _parse_collision(
         cls,
         elem: ET.Element,
-        filename_handler=None,
+        filename_handler: Optional[Callable[[str], str]] = None,
         load_mesh: bool = False,
     ) -> Collision:
         """Parse <collision> element."""
@@ -442,7 +442,7 @@ class URDFParser:
         cls,
         elem: ET.Element,
         materials: Dict[str, Material],
-        filename_handler=None,
+        filename_handler: Optional[Callable[[str], str]] = None,
         load_meshes: bool = False,
     ) -> Link:
         """Parse <link> element."""
