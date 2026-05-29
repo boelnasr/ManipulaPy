@@ -186,3 +186,14 @@ CLAUDE.md
 # personal tooling.
 scripts/record_readme_gifs.py
 scripts/record_robot_gifs.py
+
+# Local tooling / editor workspaces
+.gstack/
+.obsidian/
+
+# Sphinx build log captured by `make ... | tee build.log`
+docs/build.log
+
+# Debug plots emitted when running the control examples
+*_results.png
+*_comparison.png
