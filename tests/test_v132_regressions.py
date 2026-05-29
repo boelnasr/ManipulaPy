@@ -37,6 +37,48 @@ class TestUtilsRegressions(unittest.TestCase):
         np.testing.assert_array_almost_equal(result[:3], [0, 0, 0])
         np.testing.assert_array_almost_equal(result[3:], [1, 2, 3])
 
+    def test_logm_matches_scipy_for_coupled_rotation_translation(self):
+        """CM-1: the SE(3) matrix-log translation block must be scaled by theta.
+
+        logm returned the unit-screw linear velocity (G_inv @ p) instead of the
+        matrix-log value (theta * G_inv @ p). The angular block was already
+        scaled, so the result disagreed with scipy.linalg.logm by a factor of
+        1/theta on the linear half for any coupled rotation+translation.
+        """
+        from scipy.linalg import logm as scipy_logm
+
+        from ManipulaPy.utils import logm, se3ToVec
+
+        theta = 1.3
+        c, s = np.cos(theta), np.sin(theta)
+        T = np.eye(4)
+        T[:3, :3] = [[c, -s, 0], [s, c, 0], [0, 0, 1]]  # Rz(theta)
+        T[:3, 3] = [1.0, 2.0, 3.0]
+
+        got = logm(T)  # 6-vector [w*theta ; v*theta]
+        ref = se3ToVec(np.real(scipy_logm(T)))
+        np.testing.assert_array_almost_equal(got, ref, decimal=6)
+
+    def test_matrixlog6_roundtrip_coupled_motion(self):
+        """CM-2: MatrixExp6(MatrixLog6(T)) must reconstruct T.
+
+        MatrixLog6 left the translation block as G_inv @ p (missing the theta
+        factor present on the rotation block), so the round-trip failed for any
+        transform combining rotation and translation. adaptive IK consumes this
+        via se3ToVec(MatrixLog6(T_err)).
+        """
+        from ManipulaPy.utils import MatrixExp6, MatrixLog6, VecTose3, se3ToVec
+
+        theta = 1.1
+        c, s = np.cos(theta), np.sin(theta)
+        T = np.eye(4)
+        T[:3, :3] = [[c, 0, s], [0, 1, 0], [-s, 0, c]]  # Ry(theta)
+        T[:3, 3] = [0.5, -1.2, 2.0]
+
+        S_theta = se3ToVec(MatrixLog6(T))
+        T_recon = MatrixExp6(VecTose3(S_theta))
+        np.testing.assert_array_almost_equal(T_recon, T, decimal=6)
+
 
 class TestDynamicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/dynamics.py bugs."""

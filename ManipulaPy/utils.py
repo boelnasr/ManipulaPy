@@ -257,7 +257,7 @@ def logm(T):
         + (1 / theta - 0.5 / np.tan(theta / 2))
         * np.dot(skew_symmetric(omega), skew_symmetric(omega))
     )
-    v = np.dot(G_inv, p)
+    v = theta * np.dot(G_inv, p)
     return np.hstack((omega * theta, v))
 
 
@@ -418,7 +418,7 @@ def MatrixLog6(T):
 
     # se(3) log has w_hat*theta in the rotation block
     omega_mat_scaled = theta * w_hat
-    v = G_inv @ p
+    v = theta * (G_inv @ p)
     return np.vstack((np.hstack((omega_mat_scaled, v.reshape(-1, 1))), [0, 0, 0, 0]))
 
 
