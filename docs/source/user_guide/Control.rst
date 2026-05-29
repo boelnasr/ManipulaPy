@@ -7,6 +7,7 @@ The ManipulaPy Control Module provides comprehensive control algorithms for robo
 .. contents:: Table of Contents
    :depth: 3
    :local:
+   :backlinks: none
 
 Overview
 ========

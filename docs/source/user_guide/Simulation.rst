@@ -13,6 +13,7 @@ computations through CuPy integration.
 .. contents:: Table of Contents
    :depth: 3
    :local:
+   :backlinks: none
 
 Installation and Setup
 ----------------------

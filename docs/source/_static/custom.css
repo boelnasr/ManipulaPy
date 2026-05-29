@@ -1,5 +1,13 @@
 /* Custom CSS for ManipulaPy documentation */
 
+:root {
+    --manipulapy-brand-primary: var(--pst-color-primary, var(--color-brand-primary, #2980b9));
+    --manipulapy-brand-content: var(--pst-color-link, var(--color-brand-content, #2980b9));
+    --manipulapy-bg-secondary: var(--pst-color-surface, var(--color-background-secondary, #f8f9fb));
+    --manipulapy-border: var(--pst-color-border, var(--color-background-border, #d8dee4));
+    --manipulapy-text-secondary: var(--pst-color-text-muted, var(--color-foreground-secondary, #5a5c63));
+}
+
 .highlight {
     background-color: #f8f8f8;
     border: 1px solid #e1e4e5;
@@ -22,18 +30,11 @@
     color: #8e44ad;
 }
 
-.admonition {
-    margin: 1em 0;
-    padding: 12px;
-    border-left: 4px solid #3498db;
-    background-color: #f1f8ff;
-}
-
 .class > dt,
 .function > dt,
 .method > dt {
-    background-color: #f8f9fa;
-    border: 1px solid #e1e4e5;
+    background-color: var(--manipulapy-bg-secondary);
+    border: 1px solid var(--manipulapy-border);
     padding: 8px;
     margin-top: 1em;
     border-radius: 4px;
@@ -68,3 +69,239 @@
         width: 100%;
         max-width: 200px;
     }}
+
+/* ────────────────────────────────────────────────────────────
+   Inline `.. contents::` directive — styled as a theme-aware card
+   ──────────────────────────────────────────────────────────── */
+.contents.topic,
+nav.contents,
+div.topic.contents {
+    background: var(--manipulapy-bg-secondary);
+    border: 1px solid var(--manipulapy-border);
+    border-left: 4px solid var(--manipulapy-brand-primary);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin: 1.5rem 0 2rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.contents.topic > .topic-title,
+nav.contents > .topic-title,
+div.topic.contents > p.topic-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--manipulapy-brand-primary);
+    margin: 0 0 0.75rem;
+    padding: 0;
+    border: none;
+    background: none;
+}
+
+.contents.topic ul,
+nav.contents ul,
+div.topic.contents ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.contents.topic > ul,
+nav.contents > ul,
+div.topic.contents > ul {
+    columns: 2;
+    column-gap: 2rem;
+}
+
+.contents.topic li,
+nav.contents li,
+div.topic.contents li {
+    margin: 0.25rem 0;
+    line-height: 1.55;
+    break-inside: avoid;
+}
+
+.contents.topic ul ul,
+nav.contents ul ul,
+div.topic.contents ul ul {
+    margin-top: 0.25rem;
+    margin-bottom: 0.5rem;
+    padding-left: 0.85rem;
+    border-left: 2px solid var(--manipulapy-border);
+}
+
+.contents.topic ul ul li,
+nav.contents ul ul li,
+div.topic.contents ul ul li {
+    font-size: 0.9em;
+}
+
+.contents.topic p,
+nav.contents p,
+div.topic.contents p {
+    margin: 0;
+}
+
+.contents.topic a,
+nav.contents a,
+div.topic.contents a {
+    color: var(--manipulapy-text-secondary);
+    text-decoration: none;
+    border-bottom: 1px dashed transparent;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.contents.topic a:hover,
+nav.contents a:hover,
+div.topic.contents a:hover {
+    color: var(--manipulapy-brand-content);
+    border-bottom-color: var(--manipulapy-brand-content);
+}
+
+@media (max-width: 600px) {
+    .contents.topic > ul,
+    nav.contents > ul,
+    div.topic.contents > ul {
+        columns: 1;
+    }
+}
+
+/* ────────────────────────────────────────────────────────────
+   Getting Started page — theme-aware reskin of the inline blocks
+   (.getting-started-hero, .next-steps, .step-category, .pro-tips, .tip)
+   ──────────────────────────────────────────────────────────── */
+
+.getting-started-hero {
+    background: linear-gradient(
+        135deg,
+        var(--manipulapy-brand-primary) 0%,
+        var(--manipulapy-brand-content) 100%
+    );
+    color: #fff;
+    padding: 2rem;
+    border-radius: 12px;
+    margin: 2rem 0;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.getting-started-hero h2 {
+    margin: 0 0 0.75rem;
+    font-size: 1.75rem;
+    color: #fff;
+    border: none;
+}
+
+.getting-started-hero p {
+    margin: 0 auto;
+    max-width: 56ch;
+    color: rgba(255, 255, 255, 0.92);
+    line-height: 1.55;
+}
+
+/* ── Next-steps grid (card-based link clusters) ── */
+.next-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.25rem;
+    margin: 2rem 0;
+}
+
+.step-category {
+    background: var(--manipulapy-bg-secondary);
+    border: 1px solid var(--manipulapy-border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    transition: transform 0.15s ease, box-shadow 0.15s ease,
+                border-color 0.15s ease;
+}
+
+.step-category:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: var(--manipulapy-brand-primary);
+}
+
+.step-category h4 {
+    margin: 0 0 0.75rem;
+    color: var(--manipulapy-brand-primary);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.step-category ul {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.step-category li {
+    margin: 0.4rem 0;
+    line-height: 1.45;
+}
+
+.step-category li a {
+    color: var(--manipulapy-text-secondary);
+    text-decoration: none;
+    border-bottom: 1px dashed transparent;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.step-category li a:hover {
+    color: var(--manipulapy-brand-content);
+    border-bottom-color: var(--manipulapy-brand-content);
+}
+
+/* ── Pro-tips grid (colored callouts) ── */
+.pro-tips {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.tip {
+    color: #fff;
+    padding: 1.25rem 1rem;
+    border-radius: 10px;
+    text-align: center;
+    line-height: 1.45;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tip:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.15);
+}
+
+.tip:nth-child(1) { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+.tip:nth-child(2) { background: linear-gradient(135deg, #b91c1c, #dc2626); }
+.tip:nth-child(3) { background: linear-gradient(135deg, #047857, #059669); }
+.tip:nth-child(4) { background: linear-gradient(135deg, #6d28d9, #7c3aed); }
+
+.tip strong {
+    color: #fff;
+    font-weight: 700;
+}
+
+.tip-icon {
+    font-size: 1.6rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    line-height: 1;
+}
+
+@media (max-width: 600px) {
+    .next-steps,
+    .pro-tips {
+        grid-template-columns: 1fr;
+    }
+    .getting-started-hero {
+        padding: 1.5rem 1rem;
+    }
+    .getting-started-hero h2 {
+        font-size: 1.4rem;
+    }
+}

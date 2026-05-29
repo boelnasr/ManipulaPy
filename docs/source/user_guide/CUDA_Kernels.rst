@@ -6,6 +6,7 @@ This guide covers the **CUDA acceleration** features in ManipulaPy, which provid
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 What is GPU Acceleration?
 ----------------------------

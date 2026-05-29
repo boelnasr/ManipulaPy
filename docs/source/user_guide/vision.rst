@@ -8,6 +8,7 @@ This comprehensive guide covers the Vision module in ManipulaPy, which provides 
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 Overview
 --------

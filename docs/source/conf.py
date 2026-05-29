@@ -111,8 +111,8 @@ def _try_theme(name, mod_name, **kw):
     except ImportError:
         return None, {}
 
-# Start with RTD theme for maximum compatibility
-html_theme = "sphinx_rtd_theme" 
+# Start with RTD theme as the conservative fallback
+html_theme = "sphinx_rtd_theme"
 html_theme_options = {
     "style_nav_header_background": "#2980B9",
     "collapse_navigation": True,
@@ -121,53 +121,45 @@ html_theme_options = {
     "titles_only": False,
 }
 
-# Try better themes if available (but fallback gracefully)
+# Prefer PyData for the main docs build, but fallback gracefully for lean
+# environments that only have the Read the Docs theme installed.
 for _name, _mod, _opts in [
-    ("furo", "furo", {"extra": {      # first choice - modern and clean
-        "navigation_with_keys": True,
-        "top_of_page_button": "edit",
-        "source_repository": "https://github.com/boelnasr/ManipulaPy/",
-        "source_branch": "main",
-        "source_directory": "docs/source/",
-        "light_css_variables": {
-            "color-brand-primary": "#2980B9",
-            "color-brand-content": "#2980B9",
-        },
-        "dark_css_variables": {
-            "color-brand-primary": "#4FC3F7",
-            "color-brand-content": "#4FC3F7",
-        },
-    }}),
     ("pydata_sphinx_theme", "pydata_sphinx_theme", {
         "extra": {
             "github_url": "https://github.com/boelnasr/ManipulaPy",
-            "navbar_start": ["navbar-logo", "version-dropdown"],
-            "navbar_end": ["search-field.html", "navbar-icon-links"],
+            "navbar_start": ["navbar-logo"],
+            "navbar_center": ["navbar-nav"],
+            "navbar_end": ["theme-switcher", "navbar-icon-links"],
             "navbar_persistent": ["search-button"],
-            "footer_items": ["copyright", "sphinx-version"],
+            "footer_start": ["copyright", "sphinx-version"],
+            "footer_end": ["theme-version"],
+            "navigation_depth": 4,
+            "show_nav_level": 1,
+            "show_toc_level": 2,
             "collapse_navigation": True,
             "show_prev_next": False,
             "icon_links": [
                 {
-                    "name": "GitHub",
-                    "url": "https://github.com/boelnasr/ManipulaPy",
-                    "icon": "fab fa-github-square",
-                    "type": "fontawesome",
-                },
-                {
                     "name": "PyPI",
                     "url": "https://pypi.org/project/manipulapy/",
-                    "icon": "fas fa-box",
+                    "icon": "fa-solid fa-box",
                     "type": "fontawesome",
                 },
             ],
         }
     }),
+    ("sphinx_rtd_theme", "sphinx_rtd_theme", {"extra": {
+        "style_nav_header_background": "#2980B9",
+        "collapse_navigation": True,
+        "navigation_depth": 4,
+        "includehidden": True,
+        "titles_only": False,
+    }}),
 ]:
     _selected, _opts_dict = _try_theme(_name, _mod, extra=_opts["extra"])
     if _selected:
         html_theme = _selected
-        html_theme_options.update(_opts_dict)
+        html_theme_options = _opts_dict
         print(f"✅ Using theme: {_selected}")
         break
 

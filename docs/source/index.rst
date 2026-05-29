@@ -62,6 +62,7 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
 .. contents:: **Quick links**
    :local:
    :depth: 1
+   :backlinks: none
 
 Getting Started
 ---------------

@@ -10,6 +10,7 @@ using URDF meshes.
 .. contents:: **Quick navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 .. note::
    Examples target **Python 3.10+**, **SciPy 1.10+**, and ManipulaPy's native

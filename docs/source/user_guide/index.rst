@@ -34,6 +34,7 @@ Welcome to the comprehensive ManipulaPy User Guide! This section provides detail
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 📚 Complete Guide Overview
 --------------------------

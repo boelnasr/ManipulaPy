@@ -18,6 +18,7 @@ Welcome to ManipulaPy! This guide will get you up and running with modern roboti
 .. contents:: **What you'll learn**
    :local:
    :depth: 2
+   :backlinks: none
 
 Installation
 ------------
@@ -449,75 +450,6 @@ Common Issues & Solutions
    for highlights — the lightweight default install, the new ``[simulation]``,
    ``[urdf]``, ``[vision]``, and ``[ml]`` extras, plus control/sim/URDF bug fixes.
 
-.. raw:: html
-
-   <style>
-   .getting-started-hero {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 2rem;
-      border-radius: 10px;
-      margin: 2rem 0;
-      text-align: center;
-   }
-   .getting-started-hero h2 {
-      margin-top: 0;
-      font-size: 2rem;
-   }
-   .next-steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin: 2rem 0;
-   }
-   .step-category {
-      border: 1px solid #e1e4e8;
-      border-radius: 8px;
-      padding: 1rem;
-      background: #f8f9fa;
-   }
-   .step-category h4 {
-      margin-top: 0;
-      color: #0366d6;
-   }
-   .step-category ul {
-      margin: 0;
-      padding-left: 1rem;
-   }
-   .step-category li {
-      margin: 0.5rem 0;
-   }
-   .pro-tips {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
-   }
-   .tip {
-      color: white;
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-   }
-
-   .tip:nth-child(1) {
-      background: #2563eb; /* Strong blue */
-   }
-
-   .tip:nth-child(2) {
-      background: #dc2626; /* Strong red */
-   }
-
-   .tip:nth-child(3) {
-      background: #059669; /* Strong green */
-   }
-
-   .tip:nth-child(4) {
-      background: #7c3aed; /* Strong purple */
-   }
-   .tip-icon {
-      font-size: 1.5rem;
-      display: block;
-      margin-bottom: 0.5rem;
-   }
-   </style>
+.. Styles for .getting-started-hero, .next-steps, .step-category, .pro-tips,
+   and .tip live in docs/source/_static/custom.css so they adapt to Furo's
+   light/dark theme via CSS variables.

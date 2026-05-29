@@ -16,6 +16,7 @@ Quick Navigation
 .. contents::
    :local:
    :depth: 2
+   :backlinks: none
 
 -----------------------
 SerialManipulator Class

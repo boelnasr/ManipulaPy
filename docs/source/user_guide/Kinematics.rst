@@ -6,6 +6,7 @@ This guide covers the **SerialManipulator** class in ManipulaPy, which provides 
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 What is Robot Kinematics?
 -------------------------

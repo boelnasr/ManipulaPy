@@ -1,10 +1,11 @@
 # Core documentation dependencies
-sphinx>=4.0.0,<7.0.0
-sphinx-rtd-theme>=1.0.0,<2.0.0
-myst-parser>=0.17.0,<3.0.0
+sphinx>=8.0.0,<9.0.0
+pydata-sphinx-theme>=0.18.0,<0.19.0
+sphinx-rtd-theme>=3.0.0,<4.0.0
+myst-parser>=4.0.0,<5.0.0
 
 # For better API documentation
-sphinx-autodoc-typehints>=1.12.0,<2.0.0
+sphinx-autodoc-typehints>=3.0.0,<4.0.0
 sphinx-copybutton>=0.5.0,<1.0.0
 
 # For mathematical expressions
@@ -16,7 +17,7 @@ matplotlib>=3.9.0,<4.0.0
 
 # Required for proper documentation build
 packaging>=21.0
-docutils>=0.17,<0.20
+docutils>=0.21,<0.22
 
 # For proper reStructuredText parsing
 Pygments>=2.7.0,<3.0.0
