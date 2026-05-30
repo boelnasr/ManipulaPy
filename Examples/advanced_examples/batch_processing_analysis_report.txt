@@ -1,103 +1,38 @@
-
 ========================================================================
-                    BATCH PROCESSING ANALYSIS REPORT
+                 BATCH PROCESSING ANALYSIS REPORT
 ========================================================================
 
-1. SYSTEM CONFIGURATION
------------------------
-CPU Cores: 16
-System Memory: 31.1 GB
-GPU Available: False
-Robot DOF: 6
+1. CONFIGURATION
+----------------
+Robot DOF:            6
+CUDA available:       False
+GPU acceleration:     DISABLED (CPU)
 
+2. SCALING (batch_joint_trajectory vs. sequential joint_trajectory)
+------------------------------------------------------------------
+  batch    seq (s)  batch (s)   speedup     thr/s
+      5      0.000      0.000     0.87x   20520.1
+     10      0.000      0.000     1.04x   25543.9
+     25      0.001      0.001     0.94x   24060.9
+     50      0.002      0.003     0.77x   19120.6
+    100      0.005      0.004     1.33x   27919.2
 
-2. PERFORMANCE SCALING ANALYSIS
--------------------------------
-Maximum Batch Size Tested: 200
-CPU Sequential Time Range: 0.033s - 1.072s
-CPU Parallel Time Range: 0.064s - 0.091s
-Maximum Parallel Speedup: 14.80x
-Parallel Efficiency: 92.50%
+Best batch-vs-sequential speedup: 1.33x
 
+3. TRAJECTORY STATISTICS (from real planner output)
+---------------------------------------------------
+  Path Lengths       mean=5.356  std=1.481  range=[1.943, 9.231]
+  Max Velocities     mean=4.016  std=1.111  range=[1.456, 6.920]
+  Max Accelerations  mean=8.034  std=2.222  range=[2.914, 13.846]
 
-3. MEMORY EFFICIENCY ANALYSIS
------------------------------
-Pre-allocated Arrays:
-  Peak Memory: -14.9 MB
-  Processing Time: 0.011s
-  Memory Efficiency: -1407.91 MB/s
+4. PER-JOINT MOTION
+-------------------
+  joint_1   max_vel=4.282 rad/s  max_acc=8.568 rad/s^2  range=6.207 rad
+  joint_2   max_vel=2.176 rad/s  max_acc=4.355 rad/s^2  range=3.111 rad
+  joint_3   max_vel=4.377 rad/s  max_acc=8.758 rad/s^2  range=6.239 rad
+  joint_4   max_vel=4.448 rad/s  max_acc=8.900 rad/s^2  range=6.250 rad
+  joint_5   max_vel=2.075 rad/s  max_acc=4.152 rad/s^2  range=3.093 rad
+  joint_6   max_vel=4.276 rad/s  max_acc=8.556 rad/s^2  range=6.250 rad
 
-Chunked Processing:
-  Peak Memory: 24.1 MB
-  Processing Time: 0.554s
-  Memory Efficiency: 43.49 MB/s
-
-
-4. STATISTICAL ANALYSIS
------------------------
-TRAJECTORY METRICS:
-  Path Lengths:
-    Mean: 7.933
-    Std Dev: 3.230
-    Range: 2.922 - 15.890
-
-  Max Velocities:
-    Mean: 4.982
-    Std Dev: 2.241
-    Range: 1.742 - 14.550
-
-  Max Accelerations:
-    Mean: 56.184
-    Std Dev: 72.623
-    Range: 2.634 - 431.180
-
-JOINT-WISE ANALYSIS:
-  Joint 1:
-    Max Velocity: 9.423 rad/s
-    Max Acceleration: 279.244 rad/s²
-    Position Range: 10.094 rad
-
-  Joint 2:
-    Max Velocity: 4.179 rad/s
-    Max Acceleration: 113.502 rad/s²
-    Position Range: 4.968 rad
-
-  Joint 3:
-    Max Velocity: 7.399 rad/s
-    Max Acceleration: 200.930 rad/s²
-    Position Range: 10.895 rad
-
-  Joint 4:
-    Max Velocity: 10.049 rad/s
-    Max Acceleration: 297.801 rad/s²
-    Position Range: 10.586 rad
-
-  Joint 5:
-    Max Velocity: 2.961 rad/s
-    Max Acceleration: 61.072 rad/s²
-    Position Range: 4.989 rad
-
-  Joint 6:
-    Max Velocity: 6.473 rad/s
-    Max Acceleration: 162.557 rad/s²
-    Position Range: 8.466 rad
-
-
-5. RECOMMENDATIONS
-------------------
-- GPU ACCELERATION: Not available (install CUDA support)
-- PARALLEL PROCESSING: Recommended (14.8x speedup)
-  Optimal for batch sizes > 50 with 16 cores
-- OPTIMAL BATCH SIZE: 200 (for CPU parallel processing)
-
-
-6. TECHNICAL DETAILS
---------------------
-Analysis Timestamp: 2026-05-10 19:26:14
-ManipulaPy Version: Batch Processing Demo
-CUDA Available: False
-GPU Acceleration: DISABLED
-
-========================================================================
-                            END OF REPORT
+Generated: 2026-05-30 14:29:13
 ========================================================================
