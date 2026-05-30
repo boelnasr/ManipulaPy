@@ -19,7 +19,14 @@ Expected Output:
 Author: ManipulaPy Development Team
 """
 
+import os
 import numpy as np
+import matplotlib
+
+# Honor a pre-set non-interactive backend (e.g. MPLBACKEND=Agg for headless runs);
+# otherwise pick Agg so the demo saves figures to disk without needing a display.
+if "MPLBACKEND" not in os.environ:
+    matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
@@ -34,8 +41,9 @@ except ImportError:
 
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.kinematics import SerialManipulator
-import matplotlib
-matplotlib.use('TkAgg')
+
+# Directory next to this script for saved plots.
+OUTPUT_DIR = Path(__file__).resolve().parent
 
 class KinematicsBasicDemo:
     """
@@ -47,6 +55,8 @@ class KinematicsBasicDemo:
         self.robot = None
         self.joint_limits = None
         self.n_joints = 0
+        # Deterministic sampling so reported numbers are reproducible run-to-run.
+        np.random.seed(0)
         
     def run_demo(self) -> bool:
         """Run the complete kinematics demonstration."""
@@ -220,15 +230,17 @@ class KinematicsBasicDemo:
                 print(f"   ✅ IK converged in {iterations} iterations ({ik_time*1000:.1f} ms) using smart IK")
                 print(f"   Solution: {solution}")
                 
-                # Verify the solution
+                # Verify the solution in task space (FK of the IK solution vs. target).
                 verification_pose = self.robot.forward_kinematics(solution)
                 position_error = np.linalg.norm(verification_pose[:3, 3] - target_position)
                 orientation_error = self._compute_orientation_error(verification_pose[:3, :3], target_pose[:3, :3])
-                
+                # Joint-space residual against the configuration that produced the target.
+                joint_error = float(np.linalg.norm(solution - fk_result['joint_angles']))
+
                 print(f"   Verification:")
                 print(f"     Position error: {position_error:.2e} m")
                 print(f"     Orientation error: {orientation_error:.2e} rad")
-                
+
                 self.ik_results[config_name] = {
                     'target_pose': target_pose,
                     'solution': solution,
@@ -236,6 +248,7 @@ class KinematicsBasicDemo:
                     'computation_time': ik_time,
                     'position_error': position_error,
                     'orientation_error': orientation_error,
+                    'joint_error': joint_error,
                     'success': True
                 }
                 
@@ -425,13 +438,16 @@ class KinematicsBasicDemo:
             self._plot_error_analysis(ax12)
             
             plt.tight_layout()
-            plt.show()
-            
-            print("✅ Visualization plots created successfully!")
-            
+            out_path = OUTPUT_DIR / "kinematics_basic_demo.png"
+            fig.savefig(out_path, dpi=120, bbox_inches="tight")
+            plt.close(fig)
+
+            print(f"✅ Visualization saved to {out_path}")
+
         except Exception as e:
             print(f"⚠️ Error creating visualizations: {e}")
-            print("This might be due to missing display or matplotlib backend issues.")
+            import traceback
+            traceback.print_exc()
     
     def _plot_joint_configurations(self, ax) -> None:
         """Plot joint configurations comparison."""

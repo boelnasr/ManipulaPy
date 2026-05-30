@@ -22,12 +22,19 @@ import os
 import sys
 import time
 import logging
-import numpy as np
-import matplotlib.pyplot as plt
-from pathlib import Path
 import warnings
+from pathlib import Path
+
+import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
+
+# Respect an externally configured backend (e.g. MPLBACKEND=Agg for headless
+# runs); otherwise fall back to a non-interactive backend so the demo never
+# blocks on a missing display.
+if "MPLBACKEND" not in os.environ:
+    matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 # Suppress some warnings for cleaner output
 warnings.filterwarnings('ignore', category=UserWarning)
 warnings.filterwarnings('ignore', category=RuntimeWarning)
@@ -42,18 +49,30 @@ try:
     
     import ManipulaPy as mp
     from ManipulaPy.urdf_processor import URDFToSerialManipulator
-    from ManipulaPy.path_planning import OptimizedTrajectoryPlanning, create_optimized_planner
+    from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
     from ManipulaPy.control import ManipulatorController
     from ManipulaPy.singularity import Singularity
     from ManipulaPy.cuda_kernels import check_cuda_availability
-    
-    print("✅ ManipulaPy modules imported successfully")
-    
+
+    print("ManipulaPy modules imported successfully")
+
 except ImportError as e:
-    print(f"❌ Error importing ManipulaPy: {e}")
+    print(f"Error importing ManipulaPy: {e}")
     print("Please ensure ManipulaPy is properly installed and accessible.")
     print("Current Python path:", sys.path)
     sys.exit(1)
+
+# PyBullet is optional: the physics-simulation section degrades gracefully to a
+# skip when it (or a usable physics server) is unavailable.
+try:
+    import pybullet as pb
+    from ManipulaPy.sim import Simulation
+
+    PYBULLET_AVAILABLE = True
+except Exception:  # pragma: no cover - depends on optional dependency
+    pb = None
+    Simulation = None
+    PYBULLET_AVAILABLE = False
 
 # Configure matplotlib for non-interactive plotting
 plt.ioff()  # Turn off interactive mode for automated saving
@@ -68,22 +87,23 @@ class SimulationIntermediateDemo:
     def __init__(self, urdf_path=None, save_plots=True) -> None:
         """
         Initialize the demonstration.
-        
+
         Args:
-            urdf_path (str, optional): Path to URDF file. If None, creates a default robot example.
+            urdf_path (str, optional): Path to URDF file. If None, uses the
+                bundled 6-DOF xArm6 robot (falling back to a generated sample
+                arm if the data package is unavailable).
             save_plots (bool): Whether to save generated plots to files.
         """
         self.save_plots = save_plots
         self.script_dir = Path(__file__).parent.absolute()
         self.plots_saved = []
-        
+
         # Setup logging
         self.setup_logging()
-        
+
         # URDF path handling
         if urdf_path is None:
-            # Try to find a sample URDF or create a simple one
-            self.urdf_path = self.create_sample_urdf()
+            self.urdf_path = self.default_urdf_path()
         else:
             self.urdf_path = urdf_path
             
@@ -118,6 +138,23 @@ class SimulationIntermediateDemo:
         )
         self.logger = logging.getLogger('SimulationDemo')
         
+    def default_urdf_path(self) -> str:
+        """Resolve the default robot URDF.
+
+        Prefers the bundled 6-DOF xArm6 model (a realistic arm that yields
+        meaningful kinematics, singularity, and workspace results) and falls
+        back to a generated 2-DOF sample arm when the data package is missing.
+        """
+        try:
+            from ManipulaPy.ManipulaPy_data.xarm import urdf_file
+
+            if os.path.exists(urdf_file):
+                self.logger.info("Using bundled xArm6 robot model")
+                return urdf_file
+        except Exception as e:  # pragma: no cover - data package optional
+            self.logger.warning(f"xArm6 model unavailable ({e}); using sample arm")
+        return self.create_sample_urdf()
+
     def create_sample_urdf(self) -> str:
         """Create a simple sample URDF for demonstration if none is provided."""
         urdf_content = '''<?xml version="1.0"?>
@@ -205,8 +242,10 @@ class SimulationIntermediateDemo:
             self.joint_limits = self.robot.joint_limits
             self.num_joints = len(self.joint_limits)
             
-            # Create torque limits (if not specified)
-            self.torque_limits = [(-10.0, 10.0)] * self.num_joints
+            # Torque limits (used by the planner and as PyBullet motor forces).
+            # Sized so the position controller can actually hold the arm
+            # against gravity in the physics simulation.
+            self.torque_limits = [(-150.0, 150.0)] * self.num_joints
             
             # Initialize trajectory planner with safe settings
             self.planner = OptimizedTrajectoryPlanning(
@@ -277,7 +316,10 @@ class SimulationIntermediateDemo:
                 ee_pos = T[:3, 3]
                 ee_positions.append(ee_pos)
                 
-                self.logger.info(f"Config {i+1}: joints={np.array(angles):.3f}, ee_pos={ee_pos:.3f}")
+                self.logger.info(
+                    f"Config {i+1}: joints={np.round(angles, 3)}, "
+                    f"ee_pos={np.round(ee_pos, 3)}"
+                )
             
             # Plot workspace
             ee_positions = np.array(ee_positions)
@@ -320,32 +362,33 @@ class SimulationIntermediateDemo:
         self.logger.info("=== Inverse Kinematics Demonstration ===")
         
         try:
-            # Define target poses (reachable positions)
-            targets = [
-                [0.2, 0.1, 0.2],   # Target 1
-                [0.1, -0.2, 0.15], # Target 2
-                [0.25, 0.0, 0.3],  # Target 3
+            # Build guaranteed-reachable targets by taking FK of known
+            # configurations, then solving IK back to them. This exercises the
+            # full pose (rotation + translation) so IK can actually converge.
+            seed_configs = [
+                np.array([low + frac * (high - low) for (low, high) in self.joint_limits])
+                for frac in (0.3, 0.5, 0.7)
             ]
-            
+            target_transforms = [
+                self.robot.forward_kinematics(cfg) for cfg in seed_configs
+            ]
+
             ik_results = []
-            
-            for i, target_pos in enumerate(targets):
+
+            for i, T_target in enumerate(target_transforms):
+                target_pos = T_target[:3, 3]
                 try:
-                    # Create target transformation matrix
-                    T_target = np.eye(4)
-                    T_target[:3, 3] = target_pos
-                    
-                    # Initial guess
+                    # Initial guess away from the seed so IK does real work.
                     theta_init = np.zeros(self.num_joints)
-                    
+
                     # Solve IK
                     start_time = time.time()
                     theta_solution, success, iterations = self.robot.iterative_inverse_kinematics(
                         T_target, theta_init, max_iterations=500, plot_residuals=False
                     )
                     solve_time = time.time() - start_time
-                    
-                    # Verify solution
+
+                    # Verify solution against the target pose translation.
                     T_result = self.robot.forward_kinematics(theta_solution)
                     error = np.linalg.norm(T_result[:3, 3] - target_pos)
                     
@@ -359,7 +402,7 @@ class SimulationIntermediateDemo:
                     }
                     ik_results.append(result)
                     
-                    self.logger.info(f"Target {i+1}: {target_pos} -> Success: {success}, "
+                    self.logger.info(f"Target {i+1}: {np.round(target_pos, 3)} -> Success: {success}, "
                                    f"Error: {error:.6f}m, Time: {solve_time:.3f}s, Iterations: {iterations}")
                     
                 except Exception as e:
@@ -377,14 +420,15 @@ class SimulationIntermediateDemo:
                 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8))
                 
                 # Success rate
+                n_targets = len(ik_results)
                 successes = [r['success'] for r in ik_results]
                 success_values = [1 if s else 0 for s in successes]
-                ax1.bar(range(len(targets)), success_values, color=['green' if s else 'red' for s in successes])
+                ax1.bar(range(n_targets), success_values, color=['green' if s else 'red' for s in successes])
                 ax1.set_title('IK Success Rate')
                 ax1.set_xlabel('Target')
                 ax1.set_ylabel('Success (1) / Failure (0)')
-                ax1.set_xticks(range(len(targets)))
-                ax1.set_xticklabels([f'T{i+1}' for i in range(len(targets))])
+                ax1.set_xticks(range(n_targets))
+                ax1.set_xticklabels([f'T{i+1}' for i in range(n_targets)])
                 
                 # Solution errors (only successful ones)
                 successful_results = [r for r in ik_results if r['success']]
@@ -398,12 +442,12 @@ class SimulationIntermediateDemo:
                 
                 # Solve times
                 times = [r['solve_time'] for r in ik_results]
-                ax3.bar(range(len(targets)), times)
+                ax3.bar(range(n_targets), times)
                 ax3.set_title('IK Solve Times')
                 ax3.set_xlabel('Target')
                 ax3.set_ylabel('Time (s)')
-                ax3.set_xticks(range(len(targets)))
-                ax3.set_xticklabels([f'T{i+1}' for i in range(len(targets))])
+                ax3.set_xticks(range(n_targets))
+                ax3.set_xticklabels([f'T{i+1}' for i in range(n_targets)])
                 
                 # Joint solutions (only successful ones)
                 if successful_results:
@@ -608,7 +652,15 @@ class SimulationIntermediateDemo:
             # Condition number histogram
             ax1 = fig.add_subplot(2, 3, 1)
             if len(reasonable_cond_nums) > 0:
-                ax1.hist(reasonable_cond_nums, bins=30, alpha=0.7, edgecolor='black')
+                # Build explicit bin edges so a (near-)degenerate value range
+                # cannot trigger "too many bins for data range".
+                lo = float(np.min(reasonable_cond_nums))
+                hi = float(np.max(reasonable_cond_nums))
+                if hi - lo < 1e-9:
+                    bins = np.linspace(lo - 0.5, hi + 0.5, 5)
+                else:
+                    bins = np.linspace(lo, hi, 31)
+                ax1.hist(reasonable_cond_nums, bins=bins, alpha=0.7, edgecolor='black')
                 ax1.set_xlabel('Condition Number')
                 ax1.set_ylabel('Frequency')
                 ax1.set_title('Condition Number Distribution')
@@ -713,9 +765,9 @@ class SimulationIntermediateDemo:
             # Plot performance comparison
             fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8))
             
-            # Total times
+            # Per-run mean times (seconds)
             names = list(benchmark_results.keys())
-            times = [benchmark_results[name]['total_time'] for name in names]
+            times = [benchmark_results[name]['mean_time'] for name in names]
             gpu_usage = [benchmark_results[name]['used_gpu'] for name in names]
             
             colors = ['green' if gpu else 'blue' for gpu in gpu_usage]
@@ -845,34 +897,31 @@ class SimulationIntermediateDemo:
                 Kd = gains['Kd'] * np.ones(self.num_joints) if np.isscalar(gains['Kd']) else gains['Kd']
                 
                 try:
-                    # Test PID control
-                    import cupy as cp
+                    # Evaluate the PID and PD control laws on plain NumPy arrays
+                    # (the controller works on CPU; no GPU dependency required).
                     pid_output = self.controller.pid_control(
-                        cp.asarray(desired_pos), 
-                        cp.asarray(current_vel),
-                        cp.asarray(current_pos), 
-                        cp.asarray(current_vel),
+                        desired_pos,
+                        current_vel,
+                        current_pos,
+                        current_vel,
                         dt=0.01,
-                        Kp=cp.asarray(Kp),
-                        Ki=cp.asarray(Ki),
-                        Kd=cp.asarray(Kd)
+                        Kp=Kp,
+                        Ki=Ki,
+                        Kd=Kd,
                     )
-                    
-                    # Test PD control
+
                     pd_output = self.controller.pd_control(
-                        cp.asarray(desired_pos),
-                        cp.asarray(current_vel),
-                        cp.asarray(current_pos),
-                        cp.asarray(current_vel),
-                        Kp=cp.asarray(Kp),
-                        Kd=cp.asarray(Kd)
+                        desired_pos,
+                        current_vel,
+                        current_pos,
+                        current_vel,
+                        Kp=Kp,
+                        Kd=Kd,
                     )
-                    
-                    self.logger.info(f"PID output: {cp.asnumpy(pid_output)}")
-                    self.logger.info(f"PD output: {cp.asnumpy(pd_output)}")
-                    
-                except ImportError:
-                    self.logger.warning("CuPy not available, skipping GPU control tests")
+
+                    self.logger.info(f"PID output: {np.round(np.asarray(pid_output), 4)}")
+                    self.logger.info(f"PD output: {np.round(np.asarray(pd_output), 4)}")
+
                 except Exception as e:
                     self.logger.warning(f"Control test failed: {e}")
             
@@ -884,6 +933,122 @@ class SimulationIntermediateDemo:
             plt.close()
             return {}
     
+    def demonstrate_pybullet_simulation(self) -> dict:
+        """Run a planned trajectory through the PyBullet physics engine.
+
+        Connects to a headless (DIRECT-mode) PyBullet server, loads the robot
+        via :class:`ManipulaPy.sim.Simulation`, plans a joint trajectory with
+        the optimized planner, and drives the physics simulation waypoint by
+        waypoint under position control. Commanded and simulated joint angles
+        are recorded and plotted to show closed-loop tracking.
+
+        The whole section is guarded: when PyBullet (or a usable physics
+        server) is unavailable, it logs a skip and returns an empty result
+        instead of crashing.
+
+        Returns:
+            dict: Tracking summary (max joint tracking error and waypoint count)
+            or an empty dict when the section is skipped/failed.
+        """
+        self.logger.info("=== PyBullet Physics Simulation Demonstration ===")
+
+        if not PYBULLET_AVAILABLE:
+            self.logger.warning(
+                "PyBullet not available - skipping physics simulation section."
+            )
+            return {}
+
+        physics_client = None
+        sim = None
+        try:
+            # Headless DIRECT mode: no GUI/display required.
+            physics_client = pb.connect(pb.DIRECT)
+
+            sim = Simulation(
+                urdf_file_path=self.urdf_path,
+                joint_limits=self.joint_limits,
+                torque_limits=self.torque_limits,
+                time_step=0.01,
+                physics_client=physics_client,
+            )
+            sim.setup_simulation()
+            controlled_joints = sim.non_fixed_joints
+            self.logger.info(
+                f"Loaded robot in PyBullet (controlled joints: {controlled_joints})"
+            )
+
+            # Plan a short joint-space trajectory to track in physics.
+            N = 60
+            Tf = 1.5
+            start_config = np.zeros(self.num_joints)
+            end_config = np.array(
+                [low + 0.5 * (high - low) for (low, high) in self.joint_limits]
+            )
+            traj = self.planner.joint_trajectory(
+                start_config, end_config, Tf, N, method=5
+            )
+            commanded = np.asarray(traj["positions"])
+
+            # Drive the simulation under position control, one waypoint per step.
+            # NOTE: the trajectory is executed via raw pb.stepSimulation() to
+            # keep the loop headless and fast.
+            # A few physics sub-steps per waypoint let the position controller
+            # settle against gravity/inertia, yielding realistic tracking.
+            substeps = 8
+            simulated = np.zeros_like(commanded)
+            for k in range(N):
+                sim.set_joint_positions(commanded[k])
+                for _ in range(substeps):
+                    pb.stepSimulation()
+                simulated[k] = sim.get_joint_positions()
+
+            tracking_error = np.abs(commanded - simulated)
+            max_error = float(np.max(tracking_error))
+            self.logger.info(
+                f"Tracked {N} waypoints; max joint tracking error: "
+                f"{max_error:.4f} rad"
+            )
+
+            # Plot commanded vs simulated joint angles.
+            time_steps = np.linspace(0, Tf, N)
+            n_show = min(self.num_joints, 4)
+            fig, axes = plt.subplots(n_show, 1, figsize=(9, 3 * n_show), squeeze=False)
+            for j in range(n_show):
+                ax = axes[j, 0]
+                ax.plot(time_steps, commanded[:, j], "b-", label="Commanded")
+                ax.plot(
+                    time_steps, simulated[:, j], "r--", label="Simulated (PyBullet)"
+                )
+                ax.set_title(f"Joint {j + 1}: Commanded vs Simulated")
+                ax.set_xlabel("Time (s)")
+                ax.set_ylabel("Angle (rad)")
+                ax.legend(fontsize=8)
+                ax.grid(True)
+            plt.tight_layout()
+            self.save_plot("pybullet_tracking.png", "sim")
+            plt.close()
+
+            self.logger.info("PyBullet simulation demonstration completed")
+            return {
+                "waypoints": N,
+                "max_tracking_error": max_error,
+                "controlled_joints": len(controlled_joints),
+            }
+
+        except Exception as e:
+            self.logger.warning(f"PyBullet simulation demo skipped/failed: {e}")
+            plt.close()
+            return {}
+
+        finally:
+            try:
+                if sim is not None:
+                    sim.close_simulation()
+                elif physics_client is not None:
+                    pb.disconnect(physics_client)
+            except Exception:
+                pass
+
     def generate_summary_report(self) -> dict:
         """Generate a comprehensive summary report."""
         self.logger.info("=== Generating Summary Report ===")
@@ -905,7 +1070,7 @@ class SimulationIntermediateDemo:
             fig = plt.figure(figsize=(16, 10))
             
             # Robot information
-            ax1 = plt.subplot(2, 3, 1)
+            ax1 = plt.subplot(2, 2, 1)
             ax1.text(0.5, 0.5, f"Robot Joints: {self.num_joints}\n"
                                 f"CUDA Available: {summary_data['cuda_available']}\n"
                                 f"Plots Generated: {summary_data['plots_generated']}\n"
@@ -917,10 +1082,10 @@ class SimulationIntermediateDemo:
             
             # Performance summary (if available)
             if 'benchmarking' in self.performance_results:
-                ax2 = plt.subplot(2, 3, 2)
+                ax2 = plt.subplot(2, 2, 2)
                 bench_data = self.performance_results['benchmarking']
                 names = list(bench_data.keys())
-                times = [bench_data[name]['total_time'] for name in names]
+                times = [bench_data[name]['mean_time'] for name in names]
                 
                 ax2.bar(names, times)
                 ax2.set_title('Performance Summary')
@@ -928,25 +1093,27 @@ class SimulationIntermediateDemo:
                 plt.setp(ax2.get_xticklabels(), rotation=45)
             
             # Feature coverage
-            ax3 = plt.subplot(2, 3, 3)
+            ax3 = plt.subplot(2, 2, 3)
             features = [
                 'Forward Kinematics',
-                'Inverse Kinematics', 
+                'Inverse Kinematics',
                 'Trajectory Planning',
                 'Singularity Analysis',
                 'Performance Benchmarking',
-                'Controller Features'
+                'Controller Features',
+                'PyBullet Simulation',
             ]
-            coverage = [1, 1, 1, 1, 1, 1]  # All features demonstrated
-            
+            sim_done = bool(self.performance_results.get('pybullet_simulation'))
+            coverage = [1, 1, 1, 1, 1, 1, 1 if sim_done else 0]
+
             colors = ['green' if c else 'red' for c in coverage]
             ax3.barh(features, coverage, color=colors)
             ax3.set_title('Feature Coverage')
             ax3.set_xlabel('Demonstrated')
             ax3.set_xlim(0, 1.2)
-            
+
             # Joint limits visualization
-            ax4 = plt.subplot(2, 3, 4)
+            ax4 = plt.subplot(2, 2, 4)
             joint_numbers = range(1, self.num_joints + 1)
             lower_limits = [limit[0] for limit in self.joint_limits]
             upper_limits = [limit[1] for limit in self.joint_limits]
@@ -959,53 +1126,7 @@ class SimulationIntermediateDemo:
             ax4.set_ylabel('Angle (rad)')
             ax4.legend()
             ax4.grid(True)
-            
-            # Execution timeline
-            ax5 = plt.subplot(2, 3, 5)
-            if self.plots_saved:
-                timestamps = []
-                for plot_path in self.plots_saved:
-                    filename = os.path.basename(plot_path)
-                    if '_' in filename:
-                        timestamp_str = filename.split('_')[0]
-                        try:
-                            timestamp = time.strptime(timestamp_str, "%Y%m%d")
-                            timestamps.append(timestamp)
-                        except:
-                            pass
-                
-                if timestamps:
-                    ax5.hist([time.mktime(ts) for ts in timestamps], bins=10, alpha=0.7)
-                    ax5.set_title('Plot Generation Timeline')
-                    ax5.set_xlabel('Time')
-                    ax5.set_ylabel('Plots Generated')
-            
-            # System resources (if available)
-            ax6 = plt.subplot(2, 3, 6)
-            try:
-                import psutil
-                process = psutil.Process()
-                memory_info = process.memory_info()
-                
-                memory_data = [
-                    memory_info.rss / 1024 / 1024,  # RSS in MB
-                    memory_info.vms / 1024 / 1024,  # VMS in MB
-                ]
-                labels = ['Resident\nMemory (MB)', 'Virtual\nMemory (MB)']
-                
-                ax6.bar(labels, memory_data)
-                ax6.set_title('Memory Usage')
-                ax6.set_ylabel('Memory (MB)')
-                
-                for i, v in enumerate(memory_data):
-                    ax6.text(i, v, f'{v:.1f}', ha='center', va='bottom')
-                    
-            except ImportError:
-                ax6.text(0.5, 0.5, 'Memory info\nnot available\n(psutil not installed)', 
-                        ha='center', va='center', transform=ax6.transAxes)
-                ax6.set_title('System Resources')
-                ax6.axis('off')
-            
+
             # Add large title
             fig.suptitle('ManipulaPy Simulation Demo - Comprehensive Report', 
                          fontsize=16, fontweight='bold')
@@ -1073,7 +1194,10 @@ class SimulationIntermediateDemo:
             self.demonstrate_singularity_analysis()
             self.demonstrate_performance_benchmarking()
             self.demonstrate_controller_features()
-            
+            self.performance_results['pybullet_simulation'] = (
+                self.demonstrate_pybullet_simulation()
+            )
+
             # Generate summary
             summary = self.generate_summary_report()
             

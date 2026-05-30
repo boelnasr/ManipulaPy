@@ -17,7 +17,8 @@ Expected Output:
     - Inverse and forward dynamics verification
     - Comprehensive matplotlib visualizations saved to files
 
-Author: ManipulaPy Development Team
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import numpy as np
@@ -64,7 +65,10 @@ class DynamicsBasicDemo:
         print("   ManipulaPy: Basic Dynamics Demo")
         print("=" * 70)
         print()
-        
+
+        # Seed for reproducible random configurations / motion profiles.
+        np.random.seed(0)
+
         # Create output directory in the same folder as the script
         script_dir = Path(__file__).parent
         output_path = script_dir / "dynamics_demo_output"
@@ -387,25 +391,18 @@ class DynamicsBasicDemo:
             )
             computation_time = time.time() - start_time
             
-            # Analyze torque components
+            # Decompose the torque into its three physical contributions, all
+            # evaluated at the SAME state (joint_angles, joint_velocities) used by
+            # inverse_dynamics. The Newton-Euler inverse_dynamics reconstructs
+            # exactly as τ = M(q)q̈ + C(q,q̇) + G(q), so the verification error
+            # below should be at machine-precision level.
             M = self.mass_matrix_results[config_name]['mass_matrix']
             inertial_torques = M @ joint_accelerations
-            
-            if motion_name in ["Slow motion", "Medium motion", "Fast motion"]:
-                config_key = config_name
-                if config_key in self.coriolis_results:
-                    vel_key = "Medium velocity" if motion_name == "Medium motion" else "Low velocity"
-                    if vel_key in self.coriolis_results[config_key]:
-                        coriolis_torques = self.coriolis_results[config_key][vel_key]['coriolis_forces']
-                    else:
-                        coriolis_torques = np.zeros(self.n_joints)
-                else:
-                    coriolis_torques = np.zeros(self.n_joints)
-            else:
-                coriolis_torques = np.zeros(self.n_joints)
-            
-            gravity_torques = self.gravity_results["Earth gravity (down)"][config_name]['gravity_forces']
-            
+            coriolis_torques = self.dynamics.velocity_quadratic_forces(
+                joint_angles, joint_velocities
+            )
+            gravity_torques = self.dynamics.gravity_forces(joint_angles, gravity_vector)
+
             # Verify inverse dynamics equation: τ = M(q)q̈ + C(q,q̇) + G(q)
             computed_torques = inertial_torques + coriolis_torques + gravity_torques
             verification_error = np.linalg.norm(required_torques - computed_torques)
@@ -431,7 +428,16 @@ class DynamicsBasicDemo:
                 'computation_time': computation_time,
                 'verification_error': verification_error
             }
-    
+
+        # The Newton-Euler inverse_dynamics must equal the sum of its parts.
+        max_id_error = max(
+            r['verification_error'] for r in self.inverse_dynamics_results.values()
+        )
+        print(f"\n📈 Inverse Dynamics Decomposition Check:")
+        print(f"   τ = M(q)q̈ + C(q,q̇) + G(q)")
+        print(f"   Max reconstruction error: {max_id_error:.2e}")
+        print(f"   Decomposition check: {'✅ PASSED' if max_id_error < 1e-9 else '❌ FAILED'}")
+
     def demonstrate_forward_dynamics(self) -> None:
         """Demonstrate forward dynamics computation."""
         print(f"\n⏩ Forward Dynamics Analysis")

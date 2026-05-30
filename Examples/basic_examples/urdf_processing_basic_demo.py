@@ -232,10 +232,20 @@ def load_and_inspect_urdf(urdf_file: str) -> URDFToSerialManipulator:
     print("=" * 60)
     
     try:
-        # Initialize the ManipulaPy URDF processor with PyBullet limits
+        # Initialize the ManipulaPy URDF processor with PyBullet limits.
+        # validate=True runs ManipulaPy's structural URDF checks during parsing.
         logger.info("Initializing ManipulaPy URDFToSerialManipulator...")
-        urdf_processor = URDFToSerialManipulator(urdf_file, use_pybullet_limits=True)
-        
+        urdf_processor = URDFToSerialManipulator(
+            urdf_file, use_pybullet_limits=True, validate=True
+        )
+
+        # Validate the parsed model and report any structural issues.
+        report = urdf_processor.validate()
+        status = "valid" if report.get("valid") else "invalid"
+        print(f"🧾 URDF validation: {status}")
+        for issue in report.get("issues", []):
+            print(f"   ⚠️ {issue}")
+
         # Print basic robot information using ManipulaPy methods
         joint_info = urdf_processor.print_joint_info()
         print(f"📊 Robot Information (from ManipulaPy):")
@@ -569,34 +579,8 @@ def main() -> int:
         # Cleanup
         print(f"\n🧹 Cleaning up demo files...")
         cleanup_demo_files()
-    
+
     return 0
-    
-    # Workspace analysis (simplified)
-    print(f"\n🌐 Workspace Analysis (Sample Points):")
-    sample_size = 1000
-    workspace_points = []
-    
-    for _ in range(sample_size):
-        # Generate random joint configurations within limits
-        joint_config = np.array([
-            np.random.uniform(limits[0], limits[1]) 
-            for limits in serial_manipulator.joint_limits
-        ])
-        
-        try:
-            T = serial_manipulator.forward_kinematics(joint_config, frame="space")
-            workspace_points.append(T[:3, 3])
-        except:
-            continue
-    
-    if workspace_points:
-        workspace_points = np.array(workspace_points)
-        print(f"   Sampled {len(workspace_points)} valid points")
-        print(f"   X range: [{workspace_points[:, 0].min():.3f}, {workspace_points[:, 0].max():.3f}]")
-        print(f"   Y range: [{workspace_points[:, 1].min():.3f}, {workspace_points[:, 1].max():.3f}]")
-        print(f"   Z range: [{workspace_points[:, 2].min():.3f}, {workspace_points[:, 2].max():.3f}]")
-        print(f"   Max reach: {np.max(np.linalg.norm(workspace_points, axis=1)):.3f}")
 
 def cleanup_demo_files() -> None:
     """Clean up demo files created during the demonstration."""

@@ -24,8 +24,6 @@ import time
 import logging
 from pathlib import Path
 from typing import Optional
-import matplotlib
-matplotlib.use('TkAgg')
 
 # ManipulaPy imports
 try:
@@ -41,15 +39,14 @@ except ImportError as e:
     print("Please ensure ManipulaPy is properly installed.")
     exit(1)
 
-# Optional GPU acceleration
-try:
-    import cupy as cp
-    from numba import cuda
-    from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
-    GPU_AVAILABLE = True
+# Optional GPU acceleration. Only treat the GPU path as usable when the CUDA
+# runtime actually initializes (check_cuda_availability), not merely when the
+# CuPy/Numba packages import. This keeps the demo from claiming a GPU it cannot
+# use and lets it degrade gracefully to the CPU paths everywhere.
+GPU_AVAILABLE = bool(CUDA_AVAILABLE) and check_cuda_availability()
+if GPU_AVAILABLE:
     print("✅ GPU acceleration available")
-except ImportError:
-    GPU_AVAILABLE = False
+else:
     print("⚠️ GPU acceleration not available, using CPU only")
 
 # Scientific computing imports
@@ -940,8 +937,8 @@ class IntermediateSingularityDemo:
         counts = [len(boundary_singularities) - sum(boundary_singularities), sum(boundary_singularities)]
         colors = ['green', 'red']
         
-        wedges, texts, autotexts = ax2.pie(counts, labels=labels, colors=colors, autopct='%1.1f%%', 
-                                          startangle=90, alpha=0.8)
+        wedges, texts, autotexts = ax2.pie(counts, labels=labels, colors=colors, autopct='%1.1f%%',
+                                          startangle=90)
         ax2.set_title('Boundary Point Singularity Distribution', fontweight='bold')
         
         plt.tight_layout()
@@ -1246,8 +1243,16 @@ class IntermediateSingularityDemo:
         
         # Define target end-effector position
         num_joints = len(self.joint_limits)
-        target_position = np.array([0.5, 0.3, 0.4])  # Example target
-        
+        # A reachable target derived from the forward kinematics of a mid-range
+        # reference configuration. A hard-coded Cartesian target risks landing
+        # outside the workspace, which would collapse every objective onto the
+        # same position-penalty wall and produce identical, meaningless results.
+        reference_config = np.array([
+            (self.joint_limits[i, 0] + self.joint_limits[i, 1]) / 2
+            for i in range(num_joints)
+        ])
+        target_position = self.robot.forward_kinematics(reference_config)[:3, 3]
+
         logger.info(f"Optimizing dexterity for target position: {target_position}")
         
         # Different optimization objectives
