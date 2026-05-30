@@ -256,7 +256,16 @@ The library is layered: every higher-level module depends only on the ones above
 
 <table>
 <tr>
-<td width="33%" align="center">
+<td width="50%" align="center">
+
+<img src="docs/source/_static/gifs/pick_and_place.gif" alt="Franka Panda picking a cube and placing it at a new location" width="100%">
+
+**Pick and place**
+
+Panda lifts a cube to a new pose along a quintic-timed path.
+
+</td>
+<td width="50%" align="center">
 
 <img src="docs/source/_static/gifs/joint_trajectory.gif" alt="Six joint angles unrolling through a quintic-timed trajectory" width="100%">
 
@@ -265,7 +274,9 @@ The library is layered: every higher-level module depends only on the ones above
 Quintic time-scaled joint trajectory, CPU or CUDA.
 
 </td>
-<td width="33%" align="center">
+</tr>
+<tr>
+<td width="50%" align="center">
 
 <img src="docs/source/_static/gifs/ee_path.gif" alt="UR5 end-effector tracing the same path in 3D" width="100%">
 
@@ -274,7 +285,7 @@ Quintic time-scaled joint trajectory, CPU or CUDA.
 End-effector path computed from the same trajectory.
 
 </td>
-<td width="33%" align="center">
+<td width="50%" align="center">
 
 <img src="docs/source/_static/gifs/workspace.gif" alt="Monte-Carlo reachable workspace of the UR5" width="100%">
 
