@@ -45,6 +45,50 @@ logger = logging.getLogger(__name__)
 
 
 # ENHANCED CUDA DETECTION WITH COMPREHENSIVE ERROR HANDLING
+def _cuda_safe_to_probe() -> bool:
+    """Check whether the CUDA driver can be initialized without crashing.
+
+    A mismatched or broken NVIDIA driver can raise a hardware-level
+    ``SIGSEGV`` *inside* numba's C driver call (e.g. ``cuCtxGetCurrent``),
+    which a Python ``try``/``except`` in this process cannot catch — it would
+    abort the whole interpreter at import time. To stay safe we run the risky
+    initialization in a throwaway subprocess: if the child segfaults or hangs,
+    only the child dies and we fall back to CPU instead of crashing the import.
+
+    Set ``MANIPULAPY_SKIP_CUDA_PROBE=1`` to skip this check (e.g. when the
+    subprocess cost is undesirable and the driver is known good).
+
+    Returns:
+        bool: ``True`` if a child process initialized CUDA cleanly, else ``False``.
+    """
+    if os.getenv("NUMBA_DISABLE_CUDA", "0") == "1":
+        return False
+    if os.getenv("MANIPULAPY_SKIP_CUDA_PROBE", "0") == "1":
+        return True
+    import subprocess
+    import sys
+
+    probe = (
+        "from numba import cuda\n"
+        "import numpy as np\n"
+        "assert cuda.is_available()\n"
+        "cuda.list_devices()\n"
+        "cuda.get_current_device()\n"
+        "d = cuda.device_array(8, dtype=np.float32)\n"
+        "cuda.synchronize()\n"
+    )
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-c", probe],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+        )
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
 def _detect_cuda_capability() -> Tuple[bool, Any, Any, Any, Optional[str]]:
     """
     Comprehensive CUDA detection with detailed diagnostics and error handling.
@@ -53,6 +97,18 @@ def _detect_cuda_capability() -> Tuple[bool, Any, Any, Any, Optional[str]]:
         tuple: (cuda_available, cuda_module, float32, int32, error_message)
     """
     try:
+        # Step 0: Probe the driver in a subprocess first. A broken driver can
+        # SIGSEGV inside numba's C call, which try/except here cannot catch, so
+        # we never touch it in-process unless a sacrificial child survived.
+        if not _cuda_safe_to_probe():
+            return (
+                False,
+                None,
+                None,
+                None,
+                "CUDA driver probe failed (unavailable or driver crash) - using CPU",
+            )
+
         # Step 1: Import numba.cuda with proper error handling
         from numba import cuda, float32, int32
 

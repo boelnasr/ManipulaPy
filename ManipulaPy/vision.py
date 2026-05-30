@@ -364,6 +364,8 @@ class Vision:
             )
             ch.setFormatter(fmt)
             logger.addHandler(ch)
+            # Own our output; don't also bubble to the root handler (double logging)
+            logger.propagate = False
         return logger
 
     # --------------------------------------------------------------------------
@@ -702,6 +704,10 @@ class Vision:
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
         boxes = results[0].boxes
+        # YOLO may return CUDA tensors; move to host so the numpy conversion of
+        # box coordinates below does not raise "can't convert cuda:0 tensor".
+        if hasattr(boxes, "cpu"):
+            boxes = boxes.cpu()
 
         fx = self.cameras[camera_index]["intrinsic_matrix"][0, 0]
         fy = self.cameras[camera_index]["intrinsic_matrix"][1, 1]

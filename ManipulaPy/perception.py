@@ -90,6 +90,8 @@ class Perception:
             )
             ch.setFormatter(fmt)
             logger.addHandler(ch)
+            # Own our output; don't also bubble to the root handler (double logging)
+            logger.propagate = False
         return logger
 
     # --------------------------------------------------------------------------

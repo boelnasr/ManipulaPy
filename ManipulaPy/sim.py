@@ -30,6 +30,7 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 import logging
+import os
 import time
 from typing import Any, List, Optional, Sequence, Tuple
 
@@ -164,7 +165,37 @@ class Simulation:
                 )
             )
             logger.addHandler(ch)
+            # Own our output; don't also bubble to the root handler (double logging)
+            logger.propagate = False
         return logger
+
+    def _connect_client(self) -> int:
+        """Connect to PyBullet, preferring GUI but falling back to DIRECT.
+
+        Honors ``MANIPULAPY_PYBULLET_CONNECT`` (``GUI`` or ``DIRECT``) so headless
+        environments (CI, servers) can force a windowless client. Otherwise it
+        tries GUI and transparently falls back to DIRECT when no display is
+        available, instead of leaving an invalid client that later surfaces as
+        out-of-range joint-index errors.
+
+        Returns:
+            int: The connected PyBullet physics client id.
+        """
+        mode = os.getenv("MANIPULAPY_PYBULLET_CONNECT", "").strip().upper()
+        if mode == "DIRECT":
+            return p.connect(p.DIRECT)
+        if mode == "GUI":
+            return p.connect(p.GUI)
+        try:
+            client = p.connect(p.GUI)
+            if client < 0:
+                raise RuntimeError("GUI connection returned an invalid client id")
+            return client
+        except Exception:
+            self.logger.warning(
+                "PyBullet GUI unavailable; falling back to DIRECT (headless) mode."
+            )
+            return p.connect(p.DIRECT)
 
     def connect_simulation(self) -> None:
         """
@@ -173,7 +204,7 @@ class Simulation:
         _check_pybullet_available()
         self.logger.info("Connecting to PyBullet simulation...")
         if self.physics_client is None:
-            self.physics_client = p.connect(p.GUI)
+            self.physics_client = self._connect_client()
         p.resetSimulation()  # Clear the simulation environment
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)
@@ -196,7 +227,7 @@ class Simulation:
         """
         _check_pybullet_available()
         if self.physics_client is None:
-            self.physics_client = p.connect(p.GUI)
+            self.physics_client = self._connect_client()
         p.resetSimulation()
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)

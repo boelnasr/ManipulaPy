@@ -6,6 +6,9 @@ These tests exercise the NumPy fallback paths and ensure GPU-only
 entry points raise clearly when CUDA is unavailable.
 """
 
+import subprocess
+import sys
+
 import numpy as np
 import pytest
 
@@ -80,6 +83,32 @@ def test_optimized_trajectory_generation_uses_cpu_when_no_cuda(monkeypatch: pyte
     assert np.allclose(result_pos, cpu_pos)
     assert np.allclose(result_vel, cpu_vel)
     assert np.allclose(result_acc, cpu_acc)
+
+
+def test_import_never_crashes_on_broken_cuda_driver() -> None:
+    """Importing cuda_kernels must not abort the interpreter on a bad driver.
+
+    A mismatched NVIDIA driver can SIGSEGV inside numba's C call during CUDA
+    detection. Detection runs in a sacrificial subprocess so the import always
+    completes and degrades to CPU. We verify the import succeeds in a child
+    process: a segfault would surface here as a non-zero (negative) return code
+    rather than crashing the test runner.
+    """
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import ManipulaPy.cuda_kernels as ck; "
+            "assert isinstance(ck.CUDA_AVAILABLE, bool); print('ok')",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, (
+        f"import crashed (rc={proc.returncode}): {proc.stderr[-2000:]}"
+    )
+    assert "ok" in proc.stdout
 
 
 @pytest.mark.skipif(
