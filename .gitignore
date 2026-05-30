@@ -197,3 +197,14 @@ docs/build.log
 # Debug plots emitted when running the control examples
 *_results.png
 *_comparison.png
+
+# Timestamped example run outputs (perception/simulation demos regenerate these
+# every run, e.g. 20260530_135344_fk_forward_kinematics_workspace.png)
+Examples/**/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_*.png
+
+# Per-run example output directories created by the demos
+Examples/**/*_demo_outputs/
+
+# Generated per-run example reports/logs
+Examples/**/*_analysis_report.txt
+Examples/**/*_demo_report.txt
