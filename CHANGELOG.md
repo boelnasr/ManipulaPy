@@ -186,6 +186,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when `Simulation()` is actually constructed. Module import is now
   safe on minimal installs.
 
+### Fixed — core math (correctness audit)
+- **`utils.logm` / `utils.MatrixLog6`** — the translational part of the
+  SE(3) logarithm was returned as the *unit-screw* velocity, missing the
+  `θ` scale factor. Coupled rotation+translation motions now round-trip
+  (`exp(log(T)) == T`); verified term-by-term against `scipy.linalg.logm`.
+- **`utils.rotation_logm`** — recover the rotation axis at `θ ≈ π`, where
+  the generic `(R − Rᵀ)` extraction degenerates. Mirrors the `MatrixLog3`
+  diagonal-term branch so 180° rotations return a correct axis.
+- **`kinematics.SerialManipulator.jacobian(frame="body")`** — corrected
+  the seed transform so the body Jacobian satisfies the adjoint identity
+  `J_b = Ad_{T_bs} J_s` instead of accumulating from the wrong frame.
+- **`kinematics.SerialManipulator`** — `S_list` is now generated from
+  `omega_list` with the correct sign; the prior negation flipped the
+  screw axes used by `generate_path` for off-home configurations.
+- **`dynamics.gravity_forces`** — recomputed as `Σ Jₖᵀ Fₖ` over per-link
+  CoM body Jacobians, matching the holding torque `∂PE/∂θ`; the legacy
+  path is retained behind a `DeprecationWarning` when per-link transforms
+  are unavailable.
+
 ### Fixed — sim.py
 - **Public methods now raise a clear `ImportError`** with install hint
   when `pybullet` is unavailable, instead of `AttributeError` on the
@@ -434,6 +453,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`tests/test_control.py`** wraps the top-level `import cupy as
   cp` in try/except so collection succeeds on CPU-only contributor
   machines (analogous to the `sim.py` guard pattern).
+
+### Documentation
+- **Type hints and docstrings across the package** — added return-type
+  annotations and Google-style docstrings throughout the source, tests,
+  examples, benchmarks, and scripts, with full `Args:`/`Returns:`/`Raises:`
+  sections on the public API surface for cleaner Sphinx/napoleon rendering.
+- **README showcase** — added a Franka Panda pick-and-place demo to the
+  "What it looks like" grid, and re-recorded the bundled-robot montage with
+  collision-free per-robot poses.
 
 ### Tests
 - **`tests/test_path_planning_cpu.py::test_trajectory_cpu_fallback_quintic_midpoint_values`**
