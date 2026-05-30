@@ -44,7 +44,7 @@ def has_pybullet():
 class PyBulletReference:
     """Helper class for PyBullet reference computations."""
 
-    def __init__(self, urdf_path):
+    def __init__(self, urdf_path) -> None:
         import pybullet as p
         import pybullet_data
         from ManipulaPy.urdf.resolver import PackageResolver
@@ -115,7 +115,7 @@ class PyBulletReference:
             self._temp_urdf = Path(temp_urdf.name)
             return self._temp_urdf
 
-    def set_configuration(self, config):
+    def set_configuration(self, config) -> None:
         """Set robot to given configuration."""
         for i, joint_idx in enumerate(self.actuated_joints):
             if i < len(config):
@@ -194,7 +194,7 @@ class PyBulletReference:
 
         return R
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Disconnect from PyBullet."""
         self.p.disconnect()
         if self._temp_urdf is not None:
@@ -233,7 +233,7 @@ class TestFKAccuracy:
 
         pybullet_ref.disconnect()
 
-    def test_simple_arm_zero_config(self, simple_arm_comparison):
+    def test_simple_arm_zero_config(self, simple_arm_comparison) -> None:
         """Test FK at zero configuration."""
         native, pybullet_ref = simple_arm_comparison
 
@@ -271,7 +271,7 @@ class TestFKAccuracy:
                 err["rot_error"] < 1e-6
             ), f"Rotation error for {err['link']}: {err['rot_error']}"
 
-    def test_simple_arm_random_configs(self, simple_arm_comparison):
+    def test_simple_arm_random_configs(self, simple_arm_comparison) -> None:
         """Test FK at random configurations."""
         native, pybullet_ref = simple_arm_comparison
 
@@ -304,7 +304,7 @@ class TestFKAccuracy:
         assert max_rot_error < 1e-5, f"Max rotation error too large: {max_rot_error}"
 
     @pytest.mark.skipif(not UR5_URDF.exists(), reason="UR5 URDF not found")
-    def test_ur5_zero_config(self, ur5_comparison):
+    def test_ur5_zero_config(self, ur5_comparison) -> None:
         """Test UR5 FK at zero configuration."""
         native, pybullet_ref = ur5_comparison
 
@@ -330,7 +330,7 @@ class TestFKAccuracy:
             assert rot_error < 1e-5, f"EE rotation error: {rot_error}"
 
     @pytest.mark.skipif(not UR5_URDF.exists(), reason="UR5 URDF not found")
-    def test_ur5_random_configs(self, ur5_comparison):
+    def test_ur5_random_configs(self, ur5_comparison) -> None:
         """Test UR5 FK at random configurations."""
         native, pybullet_ref = ur5_comparison
 
@@ -401,7 +401,7 @@ class TestDynamicsAccuracy:
 
         pybullet_ref.disconnect()
 
-    def test_mass_matrix_shape(self, ur5_dynamics):
+    def test_mass_matrix_shape(self, ur5_dynamics) -> None:
         """Test mass matrix has correct shape."""
         native, pybullet_ref = ur5_dynamics
 
@@ -421,7 +421,7 @@ class TestDynamicsAccuracy:
 
         assert M_native.shape == (n, n), f"Native shape: {M_native.shape}"
 
-    def test_mass_matrix_positive_definite(self, simple_arm_dynamics):
+    def test_mass_matrix_positive_definite(self, simple_arm_dynamics) -> None:
         """Test mass matrix is positive definite for simple arm."""
         native, _ = simple_arm_dynamics
 
@@ -438,7 +438,7 @@ class TestDynamicsAccuracy:
                 eigenvalues > 0
             ), f"Mass matrix not positive definite: {eigenvalues}"
 
-    def test_mass_matrix_symmetry(self, simple_arm_dynamics):
+    def test_mass_matrix_symmetry(self, simple_arm_dynamics) -> None:
         """Test mass matrix is symmetric."""
         native, _ = simple_arm_dynamics
 
@@ -475,7 +475,7 @@ class TestJointPropertiesAccuracy:
 
         pybullet_ref.disconnect()
 
-    def test_joint_count_match(self, ur5_joints):
+    def test_joint_count_match(self, ur5_joints) -> None:
         """Test actuated joint count matches."""
         native, pybullet_ref = ur5_joints
 
@@ -484,7 +484,7 @@ class TestJointPropertiesAccuracy:
 
         assert native.num_dofs == len(pybullet_ref.actuated_joints)
 
-    def test_joint_limits_match(self, ur5_joints):
+    def test_joint_limits_match(self, ur5_joints) -> None:
         """Test joint limits match."""
         native, pybullet_ref = ur5_joints
 
@@ -521,7 +521,7 @@ class TestJointPropertiesAccuracy:
 class TestSerialManipulatorAccuracy:
     """Test SerialManipulator conversion accuracy."""
 
-    def test_fk_matches_urdf_fk(self):
+    def test_fk_matches_urdf_fk(self) -> None:
         """Test SerialManipulator FK matches URDF FK."""
         from ManipulaPy.urdf import URDF
 
@@ -558,7 +558,7 @@ class TestSerialManipulatorAccuracy:
         assert max_rot < 1e-10, f"Rotation error too large: {max_rot}"
 
     @pytest.mark.skipif(not UR5_URDF.exists(), reason="UR5 URDF not found")
-    def test_ur5_screw_axes_valid(self):
+    def test_ur5_screw_axes_valid(self) -> None:
         """Test UR5 screw axes are valid."""
         from ManipulaPy.urdf import URDF
 
@@ -598,7 +598,7 @@ class TestPrismaticJointAccuracy:
 
         return URDF.load(FIXTURES_DIR / "prismatic_joint.urdf")
 
-    def test_prismatic_fk_linear_motion(self, prismatic_robot):
+    def test_prismatic_fk_linear_motion(self, prismatic_robot) -> None:
         """Test prismatic joint produces linear motion."""
         robot = prismatic_robot
 
@@ -614,7 +614,7 @@ class TestPrismaticJointAccuracy:
             # Position should be [x, 0, 0.045]
             assert abs(x_slide_T[0, 3] - x) < 1e-10, f"X motion incorrect at {x}"
 
-    def test_prismatic_fk_cascaded_motion(self, prismatic_robot):
+    def test_prismatic_fk_cascaded_motion(self, prismatic_robot) -> None:
         """Test cascaded prismatic joints."""
         robot = prismatic_robot
 
@@ -646,7 +646,7 @@ class TestPrismaticJointAccuracy:
 class TestBatchFKAccuracy:
     """Test batch FK accuracy."""
 
-    def test_batch_matches_individual(self):
+    def test_batch_matches_individual(self) -> None:
         """Test batch FK matches individual FK calls."""
         from ManipulaPy.urdf import URDF
 

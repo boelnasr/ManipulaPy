@@ -24,7 +24,7 @@ from ManipulaPy.singularity import Singularity
 class MockSerialManipulator:
     """Mock SerialManipulator for testing with configurable behavior."""
 
-    def __init__(self, singular_configs=None):
+    def __init__(self, singular_configs=None) -> None:
         """
         Initialize mock manipulator.
 
@@ -71,26 +71,26 @@ class MockSerialManipulator:
 class TestSingularityDetection(unittest.TestCase):
     """Tests for singularity detection functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         # Create mock manipulator with known singular configuration
         singular_config = np.zeros(6)
         self.robot = MockSerialManipulator(singular_configs=[singular_config])
         self.singularity = Singularity(self.robot)
 
-    def test_singularity_at_zero_configuration(self):
+    def test_singularity_at_zero_configuration(self) -> None:
         """Test singularity detection at zero configuration."""
         theta = np.zeros(6)
         is_singular = self.singularity.singularity_analysis(theta)
         self.assertTrue(is_singular)
 
-    def test_no_singularity_at_random_configuration(self):
+    def test_no_singularity_at_random_configuration(self) -> None:
         """Test that random configurations are not singular."""
         theta = np.random.uniform(-1, 1, 6)
         is_singular = self.singularity.singularity_analysis(theta)
         self.assertFalse(is_singular)
 
-    def test_singularity_at_multiple_configurations(self):
+    def test_singularity_at_multiple_configurations(self) -> None:
         """Test singularity detection at multiple known configurations."""
         singular_configs = [
             np.zeros(6),
@@ -104,7 +104,7 @@ class TestSingularityDetection(unittest.TestCase):
             is_singular = singularity.singularity_analysis(config)
             self.assertTrue(is_singular, f"Should detect singularity at {config}")
 
-    def test_singularity_with_different_tolerances(self):
+    def test_singularity_with_different_tolerances(self) -> None:
         """Test that singularity detection is sensitive to small changes."""
         # At singular configuration
         theta_singular = np.zeros(6)
@@ -121,26 +121,26 @@ class TestSingularityDetection(unittest.TestCase):
 class TestConditionNumber(unittest.TestCase):
     """Tests for condition number computation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         singular_config = np.zeros(6)
         self.robot = MockSerialManipulator(singular_configs=[singular_config])
         self.singularity = Singularity(self.robot)
 
-    def test_condition_number_at_singularity(self):
+    def test_condition_number_at_singularity(self) -> None:
         """Test condition number is infinite at singularity."""
         theta = np.zeros(6)
         cond = self.singularity.condition_number(theta)
         self.assertTrue(np.isinf(cond) or cond > 1e10)
 
-    def test_condition_number_at_regular_configuration(self):
+    def test_condition_number_at_regular_configuration(self) -> None:
         """Test condition number is finite at regular configuration."""
         theta = np.ones(6)
         cond = self.singularity.condition_number(theta)
         self.assertTrue(np.isfinite(cond))
         self.assertGreater(cond, 1.0)
 
-    def test_condition_number_increases_near_singularity(self):
+    def test_condition_number_increases_near_singularity(self) -> None:
         """Test that condition number increases approaching singularity."""
         # Far from singularity
         theta_far = np.array([1.0, 0.5, -0.5, 1.0, 0.5, -0.5])
@@ -155,7 +155,7 @@ class TestConditionNumber(unittest.TestCase):
         self.assertTrue(np.isfinite(cond_far))
         self.assertTrue(np.isfinite(cond_near))
 
-    def test_condition_number_positive(self):
+    def test_condition_number_positive(self) -> None:
         """Test that condition number is always positive."""
         test_configs = [
             np.random.uniform(-1, 1, 6),
@@ -172,19 +172,19 @@ class TestConditionNumber(unittest.TestCase):
 class TestNearSingularityDetection(unittest.TestCase):
     """Tests for near-singularity detection."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         singular_config = np.zeros(6)
         self.robot = MockSerialManipulator(singular_configs=[singular_config])
         self.singularity = Singularity(self.robot)
 
-    def test_near_singularity_at_singular_configuration(self):
+    def test_near_singularity_at_singular_configuration(self) -> None:
         """Test near-singularity detection at singular configuration."""
         theta = np.zeros(6)
         is_near = self.singularity.near_singularity_detection(theta, threshold=1e-2)
         self.assertTrue(is_near)
 
-    def test_near_singularity_at_regular_configuration(self):
+    def test_near_singularity_at_regular_configuration(self) -> None:
         """Test near-singularity detection at regular configuration."""
         theta = np.ones(6)
         is_near = self.singularity.near_singularity_detection(theta, threshold=1e-2)
@@ -192,7 +192,7 @@ class TestNearSingularityDetection(unittest.TestCase):
         # (condition number is typically > 1e-2)
         self.assertTrue(is_near)
 
-    def test_near_singularity_threshold_sensitivity(self):
+    def test_near_singularity_threshold_sensitivity(self) -> None:
         """Test threshold sensitivity of near-singularity detection."""
         theta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
 
@@ -207,7 +207,7 @@ class TestNearSingularityDetection(unittest.TestCase):
         # Depends on actual condition number, but should be consistent
         self.assertIsInstance(is_near_low, (bool, np.bool_))
 
-    def test_near_singularity_default_threshold(self):
+    def test_near_singularity_default_threshold(self) -> None:
         """Test near-singularity detection with default threshold."""
         theta = np.array([1.0, 0.5, -0.5, 1.0, 0.5, -0.5])
         is_near = self.singularity.near_singularity_detection(theta)
@@ -218,13 +218,13 @@ class TestNearSingularityDetection(unittest.TestCase):
 class TestManipulabilityEllipsoid(unittest.TestCase):
     """Tests for manipulability ellipsoid visualization."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.robot = MockSerialManipulator()
         self.singularity = Singularity(self.robot)
 
     @patch("matplotlib.pyplot.show")
-    def test_manipulability_ellipsoid_without_axis(self, mock_show):
+    def test_manipulability_ellipsoid_without_axis(self, mock_show) -> None:
         """Test manipulability ellipsoid generation without provided axis."""
         theta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
 
@@ -235,7 +235,7 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
             self.fail(f"manipulability_ellipsoid raised exception: {e}")
 
     @patch("matplotlib.pyplot.show")
-    def test_manipulability_ellipsoid_at_different_configurations(self, mock_show):
+    def test_manipulability_ellipsoid_at_different_configurations(self, mock_show) -> None:
         """Test manipulability ellipsoid at various configurations."""
         test_configs = [
             np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
@@ -249,7 +249,7 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
             except Exception as e:
                 self.fail(f"manipulability_ellipsoid failed at {theta}: {e}")
 
-    def test_manipulability_ellipsoid_with_custom_axis(self):
+    def test_manipulability_ellipsoid_with_custom_axis(self) -> None:
         """Test manipulability ellipsoid with custom matplotlib axis."""
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
@@ -268,7 +268,7 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
             self.fail(f"manipulability_ellipsoid with custom ax raised exception: {e}")
 
     @patch("matplotlib.pyplot.show")
-    def test_manipulability_ellipsoid_calls_show(self, mock_show):
+    def test_manipulability_ellipsoid_calls_show(self, mock_show) -> None:
         """Test manipulability ellipsoid calls plt.show when ax=None."""
         theta = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
 
@@ -282,7 +282,7 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
 class TestEdgeCases(unittest.TestCase):
     """Tests for edge cases and numerical stability."""
 
-    def test_singularity_with_nan_configuration(self):
+    def test_singularity_with_nan_configuration(self) -> None:
         """Test singularity detection with NaN configuration."""
         robot = MockSerialManipulator()
         singularity = Singularity(robot)
@@ -298,7 +298,7 @@ class TestEdgeCases(unittest.TestCase):
             # It's acceptable to raise an exception for invalid input
             pass
 
-    def test_singularity_with_inf_configuration(self):
+    def test_singularity_with_inf_configuration(self) -> None:
         """Test singularity detection with infinite configuration."""
         robot = MockSerialManipulator()
         singularity = Singularity(robot)
@@ -312,7 +312,7 @@ class TestEdgeCases(unittest.TestCase):
         except (ValueError, RuntimeError, OverflowError):
             pass
 
-    def test_condition_number_numerical_stability(self):
+    def test_condition_number_numerical_stability(self) -> None:
         """Test condition number computation numerical stability."""
         robot = MockSerialManipulator()
         singularity = Singularity(robot)
@@ -326,7 +326,7 @@ class TestEdgeCases(unittest.TestCase):
         if np.isfinite(cond):
             self.assertGreater(cond, 0)
 
-    def test_singularity_with_large_configuration(self):
+    def test_singularity_with_large_configuration(self) -> None:
         """Test singularity detection with large joint angles."""
         robot = MockSerialManipulator()
         singularity = Singularity(robot)
@@ -344,12 +344,12 @@ class TestEdgeCases(unittest.TestCase):
 class TestWorkspaceGeneration(unittest.TestCase):
     """Tests for workspace generation functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.robot = MockSerialManipulator()
         self.singularity = Singularity(self.robot)
 
-    def test_workspace_generation_requires_cuda(self):
+    def test_workspace_generation_requires_cuda(self) -> None:
         """Test that workspace generation requires CUDA and valid robot."""
         joint_limits = [(-1, 1), (-1, 1), (-1, 1)]
 
@@ -395,7 +395,7 @@ class TestWorkspaceGeneration(unittest.TestCase):
             # If ManipulaPy.cuda_kernels can't be imported, that's fine
             pass
 
-    def test_workspace_generation_parameters(self):
+    def test_workspace_generation_parameters(self) -> None:
         """Test workspace generation accepts different parameters."""
         # Test that function accepts different joint limit configurations
         test_configs = [
@@ -431,7 +431,7 @@ class TestWorkspaceGeneration(unittest.TestCase):
 class TestDifferentRobotConfigurations(unittest.TestCase):
     """Tests with different robot configurations."""
 
-    def test_3dof_robot(self):
+    def test_3dof_robot(self) -> None:
         """Test singularity analysis on under-actuated (3-DOF) robot via SVD."""
 
         class Mock3DOFRobot:
@@ -458,7 +458,7 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
         result = singularity.singularity_analysis(theta_singular)
         self.assertTrue(result)
 
-    def test_7dof_robot(self):
+    def test_7dof_robot(self) -> None:
         """Test singularity analysis on redundant (7-DOF) robot via SVD."""
 
         class Mock7DOFRobot:

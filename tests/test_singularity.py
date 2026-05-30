@@ -44,12 +44,12 @@ def singularity_analyzer():
     return Singularity(robot)
 
 
-def test_singularity_detection(singularity_analyzer):
+def test_singularity_detection(singularity_analyzer) -> None:
     assert singularity_analyzer.singularity_analysis(np.zeros(6)) == True
     assert singularity_analyzer.singularity_analysis(np.ones(6)) == False
 
 
-def test_condition_number(singularity_analyzer):
+def test_condition_number(singularity_analyzer) -> None:
     cond_singular = singularity_analyzer.condition_number(np.zeros(6))
     cond_regular = singularity_analyzer.condition_number(np.ones(6))
 
@@ -57,12 +57,12 @@ def test_condition_number(singularity_analyzer):
     assert cond_regular > 1.0
 
 
-def test_near_singularity_detection(singularity_analyzer):
+def test_near_singularity_detection(singularity_analyzer) -> None:
     assert singularity_analyzer.near_singularity_detection(np.zeros(6))
     assert singularity_analyzer.near_singularity_detection(np.ones(6))
 
 
-def test_manipulability_ellipsoid_plot(singularity_analyzer):
+def test_manipulability_ellipsoid_plot(singularity_analyzer) -> None:
     try:
         # Just test it doesn't crash (plotting optional)
         singularity_analyzer.manipulability_ellipsoid(np.ones(6))
@@ -87,23 +87,23 @@ def test_manipulability_ellipsoid_plot(singularity_analyzer):
     def singularity_analyzer():
         return Singularity(MockSerialManipulator())
 
-    def test_singularity_detection(singularity_analyzer):
+    def test_singularity_detection(singularity_analyzer) -> None:
         assert singularity_analyzer.singularity_analysis(np.zeros(6))
         assert not singularity_analyzer.singularity_analysis(np.ones(6))
 
-    def test_condition_number(singularity_analyzer):
+    def test_condition_number(singularity_analyzer) -> None:
         cond_singular = singularity_analyzer.condition_number(np.zeros(6))
         cond_regular = singularity_analyzer.condition_number(np.ones(6))
 
         assert np.isinf(cond_singular)
         assert cond_regular > 1.0
 
-    def test_near_singularity_detection(singularity_analyzer):
+    def test_near_singularity_detection(singularity_analyzer) -> None:
         assert singularity_analyzer.near_singularity_detection(np.zeros(6))
         assert singularity_analyzer.near_singularity_detection(np.ones(6))
 
     @patch("matplotlib.pyplot.show")  # Suppress actual plot
-    def test_manipulability_ellipsoid_plot(mock_show, singularity_analyzer):
+    def test_manipulability_ellipsoid_plot(mock_show, singularity_analyzer) -> None:
         try:
             singularity_analyzer.manipulability_ellipsoid(np.ones(6))
         except Exception as e:
@@ -111,7 +111,7 @@ def test_manipulability_ellipsoid_plot(singularity_analyzer):
 
     @pytest.mark.skipif(not CUDA_AVAILABLE, reason="CUDA not available")
     @patch("matplotlib.pyplot.show")
-    def test_plot_workspace_monte_carlo(mock_show, singularity_analyzer):
+    def test_plot_workspace_monte_carlo(mock_show, singularity_analyzer) -> None:
         joint_limits = [(-1, 1), (-2, 2), (-np.pi, np.pi)]
         try:
             singularity_analyzer.plot_workspace_monte_carlo(

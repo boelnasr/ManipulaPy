@@ -22,14 +22,14 @@ FIXTURES_DIR = Path(__file__).parent / "urdf_fixtures"
 class TestNativeParserStandalone:
     """Test native parser functionality without comparison."""
 
-    def test_legacy_urchin_backend_rejected(self):
+    def test_legacy_urchin_backend_rejected(self) -> None:
         """The removed legacy backend should not be accepted."""
         from ManipulaPy.urdf import URDF
 
         with pytest.raises(ValueError, match="builtin.*pybullet"):
             URDF.load(FIXTURES_DIR / "simple_arm.urdf", backend="urchin")
 
-    def test_simple_arm_fk_consistency(self):
+    def test_simple_arm_fk_consistency(self) -> None:
         """Test FK is internally consistent."""
         from ManipulaPy.urdf import URDF
 
@@ -43,7 +43,7 @@ class TestNativeParserStandalone:
         for link_name in fk1:
             np.testing.assert_allclose(fk1[link_name], fk2[link_name])
 
-    def test_serial_manipulator_conversion(self):
+    def test_serial_manipulator_conversion(self) -> None:
         """Test conversion to SerialManipulator."""
         from ManipulaPy.urdf import URDF
 
@@ -57,7 +57,7 @@ class TestNativeParserStandalone:
         # Check screw axes have correct shape
         assert manipulator.S_list.shape[1] == robot.num_dofs
 
-    def test_dynamics_conversion(self):
+    def test_dynamics_conversion(self) -> None:
         """Test conversion to ManipulatorDynamics."""
         from ManipulaPy.urdf import URDF
 
@@ -75,7 +75,7 @@ class TestNativeParserStandalone:
         eigenvalues = np.linalg.eigvalsh(M)
         assert np.all(eigenvalues > 0), "Mass matrix should be positive definite"
 
-    def test_extract_screw_axes(self):
+    def test_extract_screw_axes(self) -> None:
         """Test screw axis extraction."""
         from ManipulaPy.urdf import URDF
 
@@ -96,7 +96,7 @@ class TestNativeParserStandalone:
         np.testing.assert_allclose(R @ R.T, np.eye(3), atol=1e-10)
         np.testing.assert_allclose(np.linalg.det(R), 1.0, atol=1e-10)
 
-    def test_fk_matches_serial_manipulator(self):
+    def test_fk_matches_serial_manipulator(self) -> None:
         """Test FK results match SerialManipulator FK."""
         from ManipulaPy.urdf import URDF
 
@@ -124,7 +124,7 @@ class TestNativeParserStandalone:
 class TestPerformanceBenchmarks:
     """Performance benchmarks for the native parser."""
 
-    def test_load_time_reasonable(self):
+    def test_load_time_reasonable(self) -> None:
         """Test URDF loading time is reasonable."""
         import time
 
@@ -140,7 +140,7 @@ class TestPerformanceBenchmarks:
         # Should load in under 100ms for simple URDF
         assert avg_time < 0.1, f"Loading too slow: {avg_time*1000:.2f}ms"
 
-    def test_fk_time_reasonable(self):
+    def test_fk_time_reasonable(self) -> None:
         """Test FK computation time is reasonable."""
         import time
 
@@ -163,7 +163,7 @@ class TestPerformanceBenchmarks:
         # Should compute FK in under 1ms
         assert avg_time < 0.001, f"FK too slow: {avg_time*1e6:.2f}us"
 
-    def test_batch_fk_faster_than_loop(self):
+    def test_batch_fk_faster_than_loop(self) -> None:
         """Test batch FK is faster than individual FK calls."""
         import time
 
@@ -195,7 +195,7 @@ class TestPerformanceBenchmarks:
 class TestRobustness:
     """Test robustness to various input scenarios."""
 
-    def test_empty_configuration(self):
+    def test_empty_configuration(self) -> None:
         """Test handling of empty/zero configuration."""
         from ManipulaPy.urdf import URDF
 
@@ -206,7 +206,7 @@ class TestRobustness:
         fk = robot.link_fk(cfg)
         assert len(fk) > 0
 
-    def test_large_configuration_values(self):
+    def test_large_configuration_values(self) -> None:
         """Test handling of large joint values."""
         from ManipulaPy.urdf import URDF
 
@@ -221,7 +221,7 @@ class TestRobustness:
             R = T[:3, :3]
             np.testing.assert_allclose(R @ R.T, np.eye(3), atol=1e-10)
 
-    def test_repeated_fk_calls(self):
+    def test_repeated_fk_calls(self) -> None:
         """Test FK is consistent across repeated calls."""
         from ManipulaPy.urdf import URDF
 

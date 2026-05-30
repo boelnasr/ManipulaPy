@@ -13,7 +13,7 @@ import the file without doing demo work.
 """
 
 
-def main():
+def main() -> None:
     """Run the robust IK comparison demo."""
     from collections import Counter
 

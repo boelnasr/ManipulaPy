@@ -22,7 +22,7 @@ from ManipulaPy.potential_field import PotentialField
 class TestPotentialFieldExtended(unittest.TestCase):
     """Additional coverage for PotentialField gradient and edge cases."""
 
-    def test_repulsive_outside_influence(self):
+    def test_repulsive_outside_influence(self) -> None:
         """Obstacle outside influence distance → 0 repulsive potential."""
         pf = PotentialField(influence_distance=0.5)
         q = np.array([0.0, 0.0])
@@ -30,7 +30,7 @@ class TestPotentialFieldExtended(unittest.TestCase):
         pot = pf.compute_repulsive_potential(q, [obstacle])
         self.assertAlmostEqual(pot, 0.0)
 
-    def test_gradient_far_obstacle(self):
+    def test_gradient_far_obstacle(self) -> None:
         """Far obstacle contributes no repulsive gradient."""
         pf = PotentialField(influence_distance=0.5)
         q = np.array([0.0, 0.0])
@@ -41,7 +41,7 @@ class TestPotentialFieldExtended(unittest.TestCase):
         expected = pf.attractive_gain * (q - q_goal)
         np.testing.assert_array_almost_equal(grad, expected)
 
-    def test_gradient_near_obstacle(self):
+    def test_gradient_near_obstacle(self) -> None:
         """Close obstacle adds repulsive gradient component."""
         pf = PotentialField(influence_distance=2.0, repulsive_gain=100.0)
         q = np.array([0.1, 0.0])
@@ -52,7 +52,7 @@ class TestPotentialFieldExtended(unittest.TestCase):
         # The repulsive gradient should differ from the purely attractive one
         self.assertGreater(np.linalg.norm(grad_with - grad_without), 0.1)
 
-    def test_multiple_obstacles(self):
+    def test_multiple_obstacles(self) -> None:
         """Multiple obstacles within influence."""
         pf = PotentialField(influence_distance=5.0)
         q = np.array([0.0, 0.0])
@@ -78,7 +78,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
             pts += offset
         return ConvexHull(pts)
 
-    def test_hulls_intersect_overlapping(self):
+    def test_hulls_intersect_overlapping(self) -> None:
         """Two overlapping hulls should intersect."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -96,7 +96,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         self.assertTrue(checker._hulls_intersect(hull1, hull2))
 
-    def test_hulls_intersect_separated(self):
+    def test_hulls_intersect_separated(self) -> None:
         """Two well-separated hulls should not intersect."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -110,7 +110,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         self.assertFalse(checker._hulls_intersect(hull1, hull2))
 
-    def test_transform_convex_hull(self):
+    def test_transform_convex_hull(self) -> None:
         """Transformation should shift hull vertices."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -125,7 +125,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         # All x coordinates should be >= 5.0
         self.assertGreater(np.min(transformed.points[:, 0]), 4.9)
 
-    def test_check_collision_with_mock_fk(self):
+    def test_check_collision_with_mock_fk(self) -> None:
         """check_collision with mocked link_fk and convex hulls."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -147,7 +147,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         self.assertTrue(checker.check_collision(np.zeros(6)))
 
-    def test_check_collision_no_collision(self):
+    def test_check_collision_no_collision(self) -> None:
         """Separated links → no collision."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -172,7 +172,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         self.assertFalse(checker.check_collision(np.zeros(6)))
 
-    def test_check_collision_missing_hull(self):
+    def test_check_collision_missing_hull(self) -> None:
         """Links without convex hulls should be skipped."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -191,7 +191,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         self.assertFalse(checker.check_collision(np.zeros(6)))
 
-    def test_create_convex_hulls_mesh_data(self):
+    def test_create_convex_hulls_mesh_data(self) -> None:
         """_create_convex_hulls with mesh_data attribute (via visual fallback)."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -223,7 +223,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         hulls = checker._create_convex_hulls()
         self.assertIn("test_link", hulls)
 
-    def test_create_convex_hulls_legacy_mesh(self):
+    def test_create_convex_hulls_legacy_mesh(self) -> None:
         """_create_convex_hulls with legacy mesh attribute (via visual fallback)."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -256,7 +256,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         hulls = checker._create_convex_hulls()
         self.assertIn("legacy_link", hulls)
 
-    def test_create_convex_hulls_no_geometry(self):
+    def test_create_convex_hulls_no_geometry(self) -> None:
         """Visual with geometry=None should be skipped."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -279,7 +279,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         hulls = checker._create_convex_hulls()
         self.assertEqual(len(hulls), 0)
 
-    def test_create_convex_hulls_no_visuals(self):
+    def test_create_convex_hulls_no_visuals(self) -> None:
         """Link with no visuals and no collisions should be skipped."""
         from ManipulaPy.potential_field import CollisionChecker
 

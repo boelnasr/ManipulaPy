@@ -10,7 +10,7 @@ import pytest
 from ManipulaPy.path_planning import _traj_cpu_njit, _trajectory_cpu_fallback
 
 
-def test_trajectory_cpu_fallback_cubic_endpoints():
+def test_trajectory_cpu_fallback_cubic_endpoints() -> None:
     thetastart = np.array([0.0, 1.0], dtype=np.float32)
     thetaend = np.array([1.0, 3.0], dtype=np.float32)
     Tf, N, method = 1.0, 3, 3  # cubic: endpoints should match, vel/acc zero at ends
@@ -25,7 +25,7 @@ def test_trajectory_cpu_fallback_cubic_endpoints():
     assert np.allclose(vel[-1], 0.0)
 
 
-def test_trajectory_cpu_fallback_quintic_midpoint_values():
+def test_trajectory_cpu_fallback_quintic_midpoint_values() -> None:
     thetastart = np.array([0.0], dtype=np.float32)
     thetaend = np.array([1.0], dtype=np.float32)
     Tf, N, method = 2.0, 5, 5  # quintic
@@ -41,7 +41,7 @@ def test_trajectory_cpu_fallback_quintic_midpoint_values():
     assert np.all(np.isfinite(vel))
 
 
-def test_trajectory_cpu_fallback_unsupported_method_returns_constant():
+def test_trajectory_cpu_fallback_unsupported_method_returns_constant() -> None:
     thetastart = np.array([1.0, 2.0], dtype=np.float32)
     thetaend = np.array([3.0, 4.0], dtype=np.float32)
     Tf, N, method = 1.0, 4, 7  # unsupported → s=0
@@ -54,7 +54,7 @@ def test_trajectory_cpu_fallback_unsupported_method_returns_constant():
     assert np.allclose(acc, 0.0)
 
 
-def test_traj_cpu_njit_matches_fallback():
+def test_traj_cpu_njit_matches_fallback() -> None:
     thetastart = np.array([0.5], dtype=np.float32)
     thetaend = np.array([1.5], dtype=np.float32)
     Tf, N, method = 1.5, 6, 3

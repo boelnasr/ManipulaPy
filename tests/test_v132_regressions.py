@@ -14,7 +14,7 @@ import pytest
 class TestUtilsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/utils.py bugs."""
 
-    def test_transform_from_twist_prismatic_returns_4x4(self):
+    def test_transform_from_twist_prismatic_returns_4x4(self) -> None:
         from ManipulaPy.utils import transform_from_twist
 
         S_prismatic = np.array([0, 0, 0, 1, 0, 0])
@@ -25,7 +25,7 @@ class TestUtilsRegressions(unittest.TestCase):
         np.testing.assert_array_almost_equal(T[:3, 3], [2.5, 0, 0])
         np.testing.assert_array_almost_equal(T[3, :], [0, 0, 0, 1])
 
-    def test_logm_pure_translation_no_div_by_zero(self):
+    def test_logm_pure_translation_no_div_by_zero(self) -> None:
         from ManipulaPy.utils import logm
 
         T = np.eye(4)
@@ -37,7 +37,7 @@ class TestUtilsRegressions(unittest.TestCase):
         np.testing.assert_array_almost_equal(result[:3], [0, 0, 0])
         np.testing.assert_array_almost_equal(result[3:], [1, 2, 3])
 
-    def test_logm_matches_scipy_for_coupled_rotation_translation(self):
+    def test_logm_matches_scipy_for_coupled_rotation_translation(self) -> None:
         """CM-1: the SE(3) matrix-log translation block must be scaled by theta.
 
         logm returned the unit-screw linear velocity (G_inv @ p) instead of the
@@ -59,7 +59,7 @@ class TestUtilsRegressions(unittest.TestCase):
         ref = se3ToVec(np.real(scipy_logm(T)))
         np.testing.assert_array_almost_equal(got, ref, decimal=6)
 
-    def test_matrixlog6_roundtrip_coupled_motion(self):
+    def test_matrixlog6_roundtrip_coupled_motion(self) -> None:
         """CM-2: MatrixExp6(MatrixLog6(T)) must reconstruct T.
 
         MatrixLog6 left the translation block as G_inv @ p (missing the theta
@@ -79,7 +79,7 @@ class TestUtilsRegressions(unittest.TestCase):
         T_recon = MatrixExp6(VecTose3(S_theta))
         np.testing.assert_array_almost_equal(T_recon, T, decimal=6)
 
-    def test_rotation_logm_recovers_axis_at_180_degrees(self):
+    def test_rotation_logm_recovers_axis_at_180_degrees(self) -> None:
         """CM-6: rotation_logm must recover the axis at theta = pi.
 
         A 180-degree rotation matrix is symmetric, so R - R^T = 0 and
@@ -120,7 +120,7 @@ class TestUtilsRegressions(unittest.TestCase):
 class TestDynamicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/dynamics.py bugs."""
 
-    def test_mass_matrix_2r_planar_arm_against_analytical(self):
+    def test_mass_matrix_2r_planar_arm_against_analytical(self) -> None:
         """Verify mass matrix against analytical 2R planar arm.
 
         For a 2R arm with point masses m1, m2 at distances L1, L2 from their
@@ -188,7 +188,7 @@ class TestDynamicsRegressions(unittest.TestCase):
         np.testing.assert_array_almost_equal(M, M_expected, decimal=4)
         self.assertTrue(np.allclose(M, M.T, atol=1e-10), "Mass matrix not symmetric")
 
-    def test_mass_matrix_legacy_path_emits_warning(self):
+    def test_mass_matrix_legacy_path_emits_warning(self) -> None:
         """Constructing ManipulatorDynamics without Mlist_per_link should warn."""
         import warnings
         from ManipulaPy.dynamics import ManipulatorDynamics
@@ -214,7 +214,7 @@ class TestDynamicsRegressions(unittest.TestCase):
             dyn.mass_matrix(np.array([0.0]))
             self.assertTrue(any("legacy approximation" in str(wi.message) for wi in w))
 
-    def test_gravity_forces_mutable_default_is_safe(self):
+    def test_gravity_forces_mutable_default_is_safe(self) -> None:
         import inspect
         from ManipulaPy.dynamics import ManipulatorDynamics
 
@@ -222,7 +222,7 @@ class TestDynamicsRegressions(unittest.TestCase):
         g_default = sig.parameters["g"].default
         self.assertIsNone(g_default, "Mutable default detected — should use None")
 
-    def test_gravity_forces_2r_planar_analytical(self):
+    def test_gravity_forces_2r_planar_analytical(self) -> None:
         """CM-4: gravity_forces must equal the analytical holding torque.
 
         The old implementation read the rotational inertia block
@@ -283,7 +283,7 @@ class TestDynamicsRegressions(unittest.TestCase):
         tau_z = dyn.gravity_forces(theta, [0.0, 0.0, -9.81])
         np.testing.assert_array_almost_equal(tau_z, [0.0, 0.0], decimal=6)
 
-    def test_gravity_forces_legacy_path_emits_warning(self):
+    def test_gravity_forces_legacy_path_emits_warning(self) -> None:
         """CM-4: without Mlist_per_link, gravity_forces warns and falls back."""
         import warnings
 
@@ -331,7 +331,7 @@ class TestKinematicsRegressions(unittest.TestCase):
         )
         return URDFToSerialManipulator(urdf_path).serial_manipulator
 
-    def test_body_jacobian_satisfies_adjoint_identity(self):
+    def test_body_jacobian_satisfies_adjoint_identity(self) -> None:
         """CM-3: jacobian(frame="body") must satisfy Js = Ad_{T_sb} @ Jb.
 
         The body branch seeded its accumulator from the full body FK
@@ -361,7 +361,7 @@ class TestKinematicsRegressions(unittest.TestCase):
             Jb[:, -1], robot.B_list[:, -1], decimal=6
         )
 
-    def test_generate_path_screws_match_analytical_2r_off_home(self):
+    def test_generate_path_screws_match_analytical_2r_off_home(self) -> None:
         """CM-5: building from omega_list/r_list (no S_list) must give correct
         off-home FK.
 
@@ -403,7 +403,7 @@ class TestKinematicsRegressions(unittest.TestCase):
 class TestPathPlanningRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/path_planning.py bugs."""
 
-    def test_cartesian_quintic_acceleration_satisfies_boundary_conditions(self):
+    def test_cartesian_quintic_acceleration_satisfies_boundary_conditions(self) -> None:
         """The Cartesian-trajectory CPU fallback used a wrong s_ddot for the
         quintic time-scaling: 60·τ·(1−2τ)/Tf² = (60τ − 120τ²)/Tf², missing
         the +120τ³ term and using -120 instead of -180 on τ².
@@ -453,7 +453,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
             traj_vel[-1], [0, 0, 0], decimal=4, err_msg="Quintic s_dot(Tf) != 0"
         )
 
-    def test_screw_list_sign_correct_via_home_fk(self):
+    def test_screw_list_sign_correct_via_home_fk(self) -> None:
         """At home config, FK in BOTH frames must equal M_list (the home pose).
 
         Uses the bundled tests/urdf_fixtures/simple_arm.urdf so this test
@@ -500,7 +500,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
             "FK didn't respond to joint motion — screw chain may be degenerate",
         )
 
-    def test_quintic_polynomial_endpoints(self):
+    def test_quintic_polynomial_endpoints(self) -> None:
         """Pure math test: quintic time-scaling endpoints."""
 
         def s(tau):
@@ -514,7 +514,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
         self.assertAlmostEqual(s_ddot(0.0), 0.0)
         self.assertAlmostEqual(s_ddot(1.0), 0.0)
 
-    def test_quintic_trajectory_zero_endpoint_acceleration(self):
+    def test_quintic_trajectory_zero_endpoint_acceleration(self) -> None:
         from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
 
         class MockManip:
@@ -540,7 +540,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
             traj["accelerations"][-1], np.zeros(6), decimal=4
         )
 
-    def test_plot_tcp_trajectory_does_not_shadow_time_module(self):
+    def test_plot_tcp_trajectory_does_not_shadow_time_module(self) -> None:
         import inspect
         from ManipulaPy import path_planning
 
@@ -555,7 +555,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
 class TestControlRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/control.py bugs."""
 
-    def test_cartesian_space_control_dimensions(self):
+    def test_cartesian_space_control_dimensions(self) -> None:
         from ManipulaPy.urdf_processor import URDFToSerialManipulator
         from ManipulaPy.control import ManipulatorController
         from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
@@ -574,7 +574,7 @@ class TestControlRegressions(unittest.TestCase):
         )
         self.assertEqual(tau.shape, (n,))
 
-    def test_cartesian_space_control_accepts_vector_gains(self):
+    def test_cartesian_space_control_accepts_vector_gains(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
@@ -596,7 +596,7 @@ class TestControlRegressions(unittest.TestCase):
 
         np.testing.assert_allclose(tau, np.array([9.5, 38.0, 85.5]))
 
-    def test_rise_time_handles_response_never_reaching_setpoint(self):
+    def test_rise_time_handles_response_never_reaching_setpoint(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -604,7 +604,7 @@ class TestControlRegressions(unittest.TestCase):
         rt = ctrl.calculate_rise_time(np.linspace(0, 1, 100), np.zeros(100), 1.0)
         self.assertTrue(np.isinf(rt) or rt >= 0)
 
-    def test_percent_overshoot_handles_zero_setpoint(self):
+    def test_percent_overshoot_handles_zero_setpoint(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -612,7 +612,7 @@ class TestControlRegressions(unittest.TestCase):
         po = ctrl.calculate_percent_overshoot(np.array([0.0, 0.1, 0.0]), set_point=0.0)
         self.assertTrue(np.isfinite(po))
 
-    def test_pid_control_resets_eint_on_dof_change(self):
+    def test_pid_control_resets_eint_on_dof_change(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -645,7 +645,7 @@ class TestControlRegressions(unittest.TestCase):
             ctrl.eint.shape, (2,), "eint must reset when input DOF changes"
         )
 
-    def test_pid_control_dof_change_logs_debug_not_warning(self):
+    def test_pid_control_dof_change_logs_debug_not_warning(self) -> None:
         from unittest.mock import patch
 
         from ManipulaPy.control import ManipulatorController
@@ -682,14 +682,14 @@ class TestControlRegressions(unittest.TestCase):
         warning.assert_not_called()
         debug.assert_called_once()
 
-    def test_ziegler_nichols_tuning_rejects_zero_period(self):
+    def test_ziegler_nichols_tuning_rejects_zero_period(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
         with self.assertRaises(ValueError):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=0.0, kind="PID")
 
-    def test_ziegler_nichols_p_allows_zero_period(self):
+    def test_ziegler_nichols_p_allows_zero_period(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -700,14 +700,14 @@ class TestControlRegressions(unittest.TestCase):
         self.assertEqual(Ki, 0.0)
         self.assertEqual(Kd, 0.0)
 
-    def test_ziegler_nichols_tuning_rejects_negative_period(self):
+    def test_ziegler_nichols_tuning_rejects_negative_period(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
         with self.assertRaises(ValueError):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=-1.0, kind="PID")
 
-    def test_ziegler_nichols_tuning_rejects_nonfinite_period(self):
+    def test_ziegler_nichols_tuning_rejects_nonfinite_period(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -716,7 +716,7 @@ class TestControlRegressions(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=float("inf"), kind="PID")
 
-    def test_pid_control_integral_windup_clamped_when_set(self):
+    def test_pid_control_integral_windup_clamped_when_set(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -741,7 +741,7 @@ class TestControlRegressions(unittest.TestCase):
             np.all(np.abs(ctrl.eint) <= 5.0 + 1e-9), f"eint={ctrl.eint} exceeded clamp"
         )
 
-    def test_pid_control_rejects_invalid_i_clamp(self):
+    def test_pid_control_rejects_invalid_i_clamp(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -760,7 +760,7 @@ class TestControlRegressions(unittest.TestCase):
                         i_clamp=bad_clamp,
                     )
 
-    def test_computed_torque_control_rejects_invalid_i_clamp(self):
+    def test_computed_torque_control_rejects_invalid_i_clamp(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
@@ -786,7 +786,7 @@ class TestControlRegressions(unittest.TestCase):
                 i_clamp=float("nan"),
             )
 
-    def test_pid_control_unclamped_when_clamp_none(self):
+    def test_pid_control_unclamped_when_clamp_none(self) -> None:
         """Default (i_clamp=None) preserves existing accumulation behavior."""
         from ManipulaPy.control import ManipulatorController
 
@@ -801,7 +801,7 @@ class TestControlRegressions(unittest.TestCase):
         # 100 steps x 1.0 error x 0.01 dt = 1.0 expected
         np.testing.assert_allclose(ctrl.eint, [1.0], atol=1e-9)
 
-    def test_pid_control_initializes_integral_as_float_for_integer_inputs(self):
+    def test_pid_control_initializes_integral_as_float_for_integer_inputs(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -822,7 +822,7 @@ class TestControlRegressions(unittest.TestCase):
 
     def test_computed_torque_control_initializes_integral_as_float_for_integer_inputs(
         self,
-    ):
+    ) -> None:
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
@@ -850,7 +850,7 @@ class TestControlRegressions(unittest.TestCase):
         np.testing.assert_allclose(ctrl.eint, [0.01, 0.01])
         np.testing.assert_allclose(tau, [1.01, 1.01])
 
-    def test_kalman_filter_update_rejects_shape_mismatch(self):
+    def test_kalman_filter_update_rejects_shape_mismatch(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -862,7 +862,7 @@ class TestControlRegressions(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctrl.kalman_filter_update(z_wrong, R_wrong)
 
-    def test_kalman_filter_update_rejects_bad_R_shape(self):
+    def test_kalman_filter_update_rejects_bad_R_shape(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -874,7 +874,7 @@ class TestControlRegressions(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctrl.kalman_filter_update(z, R_wrong)
 
-    def test_kalman_filter_update_rejects_column_vector_z(self):
+    def test_kalman_filter_update_rejects_column_vector_z(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -883,7 +883,7 @@ class TestControlRegressions(unittest.TestCase):
         with self.assertRaises(ValueError):
             ctrl.kalman_filter_update(np.zeros((4, 1)), np.eye(4))
 
-    def test_kalman_filter_predict_rejects_bad_Q_shape(self):
+    def test_kalman_filter_predict_rejects_bad_Q_shape(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -902,7 +902,7 @@ class TestControlRegressions(unittest.TestCase):
                 Q=Q_wrong,
             )
 
-    def test_kalman_filters_explicitly_convert_real_cupy_like_arrays(self):
+    def test_kalman_filters_explicitly_convert_real_cupy_like_arrays(self) -> None:
         from types import SimpleNamespace
         from unittest.mock import patch
 
@@ -910,13 +910,13 @@ class TestControlRegressions(unittest.TestCase):
         from ManipulaPy.control import ManipulatorController
 
         class ExplicitArray:
-            def __init__(self, value):
+            def __init__(self, value) -> None:
                 self.value = np.asarray(value)
 
             def get(self):
                 return self.value
 
-            def __array__(self, dtype=None):
+            def __array__(self, dtype=None) -> None:
                 raise TypeError("Implicit conversion to a NumPy array is not allowed")
 
         class Dynamics:
@@ -945,7 +945,7 @@ class TestControlRegressions(unittest.TestCase):
 
         self.assertFalse(np.allclose(old_x_hat, ctrl.x_hat))
 
-    def test_control_module_imports_without_cupy(self):
+    def test_control_module_imports_without_cupy(self) -> None:
         """ManipulaPy.control must import on a cupy-less machine.
 
         Currently fails because Union[cp.ndarray, ...] in enforce_limits is
@@ -979,7 +979,7 @@ class TestControlRegressions(unittest.TestCase):
             f"control.py failed to import without cupy:\n{result.stderr}",
         )
 
-    def test_settling_time_returns_first_settled_time_not_last(self):
+    def test_settling_time_returns_first_settled_time_not_last(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -990,7 +990,7 @@ class TestControlRegressions(unittest.TestCase):
             ctrl.calculate_settling_time(t, r, 1.0, tolerance=0.02), 1.0
         )
 
-    def test_settling_time_handles_negative_setpoint(self):
+    def test_settling_time_handles_negative_setpoint(self) -> None:
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -1005,7 +1005,7 @@ class TestControlRegressions(unittest.TestCase):
 class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""
 
-    def test_singularity_analysis_works_on_redundant_robot(self):
+    def test_singularity_analysis_works_on_redundant_robot(self) -> None:
         from ManipulaPy.singularity import Singularity
 
         class MockManip:
@@ -1016,7 +1016,7 @@ class TestSingularityRegressions(unittest.TestCase):
         result = sing.singularity_analysis(np.zeros(7))
         self.assertIsInstance(result, (bool, np.bool_))
 
-    def test_manipulability_ellipsoid_radii_finite_at_singular_jacobian(self):
+    def test_manipulability_ellipsoid_radii_finite_at_singular_jacobian(self) -> None:
         """A singular Jacobian must still produce finite plotted ellipsoid points."""
         from ManipulaPy.singularity import Singularity
 
@@ -1025,13 +1025,13 @@ class TestSingularityRegressions(unittest.TestCase):
                 return np.zeros((6, 6))
 
         class RecordingAxis:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.surfaces = []
 
-            def plot_surface(self, x, y, z, **kwargs):
+            def plot_surface(self, x, y, z, **kwargs) -> None:
                 self.surfaces.append((x, y, z))
 
-            def set_title(self, title):
+            def set_title(self, title) -> None:
                 pass
 
         ax = RecordingAxis()
@@ -1042,7 +1042,7 @@ class TestSingularityRegressions(unittest.TestCase):
             for values in surface:
                 self.assertTrue(np.all(np.isfinite(values)))
 
-    def test_manipulability_ellipsoid_handles_underactuated_jacobian(self):
+    def test_manipulability_ellipsoid_handles_underactuated_jacobian(self) -> None:
         from ManipulaPy.singularity import Singularity
 
         class MockManip:
@@ -1050,13 +1050,13 @@ class TestSingularityRegressions(unittest.TestCase):
                 return np.array([[1.0], [0.0], [0.0], [0.0], [1.0], [0.0]])
 
         class RecordingAxis:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.surfaces = []
 
-            def plot_surface(self, x, y, z, **kwargs):
+            def plot_surface(self, x, y, z, **kwargs) -> None:
                 self.surfaces.append((x, y, z))
 
-            def set_title(self, title):
+            def set_title(self, title) -> None:
                 pass
 
         ax = RecordingAxis()
@@ -1072,7 +1072,7 @@ class TestSingularityRegressions(unittest.TestCase):
 class TestPotentialFieldRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/potential_field.py bugs."""
 
-    def test_repulsive_potential_when_at_obstacle(self):
+    def test_repulsive_potential_when_at_obstacle(self) -> None:
         from ManipulaPy.potential_field import PotentialField
 
         pf = PotentialField(
@@ -1082,7 +1082,7 @@ class TestPotentialFieldRegressions(unittest.TestCase):
         p_val = pf.compute_repulsive_potential(q, [q.copy()])
         self.assertTrue(np.isfinite(p_val))
 
-    def test_repulsive_gradient_when_at_obstacle(self):
+    def test_repulsive_gradient_when_at_obstacle(self) -> None:
         from ManipulaPy.potential_field import PotentialField
 
         pf = PotentialField(
@@ -1092,7 +1092,7 @@ class TestPotentialFieldRegressions(unittest.TestCase):
         grad = pf.compute_gradient(q, np.zeros(3), [q.copy()])
         self.assertTrue(np.all(np.isfinite(grad)))
 
-    def test_repulsive_gradient_at_obstacle_provides_escape_direction(self):
+    def test_repulsive_gradient_at_obstacle_provides_escape_direction(self) -> None:
         """When q == obstacle exactly, gradient must be nonzero so robot can escape."""
         from ManipulaPy.potential_field import PotentialField
 
@@ -1106,7 +1106,7 @@ class TestPotentialFieldRegressions(unittest.TestCase):
             np.linalg.norm(grad), 0, "Robot stuck at obstacle has no escape force"
         )
 
-    def test_repulsive_gradient_at_obstacle_escape_is_bounded(self):
+    def test_repulsive_gradient_at_obstacle_escape_is_bounded(self) -> None:
         from ManipulaPy.potential_field import PotentialField
 
         pf = PotentialField(
@@ -1122,7 +1122,7 @@ class TestPotentialFieldRegressions(unittest.TestCase):
 class TestSimRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/sim.py bugs."""
 
-    def test_sim_module_imports_without_pybullet(self):
+    def test_sim_module_imports_without_pybullet(self) -> None:
         """sim module must be importable when pybullet is missing.
 
         Runs in a subprocess so that mucking with ``sys.modules`` and the
@@ -1185,7 +1185,7 @@ class TestSimRegressions(unittest.TestCase):
             msg=f"subprocess failed:\nstdout={result.stdout}\nstderr={result.stderr}",
         )
 
-    def test_run_controller_tracks_desired_positions(self):
+    def test_run_controller_tracks_desired_positions(self) -> None:
         """run_controller must end at the final desired position (open-loop)."""
         from unittest.mock import MagicMock, patch
 
@@ -1226,7 +1226,7 @@ class TestSimRegressions(unittest.TestCase):
             for actual, expected in zip(actual_calls, desired_positions):
                 np.testing.assert_array_equal(actual, expected)
 
-    def test_run_controller_rejects_1d_input(self):
+    def test_run_controller_rejects_1d_input(self) -> None:
         """run_controller requires a 2D waypoint matrix."""
         from unittest.mock import MagicMock, patch
 
@@ -1249,7 +1249,7 @@ class TestSimRegressions(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "shape|2D"):
                 sim.run_controller(np.zeros(6))
 
-    def test_run_controller_rejects_empty_input(self):
+    def test_run_controller_rejects_empty_input(self) -> None:
         """run_controller rejects empty trajectories before stepping."""
         from unittest.mock import MagicMock, patch
 
@@ -1272,7 +1272,7 @@ class TestSimRegressions(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "empty"):
                 sim.run_controller([])
 
-    def test_run_controller_rejects_wrong_dof(self):
+    def test_run_controller_rejects_wrong_dof(self) -> None:
         """run_controller requires waypoint width to match movable joints."""
         from unittest.mock import MagicMock, patch
 
@@ -1295,7 +1295,7 @@ class TestSimRegressions(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "6|3|joint count"):
                 sim.run_controller([np.zeros(3)])
 
-    def test_run_controller_accepts_generator(self):
+    def test_run_controller_accepts_generator(self) -> None:
         """run_controller materializes iterable waypoints before tracking."""
         from unittest.mock import MagicMock, patch
 
@@ -1329,7 +1329,7 @@ class TestSimRegressions(unittest.TestCase):
             second_call_arg = sim.set_joint_positions.call_args_list[1].args[0]
             np.testing.assert_array_equal(second_call_arg, second_waypoint)
 
-    def test_loop_methods_close_simulation_on_inner_exception(self):
+    def test_loop_methods_close_simulation_on_inner_exception(self) -> None:
         """Non-KeyboardInterrupt exceptions inside simulation loops must clean up."""
         from unittest.mock import MagicMock, patch
 
@@ -1384,7 +1384,7 @@ class TestSimRegressions(unittest.TestCase):
 
                 sim.close_simulation.assert_called_once_with()
 
-    def test_del_logs_cleanup_failure_at_debug_level(self):
+    def test_del_logs_cleanup_failure_at_debug_level(self) -> None:
         """Destructor cleanup failures should be visible only at debug level."""
         from unittest.mock import MagicMock
 
@@ -1400,7 +1400,7 @@ class TestSimRegressions(unittest.TestCase):
         sim.logger.debug.assert_called_once()
         self.assertTrue(sim.logger.debug.call_args.kwargs["exc_info"])
 
-    def test_simulation_with_external_physics_client_loads_robot(self):
+    def test_simulation_with_external_physics_client_loads_robot(self) -> None:
         """Passing an existing physics_client must still load plane + robot."""
         from unittest.mock import patch, MagicMock
         from ManipulaPy.sim import Simulation
@@ -1426,7 +1426,7 @@ class TestSimRegressions(unittest.TestCase):
             self.assertEqual(len(sim.non_fixed_joints), 6)
             self.assertEqual(sim.home_position.shape, (6,))
 
-    def test_set_joint_positions_passes_forces_kwarg(self):
+    def test_set_joint_positions_passes_forces_kwarg(self) -> None:
         """set_joint_positions must pass forces= so URDFs with low effort
         limits don't silently fail to track."""
         from unittest.mock import MagicMock, patch
@@ -1446,7 +1446,7 @@ class TestSimRegressions(unittest.TestCase):
             self.assertIn("forces", kwargs, "forces= must be supplied")
             self.assertEqual(len(kwargs["forces"]), 6)
 
-    def test_setup_logger_does_not_duplicate_handlers(self):
+    def test_setup_logger_does_not_duplicate_handlers(self) -> None:
         """Constructing Simulation N times must not stack N stream handlers."""
         import logging
         from unittest.mock import patch, MagicMock
@@ -1473,7 +1473,7 @@ class TestSimRegressions(unittest.TestCase):
                 handler_count, 1, f"Expected 1 stream handler, got {handler_count}"
             )
 
-    def test_capsule_line_uses_inline_axis_angle_quaternion(self):
+    def test_capsule_line_uses_inline_axis_angle_quaternion(self) -> None:
         """_capsule_line must not depend on p.getQuaternionFromAxisAngle —
         that helper is missing from several pybullet builds. Inline math
         replaced it; confirm by deleting the helper from the mocked module
@@ -1500,7 +1500,7 @@ class TestSimRegressions(unittest.TestCase):
         self.assertEqual(body_id, 12)
         mock_p.createMultiBody.assert_called_once()
 
-    def test_plot_trajectory_no_mutable_default_color(self):
+    def test_plot_trajectory_no_mutable_default_color(self) -> None:
         """color=[1, 0, 0] as a mutable default is the same footgun as Task 4.
         Fix: use color=None and assign the default inside the function."""
         import inspect
@@ -1562,7 +1562,7 @@ class TestSimPybulletGuards(unittest.TestCase):
         sim.trajectory_body_ids = []
         return sim
 
-    def test_public_methods_raise_importerror_without_pybullet(self):
+    def test_public_methods_raise_importerror_without_pybullet(self) -> None:
         from unittest.mock import patch
 
         for method_name, args_factory in self._METHODS_AND_ARGS:
@@ -1586,7 +1586,7 @@ class TestSimPybulletGuards(unittest.TestCase):
 class TestVisionRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/vision.py bugs."""
 
-    def test_detect_obstacles_default_threshold_does_not_filter_everything(self):
+    def test_detect_obstacles_default_threshold_does_not_filter_everything(self) -> None:
         """depth_threshold=0.0 + 'if mean_depth > threshold: continue' was
         filtering out every detection with positive depth (i.e., all real
         obstacles). With the new 5.0m default a 1m obstacle survives.
@@ -1622,7 +1622,7 @@ class TestVisionRegressions(unittest.TestCase):
 
 
 class TestUrdfRegressions(unittest.TestCase):
-    def test_mesh_load_failure_emits_warning(self):
+    def test_mesh_load_failure_emits_warning(self) -> None:
         import logging
         from ManipulaPy.urdf.types import Mesh  # adjust import path as needed
 
@@ -1631,7 +1631,7 @@ class TestUrdfRegressions(unittest.TestCase):
             mesh._load_mesh()
         self.assertTrue(any("not found" in msg.lower() for msg in cm.output))
 
-    def test_package_resolver_refuses_ambiguous_package_uri(self):
+    def test_package_resolver_refuses_ambiguous_package_uri(self) -> None:
         import tempfile
         from pathlib import Path
 
@@ -1655,7 +1655,7 @@ class TestUrdfRegressions(unittest.TestCase):
             self.assertEqual(resolved, uri)
             self.assertTrue(any("multiple" in msg.lower() for msg in cm.output))
 
-    def test_package_resolver_explicit_map_overrides_other_strategies(self):
+    def test_package_resolver_explicit_map_overrides_other_strategies(self) -> None:
         """add_package() must short-circuit ambiguity detection.
 
         The remediation advice in the ambiguity warning instructs callers to
@@ -1689,7 +1689,7 @@ class TestUrdfRegressions(unittest.TestCase):
                 "add_package() mapping must take precedence over search paths.",
             )
 
-    def test_resolver_use_ros_false_isolates_from_ros_env(self):
+    def test_resolver_use_ros_false_isolates_from_ros_env(self) -> None:
         """use_ros=False must NOT scan ROS_PACKAGE_PATH or ament_index."""
         import os
         import tempfile
@@ -1716,7 +1716,7 @@ class TestUrdfRegressions(unittest.TestCase):
                 "use_ros=False should not consult ROS_PACKAGE_PATH",
             )
 
-    def test_resolver_uses_find_ros_package_when_enabled(self):
+    def test_resolver_uses_find_ros_package_when_enabled(self) -> None:
         """use_ros=True must consult _find_ros_package (ament/rospack/catkin)."""
         import tempfile
         from unittest.mock import patch
@@ -1736,7 +1736,7 @@ class TestUrdfRegressions(unittest.TestCase):
 
             self.assertEqual(resolved, str(mesh))
 
-    def test_resolver_search_path_supports_flat_package_root(self):
+    def test_resolver_search_path_supports_flat_package_root(self) -> None:
         """search_path/relative form must work when caller adds the package
         root itself (e.g., add_search_path('/opt/robot_pkg')).
         """
@@ -1757,7 +1757,7 @@ class TestUrdfRegressions(unittest.TestCase):
             resolved = resolver.resolve("package://robot_pkg/meshes/a.stl")
             self.assertEqual(resolved, str(mesh))
 
-    def test_resolver_rejects_path_traversal_in_package_uri(self):
+    def test_resolver_rejects_path_traversal_in_package_uri(self) -> None:
         """package://pkg/../etc/passwd must be refused."""
         import tempfile
         from pathlib import Path
@@ -1779,7 +1779,7 @@ class TestUrdfRegressions(unittest.TestCase):
             self.assertEqual(resolved, uri)
             self.assertTrue(any("traversal" in msg.lower() for msg in cm.output))
 
-    def test_resolver_dedupes_symlinked_workspaces(self):
+    def test_resolver_dedupes_symlinked_workspaces(self) -> None:
         """Symlinked or duplicate-mounted search paths must not falsely
         trigger ambiguity when they reference the same physical file.
         """
@@ -1817,7 +1817,7 @@ class TestUrdfRegressions(unittest.TestCase):
                 "trigger the ambiguity refusal",
             )
 
-    def test_resolver_warns_on_malformed_package_uri(self):
+    def test_resolver_warns_on_malformed_package_uri(self) -> None:
         """package://, package://pkg, package://pkg/ should all warn."""
         from ManipulaPy.urdf.resolver import PackageResolver
 
@@ -1832,7 +1832,7 @@ class TestUrdfRegressions(unittest.TestCase):
                     f"no malformed-URI warning for {malformed!r}: {cm.output}",
                 )
 
-    def test_resolver_handles_file_uri(self):
+    def test_resolver_handles_file_uri(self) -> None:
         """file://path should round-trip through url2pathname so Windows
         file:///C:/foo doesn't end up as /C:/foo.
         """
@@ -1849,7 +1849,7 @@ class TestUrdfRegressions(unittest.TestCase):
             resolved = resolver.resolve(f"file://{target}")
             self.assertEqual(Path(resolved), target)
 
-    def test_mesh_load_failure_does_not_flood_warnings(self):
+    def test_mesh_load_failure_does_not_flood_warnings(self) -> None:
         """Repeated vertices/faces access on a missing mesh must warn once."""
         import logging
         from ManipulaPy.urdf.types import Mesh
@@ -1865,7 +1865,7 @@ class TestUrdfRegressions(unittest.TestCase):
             f"expected exactly one warning, got {len(cm.output)}: {cm.output}",
         )
 
-    def test_mesh_unresolved_package_uri_is_reported_distinctly(self):
+    def test_mesh_unresolved_package_uri_is_reported_distinctly(self) -> None:
         """An unresolved package:// URI stored as filename must surface as
         an unresolved-URI warning, not a misleading 'Mesh file not found'.
         """
@@ -1878,7 +1878,7 @@ class TestUrdfRegressions(unittest.TestCase):
         self.assertIn("unresolved package uri", joined)
         self.assertNotIn("file not found", joined)
 
-    def test_mesh_warning_escapes_log_injection_in_filename(self):
+    def test_mesh_warning_escapes_log_injection_in_filename(self) -> None:
         """Newlines/control chars in URDF filenames must not forge log lines."""
         from ManipulaPy.urdf.types import Mesh
 
@@ -1892,7 +1892,7 @@ class TestUrdfRegressions(unittest.TestCase):
         for record in cm.records:
             self.assertNotIn("\nERROR: forged log line", record.getMessage())
 
-    def test_mesh_loader_warning_includes_full_path_not_just_basename(self):
+    def test_mesh_loader_warning_includes_full_path_not_just_basename(self) -> None:
         """When two missing meshes share a basename, warnings must distinguish
         them by including the full path (Codex finding: path.name truncation).
         """
@@ -1922,7 +1922,7 @@ class TestUrdfRegressions(unittest.TestCase):
         self.assertIn("/tmp/left/robot.dae", joined)
         self.assertIn("/tmp/right/robot.dae", joined)
 
-    def test_mesh_loader_import_warning_mentions_file_and_install_hint(self):
+    def test_mesh_loader_import_warning_mentions_file_and_install_hint(self) -> None:
         import builtins
         from pathlib import Path
         from unittest.mock import patch
@@ -1949,7 +1949,7 @@ class TestUrdfRegressions(unittest.TestCase):
         self.assertIn("robot.dae", warning)
         self.assertIn("pip install trimesh", warning)
 
-    def test_urdf_processor_omega_list_shape_and_values(self):
+    def test_urdf_processor_omega_list_shape_and_values(self) -> None:
         """omega_list must be (3, N) with each column a unit screw axis.
 
         Earlier code derived omega from data['Slist'] using inconsistent
@@ -1981,7 +1981,7 @@ class TestUrdfRegressions(unittest.TestCase):
             norms = np.linalg.norm(omega, axis=0)
             np.testing.assert_array_almost_equal(norms, np.ones(6), decimal=4)
 
-    def test_trimesh_viz_mesh_load_failure_emits_warning(self):
+    def test_trimesh_viz_mesh_load_failure_emits_warning(self) -> None:
         """trimesh_viz silently fell back to a placeholder box when mesh load
         failed, hiding viz problems. Commit on Task 38 logs a warning before
         falling back.
@@ -2024,7 +2024,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
     and asserting it matches the corrected formula.
     """
 
-    def test_trajectory_cpu_fallback_matches_quintic_reference(self):
+    def test_trajectory_cpu_fallback_matches_quintic_reference(self) -> None:
         """CPU fallback locks in the per-timestep formula used by CUDA kernels."""
         from ManipulaPy.cuda_kernels import trajectory_cpu_fallback
 
@@ -2050,7 +2050,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         np.testing.assert_array_almost_equal(acc[0], np.zeros(6), decimal=6)
         np.testing.assert_array_almost_equal(acc[-1], np.zeros(6), decimal=6)
 
-    def test_trajectory_cpu_fallback_linear_method_is_linear(self):
+    def test_trajectory_cpu_fallback_linear_method_is_linear(self) -> None:
         """method=1 must be true linear scaling, not cubic fall-through."""
         from ManipulaPy.cuda_kernels import trajectory_cpu_fallback
 
@@ -2078,7 +2078,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         )
         np.testing.assert_array_equal(acc, np.zeros_like(acc))
 
-    def test_cuda_kernel_variants_handle_linear_method(self):
+    def test_cuda_kernel_variants_handle_linear_method(self) -> None:
         """All trajectory kernel variants must implement linear method (method=1)."""
         import inspect
         from ManipulaPy import cuda_kernels
@@ -2131,7 +2131,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         end_rel = rest.find("\n    @cuda.jit")
         return rest if end_rel < 0 else rest[:end_rel]
 
-    def test_cartesian_kernel_no_shared_memory_race(self):
+    def test_cartesian_kernel_no_shared_memory_race(self) -> None:
         """cartesian_trajectory_kernel must compute scaling per-thread, not via
         a shared-memory write from thread (0,0) only.
         """
@@ -2144,7 +2144,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         )
         self.assertNotIn("cuda.syncthreads", body)
 
-    def test_cartesian_kernel_quintic_position_uses_tau5(self):
+    def test_cartesian_kernel_quintic_position_uses_tau5(self) -> None:
         """The quintic position formula must include 6 * tau^5, not 6 * tau * tau^3 (=tau^4)."""
         body = self._kernel_source("cartesian_trajectory_kernel")
         self.assertNotIn(
@@ -2159,7 +2159,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
             f"expected 6*tau5 or 6*tau2*tau3 in cartesian quintic; body=\n{body[:600]}",
         )
 
-    def test_cartesian_kernel_quintic_acceleration_includes_one_minus_tau(self):
+    def test_cartesian_kernel_quintic_acceleration_includes_one_minus_tau(self) -> None:
         """Quintic s_ddot must be 60 tau (1 - tau)(1 - 2tau) / Tf^2,
         not the truncated 60 tau (1 - 2tau) / Tf^2.
         """
@@ -2171,7 +2171,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
             "(1 - tau) factor — it would zero-cross at tau=0.5 incorrectly.",
         )
 
-    def test_cartesian_kernel_supports_linear_method(self):
+    def test_cartesian_kernel_supports_linear_method(self) -> None:
         body = self._kernel_source("cartesian_trajectory_kernel")
         self.assertIn(
             "s = tau",
@@ -2180,7 +2180,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
             "method (method == 1) instead of falling through to s = 0.",
         )
 
-    def test_batch_kernel_no_shared_memory_race(self):
+    def test_batch_kernel_no_shared_memory_race(self) -> None:
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertNotIn(
             "cuda.shared.array",
@@ -2189,22 +2189,22 @@ class TestCudaKernelRegressions(unittest.TestCase):
             "race as cartesian_trajectory_kernel.",
         )
 
-    def test_batch_kernel_quintic_position_uses_tau5(self):
+    def test_batch_kernel_quintic_position_uses_tau5(self) -> None:
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertNotIn("6.0 * tau * tau3", body)
         self.assertTrue(
             "6.0 * tau5" in body or "6.0 * tau2 * tau3" in body,
         )
 
-    def test_batch_kernel_quintic_acceleration_includes_one_minus_tau(self):
+    def test_batch_kernel_quintic_acceleration_includes_one_minus_tau(self) -> None:
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertIn("(1 - tau) * (1 - 2 * tau)", body)
 
-    def test_batch_kernel_supports_linear_method(self):
+    def test_batch_kernel_supports_linear_method(self) -> None:
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertIn("s = tau", body)
 
-    def test_quintic_formula_satisfies_boundary_conditions(self):
+    def test_quintic_formula_satisfies_boundary_conditions(self) -> None:
         """Pure-Python equivalent of the corrected quintic — proves the new
         formula gives s(0)=0, s(1)=1, s_dot(0)=s_dot(1)=0, s_ddot(0)=s_ddot(1)=0.
         """
@@ -2224,7 +2224,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
             self.assertAlmostEqual(s_dot, 0.0)
             self.assertAlmostEqual(s_ddot, 0.0)
 
-    def test_forward_dynamics_kernel_has_no_temporal_data_race(self):
+    def test_forward_dynamics_kernel_has_no_temporal_data_race(self) -> None:
         """forward_dynamics_kernel previously read thetamat[t_idx-1, j_idx] from
         another thread's not-yet-written row — a classic CUDA temporal race.
         The fixed kernel integrates from initial state per-thread.
@@ -2243,7 +2243,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         self.assertIn("range(1, t_idx + 1)", body)
         self.assertNotIn("range(t_idx + 1)", body)
 
-    def test_potential_gradient_repulsive_pushes_away_from_obstacle(self):
+    def test_potential_gradient_repulsive_pushes_away_from_obstacle(self) -> None:
         """Pure-Python equivalent of the fused potential gradient — verifies
         the corrected sign on the repulsive term: force = -∇U must point
         AWAY from the obstacle. The buggy code dropped the leading minus,
@@ -2282,7 +2282,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         self.assertAlmostEqual(force[1], 0.0)
         self.assertAlmostEqual(force[2], 0.0)
 
-    def test_cuda_kernels_has_no_bare_except_handlers(self):
+    def test_cuda_kernels_has_no_bare_except_handlers(self) -> None:
         """Bare 'except:' swallows SystemExit/KeyboardInterrupt and trips
         flake8 E722. Narrow to 'except Exception:'."""
         import ast
@@ -2300,7 +2300,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
             bare_handlers, [], f"bare except handlers at lines {bare_handlers}"
         )
 
-    def test_setup_cuda_environment_respects_existing_user_values(self):
+    def test_setup_cuda_environment_respects_existing_user_values(self) -> None:
         """setup_cuda_environment must not clobber env vars the user set
         explicitly. Use setdefault, not direct assignment."""
         import os
@@ -2322,7 +2322,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
             else:
                 os.environ[key] = previous
 
-    def test_setup_cuda_environment_tolerates_unusable_cupy_runtime(self):
+    def test_setup_cuda_environment_tolerates_unusable_cupy_runtime(self) -> None:
         """Importable CuPy is not enough; CUDA runtime calls can still fail."""
         import sys
         import types
@@ -2331,7 +2331,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         from ManipulaPy import cuda_kernels
 
         class BrokenMemoryPool:
-            def set_limit(self, *args, **kwargs):
+            def set_limit(self, *args, **kwargs) -> None:
                 raise RuntimeError("cudaErrorCompatNotSupportedOnDevice")
 
         broken_cupy = types.ModuleType("cupy")
@@ -2347,7 +2347,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
 class TestTestInfraRegressions(unittest.TestCase):
     """Regressions for test infrastructure issues (Tasks 42-44)."""
 
-    def test_torch_smart_mock_tensor_is_array_like_class(self):
+    def test_torch_smart_mock_tensor_is_array_like_class(self) -> None:
         """torch_mock.Tensor must be a class, not a Mock(), so that
         isinstance(x, torch.Tensor) and issubclass checks behave correctly.
         """
@@ -2363,7 +2363,7 @@ class TestTestInfraRegressions(unittest.TestCase):
         # Class-ness: issubclass must work without raising TypeError.
         self.assertTrue(issubclass(torch_mock.Tensor, object))
 
-    def test_trajectory_planning_has_no_top_level_psutil_import(self):
+    def test_trajectory_planning_has_no_top_level_psutil_import(self) -> None:
         """psutil is optional. A module-level 'import psutil' breaks
         collection on systems without psutil installed; the import must
         live inside the try/except block where it's actually used.
@@ -2394,7 +2394,7 @@ class TestTestInfraRegressions(unittest.TestCase):
             "module level — it breaks collection without psutil installed.",
         )
 
-    def test_test_control_module_imports_without_cupy(self):
+    def test_test_control_module_imports_without_cupy(self) -> None:
         """tests/test_control.py used to do bare 'import cupy as cp' at
         module scope. On a CPU-only contributor machine without cupy,
         that broke collection. Wrapped in try/except now.
@@ -2429,7 +2429,7 @@ class TestTestInfraRegressions(unittest.TestCase):
             f"stdout: {result.stdout}\nstderr: {result.stderr}",
         )
 
-    def test_test_control_rejects_importable_but_unusable_cupy(self):
+    def test_test_control_rejects_importable_but_unusable_cupy(self) -> None:
         """tests/test_control.py must not select CuPy just because it imports.
 
         Some developer machines have a cupy package installed while the CUDA
@@ -2505,7 +2505,7 @@ class TestPackagingRegressions(unittest.TestCase):
         with open(repo_root / "pyproject.toml", "rb") as f:
             return tomllib.load(f), repo_root
 
-    def test_heavy_dependencies_are_optional_not_core(self):
+    def test_heavy_dependencies_are_optional_not_core(self) -> None:
         """torch, opencv-python, ultralytics, pybullet, cupy-* and trimesh
         must NOT be in [project.dependencies] — they live in optional groups
         so `pip install ManipulaPy` works on Apple Silicon and minimal
@@ -2539,7 +2539,7 @@ class TestPackagingRegressions(unittest.TestCase):
         for group in ("simulation", "vision", "urdf", "cuda", "all"):
             self.assertIn(group, optional, f"missing optional group [{group}]")
 
-    def test_python_312_classifier_present_no_premature_313(self):
+    def test_python_312_classifier_present_no_premature_313(self) -> None:
         """Python 3.12 is supported (Numba/SciPy ship 3.12 wheels). 3.13
         is held back until CI proves it green."""
         pyproject, _ = self._load_pyproject()
@@ -2547,7 +2547,7 @@ class TestPackagingRegressions(unittest.TestCase):
         self.assertIn("Programming Language :: Python :: 3.12", classifiers)
         self.assertNotIn("Programming Language :: Python :: 3.13", classifiers)
 
-    def test_py_typed_marker_present(self):
+    def test_py_typed_marker_present(self) -> None:
         """PEP 561 marker so downstream type checkers honor inline hints."""
         from pathlib import Path
 
@@ -2558,7 +2558,7 @@ class TestPackagingRegressions(unittest.TestCase):
             "package as untyped",
         )
 
-    def test_setup_py_version_matches_pyproject(self):
+    def test_setup_py_version_matches_pyproject(self) -> None:
         """setup.py is legacy but stale-version metadata is misleading.
         Keep the version field synced with pyproject.toml's [project].version."""
         from pathlib import Path
@@ -2590,7 +2590,7 @@ class TestPackagingRegressions(unittest.TestCase):
                         return ast.literal_eval(keyword.value)
         raise AssertionError(f"setup.py missing setup({keyword_name}=...)")
 
-    def test_setup_py_core_dependencies_follow_optional_split(self):
+    def test_setup_py_core_dependencies_follow_optional_split(self) -> None:
         """Legacy setup.py must not reintroduce the heavy deps that pyproject
         moved behind extras. Some downstream tools still inspect setup.py."""
         install_requires = self._setup_py_keyword("install_requires")
@@ -2624,7 +2624,7 @@ class TestPackagingRegressions(unittest.TestCase):
         for group in ("simulation", "vision", "urdf", "cuda", "ml", "all"):
             self.assertIn(group, extras, f"setup.py missing extra {group!r}")
 
-    def test_setup_py_package_data_does_not_reinclude_meshes(self):
+    def test_setup_py_package_data_does_not_reinclude_meshes(self) -> None:
         """Task 48 chose URDF-only wheels; setup.py package_data must not
         contradict MANIFEST.in by listing mesh globs."""
         package_data = self._setup_py_keyword("package_data")
@@ -2632,7 +2632,7 @@ class TestPackagingRegressions(unittest.TestCase):
         for suffix in (".stl", ".dae", ".obj", ".mesh"):
             self.assertNotIn(suffix, package_data_text)
 
-    def test_python_312_ci_matrix_present(self):
+    def test_python_312_ci_matrix_present(self) -> None:
         """Declaring Python 3.12 support requires CI coverage for 3.12."""
         from pathlib import Path
 
@@ -2642,7 +2642,7 @@ class TestPackagingRegressions(unittest.TestCase):
         )
         self.assertIn("3.12", workflow)
 
-    def test_init_py_version_matches_pyproject(self):
+    def test_init_py_version_matches_pyproject(self) -> None:
         """ManipulaPy.__version__ must match pyproject.toml [project].version
         so what `pip install` ships and what `import ManipulaPy; print(...)`
         reports are the same string."""
@@ -2655,7 +2655,7 @@ class TestPackagingRegressions(unittest.TestCase):
             "ManipulaPy.__version__ drift from pyproject.toml",
         )
 
-    def test_changelog_has_v132_release_section(self):
+    def test_changelog_has_v132_release_section(self) -> None:
         """v1.3.2 ship-ritual: CHANGELOG must have a dated [1.3.2] section
         (no lingering '[Unreleased] — targeting 1.3.2' header)."""
         from pathlib import Path
@@ -2665,7 +2665,7 @@ class TestPackagingRegressions(unittest.TestCase):
         self.assertIn("## [1.3.2]", text)
         self.assertNotIn("[Unreleased] — targeting 1.3.2", text)
 
-    def test_data_manifest_does_not_lie_about_mesh_bundling(self):
+    def test_data_manifest_does_not_lie_about_mesh_bundling(self) -> None:
         """The wheel doesn't bundle .stl/.dae/.obj/.mesh assets (excluded
         by MANIFEST.in). The data manifest must say so explicitly so users
         on a PyPI install aren't surprised."""
@@ -2683,7 +2683,7 @@ class TestPackagingRegressions(unittest.TestCase):
 class TestXacroRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/urdf/xacro.py — security audit (Task 41)."""
 
-    def test_xacro_arg_name_must_match_identifier_pattern(self):
+    def test_xacro_arg_name_must_match_identifier_pattern(self) -> None:
         from pathlib import Path
         from ManipulaPy.urdf.xacro import XacroProcessor
 
@@ -2699,7 +2699,7 @@ class TestXacroRegressions(unittest.TestCase):
                         Path("/nonexistent.xacro"), {bad_key: "value"}
                     )
 
-    def test_xacro_arg_value_rejects_shell_metacharacters(self):
+    def test_xacro_arg_value_rejects_shell_metacharacters(self) -> None:
         from pathlib import Path
         from ManipulaPy.urdf.xacro import XacroProcessor
 
@@ -2717,7 +2717,7 @@ class TestXacroRegressions(unittest.TestCase):
                         Path("/nonexistent.xacro"), {"safe_key": bad_value}
                     )
 
-    def test_xacro_arg_value_rejects_cli_flag_lookalikes(self):
+    def test_xacro_arg_value_rejects_cli_flag_lookalikes(self) -> None:
         from pathlib import Path
         from ManipulaPy.urdf.xacro import XacroProcessor
 
@@ -2728,7 +2728,7 @@ class TestXacroRegressions(unittest.TestCase):
                         Path("/nonexistent.xacro"), {"safe_key": bad_value}
                     )
 
-    def test_xacro_arg_value_allows_negative_numbers(self):
+    def test_xacro_arg_value_allows_negative_numbers(self) -> None:
         """Codex caught: rejecting all '-' values would break legit
         negative numerics like joint limits or offsets."""
         import subprocess
@@ -2759,7 +2759,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
     cannot land twice.
     """
 
-    def test_kalman_filter_update_validates_P_shape(self):
+    def test_kalman_filter_update_validates_P_shape(self) -> None:
         """kalman_filter_update must reject self.P=None or wrong-shape P
         with a clear ValueError, before reaching the matrix algebra (which
         would fail with a confusing low-level error).
@@ -2792,7 +2792,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
 
     def test_connect_disconnect_initialize_robot_raise_importerror_without_pybullet(
         self,
-    ):
+    ) -> None:
         """connect_simulation/disconnect_simulation/initialize_robot must
         all surface ImportError when pybullet is missing — previously they
         skipped _check_pybullet_available() and raised AttributeError on
@@ -2820,7 +2820,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
                         getattr(sim, method_name)()
                 self.assertIn("ManipulaPy[simulation]", str(ctx.exception))
 
-    def test_set_joint_positions_collapses_torque_pairs_to_scalars(self):
+    def test_set_joint_positions_collapses_torque_pairs_to_scalars(self) -> None:
         """set_joint_positions must hand PyBullet one scalar per joint.
         torque_limits is canonically [(min, max), ...]; the previous code
         passed those tuples through verbatim and PyBullet rejected them.
@@ -2837,7 +2837,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
 
         captured = {}
 
-        def fake_set_motor(robot_id, indices, mode, targetPositions, forces):
+        def fake_set_motor(robot_id, indices, mode, targetPositions, forces) -> None:
             captured["forces"] = forces
 
         fake_p = MagicMock()
@@ -2858,7 +2858,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         self.assertAlmostEqual(forces[1], 20.0)
         self.assertAlmostEqual(forces[2], 30.0)
 
-    def test_manifest_load_example_imports_get_robot_urdf(self):
+    def test_manifest_load_example_imports_get_robot_urdf(self) -> None:
         """The ManipulaPy_data/MANIFEST.md snippet that calls
         ``URDF.load(get_robot_urdf('ur5'))`` must also import
         ``get_robot_urdf`` so users can copy-paste it verbatim.
@@ -2890,7 +2890,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             f"MANIFEST.md python block(s) {offending} call get_robot_urdf without importing it",
         )
 
-    def test_resolver_explicit_map_miss_does_not_fall_through(self):
+    def test_resolver_explicit_map_miss_does_not_fall_through(self) -> None:
         """When add_package() pins a package to a path and the requested
         file is absent under that path, the resolver must NOT silently
         return a hit from another search path — that defeats the explicit
@@ -2925,7 +2925,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             joined = "\n".join(cm.output)
             self.assertIn("Explicit package mapping", joined)
 
-    def test_h2d_pinned_skips_pinned_memory_by_default(self):
+    def test_h2d_pinned_skips_pinned_memory_by_default(self) -> None:
         """_h2d_pinned must NOT call cuda.pinned_array() unless the user
         opts in via MANIPULAPY_USE_PINNED_MEMORY=1. The pinned path
         SIGSEGVs on numba 0.65 + driver 580 (CUDA 13 ABI) — a try/except
@@ -2959,7 +2959,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
                 pass
             spy.assert_not_called()
 
-    def test_h2d_pinned_uses_pinned_memory_when_opted_in(self):
+    def test_h2d_pinned_uses_pinned_memory_when_opted_in(self) -> None:
         """When the user sets MANIPULAPY_USE_PINNED_MEMORY=1, _h2d_pinned
         must route through cuda.pinned_array() — that's the whole point
         of the opt-in flag. If pinned_array raises a real exception, the
@@ -2990,7 +2990,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         self.assertTrue(captured.get("called"))
         self.assertEqual(captured["shape"], arr.shape)
 
-    def test_trajectory_cpu_fallback_handles_zero_Tf_without_warnings(self):
+    def test_trajectory_cpu_fallback_handles_zero_Tf_without_warnings(self) -> None:
         """trajectory_cpu_fallback used to emit a numpy RuntimeWarning
         ("invalid value encountered in divide") when called with Tf=0
         because of `tau = t / Tf`. The GPU kernels were guarded against
@@ -3022,7 +3022,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             np.testing.assert_array_equal(vel1, np.zeros((1, 2), dtype=np.float32))
             np.testing.assert_array_equal(acc1, np.zeros((1, 2), dtype=np.float32))
 
-    def test_trajectory_kernels_guard_division_by_zero_when_N_equals_one(self):
+    def test_trajectory_kernels_guard_division_by_zero_when_N_equals_one(self) -> None:
         """All trajectory kernels normalize by (N - 1). With N=1 that is
         division by zero, producing NaN/Inf. Source must guard with
         ``0.0 if N <= 1 else t_idx / (N - 1.0)``.
@@ -3054,7 +3054,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
             f"expected >=7 guarded tau assignments, got {guarded_count}",
         )
 
-    def test_simulation_rst_open_loop_examples_import_numpy(self):
+    def test_simulation_rst_open_loop_examples_import_numpy(self) -> None:
         """The Open-Loop RST snippets call ``np.array(...)``; without an
         explicit ``import numpy as np`` they fail when copy-pasted.
         """
@@ -3190,7 +3190,7 @@ class TestSelfCollision(unittest.TestCase):
     # ACM tests
     # ------------------------------------------------------------------
 
-    def test_acm_excludes_joint_neighbors(self):
+    def test_acm_excludes_joint_neighbors(self) -> None:
         """build_link_adjacency must include every parent<->child joint pair."""
         from pathlib import Path
 
@@ -3214,7 +3214,7 @@ class TestSelfCollision(unittest.TestCase):
                 f"ACM missing joint pair {j.parent!r} <-> {j.child!r}",
             )
 
-    def test_acm_grandparents_excluded_when_flag_set(self):
+    def test_acm_grandparents_excluded_when_flag_set(self) -> None:
         """With exclude_grandparents=True, grandparent<->grandchild pairs are also excluded."""
         from pathlib import Path
 
@@ -3237,7 +3237,7 @@ class TestSelfCollision(unittest.TestCase):
             "ACM with grandparents must contain all pairs from ACM without",
         )
 
-    def test_acm_empty_joints(self):
+    def test_acm_empty_joints(self) -> None:
         """build_link_adjacency on a URDF with no joints returns an empty set."""
         from unittest.mock import MagicMock
         from ManipulaPy.potential_field import build_link_adjacency
@@ -3251,7 +3251,7 @@ class TestSelfCollision(unittest.TestCase):
     # CollisionChecker ACM integration
     # ------------------------------------------------------------------
 
-    def test_home_pose_no_false_positive(self):
+    def test_home_pose_no_false_positive(self) -> None:
         """Adjacent-link hulls placed at overlapping positions must not trigger
         a collision when their pair is in the ACM."""
         # Two overlapping hulls for adjacent links — old code reported collision here
@@ -3271,7 +3271,7 @@ class TestSelfCollision(unittest.TestCase):
             "Adjacent links in ACM must not produce a false-positive collision",
         )
 
-    def test_intentional_self_collision_detected(self):
+    def test_intentional_self_collision_detected(self) -> None:
         """A deliberate non-adjacent hull overlap must be flagged."""
         hull_base = self._make_tetra_hull()
         hull_tool = self._make_tetra_hull(offset=[0.3, 0.0, 0.0])
@@ -3290,7 +3290,7 @@ class TestSelfCollision(unittest.TestCase):
             "Non-adjacent overlapping links outside the ACM must report collision",
         )
 
-    def test_non_adjacent_overlapping_hulls_detected(self):
+    def test_non_adjacent_overlapping_hulls_detected(self) -> None:
         """Non-adjacent links that physically overlap MUST be detected as a collision."""
         hull_a = self._make_tetra_hull()
         hull_b = self._make_tetra_hull(offset=[0.3, 0.0, 0.0])  # overlapping
@@ -3310,7 +3310,7 @@ class TestSelfCollision(unittest.TestCase):
             "Non-adjacent overlapping hulls must be detected as a collision",
         )
 
-    def test_non_adjacent_separated_hulls_not_detected(self):
+    def test_non_adjacent_separated_hulls_not_detected(self) -> None:
         """Non-adjacent links that are far apart must not be reported as colliding."""
         hull_a = self._make_tetra_hull()
         hull_b = self._make_tetra_hull(offset=[20.0, 0.0, 0.0])
@@ -3326,7 +3326,7 @@ class TestSelfCollision(unittest.TestCase):
         result = checker.check_collision([0.0] * 6)
         self.assertFalse(result, "Separated far-apart hulls must not report collision")
 
-    def test_check_collision_applies_fk_translation_to_cached_vertices(self):
+    def test_check_collision_applies_fk_translation_to_cached_vertices(self) -> None:
         """Verify check_collision actually transforms cached hull vertices by the FK matrix
         (not just inspecting them in body frame). A hull at origin and a translated FK should
         place the hull's world-frame vertices in the translated location."""
@@ -3359,7 +3359,7 @@ class TestSelfCollision(unittest.TestCase):
     # Collision-mesh source preference
     # ------------------------------------------------------------------
 
-    def test_collision_checker_prefers_collision_meshes(self):
+    def test_collision_checker_prefers_collision_meshes(self) -> None:
         """_create_convex_hulls must use link.collisions vertices when both are present,
         and fall back to link.visuals only when collisions is empty."""
         from unittest.mock import MagicMock, patch
@@ -3442,7 +3442,7 @@ class TestSelfCollision(unittest.TestCase):
             "Visual fallback must mark the link as warned",
         )
 
-    def test_visual_fallback_warning_issued_once(self):
+    def test_visual_fallback_warning_issued_once(self) -> None:
         """When falling back from collisions to visuals, a warning is logged exactly once per link."""
         import logging
         from unittest.mock import MagicMock, patch
@@ -3466,7 +3466,7 @@ class TestSelfCollision(unittest.TestCase):
     # ------------------------------------------------------------------
 
     @pytest.mark.simulation
-    def test_sim_self_collision_off_by_default(self):
+    def test_sim_self_collision_off_by_default(self) -> None:
         """Simulation with enable_self_collision=False returns [] from check_collisions."""
         try:
             import pybullet as p
@@ -3497,7 +3497,7 @@ class TestSelfCollision(unittest.TestCase):
                 pass
 
     @pytest.mark.simulation
-    def test_sim_self_collision_flag_wires_pybullet_flag(self):
+    def test_sim_self_collision_flag_wires_pybullet_flag(self) -> None:
         """enable_self_collision=True passes URDF_USE_SELF_COLLISION to loadURDF."""
         try:
             import pybullet as p
@@ -3544,7 +3544,7 @@ class TestSelfCollision(unittest.TestCase):
                 pass
 
     @pytest.mark.simulation
-    def test_sim_check_collisions_returns_list(self):
+    def test_sim_check_collisions_returns_list(self) -> None:
         """check_collisions() must return a list (not None) in all cases."""
         try:
             import pybullet as p
@@ -3579,7 +3579,7 @@ class TestSelfCollision(unittest.TestCase):
                 pass
 
     @pytest.mark.simulation
-    def test_sim_self_collision_returns_contacts_when_enabled(self):
+    def test_sim_self_collision_returns_contacts_when_enabled(self) -> None:
         """A primitive non-adjacent self contact is reported when enabled."""
         try:
             import pybullet as p

@@ -68,13 +68,13 @@ class _RobotFixtureMixin:
 class TestTracIKSolverInit(unittest.TestCase, _RobotFixtureMixin):
     """Tests for TracIKSolver.__init__."""
 
-    def test_init_stores_attributes(self):
+    def test_init_stores_attributes(self) -> None:
         solver = self._make_solver()
         self.assertEqual(solver.n_joints, 6)
         self.assertEqual(len(solver.joint_limits), 6)
         self.assertEqual(len(solver.bounds), 6)
 
-    def test_init_none_limits_use_defaults(self):
+    def test_init_none_limits_use_defaults(self) -> None:
         """Joints with None limits should get ±2π bounds."""
         robot = self._make_robot()
         solver = TracIKSolver(
@@ -90,7 +90,7 @@ class TestTracIKSolverInit(unittest.TestCase, _RobotFixtureMixin):
         self.assertAlmostEqual(solver.bounds[2][0], -2 * np.pi)
         self.assertAlmostEqual(solver.bounds[2][1], 2.0)
 
-    def test_custom_error_func(self):
+    def test_custom_error_func(self) -> None:
         """Custom error_func should replace default."""
         robot = self._make_robot()
         custom_fn = MagicMock(return_value=(np.zeros(6), 0.0, 0.0))
@@ -110,12 +110,12 @@ class TestTracIKSolverInit(unittest.TestCase, _RobotFixtureMixin):
 class TestTracIKSolverSolve(unittest.TestCase, _RobotFixtureMixin):
     """Tests for TracIKSolver.solve (high-level API)."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
-    def test_solve_parallel_success(self):
+    def test_solve_parallel_success(self) -> None:
         """Parallel solve should find a solution for a reachable target."""
         theta, success, solve_time = self.solver.solve(
             self.T_desired, theta0=self.theta_known, timeout=2.0, use_parallel=True
@@ -124,7 +124,7 @@ class TestTracIKSolverSolve(unittest.TestCase, _RobotFixtureMixin):
         self.assertEqual(theta.shape, (6,))
         self.assertGreater(solve_time, 0.0)
 
-    def test_solve_sequential_success(self):
+    def test_solve_sequential_success(self) -> None:
         """Sequential solve should also succeed."""
         theta, success, solve_time = self.solver.solve(
             self.T_desired,
@@ -134,7 +134,7 @@ class TestTracIKSolverSolve(unittest.TestCase, _RobotFixtureMixin):
         )
         self.assertTrue(success)
 
-    def test_solve_without_initial_guess(self):
+    def test_solve_without_initial_guess(self) -> None:
         """Solve without theta0 should use workspace heuristic."""
         theta, success, solve_time = self.solver.solve(
             self.T_desired, theta0=None, timeout=2.0
@@ -143,7 +143,7 @@ class TestTracIKSolverSolve(unittest.TestCase, _RobotFixtureMixin):
         self.assertEqual(theta.shape, (6,))
         self.assertGreater(solve_time, 0.0)
 
-    def test_solve_returns_best_on_failure(self):
+    def test_solve_returns_best_on_failure(self) -> None:
         """Unreachable target should return best attempt, success=False."""
         T_far = np.eye(4)
         T_far[:3, 3] = [100.0, 100.0, 100.0]  # Very far away
@@ -151,7 +151,7 @@ class TestTracIKSolverSolve(unittest.TestCase, _RobotFixtureMixin):
         self.assertFalse(success)
         self.assertEqual(theta.shape, (6,))
 
-    def test_solve_respects_tolerances(self):
+    def test_solve_respects_tolerances(self) -> None:
         """Tight tolerances should be honoured when success=True."""
         eomg, ev = 1e-4, 1e-4
         theta, success, _ = self.solver.solve(
@@ -165,7 +165,7 @@ class TestTracIKSolverSolve(unittest.TestCase, _RobotFixtureMixin):
             self.assertLess(pos_err, ev)
             self.assertLess(rot_err, eomg)
 
-    def test_solve_num_restarts(self):
+    def test_solve_num_restarts(self) -> None:
         """Different num_restarts values should not crash."""
         for n in [1, 2, 5]:
             theta, _, _ = self.solver.solve(
@@ -180,12 +180,12 @@ class TestTracIKSolverSolve(unittest.TestCase, _RobotFixtureMixin):
 class TestInitialGuesses(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _generate_initial_guesses."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, _ = self._reachable_target(self.robot)
 
-    def test_with_theta0(self):
+    def test_with_theta0(self) -> None:
         theta0 = np.ones(6) * 0.5
         guesses = self.solver._generate_initial_guesses(
             self.T_desired, theta0, num_restarts=5
@@ -194,7 +194,7 @@ class TestInitialGuesses(unittest.TestCase, _RobotFixtureMixin):
         np.testing.assert_array_almost_equal(guesses[0], theta0)
         self.assertGreaterEqual(len(guesses), 4)
 
-    def test_without_theta0(self):
+    def test_without_theta0(self) -> None:
         guesses = self.solver._generate_initial_guesses(
             self.T_desired, None, num_restarts=6
         )
@@ -203,7 +203,7 @@ class TestInitialGuesses(unittest.TestCase, _RobotFixtureMixin):
         self.assertEqual(guesses[0].shape, (6,))
         self.assertEqual(guesses[1].shape, (6,))
 
-    def test_minimum_restarts(self):
+    def test_minimum_restarts(self) -> None:
         """With few restarts, should still generate core guesses."""
         guesses = self.solver._generate_initial_guesses(
             self.T_desired, None, num_restarts=1
@@ -218,12 +218,12 @@ class TestInitialGuesses(unittest.TestCase, _RobotFixtureMixin):
 class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
     """Test SVD-robust solve behavior via _dls_solver."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
-    def test_well_conditioned(self):
+    def test_well_conditioned(self) -> None:
         """DLS solver should converge from a good starting point."""
         stop_event = threading.Event()
         theta, success, error = self.solver._dls_solver(
@@ -237,7 +237,7 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
         self.assertTrue(success)
         self.assertLess(error, 0.01)
 
-    def test_near_singular(self):
+    def test_near_singular(self) -> None:
         """DLS should handle configurations near singularities gracefully."""
         # Start from a nearly-singular configuration (extended arm)
         theta_singular = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
@@ -253,7 +253,7 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
         # Should return finite values regardless of success
         self.assertTrue(np.all(np.isfinite(theta)))
 
-    def test_svd_failure_returns_zero(self):
+    def test_svd_failure_returns_zero(self) -> None:
         """If SVD raises LinAlgError, DLS should still return a result via fallback."""
         stop_event = threading.Event()
         # Patch SVD to fail, forcing fallback to normal equations
@@ -268,7 +268,7 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
             )
         self.assertTrue(np.all(np.isfinite(theta)))
 
-    def test_damping_effect(self):
+    def test_damping_effect(self) -> None:
         """DLS solver uses adaptive damping — verify it doesn't diverge."""
         stop_event = threading.Event()
         T_difficult = np.eye(4)
@@ -291,35 +291,35 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
 class TestDetectOscillation(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _detect_oscillation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.solver = self._make_solver()
 
-    def test_short_history_returns_false(self):
+    def test_short_history_returns_false(self) -> None:
         history = deque([1.0, 2.0], maxlen=10)
         stag, osc = self.solver._detect_oscillation(history, window_size=5)
         self.assertFalse(stag)
         self.assertFalse(osc)
 
-    def test_stagnation_detected(self):
+    def test_stagnation_detected(self) -> None:
         """Constant error should be detected as stagnation."""
         history = deque([0.5, 0.5, 0.5, 0.5, 0.5, 0.5], maxlen=10)
         stag, osc = self.solver._detect_oscillation(history, window_size=5)
         self.assertTrue(stag)
 
-    def test_oscillation_detected(self):
+    def test_oscillation_detected(self) -> None:
         """Alternating error should be detected as oscillation."""
         history = deque([0.5, 0.6, 0.5, 0.6, 0.5, 0.6], maxlen=10)
         stag, osc = self.solver._detect_oscillation(history, window_size=5)
         self.assertTrue(osc)
 
-    def test_decreasing_error_no_flags(self):
+    def test_decreasing_error_no_flags(self) -> None:
         """Steadily decreasing error should not flag anything."""
         history = deque([1.0, 0.8, 0.6, 0.4, 0.2, 0.1], maxlen=10)
         stag, osc = self.solver._detect_oscillation(history, window_size=5)
         self.assertFalse(stag)
         self.assertFalse(osc)
 
-    def test_near_zero_stagnation(self):
+    def test_near_zero_stagnation(self) -> None:
         """Very small errors that are constant should stagnate."""
         history = deque([1e-12, 1e-12, 1e-12, 1e-12, 1e-12], maxlen=10)
         stag, _ = self.solver._detect_oscillation(history, window_size=5)
@@ -332,11 +332,11 @@ class TestDetectOscillation(unittest.TestCase, _RobotFixtureMixin):
 class TestDLSPerturbationRecovery(unittest.TestCase, _RobotFixtureMixin):
     """Test DLS solver's perturbation recovery from stagnation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
 
-    def test_perturbation_limit(self):
+    def test_perturbation_limit(self) -> None:
         """DLS with max_perturbations=0 should give up sooner."""
         T_far = np.eye(4)
         T_far[:3, 3] = [50.0, 50.0, 50.0]
@@ -352,7 +352,7 @@ class TestDLSPerturbationRecovery(unittest.TestCase, _RobotFixtureMixin):
         )
         self.assertFalse(success)
 
-    def test_perturbation_recovery_attempts(self):
+    def test_perturbation_recovery_attempts(self) -> None:
         """DLS with higher max_perturbations should try harder."""
         stop_event = threading.Event()
         T_difficult = np.eye(4)
@@ -375,12 +375,12 @@ class TestDLSPerturbationRecovery(unittest.TestCase, _RobotFixtureMixin):
 class TestDLSSolver(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _dls_solver."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
-    def test_dls_converges(self):
+    def test_dls_converges(self) -> None:
         stop_event = threading.Event()
         theta, success, error = self.solver._dls_solver(
             self.T_desired,
@@ -393,7 +393,7 @@ class TestDLSSolver(unittest.TestCase, _RobotFixtureMixin):
         self.assertTrue(success)
         self.assertLess(error, 0.01)
 
-    def test_dls_respects_stop_event(self):
+    def test_dls_respects_stop_event(self) -> None:
         """Should stop early when stop_event is set."""
         stop_event = threading.Event()
         stop_event.set()  # Already signalled
@@ -408,7 +408,7 @@ class TestDLSSolver(unittest.TestCase, _RobotFixtureMixin):
         # Should exit immediately without converging
         self.assertFalse(success)
 
-    def test_dls_respects_timeout(self):
+    def test_dls_respects_timeout(self) -> None:
         """Should return within reasonable time after timeout."""
         stop_event = threading.Event()
         T_far = np.eye(4)
@@ -430,12 +430,12 @@ class TestDLSSolver(unittest.TestCase, _RobotFixtureMixin):
 class TestSQPSolver(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _sqp_solver."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
-    def test_sqp_converges(self):
+    def test_sqp_converges(self) -> None:
         stop_event = threading.Event()
         theta, success, error = self.solver._sqp_solver(
             self.T_desired,
@@ -447,7 +447,7 @@ class TestSQPSolver(unittest.TestCase, _RobotFixtureMixin):
         )
         self.assertTrue(success)
 
-    def test_sqp_respects_stop_event(self):
+    def test_sqp_respects_stop_event(self) -> None:
         stop_event = threading.Event()
         stop_event.set()
         theta, success, error = self.solver._sqp_solver(
@@ -468,10 +468,10 @@ class TestSQPSolver(unittest.TestCase, _RobotFixtureMixin):
 class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _default_error_func."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.solver = self._make_solver()
 
-    def test_identical_poses_zero_error(self):
+    def test_identical_poses_zero_error(self) -> None:
         """Identical poses should give ~zero error."""
         T = np.eye(4)
         V_err, rot_err, trans_err = self.solver._default_error_func(T, T)
@@ -479,7 +479,7 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
         self.assertAlmostEqual(trans_err, 0.0, places=5)
         np.testing.assert_array_almost_equal(V_err, np.zeros(6), decimal=5)
 
-    def test_pure_translation_error(self):
+    def test_pure_translation_error(self) -> None:
         """Only position differs — rotation error should be ~0."""
         T_curr = np.eye(4)
         T_des = np.eye(4)
@@ -489,7 +489,7 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
         expected_dist = np.linalg.norm([0.1, 0.2, 0.3])
         self.assertAlmostEqual(trans_err, expected_dist, places=5)
 
-    def test_small_rotation(self):
+    def test_small_rotation(self) -> None:
         """Small rotation (angle < 1e-6) — exercises small-angle branch."""
         T_curr = np.eye(4)
         T_des = np.eye(4)
@@ -505,7 +505,7 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
         V_err, rot_err, trans_err = self.solver._default_error_func(T_curr, T_des)
         self.assertLess(rot_err, 1e-5)
 
-    def test_90_degree_rotation(self):
+    def test_90_degree_rotation(self) -> None:
         """90° rotation — exercises general case branch."""
         T_curr = np.eye(4)
         T_des = np.eye(4)
@@ -515,7 +515,7 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
         self.assertAlmostEqual(rot_err, np.pi / 2, places=3)
         self.assertAlmostEqual(trans_err, 0.0, places=5)
 
-    def test_180_degree_rotation(self):
+    def test_180_degree_rotation(self) -> None:
         """180° rotation — exercises near-pi branch."""
         T_curr = np.eye(4)
         T_des = np.eye(4)
@@ -524,7 +524,7 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
         V_err, rot_err, trans_err = self.solver._default_error_func(T_curr, T_des)
         self.assertAlmostEqual(rot_err, np.pi, places=3)
 
-    def test_180_degree_around_x(self):
+    def test_180_degree_around_x(self) -> None:
         """180° around x — exercises near-pi branch with k=2 (z-axis dominant)."""
         T_curr = np.eye(4)
         T_des = np.eye(4)
@@ -532,7 +532,7 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
         V_err, rot_err, trans_err = self.solver._default_error_func(T_curr, T_des)
         self.assertAlmostEqual(rot_err, np.pi, places=3)
 
-    def test_180_degree_around_y(self):
+    def test_180_degree_around_y(self) -> None:
         """180° around y — exercises near-pi branch with k=0 or k=2."""
         T_curr = np.eye(4)
         T_des = np.eye(4)
@@ -547,21 +547,21 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
 class TestDelegatingHelpers(unittest.TestCase, _RobotFixtureMixin):
     """Verify the helpers delegate to ik_helpers correctly."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.solver = self._make_solver()
         self.T_desired, _ = self._reachable_target()
 
-    def test_workspace_heuristic_shape(self):
+    def test_workspace_heuristic_shape(self) -> None:
         guess = self.solver._workspace_heuristic(self.T_desired)
         self.assertEqual(guess.shape, (6,))
 
-    def test_midpoint_guess_shape(self):
+    def test_midpoint_guess_shape(self) -> None:
         guess = self.solver._midpoint_guess()
         self.assertEqual(guess.shape, (6,))
         # For symmetric limits (-pi, pi), midpoint should be 0
         np.testing.assert_array_almost_equal(guess, np.zeros(6))
 
-    def test_random_guess_within_limits(self):
+    def test_random_guess_within_limits(self) -> None:
         for _ in range(10):
             guess = self.solver._random_guess()
             for i, (mn, mx) in enumerate(self.solver.joint_limits):
@@ -570,7 +570,7 @@ class TestDelegatingHelpers(unittest.TestCase, _RobotFixtureMixin):
                 if mx is not None:
                     self.assertLessEqual(guess[i], mx)
 
-    def test_clip_to_limits(self):
+    def test_clip_to_limits(self) -> None:
         theta = np.array([10.0, -10.0, 0.0, 0.0, 0.0, 0.0])
         clipped = self.solver._clip_to_limits(theta)
         self.assertAlmostEqual(clipped[0], np.pi)
@@ -583,18 +583,18 @@ class TestDelegatingHelpers(unittest.TestCase, _RobotFixtureMixin):
 class TestTracIKSolveConvenience(unittest.TestCase, _RobotFixtureMixin):
     """Tests for the module-level trac_ik_solve() function."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.robot = self._make_robot()
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
-    def test_convenience_function_success(self):
+    def test_convenience_function_success(self) -> None:
         theta, success, solve_time = trac_ik_solve(
             self.robot, self.T_desired, theta0=self.theta_known, timeout=2.0
         )
         self.assertTrue(success)
         self.assertEqual(theta.shape, (6,))
 
-    def test_convenience_function_no_theta0(self):
+    def test_convenience_function_no_theta0(self) -> None:
         theta, success, solve_time = trac_ik_solve(
             self.robot, self.T_desired, timeout=2.0
         )
@@ -608,24 +608,24 @@ class TestTracIKSolveConvenience(unittest.TestCase, _RobotFixtureMixin):
 class TestSerialManipulatorTracIK(unittest.TestCase, _RobotFixtureMixin):
     """Test the trac_ik() method on SerialManipulator."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.robot = self._make_robot()
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
-    def test_method_returns_tuple(self):
+    def test_method_returns_tuple(self) -> None:
         result = self.robot.trac_ik(
             self.T_desired, theta0=self.theta_known, timeout=2.0
         )
         self.assertIsInstance(result, tuple)
         self.assertEqual(len(result), 3)
 
-    def test_method_success(self):
+    def test_method_success(self) -> None:
         theta, success, solve_time = self.robot.trac_ik(
             self.T_desired, theta0=self.theta_known, timeout=2.0
         )
         self.assertTrue(success)
 
-    def test_method_with_list_theta0(self):
+    def test_method_with_list_theta0(self) -> None:
         """Should accept list as theta0."""
         theta, success, _ = self.robot.trac_ik(
             self.T_desired, theta0=[0.1, 0.2, -0.3, 0.4, -0.5, 0.6], timeout=2.0

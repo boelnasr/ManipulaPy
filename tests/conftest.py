@@ -121,7 +121,7 @@ collect_ignore_glob = []
 class MockModule:
     """Enhanced mock module that handles iteration and common operations properly."""
 
-    def __init__(self, name=None):
+    def __init__(self, name=None) -> None:
         self._name = name or "MockModule"
 
     def __getattr__(self, name):
@@ -146,7 +146,7 @@ class MockModule:
 class CuPyArrayMock:
     """Enhanced CuPy array mock with proper numpy compatibility and type safety."""
 
-    def __init__(self, data, dtype=None):
+    def __init__(self, data, dtype=None) -> None:
         if dtype is None:
             dtype = (
                 np.float32
@@ -163,7 +163,7 @@ class CuPyArrayMock:
         """Alternative CuPy method for GPU->CPU transfer."""
         return self._data.copy()
 
-    def copy_to_device(self, src):
+    def copy_to_device(self, src) -> None:
         """Mock GPU memory copy."""
         self._data[:] = np.asarray(src, dtype=self._data.dtype)
 
@@ -231,7 +231,7 @@ class CuPyArrayMock:
     def __getitem__(self, key):
         return CuPyArrayMock(self._data[key], dtype=self._data.dtype)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
         if hasattr(value, "_data"):
             self._data[key] = value._data.astype(self._data.dtype)
         else:
@@ -372,7 +372,7 @@ def create_smart_mock(module_name):
         # placeholders made isinstance/issubclass either return True for
         # everything (false positives) or raise TypeError (false skips).
         class _MockTensor:
-            def __init__(self, data=None, *args, **kwargs):
+            def __init__(self, data=None, *args, **kwargs) -> None:
                 self._data = np.asarray(data) if data is not None else np.array([])
                 self.shape = self._data.shape
                 self.dtype = self._data.dtype
@@ -447,7 +447,7 @@ def create_smart_mock(module_name):
         sklearn_mock.cluster = MockModule("sklearn.cluster")
 
         class MockDBSCAN:
-            def __init__(self, eps=0.5, min_samples=5):
+            def __init__(self, eps=0.5, min_samples=5) -> None:
                 self.eps = eps
                 self.min_samples = min_samples
                 self.labels_ = None
@@ -474,12 +474,12 @@ def create_smart_mock(module_name):
         ultralytics_mock = MockModule("ultralytics")
 
         class MockYOLO:
-            def __init__(self, model_path):
+            def __init__(self, model_path) -> None:
                 self.model_path = model_path
 
             def __call__(self, image, conf=0.3):
                 class MockBoxes:
-                    def __init__(self):
+                    def __init__(self) -> None:
                         # Generate some reasonable bounding boxes
                         h, w = (
                             image.shape[:2] if hasattr(image, "shape") else (480, 640)
@@ -501,7 +501,7 @@ def create_smart_mock(module_name):
                             yield Mock(xyxy=[box])
 
                 class MockResults:
-                    def __init__(self):
+                    def __init__(self) -> None:
                         self.boxes = MockBoxes()
 
                 return [MockResults()]
@@ -688,7 +688,7 @@ SKIP_SIMULATION_TESTS = (
 # ============================================================================
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser) -> None:
     """Add custom command line options."""
     parser.addoption(
         "--skip-cuda",
@@ -713,7 +713,7 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config) -> None:
     """Configure pytest markers and environment."""
     # Register custom markers
     config.addinivalue_line("markers", "cuda: mark test as requiring CUDA")
@@ -738,7 +738,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "singularity: mark test as singularity-related")
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config, items) -> None:
     """Modify test collection based on available dependencies and options."""
     # Skip markers
     skip_cuda = pytest.mark.skip(reason="CUDA not available or skipped")
@@ -924,7 +924,7 @@ def setup_test_environment():
 # ============================================================================
 
 
-def assert_array_almost_equal(actual, expected, tolerance=1e-6, msg=""):
+def assert_array_almost_equal(actual, expected, tolerance=1e-6, msg="") -> None:
     """Assert that two arrays are almost equal within tolerance."""
     actual = np.asarray(actual)
     expected = np.asarray(expected)
@@ -1036,7 +1036,7 @@ def print_convergence_summary(results_list):
 # ============================================================================
 
 
-def pytest_sessionstart(session):
+def pytest_sessionstart(session) -> None:
     """Report test session start with environment info."""
     print("\n" + "=" * 60)
     print("ManipulaPy Test Suite")

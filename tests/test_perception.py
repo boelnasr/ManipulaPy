@@ -31,7 +31,7 @@ def is_module_available(module_name):
 class TestPerceptionInitialization(unittest.TestCase):
     """Test Perception module initialization and basic functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         # Create mock vision instance
         self.mock_vision = Mock()
@@ -44,7 +44,7 @@ class TestPerceptionInitialization(unittest.TestCase):
             np.arange(10),  # Labels 0-9
         )
 
-    def test_perception_basic_initialization(self):
+    def test_perception_basic_initialization(self) -> None:
         """Test basic Perception initialization."""
         try:
             from ManipulaPy.perception import Perception
@@ -62,7 +62,7 @@ class TestPerceptionInitialization(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_requires_vision_instance(self):
+    def test_perception_requires_vision_instance(self) -> None:
         """Test that Perception requires a valid vision instance."""
         try:
             from ManipulaPy.perception import Perception
@@ -76,7 +76,7 @@ class TestPerceptionInitialization(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_logger_setup(self):
+    def test_perception_logger_setup(self) -> None:
         """Test that Perception sets up logging correctly."""
         try:
             from ManipulaPy.perception import Perception
@@ -97,7 +97,7 @@ class TestPerceptionInitialization(unittest.TestCase):
 class TestPerceptionObstacleDetection(unittest.TestCase):
     """Test Perception obstacle detection and clustering functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.mock_vision = Mock()
         self.mock_vision.capture_image.return_value = (
@@ -109,7 +109,7 @@ class TestPerceptionObstacleDetection(unittest.TestCase):
             np.arange(10),
         )
 
-    def test_detect_and_cluster_obstacles_pipeline(self):
+    def test_detect_and_cluster_obstacles_pipeline(self) -> None:
         """Test the full obstacle detection and clustering pipeline."""
         try:
             from ManipulaPy.perception import Perception
@@ -136,7 +136,7 @@ class TestPerceptionObstacleDetection(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_empty_obstacle_detection(self):
+    def test_empty_obstacle_detection(self) -> None:
         """Test perception behavior when no obstacles are detected."""
         try:
             from ManipulaPy.perception import Perception
@@ -166,7 +166,7 @@ class TestPerceptionObstacleDetection(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_invalid_depth_handling(self):
+    def test_invalid_depth_handling(self) -> None:
         """Test perception with invalid depth data."""
         try:
             from ManipulaPy.perception import Perception
@@ -196,11 +196,11 @@ class TestPerceptionObstacleDetection(unittest.TestCase):
 class TestPerceptionClustering(unittest.TestCase):
     """Test Perception clustering functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.mock_vision = Mock()
 
-    def test_clustering_with_real_sklearn(self):
+    def test_clustering_with_real_sklearn(self) -> None:
         """Test perception clustering with real scikit-learn when available."""
         if not is_module_available("sklearn"):
             self.skipTest("Real sklearn not available")
@@ -270,7 +270,7 @@ class TestPerceptionClustering(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Real sklearn not available: {e}")
 
-    def test_clustering_with_mock_sklearn(self):
+    def test_clustering_with_mock_sklearn(self) -> None:
         """Test clustering with mocked sklearn."""
         try:
             from ManipulaPy.perception import Perception
@@ -297,7 +297,7 @@ class TestPerceptionClustering(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_clustering_empty_points(self):
+    def test_clustering_empty_points(self) -> None:
         """Test clustering behavior with empty point set."""
         try:
             from ManipulaPy.perception import Perception
@@ -325,7 +325,7 @@ class TestPerceptionClustering(unittest.TestCase):
 class TestPerceptionStereoMethods(unittest.TestCase):
     """Test Perception stereo vision functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         # Mock vision with stereo capabilities
         self.stereo_vision = Mock()
@@ -341,7 +341,7 @@ class TestPerceptionStereoMethods(unittest.TestCase):
             1000, 3
         )
 
-    def test_stereo_disparity_computation(self):
+    def test_stereo_disparity_computation(self) -> None:
         """Test stereo disparity computation through Perception."""
         try:
             from ManipulaPy.perception import Perception
@@ -365,7 +365,7 @@ class TestPerceptionStereoMethods(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_stereo_point_cloud_generation(self):
+    def test_stereo_point_cloud_generation(self) -> None:
         """Test stereo point cloud generation through Perception."""
         try:
             from ManipulaPy.perception import Perception
@@ -389,7 +389,7 @@ class TestPerceptionStereoMethods(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_stereo_methods_without_stereo_config(self):
+    def test_stereo_methods_without_stereo_config(self) -> None:
         """Test stereo operations fail gracefully without stereo configuration."""
         try:
             from ManipulaPy.perception import Perception
@@ -416,7 +416,7 @@ class TestPerceptionStereoMethods(unittest.TestCase):
 class TestPerceptionResourceManagement(unittest.TestCase):
     """Test Perception resource management and cleanup."""
 
-    def test_resource_cleanup(self):
+    def test_resource_cleanup(self) -> None:
         """Test that Perception properly cleans up resources."""
         try:
             from ManipulaPy.perception import Perception
@@ -436,7 +436,7 @@ class TestPerceptionResourceManagement(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_destructor_cleanup(self):
+    def test_destructor_cleanup(self) -> None:
         """Test that Perception destructor handles cleanup gracefully."""
         try:
             from ManipulaPy.perception import Perception
@@ -460,7 +460,7 @@ class TestPerceptionResourceManagement(unittest.TestCase):
 class TestPerceptionIntegration(unittest.TestCase):
     """Test Perception integration with real Vision module."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up PyBullet patches for all integration tests."""
         # Create comprehensive PyBullet mock patches
         self.pybullet_patches = [
@@ -501,12 +501,12 @@ class TestPerceptionIntegration(unittest.TestCase):
             segmentation,
         )
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Clean up patches."""
         for p in self.pybullet_patches:
             p.stop()
 
-    def test_perception_with_real_vision_fixed(self):
+    def test_perception_with_real_vision_fixed(self) -> None:
         """Test Perception integration with proper PyBullet mocking."""
         try:
             from ManipulaPy.perception import Perception
@@ -573,7 +573,7 @@ class TestPerceptionIntegration(unittest.TestCase):
             print(f"⚠️ Perception-Vision integration test had issues: {e}")
             self.skipTest(f"Integration test failed: {e}")
 
-    def test_end_to_end_obstacle_detection(self):
+    def test_end_to_end_obstacle_detection(self) -> None:
         """Test end-to-end obstacle detection pipeline with mock data."""
         try:
             from ManipulaPy.perception import Perception
@@ -639,7 +639,7 @@ class TestPerceptionIntegration(unittest.TestCase):
 class TestPerceptionErrorHandling(unittest.TestCase):
     """Test Perception error handling and edge cases."""
 
-    def test_vision_method_errors(self):
+    def test_vision_method_errors(self) -> None:
         """Test handling of errors from Vision methods."""
         try:
             from ManipulaPy.perception import Perception
@@ -666,7 +666,7 @@ class TestPerceptionErrorHandling(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_clustering_parameter_validation(self):
+    def test_clustering_parameter_validation(self) -> None:
         """Test clustering parameter validation."""
         try:
             from ManipulaPy.perception import Perception
@@ -700,7 +700,7 @@ class TestPerceptionErrorHandling(unittest.TestCase):
 class TestPerceptionNoneHandling(unittest.TestCase):
     """Test Perception handling of None returns from Vision."""
 
-    def test_none_detection_results(self):
+    def test_none_detection_results(self) -> None:
         """Test handling when vision.detect_obstacles returns None."""
         try:
             from ManipulaPy.perception import Perception
@@ -729,7 +729,7 @@ class TestPerceptionNoneHandling(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_malformed_vision_responses(self):
+    def test_malformed_vision_responses(self) -> None:
         """Test handling of malformed responses from Vision."""
         try:
             from ManipulaPy.perception import Perception

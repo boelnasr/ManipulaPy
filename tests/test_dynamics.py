@@ -20,7 +20,7 @@ from ManipulaPy.dynamics import ManipulatorDynamics
 
 
 class TestDynamics(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         """
         Build a 6-DOF manipulator for testing.
         We'll explicitly pass S_list, B_list, and Glist
@@ -68,7 +68,7 @@ class TestDynamics(unittest.TestCase):
 
         self.n_joints = 6
 
-    def test_mass_matrix(self):
+    def test_mass_matrix(self) -> None:
         """
         Check that mass_matrix(...) returns an NxN matrix and it's symmetric.
         """
@@ -81,7 +81,7 @@ class TestDynamics(unittest.TestCase):
             M, M.T, decimal=5, err_msg="Mass matrix is not symmetric."
         )
 
-    def test_velocity_quadratic_forces(self):
+    def test_velocity_quadratic_forces(self) -> None:
         """
         With zero velocity, Coriolis/centrifugal forces c should be zero.
         """
@@ -100,7 +100,7 @@ class TestDynamics(unittest.TestCase):
             err_msg="With zero velocity, velocity_quadratic_forces(...) should be 0.",
         )
 
-    def test_gravity_forces(self):
+    def test_gravity_forces(self) -> None:
         """
         If there's nontrivial inertia, gravity_forces(...) should yield a nonzero vector.
         """
@@ -115,7 +115,7 @@ class TestDynamics(unittest.TestCase):
             "Gravity forces should not be zero if mass is nontrivial.",
         )
 
-    def test_inverse_forward_dynamics_consistency(self):
+    def test_inverse_forward_dynamics_consistency(self) -> None:
         """
         If we use inverse_dynamics to get torques for a desired ddtheta,
         then forward_dynamics with those torques should yield ddtheta within tolerance.

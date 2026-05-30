@@ -42,7 +42,7 @@ def is_module_available(module_name):
 
 
 class TestManipulatorController(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         # Determine backend
         if is_module_available("cupy"):
             self.backend = "cupy"
@@ -82,12 +82,12 @@ class TestManipulatorController(unittest.TestCase):
             print(f"Error loading URDF: {e}")
             self.create_mock_objects()
 
-    def create_mock_objects(self):
+    def create_mock_objects(self) -> None:
         """Create mock objects for testing without a real URDF"""
 
         # Create a simplified dynamics object for testing
         class MockDynamics:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.Glist = np.array([np.eye(6), np.eye(6)])
                 self.S_list = np.array([[0, 0, 1, 0, 0, 0], [0, 0, 1, 0, 0.1, 0]]).T
                 self.M_list = np.eye(4)
@@ -162,7 +162,7 @@ class TestManipulatorController(unittest.TestCase):
         )
         self.torque_limits = np.array([[-10, 10], [-10, 10]], dtype=np.float32)
 
-    def test_pid_control(self):
+    def test_pid_control(self) -> None:
         """Test PID control convergence to a setpoint."""
         num_joints = len(self.thetalist)
         thetalistd = np.array(
@@ -214,7 +214,7 @@ class TestManipulatorController(unittest.TestCase):
             f"PID control did not converge. Final error: {error}",
         )
 
-    def test_computed_torque_control(self):
+    def test_computed_torque_control(self) -> None:
         """Test computed torque control with non-zero gravity."""
         num_joints = len(self.thetalist)
         thetalistd = np.array(
@@ -269,7 +269,7 @@ class TestManipulatorController(unittest.TestCase):
             f"Computed torque control did not converge. Final error: {error}",
         )
 
-    def test_feedforward_control(self):
+    def test_feedforward_control(self) -> None:
         """Test feedforward control with a simple trajectory."""
         steps = 200
         num_joints = len(self.thetalist)
@@ -319,7 +319,7 @@ class TestManipulatorController(unittest.TestCase):
             "Feedforward torques contain non-finite values",
         )
 
-    def test_kalman_filter_predict(self):
+    def test_kalman_filter_predict(self) -> None:
         """Test Kalman filter prediction step."""
         num_joints = len(self.thetalist)
         thetalist = self.cp.asarray(self.thetalist)
@@ -351,7 +351,7 @@ class TestManipulatorController(unittest.TestCase):
         # Verify that x_hat has been updated
         self.assertFalse(self.cp.allclose(old_x_hat, self.controller.x_hat))
 
-    def test_kalman_filter_update(self):
+    def test_kalman_filter_update(self) -> None:
         """Test Kalman filter update step."""
         num_joints = len(self.thetalist)
 
@@ -372,7 +372,7 @@ class TestManipulatorController(unittest.TestCase):
         # Verify that x_hat has been updated
         self.assertFalse(self.cp.allclose(old_x_hat, self.controller.x_hat))
 
-    def test_kalman_filter_control(self):
+    def test_kalman_filter_control(self) -> None:
         """Test complete Kalman filter control."""
         num_joints = len(self.thetalist)
         thetalistd = self.cp.asarray(self.thetalist + 0.1)
@@ -404,7 +404,7 @@ class TestManipulatorController(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(theta_est_np)))
         self.assertTrue(np.all(np.isfinite(dtheta_est_np)))
 
-    def test_pd_feedforward_control(self):
+    def test_pd_feedforward_control(self) -> None:
         """Test combined PD and feedforward control with robustness to instability."""
         num_joints = len(self.thetalist)
         small_dt = 0.001
@@ -529,7 +529,7 @@ class TestManipulatorController(unittest.TestCase):
         else:
             self.skipTest("No stable steps recorded in the execution history")
 
-    def test_enforcing_limits(self):
+    def test_enforcing_limits(self) -> None:
         """Test that joint and torque limits are properly enforced."""
         num_joints = len(self.thetalist)
 
@@ -563,7 +563,7 @@ class TestManipulatorController(unittest.TestCase):
                 f"Torque limit enforcement failed for joint {i}: value {clipped_tau[i]} not in [{self.torque_limits[i, 0]}, {self.torque_limits[i, 1]}]",
             )
 
-    def test_cartesian_space_control(self):
+    def test_cartesian_space_control(self) -> None:
         """Test Cartesian space control."""
         num_joints = len(self.thetalist)
         # Only run this test for a 3‑DOF arm
@@ -590,7 +590,7 @@ class TestManipulatorController(unittest.TestCase):
         self.assertEqual(len(tau_np), num_joints)
         self.assertTrue(np.all(np.isfinite(tau_np)))
 
-    def test_pd_control(self):
+    def test_pd_control(self) -> None:
         """Test PD control without integral term."""
         num_joints = len(self.thetalist)
         desired_position = self.cp.asarray(
@@ -621,7 +621,7 @@ class TestManipulatorController(unittest.TestCase):
         self.assertEqual(len(tau_np), num_joints)
         self.assertTrue(np.all(np.isfinite(tau_np)))
 
-    def test_ziegler_nichols_tuning(self):
+    def test_ziegler_nichols_tuning(self) -> None:
         """Test Ziegler-Nichols PID tuning methods."""
         Ku = 50.0  # Ultimate gain
         Tu = 0.5  # Ultimate period
@@ -664,7 +664,7 @@ class TestManipulatorController(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.controller.ziegler_nichols_tuning(Ku, Tu, kind="INVALID")
 
-    def test_tune_controller(self):
+    def test_tune_controller(self) -> None:
         """Test the tune_controller convenience wrapper."""
         Ku = 45.0
         Tu = 0.8
@@ -682,7 +682,7 @@ class TestManipulatorController(unittest.TestCase):
         Kp_pi, Ki_pi, Kd_pi = self.controller.tune_controller(Ku, Tu, kind="PI")
         self.assertEqual(Kd_pi, 0.0)  # PI controller should have zero derivative gain
 
-    def test_find_ultimate_gain_and_period(self):
+    def test_find_ultimate_gain_and_period(self) -> None:
         """Test ultimate gain and period finding for Ziegler-Nichols tuning."""
         num_joints = len(self.thetalist)
         thetalist = np.array([0.1, 0.05] if num_joints == 2 else [0.1] * num_joints)
@@ -713,7 +713,7 @@ class TestManipulatorController(unittest.TestCase):
             # In case the method fails due to numerical issues, just verify it doesn't crash
             self.assertIsInstance(e, Exception)
 
-    def test_plot_steady_state_response(self):
+    def test_plot_steady_state_response(self) -> None:
         """Test plotting of steady‑state response (skip on TypeError)."""
         time = np.linspace(0, 3, 50)
         set_point = 1.5
@@ -730,7 +730,7 @@ class TestManipulatorController(unittest.TestCase):
                 # If no exception, we consider it a pass
                 self.assertTrue(True)
 
-    def test_control_error_handling(self):
+    def test_control_error_handling(self) -> None:
         """Test error handling in control methods."""
         num_joints = len(self.thetalist)
 
@@ -757,7 +757,7 @@ class TestManipulatorController(unittest.TestCase):
                 self.cp.asarray(Kd),
             )
 
-    def test_adaptive_control(self):
+    def test_adaptive_control(self) -> None:
         """Test adaptive control with parameter estimation."""
         num_joints = len(self.thetalist)
         thetalist = self.cp.asarray(self.thetalist)
@@ -811,7 +811,7 @@ class TestManipulatorController(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(tau1_np)))
         self.assertTrue(np.all(np.isfinite(tau2_np)))
 
-    def test_robust_control(self):
+    def test_robust_control(self) -> None:
         """Test robust control with disturbance estimation."""
         num_joints = len(self.thetalist)
         thetalist = self.cp.asarray(self.thetalist)
@@ -850,7 +850,7 @@ class TestManipulatorController(unittest.TestCase):
         self.assertEqual(len(tau_np), num_joints)
         self.assertTrue(np.all(np.isfinite(tau_np)))
 
-    def test_control_with_cupy_arrays(self):
+    def test_control_with_cupy_arrays(self) -> None:
         """Test that control methods work with *real* CuPy arrays (skip on mocks)."""
         # Skip unless this is a real cupy.ndarray with an asnumpy()
         if self.backend != "cupy" or not (
@@ -895,7 +895,7 @@ class TestManipulatorController(unittest.TestCase):
             self.assertTrue(hasattr(tau, "shape"))
             self.assertEqual(tau.shape[0], num_joints)
 
-    def test_joint_space_control(self):
+    def test_joint_space_control(self) -> None:
         """Test joint space control using *NumPy* inputs (skip under CuPy)."""
         # under the CuPy‐mock backend this will fail on "0 - array", so skip
         if self.backend == "cupy":
@@ -918,7 +918,7 @@ class TestManipulatorController(unittest.TestCase):
         self.assertEqual(len(tau), num_joints)
         self.assertTrue(np.all(np.isfinite(tau)))
 
-    def test_steady_state_metrics(self):
+    def test_steady_state_metrics(self) -> None:
         """Test calculation of steady‑state response metrics (skip under CuPy)."""
         if self.backend == "cupy":
             self.skipTest("Skipping steady_state_metrics under CuPy mock")
@@ -948,7 +948,7 @@ class TestManipulatorController(unittest.TestCase):
         )
         self.assertLess(abs(steady_state_error), 0.1)
 
-    def test_control_stability_with_large_gains(self):
+    def test_control_stability_with_large_gains(self) -> None:
         """Test controller behavior with unrealistically large gains."""
         num_joints = len(self.thetalist)
 
@@ -981,7 +981,7 @@ class TestManipulatorController(unittest.TestCase):
         # Even with large gains, output should be finite
         self.assertTrue(np.all(np.isfinite(tau_np)))
 
-    def test_control_with_zero_gains(self):
+    def test_control_with_zero_gains(self) -> None:
         """Test controller behavior with zero gains."""
         num_joints = len(self.thetalist)
 
@@ -1014,7 +1014,7 @@ class TestManipulatorController(unittest.TestCase):
         # With zero gains, output should be zero (or very small due to numerical precision)
         self.assertTrue(np.allclose(tau_np, 0.0, atol=1e-10))
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Clean up after each test."""
         # Reset controller state
         self.controller.eint = None
