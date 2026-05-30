@@ -50,7 +50,18 @@ class Singularity:
     def singularity_analysis(
         self, thetalist: Union[NDArray[np.float64], List[float]]
     ) -> bool:
-        """Detect singularity using smallest singular value (works for any Jacobian shape)."""
+        """Detect singularity using smallest singular value (works for any Jacobian shape).
+
+        Computes the space-frame Jacobian at the given configuration and flags a
+        singularity when its smallest singular value falls below ``1e-4``.
+
+        Args:
+            thetalist: Joint angles in radians, length-N array or list, where N
+                is the number of joints.
+
+        Returns:
+            bool: True if the configuration is (near-)singular, otherwise False.
+        """
         J = self.serial_manipulator.jacobian(thetalist, frame="space")
         singular_values = np.linalg.svd(J, compute_uv=False)
         return bool(singular_values[-1] < 1e-4)
@@ -139,7 +150,19 @@ class Singularity:
         # Define the CUDA kernel for generating joint angles
         @cuda.jit
         def generate_joint_samples(rng_states, joint_limits, joint_samples) -> None:
-            """CUDA kernel filling joint_samples with uniform random angles."""
+            """CUDA kernel filling joint_samples with uniform random angles.
+
+            Each thread maps to one sample row and draws a uniform random angle
+            per joint within its lower/upper limit.
+
+            Args:
+                rng_states: xoroshiro128+ RNG state array (one state per thread),
+                    as produced by ``create_xoroshiro128p_states``.
+                joint_limits: (num_joints, 2) device array of (low, high) limits
+                    per joint, in radians.
+                joint_samples: (num_samples, num_joints) device array; in-place
+                    OUTPUT buffer written with the sampled joint angles in radians.
+            """
             pos = cuda.grid(1)
             if pos < joint_samples.shape[0]:
                 for i in range(joint_samples.shape[1]):

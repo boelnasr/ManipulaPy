@@ -190,7 +190,18 @@ class URDFParser:
         """
         Attempt to parse malformed XML with recovery.
 
-        Tries various recovery strategies for common XML issues.
+        Tries various recovery strategies for common XML issues, such as
+        stripping a leading ``<?xml ...?>`` declaration and wrapping the
+        content in a ``<robot>`` root element when one is missing.
+
+        Args:
+            xml_string: Raw URDF XML document text to parse.
+
+        Returns:
+            ET.Element: The parsed XML root element.
+
+        Raises:
+            ValueError: If parsing fails even after all recovery attempts.
         """
         # Try removing XML declaration issues
         lines = xml_string.split("\n")
@@ -217,10 +228,34 @@ class URDFParser:
     def _create_filename_handler(
         cls, base_path: Optional[Path], mesh_dir: Optional[Path]
     ) -> Callable[[str], str]:
-        """Create a filename resolution handler."""
+        """Create a filename resolution handler.
+
+        Builds a closure that resolves mesh filenames against the provided
+        directories, expanding ``package://`` and ``file://`` URIs and
+        resolving relative paths.
+
+        Args:
+            base_path: Directory of the URDF file, used as a fallback root
+                for resolving relative and package-relative paths. May be None.
+            mesh_dir: Directory to search first for mesh files. May be None.
+
+        Returns:
+            Callable[[str], str]: A handler that maps a raw URDF filename to a
+            resolved filesystem path, returning the input unchanged if it
+            cannot be resolved.
+        """
 
         def handler(filename: str) -> str:
-            """Resolve a mesh filename, expanding package:// and file:// URIs."""
+            """Resolve a mesh filename, expanding package:// and file:// URIs.
+
+            Args:
+                filename: Raw filename from a URDF mesh element, possibly a
+                    ``package://`` or ``file://`` URI or a relative path.
+
+            Returns:
+                str: The resolved filesystem path, or the original filename
+                unchanged when it is empty or cannot be resolved.
+            """
             if not filename:
                 return filename
 
@@ -269,7 +304,17 @@ class URDFParser:
 
     @classmethod
     def _parse_origin(cls, elem: Optional[ET.Element]) -> Origin:
-        """Parse <origin> element."""
+        """Parse an ``<origin>`` element into an Origin.
+
+        Args:
+            elem: The ``<origin>`` XML element, or None. When None (or when its
+                ``xyz``/``rpy`` attributes fail to parse) a default Origin is
+                returned.
+
+        Returns:
+            Origin: Origin with ``xyz`` translation (meters) and ``rpy`` Euler
+            angles (radians) parsed from the element's attributes.
+        """
         if elem is None:
             return Origin()
 
@@ -287,7 +332,16 @@ class URDFParser:
 
     @classmethod
     def _parse_inertia_matrix(cls, elem: Optional[ET.Element]) -> np.ndarray:
-        """Parse <inertia> element to 3x3 matrix."""
+        """Parse an ``<inertia>`` element into a 3x3 inertia matrix.
+
+        Args:
+            elem: The ``<inertia>`` XML element carrying the ``ixx``, ``ixy``,
+                ``ixz``, ``iyy``, ``iyz`` and ``izz`` attributes, or None.
+
+        Returns:
+            np.ndarray: Symmetric (3, 3) float64 inertia tensor; all zeros when
+            ``elem`` is None.
+        """
         if elem is None:
             return np.zeros((3, 3), dtype=np.float64)
 
@@ -304,7 +358,16 @@ class URDFParser:
 
     @classmethod
     def _parse_inertial(cls, elem: Optional[ET.Element]) -> Optional[Inertial]:
-        """Parse <inertial> element."""
+        """Parse an ``<inertial>`` element into an Inertial.
+
+        Args:
+            elem: The ``<inertial>`` XML element containing optional
+                ``<origin>``, ``<mass>`` and ``<inertia>`` children, or None.
+
+        Returns:
+            Optional[Inertial]: Inertial with mass (kg), origin and inertia
+            tensor; None when ``elem`` is None.
+        """
         if elem is None:
             return None
 
@@ -324,7 +387,20 @@ class URDFParser:
         filename_handler: Optional[Callable[[str], str]] = None,
         load_mesh: bool = False,
     ) -> Optional[Geometry]:
-        """Parse <geometry> element."""
+        """Parse a ``<geometry>`` element into a geometry primitive.
+
+        Args:
+            elem: The ``<geometry>`` XML element wrapping a ``<box>``,
+                ``<cylinder>``, ``<sphere>`` or ``<mesh>`` child, or None.
+            filename_handler: Optional callable used to resolve a mesh
+                filename to a filesystem path.
+            load_mesh: If True, eagerly load the mesh geometry data after
+                resolving its filename.
+
+        Returns:
+            Optional[Geometry]: A Box, Cylinder, Sphere or Mesh instance, or
+            None when ``elem`` is None or contains no recognized child.
+        """
         if elem is None:
             return None
 
@@ -377,7 +453,17 @@ class URDFParser:
 
     @classmethod
     def _parse_material(cls, elem: Optional[ET.Element]) -> Material:
-        """Parse <material> element."""
+        """Parse a ``<material>`` element into a Material.
+
+        Args:
+            elem: The ``<material>`` XML element with an optional ``name``
+                attribute and ``<color>``/``<texture>`` children, or None.
+
+        Returns:
+            Material: Material with name, optional RGBA color (length-4 float64
+            array) and optional texture filename; a default Material when
+            ``elem`` is None.
+        """
         if elem is None:
             return Material()
 
@@ -404,7 +490,20 @@ class URDFParser:
         filename_handler: Optional[Callable[[str], str]] = None,
         load_mesh: bool = False,
     ) -> Visual:
-        """Parse <visual> element."""
+        """Parse a ``<visual>`` element into a Visual.
+
+        Args:
+            elem: The ``<visual>`` XML element with optional ``<origin>``,
+                ``<geometry>`` and ``<material>`` children.
+            materials: Mapping of material name to Material used to resolve a
+                visual's referenced material by name.
+            filename_handler: Optional callable used to resolve mesh filenames
+                to filesystem paths.
+            load_mesh: If True, eagerly load mesh geometry data.
+
+        Returns:
+            Visual: Visual with name, origin, geometry and resolved material.
+        """
         name = elem.get("name", "")
         origin = cls._parse_origin(elem.find("origin"))
         geometry = cls._parse_geometry(
@@ -429,7 +528,18 @@ class URDFParser:
         filename_handler: Optional[Callable[[str], str]] = None,
         load_mesh: bool = False,
     ) -> Collision:
-        """Parse <collision> element."""
+        """Parse a ``<collision>`` element into a Collision.
+
+        Args:
+            elem: The ``<collision>`` XML element with optional ``<origin>``
+                and ``<geometry>`` children.
+            filename_handler: Optional callable used to resolve mesh filenames
+                to filesystem paths.
+            load_mesh: If True, eagerly load mesh geometry data.
+
+        Returns:
+            Collision: Collision with name, origin and geometry.
+        """
         name = elem.get("name", "")
         origin = cls._parse_origin(elem.find("origin"))
         geometry = cls._parse_geometry(
@@ -446,7 +556,25 @@ class URDFParser:
         filename_handler: Optional[Callable[[str], str]] = None,
         load_meshes: bool = False,
     ) -> Link:
-        """Parse <link> element."""
+        """Parse a ``<link>`` element into a Link.
+
+        Args:
+            elem: The ``<link>`` XML element, which must carry a ``name``
+                attribute and may contain ``<inertial>``, ``<visual>`` and
+                ``<collision>`` children.
+            materials: Mapping of material name to Material used to resolve
+                materials referenced by the link's visuals.
+            filename_handler: Optional callable used to resolve mesh filenames
+                to filesystem paths.
+            load_meshes: If True, eagerly load mesh geometry data for visuals
+                and collisions.
+
+        Returns:
+            Link: Link with name, inertial properties, visuals and collisions.
+
+        Raises:
+            ValueError: If the element has no ``name`` attribute.
+        """
         name = elem.get("name", "")
 
         if not name:
@@ -470,7 +598,17 @@ class URDFParser:
 
     @classmethod
     def _parse_joint_limit(cls, elem: Optional[ET.Element]) -> Optional[JointLimit]:
-        """Parse <limit> element."""
+        """Parse a ``<limit>`` element into a JointLimit.
+
+        Args:
+            elem: The ``<limit>`` XML element with ``lower``, ``upper``,
+                ``effort`` and ``velocity`` attributes, or None.
+
+        Returns:
+            Optional[JointLimit]: Joint limit with lower/upper position bounds
+            (radians or meters), effort (N or Nm) and velocity limits; None
+            when ``elem`` is None.
+        """
         if elem is None:
             return None
 
@@ -485,7 +623,16 @@ class URDFParser:
     def _parse_joint_dynamics(
         cls, elem: Optional[ET.Element]
     ) -> Optional[JointDynamics]:
-        """Parse <dynamics> element."""
+        """Parse a ``<dynamics>`` element into a JointDynamics.
+
+        Args:
+            elem: The ``<dynamics>`` XML element with ``damping`` and
+                ``friction`` attributes, or None.
+
+        Returns:
+            Optional[JointDynamics]: Joint dynamics with damping and friction
+            coefficients; None when ``elem`` is None.
+        """
         if elem is None:
             return None
 
@@ -496,7 +643,16 @@ class URDFParser:
 
     @classmethod
     def _parse_joint_mimic(cls, elem: Optional[ET.Element]) -> Optional[JointMimic]:
-        """Parse <mimic> element."""
+        """Parse a ``<mimic>`` element into a JointMimic.
+
+        Args:
+            elem: The ``<mimic>`` XML element with ``joint``, ``multiplier``
+                and ``offset`` attributes, or None.
+
+        Returns:
+            Optional[JointMimic]: Mimic spec naming the mimicked joint plus its
+            multiplier and offset; None when ``elem`` is None.
+        """
         if elem is None:
             return None
 
@@ -510,7 +666,17 @@ class URDFParser:
     def _parse_safety_controller(
         cls, elem: Optional[ET.Element]
     ) -> Optional[SafetyController]:
-        """Parse <safety_controller> element."""
+        """Parse a ``<safety_controller>`` element into a SafetyController.
+
+        Args:
+            elem: The ``<safety_controller>`` XML element with
+                ``soft_lower_limit``, ``soft_upper_limit``, ``k_position`` and
+                ``k_velocity`` attributes, or None.
+
+        Returns:
+            Optional[SafetyController]: Safety controller with soft position
+            limits and position/velocity gains; None when ``elem`` is None.
+        """
         if elem is None:
             return None
 
@@ -525,7 +691,17 @@ class URDFParser:
     def _parse_joint_calibration(
         cls, elem: Optional[ET.Element]
     ) -> Optional[JointCalibration]:
-        """Parse <calibration> element."""
+        """Parse a ``<calibration>`` element into a JointCalibration.
+
+        Args:
+            elem: The ``<calibration>`` XML element with optional ``rising``
+                and ``falling`` attributes, or None.
+
+        Returns:
+            Optional[JointCalibration]: Calibration with rising/falling
+            reference positions (each None if its attribute is absent); None
+            when ``elem`` is None.
+        """
         if elem is None:
             return None
 
@@ -539,7 +715,25 @@ class URDFParser:
 
     @classmethod
     def _parse_joint(cls, elem: ET.Element) -> Joint:
-        """Parse <joint> element."""
+        """Parse a ``<joint>`` element into a Joint.
+
+        Args:
+            elem: The ``<joint>`` XML element, which must carry ``name`` and
+                ``type`` attributes and ``<parent>``/``<child>`` children, and
+                may contain ``<origin>``, ``<axis>``, ``<limit>``,
+                ``<dynamics>``, ``<mimic>``, ``<safety_controller>`` and
+                ``<calibration>`` children.
+
+        Returns:
+            Joint: Joint with type, parent/child link names, origin, a
+            unit-normalized rotation/translation axis (length-3 float64 array)
+            and optional limit, dynamics, mimic, safety and calibration data.
+
+        Raises:
+            ValueError: If the joint has no ``name`` attribute, is missing a
+                ``<parent>`` or ``<child>`` element, or those elements lack a
+                ``link`` attribute.
+        """
         name = elem.get("name", "")
         type_str = elem.get("type", "fixed")
 
@@ -597,7 +791,22 @@ class URDFParser:
 
     @classmethod
     def _parse_transmission(cls, elem: ET.Element) -> Transmission:
-        """Parse <transmission> element."""
+        """Parse a ``<transmission>`` element into a Transmission.
+
+        The transmission type may be given either as a ``<type>`` child element
+        or as a ``type`` attribute. Joints without a ``name`` and actuators
+        without a ``name`` are skipped.
+
+        Args:
+            elem: The ``<transmission>`` XML element with an optional ``name``
+                attribute, an optional type, and ``<joint>``/``<actuator>``
+                children.
+
+        Returns:
+            Transmission: Transmission with name, type, and its list of
+            transmission joints (with hardware interfaces) and actuators (with
+            mechanical reduction and hardware interfaces).
+        """
         name = elem.get("name", "")
 
         # Get transmission type

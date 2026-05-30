@@ -55,7 +55,14 @@ except ImportError:
             return getattr(np, name)
 
         def asnumpy(self, x: Any) -> np.ndarray:
-            """Convert fallback arrays to NumPy arrays."""
+            """Convert fallback arrays to NumPy arrays.
+
+            Args:
+                x: Any array-like object to coerce into a NumPy array.
+
+            Returns:
+                np.ndarray: ``x`` as a NumPy array (no copy when already one).
+            """
             return np.asarray(x)
 
     cp = _NumpyProxy()
@@ -324,6 +331,17 @@ class Simulation:
     ) -> None:
         """
         Sets the joint positions of the robot.
+
+        Drives the non-fixed joints toward ``joint_positions`` using PyBullet's
+        ``POSITION_CONTROL`` mode.
+
+        Args:
+            joint_positions: Target angles for the non-fixed joints, in radians,
+                one entry per non-fixed joint.
+            forces: Optional per-joint maximum motor force. When ``None``, forces
+                are derived from ``self.torque_limits`` (collapsing each
+                (min, max) pair to its largest absolute magnitude) or default to
+                ``1000.0`` for every joint when no torque limits are configured.
         """
         _check_pybullet_available()
         n = len(self.non_fixed_joints)
@@ -649,6 +667,18 @@ class Simulation:
     ) -> Tuple[float, float, float]:
         """
         Runs a joint trajectory in the simulation.
+
+        Iterates over each waypoint, commands position control, steps the
+        simulation, records the end-effector position, and finally renders the
+        traced end-effector path in the scene.
+
+        Args:
+            joint_trajectory: Sequence of joint-angle configurations (one per
+                simulation step), each a sequence of joint angles in radians.
+
+        Returns:
+            tuple[float, float, float]: The (x, y, z) world position of the
+            end-effector at the final waypoint.
         """
         _check_pybullet_available()
         self.logger.info("Running trajectory...")
@@ -681,6 +711,19 @@ class Simulation:
         signature accepted a controller object plus PID gains; those were
         removed in v1.3.2 because the loop body never produced honest
         closed-loop behavior. See CHANGELOG.
+
+        Args:
+            desired_positions: Waypoints to track, shape ``(N, DOF)`` where DOF
+                must equal the number of non-fixed joints; joint angles in
+                radians.
+
+        Returns:
+            tuple[float, float, float]: The (x, y, z) world position of the
+            end-effector at the final waypoint.
+
+        Raises:
+            ValueError: If ``desired_positions`` is empty, is not 2-D, or its
+                joint count does not match the number of non-fixed joints.
         """
         _check_pybullet_available()
         self.logger.info("Running controller...")
@@ -733,6 +776,18 @@ class Simulation:
     ) -> Tuple[float, float, float]:
         """
         Simulates the robot's motion using a given trajectory of desired joint angles.
+
+        Commands each configuration via position control, steps the simulation,
+        collects the end-effector positions, and plots the traced path.
+
+        Args:
+            desired_angles_trajectory: Sequence of desired joint-angle
+                configurations (one per simulation step), each a sequence of
+                joint angles in radians.
+
+        Returns:
+            tuple[float, float, float]: The (x, y, z) world position of the
+            end-effector at the final configuration.
         """
         _check_pybullet_available()
         self.logger.info("Simulating robot motion...")
@@ -929,6 +984,16 @@ class Simulation:
     ) -> None:
         """
         Plots the trajectory in the simulation scene.
+
+        Renders the end-effector path as a 3-D Matplotlib line plot, then replays
+        the joint trajectory in the PyBullet simulation.
+
+        Args:
+            joint_trajectory: Sequence of joint-angle configurations (one per
+                simulation step) to replay, each a sequence of joint angles in
+                radians.
+            end_effector_trajectory: Sequence of end-effector positions to plot,
+                each an (x, y, z) world-frame coordinate.
         """
         _check_pybullet_available()
         self.logger.info("Plotting trajectory in simulation scene...")
@@ -954,6 +1019,14 @@ class Simulation:
     def run(self, joint_trajectory: Sequence[Sequence[float]]) -> None:
         """
         Main loop for running the simulation.
+
+        Runs the given trajectory once, then waits for the GUI reset button and
+        switches between trajectory, wait-for-reset, and manual control modes.
+
+        Args:
+            joint_trajectory: Sequence of joint-angle configurations (one per
+                simulation step) to execute, each a sequence of joint angles in
+                radians.
         """
         try:
             reset_pressed = False

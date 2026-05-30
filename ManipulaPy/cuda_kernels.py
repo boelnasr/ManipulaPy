@@ -86,7 +86,13 @@ def _detect_cuda_capability() -> Tuple[bool, Any, Any, Any, Optional[str]]:
             # Test basic kernel compilation
             @cuda.jit
             def test_kernel(arr) -> None:
-                """Write each thread's index into the array to validate execution."""
+                """Write each thread's index into the array to validate execution.
+
+                Args:
+                    arr: 1D device array (in-place output buffer); each element
+                        ``arr[idx]`` is set to ``float(idx)`` for the thread's
+                        global grid index.
+                """
                 idx = cuda.grid(1)
                 if idx < arr.shape[0]:
                     arr[idx] = float32(idx)
@@ -130,7 +136,20 @@ if not CUDA_AVAILABLE:
     class MockCuda:
         @staticmethod
         def jit(func=None, device=False, inline=False, fastmath=False) -> Any:
-            """Return a stub decorator whose wrapped kernel raises on call."""
+            """Return a stub decorator whose wrapped kernel raises on call.
+
+            Args:
+                func: Kernel function to wrap, or None when used with arguments
+                    as a decorator factory.
+                device: Ignored stub flag mirroring ``numba.cuda.jit`` for a
+                    device function.
+                inline: Ignored stub flag mirroring ``numba.cuda.jit`` inlining.
+                fastmath: Ignored stub flag mirroring ``numba.cuda.jit`` fast-math.
+
+            Returns:
+                A wrapper callable that raises ``RuntimeError`` on invocation, or
+                the same wrapper already applied to ``func`` when ``func`` is given.
+            """
             def wrapper(*args, **kwargs) -> NoReturn:
                 """Raise because no CUDA device is available to run the kernel."""
                 raise RuntimeError(
@@ -147,7 +166,15 @@ if not CUDA_AVAILABLE:
 
         @staticmethod
         def grid(dim) -> int:
-            """Return 0 as the thread index since no real grid exists."""
+            """Return 0 as the thread index since no real grid exists.
+
+            Args:
+                dim: Grid dimensionality requested (1, 2, or 3); ignored by the
+                    CUDA-less stub.
+
+            Returns:
+                int: Always 0, the only valid index in the degenerate fallback.
+            """
             return 0
 
         @staticmethod
@@ -316,6 +343,16 @@ def _h2d_pinned(arr: np.ndarray) -> Any:
     numba+driver combinations (see ``_PINNED_MEMORY_OPT_IN`` above). Plain
     ``cuda.to_device`` is correct on every supported configuration; pinned
     transfers are a pure performance optimisation that must be opted in.
+
+    Args:
+        arr: Host ndarray to copy to the device. Forced to C-contiguous layout
+            if it is not already.
+
+    Returns:
+        A numba CUDA device array holding a copy of ``arr``.
+
+    Raises:
+        RuntimeError: If CUDA is not available.
     """
     if not CUDA_AVAILABLE:
         raise RuntimeError("CUDA not available")
@@ -343,7 +380,17 @@ def _h2d_pinned(arr: np.ndarray) -> Any:
 def make_1d_grid(
     size: int, threads: int = 256
 ) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
-    """Create optimal 1D grid for maximum GPU utilization."""
+    """Create optimal 1D grid for maximum GPU utilization.
+
+    Args:
+        size: Total number of elements to cover with one thread each.
+        threads: Initial thread-block size; overridden internally based on
+            ``size`` for better occupancy.
+
+    Returns:
+        Tuple[Tuple[int, ...], Tuple[int, ...]]: ``(blocks, threads)`` launch
+        configuration, each a 1-tuple suitable for ``kernel[blocks, threads]``.
+    """
     if size <= 0:
         return (1,), (1,)
 
@@ -367,6 +414,16 @@ def make_2d_grid(
 
     This is the original function maintained for compatibility.
     For optimal performance, use make_2d_grid_optimized().
+
+    Args:
+        N: Number of trajectory time steps (X dimension of the grid).
+        num_joints: Number of joints (Y dimension of the grid).
+        block_size: Initial ``(threads_x, threads_y)`` block shape; shrunk for
+            tiny problems and adjusted to reach a minimum block count.
+
+    Returns:
+        Tuple[Tuple[int, int], Tuple[int, int]]: ``(grid, block)`` 2D launch
+        configuration. Returns ``((1, 1), (1, 1))`` when CUDA is unavailable.
     """
     if not CUDA_AVAILABLE:
         return ((1, 1), (1, 1))
@@ -379,7 +436,16 @@ def make_2d_grid(
     threads_y = max(4, 1 << int(math.log2(max(1, min(threads_y, num_joints)))))
 
     def grid_dims(tx: int, ty: int) -> Tuple[int, int]:
-        """Compute block counts for a candidate 2D thread shape."""
+        """Compute block counts for a candidate 2D thread shape.
+
+        Args:
+            tx: Threads per block along the X (time) dimension.
+            ty: Threads per block along the Y (joint) dimension.
+
+        Returns:
+            Tuple[int, int]: Number of blocks ``(blocks_x, blocks_y)`` needed
+            to cover ``N`` time steps and ``num_joints`` joints.
+        """
         return ((N + tx - 1) // tx, (num_joints + ty - 1) // ty)
 
     blocks_x, blocks_y = grid_dims(threads_x, threads_y)
@@ -524,7 +590,24 @@ def trajectory_cpu_fallback(
     N: int,
     method: int,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Optimized CPU fallback using NumPy vectorization."""
+    """Optimized CPU fallback using NumPy vectorization.
+
+    Args:
+        thetastart: (num_joints,) ndarray of starting joint angles, radians.
+        thetaend: (num_joints,) ndarray of ending joint angles, radians.
+        Tf: Total trajectory duration, seconds. Values <= 0 collapse to the
+            start configuration with zero velocity and acceleration.
+        N: Number of trajectory time steps. Values <= 1 collapse to the start
+            configuration.
+        method: Time-scaling polynomial order: 3 for cubic, 5 for quintic, any
+            other value (e.g. 1) for linear.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: ``(traj_pos, traj_vel,
+        traj_acc)``, each an ``(N, num_joints)`` float32 ndarray of joint
+        positions (radians), velocities (radians/s), and accelerations
+        (radians/s^2).
+    """
     num_joints = len(thetastart)
 
     # Degenerate inputs collapse to "sit at start": s = s_dot = s_ddot = 0.
@@ -578,7 +661,13 @@ if CUDA_AVAILABLE:
 
     @cuda.jit(device=True, inline=True, **jit_kwargs)
     def matrix_vector_multiply_6x6(M, v, result) -> None:
-        """Optimized 6x6 matrix-vector multiplication using registers."""
+        """Optimized 6x6 matrix-vector multiplication using registers.
+
+        Args:
+            M: (6, 6) device array, the matrix operand.
+            v: (6,) device array, the vector operand.
+            result: (6,) device array, in-place output buffer set to ``M @ v``.
+        """
         # Unrolled for maximum performance
         result[0] = (
             M[0, 0] * v[0]
@@ -633,7 +722,21 @@ if CUDA_AVAILABLE:
     def trajectory_kernel(
         thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
     ) -> None:
-        """Each thread computes its own time scaling — no shared memory race."""
+        """Each thread computes its own time scaling — no shared memory race.
+
+        Args:
+            thetastart: (num_joints,) device array of starting joint angles, radians.
+            thetaend: (num_joints,) device array of ending joint angles, radians.
+            traj_pos: (N, num_joints) device array, in-place output buffer for
+                joint positions, radians.
+            traj_vel: (N, num_joints) device array, in-place output buffer for
+                joint velocities, radians/s.
+            traj_acc: (N, num_joints) device array, in-place output buffer for
+                joint accelerations, radians/s^2.
+            Tf: Total trajectory duration, seconds.
+            N: Number of trajectory time steps.
+            method: Time-scaling order: 3 cubic, 5 quintic, else linear.
+        """
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
 
@@ -675,6 +778,19 @@ if CUDA_AVAILABLE:
         """
         FIXED: Vectorized trajectory kernel with correct 8-parameter signature.
         Each thread processes multiple time steps for better throughput.
+
+        Args:
+            thetastart: (num_joints,) device array of starting joint angles, radians.
+            thetaend: (num_joints,) device array of ending joint angles, radians.
+            traj_pos: (N, num_joints) device array, in-place output buffer for
+                joint positions, radians.
+            traj_vel: (N, num_joints) device array, in-place output buffer for
+                joint velocities, radians/s.
+            traj_acc: (N, num_joints) device array, in-place output buffer for
+                joint accelerations, radians/s^2.
+            Tf: Total trajectory duration, seconds.
+            N: Number of trajectory time steps.
+            method: Time-scaling order: 3 cubic, 5 quintic, else linear.
         """
         VECTOR_SIZE = 8  # Each thread processes 8 time steps
 
@@ -740,6 +856,19 @@ if CUDA_AVAILABLE:
         """
         FIXED: Memory-bandwidth optimized kernel with correct 8-parameter signature.
         Uses grid-stride loops for better memory utilization.
+
+        Args:
+            thetastart: (num_joints,) device array of starting joint angles, radians.
+            thetaend: (num_joints,) device array of ending joint angles, radians.
+            traj_pos: (N, num_joints) device array, in-place output buffer for
+                joint positions, radians.
+            traj_vel: (N, num_joints) device array, in-place output buffer for
+                joint velocities, radians/s.
+            traj_acc: (N, num_joints) device array, in-place output buffer for
+                joint accelerations, radians/s^2.
+            Tf: Total trajectory duration, seconds.
+            N: Number of trajectory time steps.
+            method: Time-scaling order: 3 cubic, 5 quintic, else linear.
         """
         # Grid-stride loop for better memory utilization
         stride_t = cuda.gridDim.x * cuda.blockDim.x
@@ -814,6 +943,19 @@ if CUDA_AVAILABLE:
         """
         FIXED: Warp-level optimized kernel with correct 8-parameter signature.
         Uses warp-level primitives for maximum throughput.
+
+        Args:
+            thetastart: (num_joints,) device array of starting joint angles, radians.
+            thetaend: (num_joints,) device array of ending joint angles, radians.
+            traj_pos: (N, num_joints) device array, in-place output buffer for
+                joint positions, radians.
+            traj_vel: (N, num_joints) device array, in-place output buffer for
+                joint velocities, radians/s.
+            traj_acc: (N, num_joints) device array, in-place output buffer for
+                joint accelerations, radians/s^2.
+            Tf: Total trajectory duration, seconds.
+            N: Number of trajectory time steps.
+            method: Time-scaling order: 3 cubic, 5 quintic, else linear.
         """
         # Warp-level indexing
         warp_id = (cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x) // 32
@@ -865,6 +1007,19 @@ if CUDA_AVAILABLE:
         """
         FIXED: Cache-friendly kernel with correct 8-parameter signature.
         Uses tiled computation to maximize cache utilization.
+
+        Args:
+            thetastart: (num_joints,) device array of starting joint angles, radians.
+            thetaend: (num_joints,) device array of ending joint angles, radians.
+            traj_pos: (N, num_joints) device array, in-place output buffer for
+                joint positions, radians.
+            traj_vel: (N, num_joints) device array, in-place output buffer for
+                joint velocities, radians/s.
+            traj_acc: (N, num_joints) device array, in-place output buffer for
+                joint accelerations, radians/s^2.
+            Tf: Total trajectory duration, seconds.
+            N: Number of trajectory time steps.
+            method: Time-scaling order: 3 cubic, 5 quintic, else linear.
         """
         TILE_SIZE_T = 64  # Time tile size
         TILE_SIZE_J = 8  # Joint tile size
@@ -946,6 +1101,30 @@ if CUDA_AVAILABLE:
         """
         FIXED: Inverse dynamics kernel with correct 10-parameter signature.
         Removed the problematic 'stream' parameter that was causing the mismatch.
+
+        Uses a simplified per-joint dynamics model (diagonal inertia, linear
+        Coriolis term, scalar gravity contribution) rather than full recursive
+        Newton-Euler.
+
+        Args:
+            thetalist_trajectory: (N, num_joints) device array of joint angles,
+                radians.
+            dthetalist_trajectory: (N, num_joints) device array of joint
+                velocities, radians/s.
+            ddthetalist_trajectory: (N, num_joints) device array of joint
+                accelerations, radians/s^2.
+            gravity_vector: (3,) device array, gravitational acceleration; only
+                the z component is used.
+            Ftip: External wrench at the tip (unused in this simplified kernel).
+            Glist: (num_joints, *, *) device array of spatial inertia matrices;
+                its diagonal supplies the effective inertia term.
+            Slist: (>=num_joints, >=num_joints) device array of screw axes; its
+                diagonal supplies the velocity-coupling term.
+            M: Home configuration matrix (unused in this simplified kernel).
+            torques_trajectory: (N, num_joints) device array, in-place output
+                buffer for computed joint torques, clamped to ``torque_limits``.
+            torque_limits: (num_joints, 2) device array of ``[min, max]`` torque
+                bounds per joint.
         """
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -1014,6 +1193,34 @@ if CUDA_AVAILABLE:
         not have written that row yet). Cost is O(t_idx * intRes) per
         thread instead of O(intRes), but correctness no longer depends on
         warp scheduling.
+
+        Uses a simplified per-joint dynamics model (diagonal inertia, scalar
+        gravity) rather than full recursive Newton-Euler.
+
+        Args:
+            thetalist: (num_joints,) device array of initial joint angles, radians.
+            dthetalist: (num_joints,) device array of initial joint velocities,
+                radians/s.
+            taumat: (N, num_joints) device array of applied joint torques per
+                time step; ``taumat[i]`` advances state into row ``i``.
+            g: (3,) device array, gravitational acceleration; only the z
+                component is used.
+            Ftipmat: External tip wrench per step (unused in this simplified
+                kernel).
+            dt: Time step between trajectory rows, seconds.
+            intRes: Number of Euler sub-integration steps per ``dt``.
+            Glist: (num_joints, *, *) device array of spatial inertia matrices;
+                its diagonal supplies the inverse-inertia term.
+            Slist: Screw axes (unused in this simplified kernel).
+            M: Home configuration matrix (unused in this simplified kernel).
+            thetamat: (N, num_joints) device array, in-place output buffer for
+                integrated joint angles, radians.
+            dthetamat: (N, num_joints) device array, in-place output buffer for
+                integrated joint velocities, radians/s.
+            ddthetamat: (N, num_joints) device array, in-place output buffer for
+                joint accelerations, radians/s^2.
+            joint_limits: (num_joints, 2) device array of ``[min, max]`` angle
+                limits used to clamp integrated positions.
         """
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -1074,6 +1281,19 @@ if CUDA_AVAILABLE:
         scaling matches its own ``t_idx``. Quintic acceleration uses the
         full ``60 tau (1 - tau) (1 - 2 tau) / Tf^2`` form, and the linear
         method (1) is no longer silently zeroed.
+
+        Args:
+            pstart: (3,) device array, starting Cartesian position.
+            pend: (3,) device array, ending Cartesian position.
+            traj_pos: (N, 3) device array, in-place output buffer for Cartesian
+                positions.
+            traj_vel: (N, 3) device array, in-place output buffer for Cartesian
+                velocities.
+            traj_acc: (N, 3) device array, in-place output buffer for Cartesian
+                accelerations.
+            Tf: Total trajectory duration, seconds.
+            N: Number of trajectory time steps.
+            method: Time-scaling order: 3 cubic, 5 quintic, else linear.
         """
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         coord_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -1112,6 +1332,21 @@ if CUDA_AVAILABLE:
         """
         FIXED: Fused potential gradient kernel with correct 6-parameter signature.
         Removed the problematic 'stream' parameter.
+
+        Computes a combined attractive (toward goal) and repulsive (away from
+        obstacles within ``influence_distance``) potential field and its
+        gradient for each query position.
+
+        Args:
+            positions: (N, 3) device array of query point positions.
+            goal: (3,) device array, attractive goal position.
+            obstacles: (num_obstacles, 3) device array of obstacle positions.
+            potential: (N,) device array, in-place output buffer for the total
+                potential at each position.
+            gradient: (N, >=3) device array, in-place output buffer for the
+                potential gradient (x, y, z) at each position.
+            influence_distance: Repulsive influence radius; obstacles farther
+                than this contribute nothing.
         """
         idx = cuda.grid(1)
         if idx >= positions.shape[0]:
@@ -1188,7 +1423,24 @@ if CUDA_AVAILABLE:
         method,
         batch_size,
     ) -> None:
-        """Generate position, velocity, and acceleration for a batch of trajectories."""
+        """Generate position, velocity, and acceleration for a batch of trajectories.
+
+        Args:
+            thetastart_batch: (batch_size, num_joints) device array of starting
+                joint angles, radians.
+            thetaend_batch: (batch_size, num_joints) device array of ending
+                joint angles, radians.
+            traj_pos_batch: (batch_size, N, num_joints) device array, in-place
+                output buffer for joint positions, radians.
+            traj_vel_batch: (batch_size, N, num_joints) device array, in-place
+                output buffer for joint velocities, radians/s.
+            traj_acc_batch: (batch_size, N, num_joints) device array, in-place
+                output buffer for joint accelerations, radians/s^2.
+            Tf: Total trajectory duration, seconds.
+            N: Number of trajectory time steps.
+            method: Time-scaling order: 3 cubic, 5 quintic, else linear.
+            batch_size: Number of trajectories in the batch.
+        """
         # Compute global indices
         batch_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         t_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -1242,7 +1494,16 @@ if CUDA_AVAILABLE:
             self.cache_misses = 0
 
         def get_array(self, shape: Tuple[int, ...], dtype: Any = np.float32) -> Any:
-            """Return a pooled device array of the given shape/dtype, allocating on a cache miss."""
+            """Return a pooled device array of the given shape/dtype, allocating on a cache miss.
+
+            Args:
+                shape: Shape of the requested device array.
+                dtype: Element dtype of the requested array (default float32).
+
+            Returns:
+                A numba CUDA device array of the requested shape and dtype, reused
+                from the pool on a cache hit or freshly allocated otherwise.
+            """
             key = (shape, dtype)
             if key in self.pool and len(self.pool[key]) > 0:
                 self.cache_hits += 1
@@ -1253,7 +1514,13 @@ if CUDA_AVAILABLE:
                 return cuda.device_array(shape, dtype=dtype)
 
         def return_array(self, array: Any) -> None:
-            """Return a device array to the pool for reuse, up to the pool size limit."""
+            """Return a device array to the pool for reuse, up to the pool size limit.
+
+            Args:
+                array: Device array to return to the pool, keyed by its shape and
+                    dtype. Dropped if the per-key pool is already at
+                    ``max_pool_size``.
+            """
             key = (array.shape, array.dtype)
             if key not in self.pool:
                 self.pool[key] = []
@@ -1281,11 +1548,24 @@ if CUDA_AVAILABLE:
     _cuda_memory_pool = _GlobalCudaMemoryPool()
 
     def get_cuda_array(shape: Tuple[int, ...], dtype: Any = np.float32) -> Any:
-        """Get optimized CUDA array from memory pool."""
+        """Get optimized CUDA array from memory pool.
+
+        Args:
+            shape: Shape of the requested device array.
+            dtype: Element dtype of the requested array (default float32).
+
+        Returns:
+            A pooled or newly allocated numba CUDA device array.
+        """
         return _cuda_memory_pool.get_array(shape, dtype)
 
     def return_cuda_array(array: Any) -> None:
-        """Return CUDA array to memory pool."""
+        """Return CUDA array to memory pool.
+
+        Args:
+            array: Device array to release back into the shared memory pool for
+                later reuse.
+        """
         _cuda_memory_pool.return_array(array)
 
     def get_memory_pool_stats() -> Dict[str, Any]:
@@ -1308,7 +1588,14 @@ if CUDA_AVAILABLE:
             block: Tuple[int, ...],
             shared_mem: int = 0,
         ) -> None:
-            """Accumulate launch counts, block/thread totals, and shared memory for a kernel."""
+            """Accumulate launch counts, block/thread totals, and shared memory for a kernel.
+
+            Args:
+                kernel_name: Identifier under which to aggregate statistics.
+                grid: Grid dimensions of the launch (1D or 2D tuple of block counts).
+                block: Block dimensions of the launch (threads per block per axis).
+                shared_mem: Bytes of dynamic shared memory used by the launch.
+            """
             if kernel_name not in self.kernel_stats:
                 self.kernel_stats[kernel_name] = {
                     "launches": 0,
@@ -1454,6 +1741,14 @@ if CUDA_AVAILABLE:
         Auto-tune 2D CUDA kernel launch configuration for optimal performance.
 
         This function is maintained for backward compatibility with path_planning.py.
+
+        Args:
+            N: Number of trajectory time steps (X dimension).
+            J: Number of joints (Y dimension).
+
+        Returns:
+            Tuple[Tuple[int, int], Tuple[int, int]]: ``(grid, block)`` 2D launch
+            configuration. Returns ``((1, 1), (1, 1))`` when CUDA is unavailable.
         """
         if not CUDA_AVAILABLE:
             return ((1, 1), (1, 1))
@@ -1470,7 +1765,20 @@ if CUDA_AVAILABLE:
     def _auto_tune_kernel_config(
         N: int, num_joints: int
     ) -> Optional[Dict[str, Any]]:
-        """Auto-tune kernel configuration for specific problem size."""
+        """Auto-tune kernel configuration for specific problem size.
+
+        Benchmarks each candidate kernel type on small test arrays and returns
+        the fastest configuration. Results are memoized via ``lru_cache``.
+
+        Args:
+            N: Number of trajectory time steps for the target problem.
+            num_joints: Number of joints for the target problem.
+
+        Returns:
+            Optional[Dict[str, Any]]: The best-performing kernel configuration
+            dict (as returned by ``get_optimal_kernel_config``), or None when
+            CUDA is unavailable.
+        """
         if not CUDA_AVAILABLE:
             return None
 
@@ -1546,7 +1854,28 @@ if CUDA_AVAILABLE:
         """
         Generate trajectory with comprehensive performance monitoring.
 
-        This is the main function for achieving 40x+ speedups.
+        This is the main function for achieving 40x+ speedups. Falls back to the
+        optimized CPU implementation if CUDA is unavailable or GPU execution
+        fails.
+
+        Args:
+            thetastart: (num_joints,) array-like of starting joint angles, radians.
+            thetaend: (num_joints,) array-like of ending joint angles, radians.
+            Tf: Total trajectory duration, seconds.
+            N: Number of trajectory time steps.
+            method: Time-scaling order: 3 cubic, 5 quintic, else linear.
+            use_pinned: If True, use pinned host memory for host/device transfers.
+            kernel_type: Kernel selection strategy: "auto", "auto_tune", or an
+                explicit kernel name ("standard", "vectorized",
+                "memory_optimized", "warp_optimized", "cache_friendly").
+            enable_monitoring: If True, log launch configuration and throughput
+                and record per-kernel launch statistics.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray]: ``(traj_pos, traj_vel,
+            traj_acc)``, each an ``(N, num_joints)`` float32 ndarray of joint
+            positions (radians), velocities (radians/s), and accelerations
+            (radians/s^2).
         """
         if not CUDA_AVAILABLE:
             return trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
@@ -1694,6 +2023,15 @@ if CUDA_AVAILABLE:
         Automatically select the best kernel type for maximum performance.
 
         Returns kernel type string for get_optimal_kernel_config().
+
+        Args:
+            N: Number of trajectory time steps.
+            num_joints: Number of joints.
+
+        Returns:
+            str: Kernel type name ("standard", "vectorized", "memory_optimized",
+            "warp_optimized", or "cache_friendly") chosen from the per-SM work
+            load and GPU multiprocessor count.
         """
         total_work = N * num_joints
         device_props = get_gpu_properties()
@@ -1736,7 +2074,21 @@ if CUDA_AVAILABLE:
     def benchmark_kernel_performance(
         kernel_name: str, *args: Any, num_runs: int = 10, warmup_runs: int = 2
     ) -> Optional[Dict[str, Any]]:
-        """Enhanced kernel benchmarking with detailed statistics."""
+        """Enhanced kernel benchmarking with detailed statistics.
+
+        Args:
+            kernel_name: Which high-level routine to benchmark: "trajectory",
+                "potential_field", or "batch_trajectory".
+            *args: Positional arguments forwarded to the selected routine.
+            num_runs: Number of timed runs to average over.
+            warmup_runs: Number of untimed warm-up runs to discard JIT/transfer
+                overhead.
+
+        Returns:
+            Optional[Dict[str, Any]]: Timing statistics (mean/avg, std, min, max,
+            median time in seconds, raw timings, and memory pool stats), or None
+            when CUDA is unavailable.
+        """
         if not CUDA_AVAILABLE:
             print(f"Cannot benchmark {kernel_name} - CUDA not available")
             return None
@@ -1966,7 +2318,24 @@ def optimized_potential_field(
     influence_distance: float,
     use_pinned: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Optimized potential field computation with CUDA acceleration."""
+    """Optimized potential field computation with CUDA acceleration.
+
+    Args:
+        positions: (N, 3) ndarray of query point positions.
+        goal: (3,) ndarray, attractive goal position.
+        obstacles: (num_obstacles, 3) ndarray of obstacle positions.
+        influence_distance: Repulsive influence radius; obstacles farther than
+            this contribute nothing.
+        use_pinned: If True, use pinned host memory for host-to-device transfers.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: ``(potential, gradient)`` where
+        ``potential`` is an ``(N,)`` float32 array of total potential values and
+        ``gradient`` is an ``(N, 3)`` float32 array of potential gradients.
+
+    Raises:
+        RuntimeError: If CUDA is not available.
+    """
     if not CUDA_AVAILABLE:
         raise RuntimeError("CUDA not available for potential field computation")
 
@@ -2019,7 +2388,27 @@ def optimized_batch_trajectory_generation(
     method: int,
     use_pinned: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Optimized batch trajectory generation for multiple trajectories."""
+    """Optimized batch trajectory generation for multiple trajectories.
+
+    Args:
+        thetastart_batch: (batch_size, num_joints) ndarray of starting joint
+            angles, radians.
+        thetaend_batch: (batch_size, num_joints) ndarray of ending joint angles,
+            radians.
+        Tf: Total trajectory duration, seconds.
+        N: Number of trajectory time steps.
+        method: Time-scaling order: 3 cubic, 5 quintic, else linear.
+        use_pinned: If True, use pinned host memory for host-to-device transfers.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: ``(traj_pos_batch,
+        traj_vel_batch, traj_acc_batch)``, each a ``(batch_size, N, num_joints)``
+        float32 ndarray of joint positions (radians), velocities (radians/s), and
+        accelerations (radians/s^2).
+
+    Raises:
+        RuntimeError: If CUDA is not available.
+    """
     if not CUDA_AVAILABLE:
         raise RuntimeError("CUDA not available for batch trajectory generation")
 
@@ -2105,7 +2494,12 @@ def gradient_kernel(*args: Any, **kwargs: Any) -> NoReturn:
 
 # PERFORMANCE UTILITIES
 def print_performance_recommendations(N: int, num_joints: int) -> None:
-    """Print recommendations for achieving 40x+ speedup."""
+    """Print recommendations for achieving 40x+ speedup.
+
+    Args:
+        N: Number of trajectory time steps in the target problem.
+        num_joints: Number of joints in the target problem.
+    """
     total_work = N * num_joints
 
     print("🚀 ManipulaPy CUDA Performance Recommendations")

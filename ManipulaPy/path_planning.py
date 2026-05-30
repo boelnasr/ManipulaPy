@@ -148,7 +148,26 @@ logging.getLogger("numba.cuda.cudadrv.driver").setLevel(logging.WARNING)
 def _trajectory_cpu_fallback(
     thetastart, thetaend, Tf, N, method
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Numba-optimised CPU trajectory generation (parallel)."""
+    """Numba-optimised CPU trajectory generation (parallel).
+
+    Computes joint-space position, velocity and acceleration trajectories by
+    point-to-point time scaling between ``thetastart`` and ``thetaend``. The
+    nested (timestep, joint) iteration is flattened into a single ``prange``
+    loop so Numba can parallelise it.
+
+    Args:
+        thetastart: (num_joints,) ndarray of starting joint angles, radians.
+        thetaend: (num_joints,) ndarray of ending joint angles, radians.
+        Tf (float): Total trajectory duration, seconds.
+        N (int): Number of trajectory points (timesteps).
+        method (int): Time-scaling method; 3 for cubic, 5 for quintic. Any
+            other value yields zero scaling.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: ``(traj_pos, traj_vel,
+        traj_acc)``, each an ``(N, num_joints)`` float32 array of positions
+        (rad), velocities (rad/s) and accelerations (rad/s^2).
+    """
     num_joints = len(thetastart)
 
     traj_pos = np.zeros((N, num_joints), dtype=np.float32)
@@ -193,7 +212,23 @@ def _trajectory_cpu_fallback(
 def _traj_cpu_njit(
     thetastart, thetaend, Tf, N, method
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Dispatch to the optimized CPU fallback kernel."""
+    """Dispatch to the optimized CPU fallback kernel.
+
+    Thin ``@njit`` wrapper that forwards its arguments to
+    :func:`_trajectory_cpu_fallback`, keeping a stable public entry point for
+    the CPU trajectory path.
+
+    Args:
+        thetastart: (num_joints,) ndarray of starting joint angles, radians.
+        thetaend: (num_joints,) ndarray of ending joint angles, radians.
+        Tf (float): Total trajectory duration, seconds.
+        N (int): Number of trajectory points (timesteps).
+        method (int): Time-scaling method; 3 for cubic, 5 for quintic.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: ``(traj_pos, traj_vel,
+        traj_acc)``, each an ``(N, num_joints)`` float32 array.
+    """
     return _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
 
 
@@ -391,9 +426,20 @@ class OptimizedTrajectoryPlanning:
     def _get_or_resize_gpu_array(
         self, array_name: str, shape: Tuple[int, ...], dtype: Any = np.float32
     ) -> Any:
-        """
-        Return a pooled CUDA array with the requested shape / dtype.
-        Enhanced with better memory management.
+        """Return a pooled CUDA array with the requested shape / dtype.
+
+        Looks up a previously pooled device array by ``array_name`` and reuses
+        it when its shape and dtype match; otherwise the old array (if any) is
+        returned to the pool and a freshly sized one is acquired and cached.
+
+        Args:
+            array_name (str): Cache key identifying the pooled array slot.
+            shape (Tuple[int, ...]): Desired device array shape.
+            dtype (Any): Desired element dtype. Defaults to ``np.float32``.
+
+        Returns:
+            Any: The pooled CUDA device array of the requested shape/dtype, or
+            ``None`` if CUDA is unavailable.
         """
         if not self.cuda_available:
             return None
@@ -410,7 +456,20 @@ class OptimizedTrajectoryPlanning:
         return arr
 
     def _should_use_gpu(self, N: int, num_joints: int) -> bool:
-        """Enhanced GPU selection logic with performance prediction."""
+        """Decide whether to dispatch a problem to the GPU.
+
+        Returns ``False`` when CUDA is unavailable or the total work
+        (``N * num_joints``) is below ``self.cpu_threshold``. Otherwise logs a
+        debug hint when the per-SM element count is unlikely to reach the
+        configured target speedup, then approves GPU execution.
+
+        Args:
+            N (int): Number of trajectory points / timesteps.
+            num_joints (int): Number of joints (work units per point).
+
+        Returns:
+            bool: ``True`` if the GPU path should be used, ``False`` otherwise.
+        """
         if not self.cuda_available:
             return False
 
@@ -436,7 +495,21 @@ class OptimizedTrajectoryPlanning:
     def _get_optimal_kernel_config(
         self, N: int, num_joints: int
     ) -> Optional[Dict[str, Any]]:
-        """Get or compute optimal kernel configuration with caching."""
+        """Get or compute the optimal kernel launch configuration with caching.
+
+        Resolves the effective kernel type (auto-selecting one when
+        ``self.kernel_type == "auto"``) and computes a launch configuration for
+        the given problem size, memoising results by
+        ``(N, num_joints, kernel_type)``.
+
+        Args:
+            N (int): Number of trajectory points / timesteps.
+            num_joints (int): Number of joints.
+
+        Returns:
+            Optional[Dict[str, Any]]: Kernel configuration dict (grid/block,
+            kernel type, etc.), or ``None`` if no configuration is available.
+        """
         # Ensure required attributes exist
         if not hasattr(self, "_kernel_cache"):
             self._kernel_cache = {}
@@ -516,7 +589,27 @@ class OptimizedTrajectoryPlanning:
     def _joint_trajectory_gpu(
         self, thetastart, thetaend, Tf, N, method, kernel_type, enable_monitoring
     ) -> Dict[str, np.ndarray]:
-        """Enhanced GPU trajectory generation with optimal kernel selection."""
+        """GPU joint trajectory generation with optimal kernel selection.
+
+        Runs the monitored GPU trajectory generator, clips positions to the
+        configured joint limits, optionally applies GPU collision avoidance,
+        updates performance stats, and falls back to the CPU path on any error.
+
+        Args:
+            thetastart: (num_joints,) ndarray of starting joint angles (rad).
+            thetaend: (num_joints,) ndarray of ending joint angles (rad).
+            Tf (float): Total trajectory duration, seconds.
+            N (int): Number of trajectory points.
+            method (int): Time-scaling method; 3 for cubic, 5 for quintic.
+            kernel_type (str): Kernel selection strategy passed to the GPU
+                generator (e.g. "auto", "vectorized").
+            enable_monitoring (bool): If True, enable CUDA profiling/logging.
+
+        Returns:
+            Dict[str, np.ndarray]: Dict with keys ``"positions"``,
+            ``"velocities"`` and ``"accelerations"``, each an
+            ``(N, num_joints)`` array.
+        """
         start_time = time.time()
 
         try:
@@ -592,7 +685,25 @@ class OptimizedTrajectoryPlanning:
     def _joint_trajectory_cpu(
         self, thetastart, thetaend, Tf, N, method
     ) -> Dict[str, np.ndarray]:
-        """CPU-based joint trajectory generation with performance tracking."""
+        """CPU joint trajectory generation with performance tracking.
+
+        Generates the trajectory via the Numba CPU kernel, clips positions to
+        the configured joint limits, optionally applies CPU collision
+        avoidance, and records the elapsed time as the CPU baseline used for
+        speedup reporting.
+
+        Args:
+            thetastart: (num_joints,) ndarray of starting joint angles (rad).
+            thetaend: (num_joints,) ndarray of ending joint angles (rad).
+            Tf (float): Total trajectory duration, seconds.
+            N (int): Number of trajectory points.
+            method (int): Time-scaling method; 3 for cubic, 5 for quintic.
+
+        Returns:
+            Dict[str, np.ndarray]: Dict with keys ``"positions"``,
+            ``"velocities"`` and ``"accelerations"``, each an
+            ``(N, num_joints)`` array.
+        """
         start_time = time.time()
 
         # Use optimized CPU fallback
@@ -630,7 +741,23 @@ class OptimizedTrajectoryPlanning:
     def _apply_collision_avoidance_gpu(
         self, traj_pos: np.ndarray, thetaend: np.ndarray
     ) -> np.ndarray:
-        """Apply GPU-accelerated potential field-based collision avoidance."""
+        """Apply GPU-accelerated potential field collision avoidance.
+
+        For each colliding trajectory point, iteratively descends the GPU
+        potential-field gradient toward ``thetaend`` (up to 100 iterations)
+        until the configuration is collision-free, falling back to the CPU
+        gradient on per-iteration failure and to the full CPU routine if CUDA
+        is unavailable or the GPU path errors.
+
+        Args:
+            traj_pos: (N, num_joints) ndarray of joint positions (rad);
+                modified in place as colliding points are nudged out.
+            thetaend: (num_joints,) ndarray of goal joint angles (rad), used as
+                the attractive target.
+
+        Returns:
+            np.ndarray: The (possibly adjusted) ``(N, num_joints)`` trajectory.
+        """
         if not self.cuda_available:
             return self._apply_collision_avoidance_cpu(traj_pos, thetaend)
 
@@ -686,7 +813,21 @@ class OptimizedTrajectoryPlanning:
     def _apply_collision_avoidance_cpu(
         self, traj_pos: np.ndarray, thetaend: np.ndarray
     ) -> np.ndarray:
-        """Apply CPU-based potential field collision avoidance."""
+        """Apply CPU-based potential field collision avoidance.
+
+        For each colliding trajectory point, iteratively descends the
+        potential-field gradient toward ``thetaend`` (up to 100 iterations)
+        until the configuration is collision-free.
+
+        Args:
+            traj_pos: (N, num_joints) ndarray of joint positions (rad);
+                modified in place as colliding points are nudged out.
+            thetaend: (num_joints,) ndarray of goal joint angles (rad), used as
+                the attractive target.
+
+        Returns:
+            np.ndarray: The (possibly adjusted) ``(N, num_joints)`` trajectory.
+        """
         q_goal = thetaend
         obstacles = []  # Define obstacles here as needed
 
@@ -789,7 +930,26 @@ class OptimizedTrajectoryPlanning:
     def _batch_joint_trajectory_cpu(
         self, thetastart_batch, thetaend_batch, Tf, N, method
     ) -> Dict[str, np.ndarray]:
-        """CPU fallback for batch trajectory generation."""
+        """CPU fallback for batch trajectory generation.
+
+        Generates each trajectory in the batch sequentially with the Numba CPU
+        kernel and clips positions to the configured joint limits (matching the
+        GPU batch path).
+
+        Args:
+            thetastart_batch: (batch_size, num_joints) ndarray of starting
+                joint angles, radians.
+            thetaend_batch: (batch_size, num_joints) ndarray of ending joint
+                angles, radians.
+            Tf (float): Total trajectory duration, seconds.
+            N (int): Number of trajectory points per trajectory.
+            method (int): Time-scaling method; 3 for cubic, 5 for quintic.
+
+        Returns:
+            Dict[str, np.ndarray]: Dict with keys ``"positions"``,
+            ``"velocities"`` and ``"accelerations"``, each a
+            ``(batch_size, N, num_joints)`` array.
+        """
         start_time = time.time()
 
         batch_size, num_joints = thetastart_batch.shape
@@ -896,7 +1056,28 @@ class OptimizedTrajectoryPlanning:
         gravity_vector,
         Ftip,
     ) -> np.ndarray:
-        """GPU-accelerated inverse dynamics computation with fixed kernel signature."""
+        """GPU-accelerated inverse dynamics over a trajectory.
+
+        Transfers the trajectory and the manipulator's dynamics data (Glist,
+        S_list, M_list) to the device, launches the 2D inverse-dynamics kernel
+        to compute per-point joint torques, clips them to ``self.torque_limits``
+        and returns them. Falls back to the CPU implementation if dynamics-data
+        conversion or kernel execution fails.
+
+        Args:
+            thetalist_trajectory: (num_points, num_joints) ndarray of joint
+                angles, radians.
+            dthetalist_trajectory: (num_points, num_joints) ndarray of joint
+                velocities, rad/s.
+            ddthetalist_trajectory: (num_points, num_joints) ndarray of joint
+                accelerations, rad/s^2.
+            gravity_vector: (3,) ndarray of gravitational acceleration, m/s^2.
+            Ftip: length-6 sequence of the external wrench at the end effector.
+
+        Returns:
+            np.ndarray: (num_points, num_joints) array of joint torques,
+            clipped to the configured torque limits.
+        """
         start_time = time.time()
 
         num_points = thetalist_trajectory.shape[0]
@@ -1069,7 +1250,27 @@ class OptimizedTrajectoryPlanning:
         gravity_vector,
         Ftip,
     ) -> np.ndarray:
-        """CPU-based inverse dynamics computation."""
+        """CPU-based inverse dynamics over a trajectory.
+
+        Computes per-point joint torques by calling
+        ``self.dynamics.inverse_dynamics`` at each trajectory point (using zero
+        torques for any point that raises), then clips the result to
+        ``self.torque_limits``.
+
+        Args:
+            thetalist_trajectory: (num_points, num_joints) ndarray of joint
+                angles, radians.
+            dthetalist_trajectory: (num_points, num_joints) ndarray of joint
+                velocities, rad/s.
+            ddthetalist_trajectory: (num_points, num_joints) ndarray of joint
+                accelerations, rad/s^2.
+            gravity_vector: (3,) ndarray of gravitational acceleration, m/s^2.
+            Ftip: length-6 sequence of the external wrench at the end effector.
+
+        Returns:
+            np.ndarray: (num_points, num_joints) array of joint torques,
+            clipped to the configured torque limits.
+        """
         start_time = time.time()
 
         num_points = thetalist_trajectory.shape[0]
@@ -1150,7 +1351,29 @@ class OptimizedTrajectoryPlanning:
     def _forward_dynamics_gpu(
         self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
     ) -> Dict[str, np.ndarray]:
-        """Enhanced GPU forward dynamics with optimal configuration."""
+        """GPU-accelerated forward dynamics integration over a trajectory.
+
+        Seeds the first step with the initial state, transfers the torque
+        profile, external forces and dynamics data to the device, and launches
+        the forward-dynamics kernel to integrate joint motion with ``intRes``
+        sub-steps per outer step, enforcing joint limits on the device. Falls
+        back to the CPU implementation on any error.
+
+        Args:
+            thetalist: (num_joints,) ndarray of initial joint angles, radians.
+            dthetalist: (num_joints,) ndarray of initial joint velocities,
+                rad/s.
+            taumat: (num_steps, num_joints) ndarray of applied joint torques.
+            g: (3,) ndarray of gravitational acceleration, m/s^2.
+            Ftipmat: (num_steps, 6) ndarray of end-effector wrenches per step.
+            dt (float): Outer time step between trajectory points, seconds.
+            intRes (int): Number of integration sub-steps per outer step.
+
+        Returns:
+            Dict[str, np.ndarray]: Dict with keys ``"positions"``,
+            ``"velocities"`` and ``"accelerations"``, each a
+            ``(num_steps, num_joints)`` array.
+        """
         start_time = time.time()
 
         num_steps = taumat.shape[0]
@@ -1255,7 +1478,29 @@ class OptimizedTrajectoryPlanning:
     def _forward_dynamics_cpu(
         self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
     ) -> Dict[str, np.ndarray]:
-        """CPU-based forward dynamics computation."""
+        """CPU-based forward dynamics integration over a trajectory.
+
+        Integrates joint motion step by step using
+        ``self.dynamics.forward_dynamics`` with ``intRes`` Euler sub-steps per
+        outer step (``dt / intRes`` each), clamping joint angles to
+        ``self.joint_limits`` and using zero acceleration for any step that
+        raises.
+
+        Args:
+            thetalist: (num_joints,) ndarray of initial joint angles, radians.
+            dthetalist: (num_joints,) ndarray of initial joint velocities,
+                rad/s.
+            taumat: (num_steps, num_joints) ndarray of applied joint torques.
+            g: (3,) ndarray of gravitational acceleration, m/s^2.
+            Ftipmat: (num_steps, 6) ndarray of end-effector wrenches per step.
+            dt (float): Outer time step between trajectory points, seconds.
+            intRes (int): Number of integration sub-steps per outer step.
+
+        Returns:
+            Dict[str, np.ndarray]: Dict with keys ``"positions"``,
+            ``"velocities"`` and ``"accelerations"``, each a
+            ``(num_steps, num_joints)`` array.
+        """
         start_time = time.time()
 
         num_steps = taumat.shape[0]
@@ -1378,7 +1623,24 @@ class OptimizedTrajectoryPlanning:
     def _cartesian_trajectory_gpu(
         self, pstart, pend, Tf, N, method
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """Enhanced GPU Cartesian trajectory computation."""
+        """GPU computation of Cartesian linear velocity and acceleration.
+
+        Launches the Cartesian trajectory kernel to compute the time-scaled
+        translational velocity and acceleration of the straight-line path from
+        ``pstart`` to ``pend``. Falls back to the CPU implementation on error.
+
+        Args:
+            pstart: (3,) ndarray of the start position, metres.
+            pend: (3,) ndarray of the end position, metres.
+            Tf (float): Total trajectory duration, seconds.
+            N (int): Number of trajectory points.
+            method (int): Time-scaling method; 3 for cubic, 5 for quintic.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: ``(traj_vel, traj_acc)``, each an
+            ``(N, 3)`` array of linear velocity (m/s) and acceleration
+            (m/s^2).
+        """
         start_time = time.time()
 
         try:
@@ -1437,7 +1699,24 @@ class OptimizedTrajectoryPlanning:
     def _cartesian_trajectory_cpu(
         self, pstart, pend, Tf, N, method
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """CPU-based Cartesian trajectory computation."""
+        """CPU computation of Cartesian linear velocity and acceleration.
+
+        Evaluates the time-scaling derivatives at each point and applies them to
+        the straight-line displacement ``pend - pstart`` to obtain the
+        translational velocity and acceleration profiles.
+
+        Args:
+            pstart: (3,) ndarray of the start position, metres.
+            pend: (3,) ndarray of the end position, metres.
+            Tf (float): Total trajectory duration, seconds.
+            N (int): Number of trajectory points.
+            method (int): Time-scaling method; 3 for cubic, 5 for quintic.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: ``(traj_vel, traj_acc)``, each an
+            ``(N, 3)`` array of linear velocity (m/s) and acceleration
+            (m/s^2).
+        """
         start_time = time.time()
 
         traj_vel = np.zeros((N, 3), dtype=np.float32)
@@ -1695,7 +1974,28 @@ class OptimizedTrajectoryPlanning:
         labels=None,
         performance_stats=None,
     ) -> None:
-        """Enhanced trajectory plotting with performance information."""
+        """Plot joint position, velocity and acceleration trajectories.
+
+        Draws a 3-by-num_joints grid of subplots (position, velocity,
+        acceleration per joint) over a time axis spanning ``[0, Tf]`` and
+        appends GPU speedup / kernel info to the title when
+        ``performance_stats`` is provided. Displays the figure via
+        ``plt.show()``.
+
+        Args:
+            trajectory_data (dict): Trajectory dict with keys ``"positions"``,
+                ``"velocities"`` and ``"accelerations"``, each an
+                ``(num_steps, num_joints)`` array.
+            Tf (float): Total trajectory duration, seconds, defining the time
+                axis.
+            title (str): Base figure title. Defaults to ``"Joint Trajectory"``.
+            labels (list, optional): Per-joint labels; used only when its length
+                equals ``num_joints``, otherwise generic ``"Joint i"`` labels
+                are generated.
+            performance_stats (dict, optional): Optional stats with keys such as
+                ``"speedup_achieved"`` and ``"best_kernel_used"`` used to
+                annotate the title.
+        """
         positions = trajectory_data["positions"]
         velocities = trajectory_data["velocities"]
         accelerations = trajectory_data["accelerations"]

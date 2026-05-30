@@ -23,7 +23,21 @@ logger = logging.getLogger(__name__)
 def _array_eq(
     a: Optional[np.ndarray], b: Optional[np.ndarray], tol: float = 1e-10
 ) -> bool:
-    """Compare numpy arrays with tolerance."""
+    """
+    Compare two numpy arrays for equality within a tolerance.
+
+    Two ``None`` values are considered equal; a ``None`` paired with an
+    array is not. Arrays with differing shapes are never equal.
+
+    Args:
+        a: First array, or ``None``.
+        b: Second array, or ``None``.
+        tol: Absolute tolerance passed to ``np.allclose`` (default 1e-10).
+
+    Returns:
+        bool: ``True`` if the arrays are element-wise close within ``tol``
+        (or both are ``None``), ``False`` otherwise.
+    """
     if a is None and b is None:
         return True
     if a is None or b is None:
@@ -45,7 +59,19 @@ class JointType(Enum):
 
     @classmethod
     def from_string(cls, s: str) -> "JointType":
-        """Create JointType from string."""
+        """
+        Create a JointType from its URDF string name.
+
+        Args:
+            s: URDF joint type string (e.g. ``"revolute"``, ``"fixed"``);
+                matching is case-insensitive.
+
+        Returns:
+            JointType: The enum member corresponding to ``s``.
+
+        Raises:
+            ValueError: If ``s`` does not name a known joint type.
+        """
         try:
             return cls(s.lower())
         except ValueError:
@@ -108,7 +134,21 @@ class Origin:
 
     @classmethod
     def from_matrix(cls, T: np.ndarray) -> "Origin":
-        """Create Origin from 4x4 transformation matrix."""
+        """
+        Create an Origin from a 4x4 homogeneous transformation matrix.
+
+        The translation is read from the last column and the rotation is
+        decomposed into roll-pitch-yaw Euler angles using the ZYX
+        convention, with gimbal-lock handling when the pitch is near
+        +/- 90 degrees.
+
+        Args:
+            T: (4, 4) ndarray homogeneous transformation matrix.
+
+        Returns:
+            Origin: An Origin whose ``xyz`` is the translation and whose
+            ``rpy`` is the extracted (roll, pitch, yaw) in radians.
+        """
         xyz = T[:3, 3].copy()
 
         # Extract Euler angles (ZYX convention)
@@ -217,7 +257,22 @@ class Inertial:
     def from_spatial_inertia(
         cls, G: np.ndarray, origin: Optional[Origin] = None
     ) -> "Inertial":
-        """Create Inertial from 6x6 spatial inertia matrix."""
+        """
+        Create an Inertial from a 6x6 spatial inertia matrix.
+
+        The rotational inertia tensor is taken from the top-left 3x3 block
+        and the mass from the ``G[3, 3]`` entry of the translational block.
+
+        Args:
+            G: (6, 6) ndarray spatial inertia matrix in the
+                ``[[I, 0], [0, m*I_3]]`` block layout.
+            origin: Optional Origin giving the center-of-mass pose; defaults
+                to the identity Origin when ``None``.
+
+        Returns:
+            Inertial: Inertial properties with the extracted mass, inertia
+            tensor, and origin.
+        """
         inertia = G[0:3, 0:3].copy()
         mass = G[3, 3]
         return cls(mass=mass, origin=origin or Origin(), inertia=inertia)
@@ -728,7 +783,17 @@ class Joint:
 
     @staticmethod
     def _axis_angle_rotation(axis: np.ndarray, angle: float) -> np.ndarray:
-        """Rodrigues' rotation formula."""
+        """
+        Build a 3x3 rotation matrix via Rodrigues' rotation formula.
+
+        Args:
+            axis: (3,) ndarray rotation axis; normalized internally so it
+                need not be unit length.
+            angle: Rotation angle about ``axis``, in radians.
+
+        Returns:
+            (3, 3) ndarray rotation matrix.
+        """
         axis = axis / np.linalg.norm(axis)
         K = np.array(
             [[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]], [-axis[1], axis[0], 0]],
@@ -742,7 +807,16 @@ class Joint:
         """
         Batch Rodrigues' rotation formula.
 
-        Optimized for computing many rotations about same axis.
+        Computes many rotation matrices about a single shared axis in a
+        vectorized fashion.
+
+        Args:
+            axis: (3,) ndarray rotation axis; normalized internally so it
+                need not be unit length.
+            angles: (n,) ndarray of rotation angles about ``axis``, radians.
+
+        Returns:
+            (n, 3, 3) ndarray stack of rotation matrices, one per angle.
         """
         axis = axis / np.linalg.norm(axis)
         n = len(angles)
