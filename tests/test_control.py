@@ -43,6 +43,7 @@ def is_module_available(module_name) -> bool:
 
 class TestManipulatorController(unittest.TestCase):
     def setUp(self) -> None:
+        """Select the array backend and build the controller test fixtures."""
         # Determine backend
         if is_module_available("cupy"):
             self.backend = "cupy"

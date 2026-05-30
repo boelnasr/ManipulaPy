@@ -75,6 +75,7 @@ class MockPyBullet:
         return 1
 
     def disconnect(self) -> None:
+        """Clear the fake physics-client id to mimic PyBullet disconnect."""
         self._physics_client = None
 
     def resetSimulation(self) -> None:
@@ -868,6 +869,7 @@ class MockPyBullet:
         return 1
 
     def disconnect(self) -> None:
+        """Clear the fake physics-client id to mimic PyBullet disconnect."""
         self._physics_client = None
 
     def resetSimulation(self) -> None:

@@ -1234,6 +1234,7 @@ if CUDA_AVAILABLE:
         """Enhanced memory pool with size tracking and performance optimization."""
 
         def __init__(self) -> None:
+            """Initialize the memory pool with empty caches and statistics counters."""
             self.pool = {}
             self.max_pool_size = 200  # Increased for better caching
             self.total_allocated = 0
@@ -1241,6 +1242,7 @@ if CUDA_AVAILABLE:
             self.cache_misses = 0
 
         def get_array(self, shape: Tuple[int, ...], dtype: Any = np.float32) -> Any:
+            """Return a pooled device array of the given shape/dtype, allocating on a cache miss."""
             key = (shape, dtype)
             if key in self.pool and len(self.pool[key]) > 0:
                 self.cache_hits += 1
@@ -1251,6 +1253,7 @@ if CUDA_AVAILABLE:
                 return cuda.device_array(shape, dtype=dtype)
 
         def return_array(self, array: Any) -> None:
+            """Return a device array to the pool for reuse, up to the pool size limit."""
             key = (array.shape, array.dtype)
             if key not in self.pool:
                 self.pool[key] = []
@@ -1259,6 +1262,7 @@ if CUDA_AVAILABLE:
                 self.pool[key].append(array)
 
         def get_stats(self) -> Dict[str, Any]:
+            """Return cache hit rate, total allocated memory, and per-shape pool sizes."""
             total_requests = self.cache_hits + self.cache_misses
             hit_rate = self.cache_hits / total_requests if total_requests > 0 else 0
             return {
@@ -1268,6 +1272,7 @@ if CUDA_AVAILABLE:
             }
 
         def clear(self) -> None:
+            """Empty the pool and reset allocation and cache statistics."""
             self.pool.clear()
             self.total_allocated = 0
             self.cache_hits = 0
@@ -1292,6 +1297,7 @@ if CUDA_AVAILABLE:
         """Advanced performance monitoring for CUDA kernels."""
 
         def __init__(self) -> None:
+            """Initialize empty kernel and memory statistics dictionaries."""
             self.kernel_stats = {}
             self.memory_stats = {}
 
@@ -1302,6 +1308,7 @@ if CUDA_AVAILABLE:
             block: Tuple[int, ...],
             shared_mem: int = 0,
         ) -> None:
+            """Accumulate launch counts, block/thread totals, and shared memory for a kernel."""
             if kernel_name not in self.kernel_stats:
                 self.kernel_stats[kernel_name] = {
                     "launches": 0,
@@ -1321,6 +1328,7 @@ if CUDA_AVAILABLE:
             stats["total_shared_mem"] += shared_mem
 
         def get_stats(self) -> Dict[str, Any]:
+            """Return aggregated kernel launch statistics and memory pool statistics."""
             return {
                 "kernel_stats": self.kernel_stats,
                 "memory_pool_stats": get_memory_pool_stats(),
@@ -1796,15 +1804,19 @@ else:
     # CPU-only fallback implementations
     class _MockMemoryPool:
         def get_array(self, *args: Any, **kwargs: Any) -> Any:
+            """Stub that raises because the CUDA memory pool is unavailable on CPU."""
             raise RuntimeError("CUDA memory pool not available")
 
         def return_array(self, *args: Any, **kwargs: Any) -> None:
+            """Stub that raises because the CUDA memory pool is unavailable on CPU."""
             raise RuntimeError("CUDA memory pool not available")
 
         def clear(self) -> None:
+            """No-op stub for the unavailable CUDA memory pool."""
             pass
 
         def get_stats(self) -> Dict[str, Any]:
+            """Return empty statistics for the unavailable CUDA memory pool."""
             return {}
 
     _cuda_memory_pool = _MockMemoryPool()
@@ -1813,12 +1825,15 @@ else:
         """CPU-only no-op performance monitor used when CUDA is unavailable."""
 
         def __init__(self) -> None:
+            """No-op initializer for the CPU-only performance monitor stub."""
             pass
 
         def record_kernel_launch(self, *args: Any) -> None:
+            """No-op stub since no CUDA kernels are launched on CPU."""
             pass
 
         def get_stats(self) -> Dict[str, Any]:
+            """Return empty statistics for the CPU-only performance monitor stub."""
             return {}
 
     _perf_monitor = CUDAPerformanceMonitor()

@@ -89,10 +89,12 @@ class TestRotationLogm(unittest.TestCase):
     """Cover rotation_logm edge cases."""
 
     def test_identity(self) -> None:
+        """Identity rotation yields a zero rotation angle."""
         omega, theta = utils.rotation_logm(np.eye(3))
         self.assertAlmostEqual(theta, 0.0, places=5)
 
     def test_90_deg_z(self) -> None:
+        """A 90° rotation about z recovers angle pi/2 and axis [0, 0, 1]."""
         R = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1.0]])
         omega, theta = utils.rotation_logm(R)
         self.assertAlmostEqual(theta, np.pi / 2, places=5)
@@ -138,6 +140,7 @@ class TestMatrixLog3Branches(unittest.TestCase):
     """Cover MatrixLog3 branches: identity, 180°, and general."""
 
     def test_identity(self) -> None:
+        """Identity rotation gives a zero matrix logarithm."""
         result = utils.MatrixLog3(np.eye(3))
         np.testing.assert_array_almost_equal(result, np.zeros((3, 3)))
 
@@ -179,6 +182,7 @@ class TestLogmToTwist(unittest.TestCase):
     """Cover logm_to_twist."""
 
     def test_zero_matrix(self) -> None:
+        """Zero logarithm matrix maps to a zero twist."""
         logm = np.zeros((4, 4))
         twist = utils.logm_to_twist(logm)
         np.testing.assert_array_almost_equal(twist, np.zeros(6))
@@ -189,6 +193,7 @@ class TestLogmToTwist(unittest.TestCase):
             utils.logm_to_twist(np.zeros((3, 3)))
 
     def test_general_logm(self) -> None:
+        """A general logarithm matrix maps to the expected twist components."""
         logm = np.zeros((4, 4))
         logm[0, 1] = -0.5
         logm[1, 0] = 0.5
@@ -213,6 +218,7 @@ class TestRotationMatrixToEulerGimbalLock(unittest.TestCase):
         self.assertEqual(angles.shape, (3,))
 
     def test_normal_rotation(self) -> None:
+        """A non-singular rotation returns three Euler angles."""
         R = np.array(
             [
                 [np.cos(0.3), -np.sin(0.3), 0],
@@ -228,6 +234,7 @@ class TestExtractRList(unittest.TestCase):
     """Cover extract_r_list."""
 
     def test_6xN_screw_list(self) -> None:
+        """A 6xN screw list yields one r vector per joint."""
         S = np.array(
             [
                 [0, 0],

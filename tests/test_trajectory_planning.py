@@ -36,6 +36,7 @@ def is_module_available(module_name) -> bool:
 
 class TestTrajectoryPlanning(unittest.TestCase):
     def setUp(self) -> None:
+        """Set up the backend, URDF, and planner fixtures for trajectory planning tests."""
         # Determine backend
         if is_module_available("cupy"):
             self.backend = "cupy"
@@ -169,6 +170,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         # Mock Dynamics with more comprehensive methods
         class MockDynamics:
             def __init__(self) -> None:
+                """Initialize the mock dynamics with identity spatial-inertia and screw lists."""
                 self.Glist = [np.eye(6) for _ in range(6)]  # 6 DOF robot
                 self.S_list = np.random.randn(6, 6).astype(np.float32)
                 self.M_list = np.eye(4)
@@ -253,6 +255,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         # Mock collision checker and potential field
         class MockCollisionChecker:
             def __init__(self, urdf_path=None) -> None:
+                """Initialize the mock collision checker with a fixed collision probability."""
                 self.collision_probability = 0.1  # 10% chance of collision
 
             def check_collision(self, thetalist) -> bool:
@@ -279,6 +282,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
             torque_limits=None,
             **kwargs,
         ) -> None:
+            """Patched planner initializer that injects mock collision and potential-field components."""
             # Initialize all required attributes FIRST
             self.serial_manipulator = serial_manipulator
             self.dynamics = dynamics
@@ -1369,6 +1373,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         errors_queue = queue.Queue()
 
         def generate_trajectory(thread_id) -> None:
+            """Worker that generates a trajectory on a thread and records results or errors."""
             try:
                 thetastart = np.zeros(self.num_joints)
                 thetaend = np.array([0.1 * thread_id] * self.num_joints)
@@ -1903,6 +1908,7 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
 
         class StressMockDynamics:
             def __init__(self) -> None:
+                """Initialize the stress-test mock dynamics with identity spatial-inertia and screw lists."""
                 self.Glist = [np.eye(6) for _ in range(6)]
                 self.S_list = np.random.randn(6, 6).astype(np.float32)
                 self.M_list = np.eye(4)

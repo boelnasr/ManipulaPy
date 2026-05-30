@@ -16,6 +16,7 @@ class TestUtilsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/utils.py bugs."""
 
     def test_transform_from_twist_prismatic_returns_4x4(self) -> None:
+        """Verify a prismatic twist yields a valid 4x4 homogeneous transform."""
         from ManipulaPy.utils import transform_from_twist
 
         S_prismatic = np.array([0, 0, 0, 1, 0, 0])
@@ -27,6 +28,7 @@ class TestUtilsRegressions(unittest.TestCase):
         np.testing.assert_array_almost_equal(T[3, :], [0, 0, 0, 1])
 
     def test_logm_pure_translation_no_div_by_zero(self) -> None:
+        """Verify logm of a pure translation avoids division by zero."""
         from ManipulaPy.utils import logm
 
         T = np.eye(4)
@@ -216,6 +218,7 @@ class TestDynamicsRegressions(unittest.TestCase):
             self.assertTrue(any("legacy approximation" in str(wi.message) for wi in w))
 
     def test_gravity_forces_mutable_default_is_safe(self) -> None:
+        """Verify gravity_forces uses None instead of a mutable default for g."""
         import inspect
         from ManipulaPy.dynamics import ManipulatorDynamics
 
@@ -519,6 +522,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
         self.assertAlmostEqual(s_ddot(1.0), 0.0)
 
     def test_quintic_trajectory_zero_endpoint_acceleration(self) -> None:
+        """Verify a quintic joint trajectory has zero acceleration at both endpoints."""
         from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
 
         class MockManip:
@@ -545,6 +549,7 @@ class TestPathPlanningRegressions(unittest.TestCase):
         )
 
     def test_plot_tcp_trajectory_does_not_shadow_time_module(self) -> None:
+        """Verify the trajectory plotter does not shadow the time module."""
         import inspect
         from ManipulaPy import path_planning
 
@@ -560,6 +565,7 @@ class TestControlRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/control.py bugs."""
 
     def test_cartesian_space_control_dimensions(self) -> None:
+        """Verify cartesian_space_control returns a torque vector sized to the DOF."""
         from ManipulaPy.urdf_processor import URDFToSerialManipulator
         from ManipulaPy.control import ManipulatorController
         from ManipulaPy.ManipulaPy_data.ur5 import urdf_file
@@ -579,6 +585,7 @@ class TestControlRegressions(unittest.TestCase):
         self.assertEqual(tau.shape, (n,))
 
     def test_cartesian_space_control_accepts_vector_gains(self) -> None:
+        """Verify cartesian_space_control accepts per-axis vector Kp and Kd gains."""
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
@@ -603,6 +610,7 @@ class TestControlRegressions(unittest.TestCase):
         np.testing.assert_allclose(tau, np.array([9.5, 38.0, 85.5]))
 
     def test_rise_time_handles_response_never_reaching_setpoint(self) -> None:
+        """Verify rise-time calculation handles a response that never reaches setpoint."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -611,6 +619,7 @@ class TestControlRegressions(unittest.TestCase):
         self.assertTrue(np.isinf(rt) or rt >= 0)
 
     def test_percent_overshoot_handles_zero_setpoint(self) -> None:
+        """Verify percent-overshoot calculation stays finite for a zero setpoint."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -619,6 +628,7 @@ class TestControlRegressions(unittest.TestCase):
         self.assertTrue(np.isfinite(po))
 
     def test_pid_control_resets_eint_on_dof_change(self) -> None:
+        """Verify the PID integral term resets when the input DOF changes."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -652,6 +662,7 @@ class TestControlRegressions(unittest.TestCase):
         )
 
     def test_pid_control_dof_change_logs_debug_not_warning(self) -> None:
+        """Verify a PID DOF change logs at debug level rather than warning."""
         from unittest.mock import patch
 
         from ManipulaPy.control import ManipulatorController
@@ -689,6 +700,7 @@ class TestControlRegressions(unittest.TestCase):
         debug.assert_called_once()
 
     def test_ziegler_nichols_tuning_rejects_zero_period(self) -> None:
+        """Verify Ziegler-Nichols PID tuning rejects a zero oscillation period."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -696,6 +708,7 @@ class TestControlRegressions(unittest.TestCase):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=0.0, kind="PID")
 
     def test_ziegler_nichols_p_allows_zero_period(self) -> None:
+        """Verify Ziegler-Nichols P tuning permits a zero oscillation period."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -707,6 +720,7 @@ class TestControlRegressions(unittest.TestCase):
         self.assertEqual(Kd, 0.0)
 
     def test_ziegler_nichols_tuning_rejects_negative_period(self) -> None:
+        """Verify Ziegler-Nichols PID tuning rejects a negative oscillation period."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -714,6 +728,7 @@ class TestControlRegressions(unittest.TestCase):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=-1.0, kind="PID")
 
     def test_ziegler_nichols_tuning_rejects_nonfinite_period(self) -> None:
+        """Verify Ziegler-Nichols PID tuning rejects NaN or infinite periods."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -723,6 +738,7 @@ class TestControlRegressions(unittest.TestCase):
             ctrl.ziegler_nichols_tuning(Ku=10.0, Tu=float("inf"), kind="PID")
 
     def test_pid_control_integral_windup_clamped_when_set(self) -> None:
+        """Verify PID integral windup stays within the configured i_clamp bound."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -748,6 +764,7 @@ class TestControlRegressions(unittest.TestCase):
         )
 
     def test_pid_control_rejects_invalid_i_clamp(self) -> None:
+        """Verify pid_control rejects nonpositive or nonfinite i_clamp values."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -767,6 +784,7 @@ class TestControlRegressions(unittest.TestCase):
                     )
 
     def test_computed_torque_control_rejects_invalid_i_clamp(self) -> None:
+        """Verify computed_torque_control rejects an invalid i_clamp value."""
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
@@ -810,6 +828,7 @@ class TestControlRegressions(unittest.TestCase):
         np.testing.assert_allclose(ctrl.eint, [1.0], atol=1e-9)
 
     def test_pid_control_initializes_integral_as_float_for_integer_inputs(self) -> None:
+        """Verify pid_control initializes the integral term as float for integer inputs."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -831,6 +850,7 @@ class TestControlRegressions(unittest.TestCase):
     def test_computed_torque_control_initializes_integral_as_float_for_integer_inputs(
         self,
     ) -> None:
+        """Verify computed_torque_control initializes the integral as float for integer inputs."""
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
@@ -861,6 +881,7 @@ class TestControlRegressions(unittest.TestCase):
         np.testing.assert_allclose(tau, [1.01, 1.01])
 
     def test_kalman_filter_update_rejects_shape_mismatch(self) -> None:
+        """Verify the Kalman update rejects a measurement that mismatches the state size."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -873,6 +894,7 @@ class TestControlRegressions(unittest.TestCase):
             ctrl.kalman_filter_update(z_wrong, R_wrong)
 
     def test_kalman_filter_update_rejects_bad_R_shape(self) -> None:
+        """Verify the Kalman update rejects a measurement-noise matrix of wrong shape."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -885,6 +907,7 @@ class TestControlRegressions(unittest.TestCase):
             ctrl.kalman_filter_update(z, R_wrong)
 
     def test_kalman_filter_update_rejects_column_vector_z(self) -> None:
+        """Verify the Kalman update rejects a column-vector measurement."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -894,6 +917,7 @@ class TestControlRegressions(unittest.TestCase):
             ctrl.kalman_filter_update(np.zeros((4, 1)), np.eye(4))
 
     def test_kalman_filter_predict_rejects_bad_Q_shape(self) -> None:
+        """Verify the Kalman predict step rejects a process-noise matrix of wrong shape."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -913,6 +937,7 @@ class TestControlRegressions(unittest.TestCase):
             )
 
     def test_kalman_filters_explicitly_convert_real_cupy_like_arrays(self) -> None:
+        """Verify Kalman filters explicitly convert CuPy-like arrays via .get()."""
         from types import SimpleNamespace
         from unittest.mock import patch
 
@@ -921,6 +946,7 @@ class TestControlRegressions(unittest.TestCase):
 
         class ExplicitArray:
             def __init__(self, value) -> None:
+                """Wrap a value as a NumPy array for the CuPy-like stub."""
                 self.value = np.asarray(value)
 
             def get(self) -> np.ndarray:
@@ -928,6 +954,7 @@ class TestControlRegressions(unittest.TestCase):
                 return self.value
 
             def __array__(self, dtype=None) -> None:
+                """Block implicit NumPy conversion to force explicit .get() usage."""
                 raise TypeError("Implicit conversion to a NumPy array is not allowed")
 
         class Dynamics:
@@ -992,6 +1019,7 @@ class TestControlRegressions(unittest.TestCase):
         )
 
     def test_settling_time_returns_first_settled_time_not_last(self) -> None:
+        """Verify settling-time returns the first settled instant, not the last sample."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -1003,6 +1031,7 @@ class TestControlRegressions(unittest.TestCase):
         )
 
     def test_settling_time_handles_negative_setpoint(self) -> None:
+        """Verify settling-time handles a negative setpoint symmetrically."""
         from ManipulaPy.control import ManipulatorController
 
         ctrl = ManipulatorController(None)
@@ -1018,6 +1047,7 @@ class TestSingularityRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/singularity.py bugs."""
 
     def test_singularity_analysis_works_on_redundant_robot(self) -> None:
+        """Verify singularity analysis works on a redundant (non-square) Jacobian."""
         from ManipulaPy.singularity import Singularity
 
         class MockManip:
@@ -1040,12 +1070,15 @@ class TestSingularityRegressions(unittest.TestCase):
 
         class RecordingAxis:
             def __init__(self) -> None:
+                """Initialize the axis stub with an empty surfaces list."""
                 self.surfaces = []
 
             def plot_surface(self, x, y, z, **kwargs) -> None:
+                """Record the plotted surface coordinates instead of rendering."""
                 self.surfaces.append((x, y, z))
 
             def set_title(self, title) -> None:
+                """No-op stub for the axis title setter."""
                 pass
 
         ax = RecordingAxis()
@@ -1057,6 +1090,7 @@ class TestSingularityRegressions(unittest.TestCase):
                 self.assertTrue(np.all(np.isfinite(values)))
 
     def test_manipulability_ellipsoid_handles_underactuated_jacobian(self) -> None:
+        """Verify the manipulability ellipsoid handles an underactuated Jacobian."""
         from ManipulaPy.singularity import Singularity
 
         class MockManip:
@@ -1066,12 +1100,15 @@ class TestSingularityRegressions(unittest.TestCase):
 
         class RecordingAxis:
             def __init__(self) -> None:
+                """Initialize the axis stub with an empty surfaces list."""
                 self.surfaces = []
 
             def plot_surface(self, x, y, z, **kwargs) -> None:
+                """Record the plotted surface coordinates instead of rendering."""
                 self.surfaces.append((x, y, z))
 
             def set_title(self, title) -> None:
+                """No-op stub for the axis title setter."""
                 pass
 
         ax = RecordingAxis()
@@ -1088,6 +1125,7 @@ class TestPotentialFieldRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/potential_field.py bugs."""
 
     def test_repulsive_potential_when_at_obstacle(self) -> None:
+        """Verify the repulsive potential stays finite when exactly at an obstacle."""
         from ManipulaPy.potential_field import PotentialField
 
         pf = PotentialField(
@@ -1098,6 +1136,7 @@ class TestPotentialFieldRegressions(unittest.TestCase):
         self.assertTrue(np.isfinite(p_val))
 
     def test_repulsive_gradient_when_at_obstacle(self) -> None:
+        """Verify the repulsive gradient stays finite when exactly at an obstacle."""
         from ManipulaPy.potential_field import PotentialField
 
         pf = PotentialField(
@@ -1122,6 +1161,7 @@ class TestPotentialFieldRegressions(unittest.TestCase):
         )
 
     def test_repulsive_gradient_at_obstacle_escape_is_bounded(self) -> None:
+        """Verify the at-obstacle escape gradient is bounded to a unit direction."""
         from ManipulaPy.potential_field import PotentialField
 
         pf = PotentialField(
@@ -1580,6 +1620,7 @@ class TestSimPybulletGuards(unittest.TestCase):
         return sim
 
     def test_public_methods_raise_importerror_without_pybullet(self) -> None:
+        """Verify public sim methods raise ImportError when pybullet is absent."""
         from unittest.mock import patch
 
         for method_name, args_factory in self._METHODS_AND_ARGS:
@@ -1640,6 +1681,7 @@ class TestVisionRegressions(unittest.TestCase):
 
 class TestUrdfRegressions(unittest.TestCase):
     def test_mesh_load_failure_emits_warning(self) -> None:
+        """Verify a failed mesh load emits a 'not found' warning log."""
         import logging
         from ManipulaPy.urdf.types import Mesh  # adjust import path as needed
 
@@ -1649,6 +1691,7 @@ class TestUrdfRegressions(unittest.TestCase):
         self.assertTrue(any("not found" in msg.lower() for msg in cm.output))
 
     def test_package_resolver_refuses_ambiguous_package_uri(self) -> None:
+        """Verify the package resolver refuses an ambiguous package:// URI."""
         import tempfile
         from pathlib import Path
 
@@ -1941,6 +1984,7 @@ class TestUrdfRegressions(unittest.TestCase):
         self.assertIn("/tmp/right/robot.dae", joined)
 
     def test_mesh_loader_import_warning_mentions_file_and_install_hint(self) -> None:
+        """Verify the mesh-loader import warning names the file and an install hint."""
         import builtins
         from pathlib import Path
         from unittest.mock import patch
@@ -2192,6 +2236,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         )
 
     def test_cartesian_kernel_supports_linear_method(self) -> None:
+        """Verify the cartesian trajectory kernel implements the linear method branch."""
         body = self._kernel_source("cartesian_trajectory_kernel")
         self.assertIn(
             "s = tau",
@@ -2201,6 +2246,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         )
 
     def test_batch_kernel_no_shared_memory_race(self) -> None:
+        """Verify the batch trajectory kernel no longer uses race-prone shared memory."""
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertNotIn(
             "cuda.shared.array",
@@ -2210,6 +2256,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
         )
 
     def test_batch_kernel_quintic_position_uses_tau5(self) -> None:
+        """Verify the batch kernel quintic position term uses the tau^5 form."""
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertNotIn("6.0 * tau * tau3", body)
         self.assertTrue(
@@ -2217,10 +2264,12 @@ class TestCudaKernelRegressions(unittest.TestCase):
         )
 
     def test_batch_kernel_quintic_acceleration_includes_one_minus_tau(self) -> None:
+        """Verify the batch kernel quintic acceleration includes the (1 - tau) factor."""
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertIn("(1 - tau) * (1 - 2 * tau)", body)
 
     def test_batch_kernel_supports_linear_method(self) -> None:
+        """Verify the batch trajectory kernel implements the linear method branch."""
         body = self._kernel_source("batch_trajectory_kernel")
         self.assertIn("s = tau", body)
 
@@ -2352,6 +2401,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
 
         class BrokenMemoryPool:
             def set_limit(self, *args, **kwargs) -> None:
+                """Stub memory-pool limit setter that always raises a CUDA error."""
                 raise RuntimeError("cudaErrorCompatNotSupportedOnDevice")
 
         broken_cupy = types.ModuleType("cupy")
@@ -2705,6 +2755,7 @@ class TestXacroRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/urdf/xacro.py — security audit (Task 41)."""
 
     def test_xacro_arg_name_must_match_identifier_pattern(self) -> None:
+        """Verify xacro arg names must match a safe identifier pattern."""
         from pathlib import Path
         from ManipulaPy.urdf.xacro import XacroProcessor
 
@@ -2721,6 +2772,7 @@ class TestXacroRegressions(unittest.TestCase):
                     )
 
     def test_xacro_arg_value_rejects_shell_metacharacters(self) -> None:
+        """Verify xacro arg values reject shell metacharacters."""
         from pathlib import Path
         from ManipulaPy.urdf.xacro import XacroProcessor
 
@@ -2739,6 +2791,7 @@ class TestXacroRegressions(unittest.TestCase):
                     )
 
     def test_xacro_arg_value_rejects_cli_flag_lookalikes(self) -> None:
+        """Verify xacro arg values reject CLI-flag-lookalike strings."""
         from pathlib import Path
         from ManipulaPy.urdf.xacro import XacroProcessor
 
@@ -2859,6 +2912,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         captured = {}
 
         def fake_set_motor(robot_id, indices, mode, targetPositions, forces) -> None:
+            """Stub motor-control setter that records the applied forces."""
             captured["forces"] = forces
 
         fake_p = MagicMock()

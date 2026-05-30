@@ -72,6 +72,7 @@ class TestTracIKSolverInit(unittest.TestCase, _RobotFixtureMixin):
     """Tests for TracIKSolver.__init__."""
 
     def test_init_stores_attributes(self) -> None:
+        """Constructor should store n_joints, joint_limits, and bounds."""
         solver = self._make_solver()
         self.assertEqual(solver.n_joints, 6)
         self.assertEqual(len(solver.joint_limits), 6)
@@ -114,6 +115,7 @@ class TestTracIKSolverSolve(unittest.TestCase, _RobotFixtureMixin):
     """Tests for TracIKSolver.solve (high-level API)."""
 
     def setUp(self) -> None:
+        """Build robot, solver, and a reachable target for solve() tests."""
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
@@ -184,11 +186,13 @@ class TestInitialGuesses(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _generate_initial_guesses."""
 
     def setUp(self) -> None:
+        """Build robot, solver, and a reachable target for guess tests."""
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, _ = self._reachable_target(self.robot)
 
     def test_with_theta0(self) -> None:
+        """First generated guess should be a copy of the provided theta0."""
         theta0 = np.ones(6) * 0.5
         guesses = self.solver._generate_initial_guesses(
             self.T_desired, theta0, num_restarts=5
@@ -198,6 +202,7 @@ class TestInitialGuesses(unittest.TestCase, _RobotFixtureMixin):
         self.assertGreaterEqual(len(guesses), 4)
 
     def test_without_theta0(self) -> None:
+        """Without theta0, guesses should start with heuristic and midpoint."""
         guesses = self.solver._generate_initial_guesses(
             self.T_desired, None, num_restarts=6
         )
@@ -222,6 +227,7 @@ class TestSVDRobustSolve(unittest.TestCase, _RobotFixtureMixin):
     """Test SVD-robust solve behavior via _dls_solver."""
 
     def setUp(self) -> None:
+        """Build robot, solver, and a reachable target for DLS robustness tests."""
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
@@ -295,9 +301,11 @@ class TestDetectOscillation(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _detect_oscillation."""
 
     def setUp(self) -> None:
+        """Build a solver for oscillation-detection tests."""
         self.solver = self._make_solver()
 
     def test_short_history_returns_false(self) -> None:
+        """Too-short history should report neither stagnation nor oscillation."""
         history = deque([1.0, 2.0], maxlen=10)
         stag, osc = self.solver._detect_oscillation(history, window_size=5)
         self.assertFalse(stag)
@@ -336,6 +344,7 @@ class TestDLSPerturbationRecovery(unittest.TestCase, _RobotFixtureMixin):
     """Test DLS solver's perturbation recovery from stagnation."""
 
     def setUp(self) -> None:
+        """Build robot and solver for perturbation-recovery tests."""
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
 
@@ -379,11 +388,13 @@ class TestDLSSolver(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _dls_solver."""
 
     def setUp(self) -> None:
+        """Build robot, solver, and a reachable target for _dls_solver tests."""
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
     def test_dls_converges(self) -> None:
+        """DLS solver should converge to the reachable target with low error."""
         stop_event = threading.Event()
         theta, success, error = self.solver._dls_solver(
             self.T_desired,
@@ -434,11 +445,13 @@ class TestSQPSolver(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _sqp_solver."""
 
     def setUp(self) -> None:
+        """Build robot, solver, and a reachable target for _sqp_solver tests."""
         self.robot = self._make_robot()
         self.solver = self._make_solver(self.robot)
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
     def test_sqp_converges(self) -> None:
+        """SQP solver should converge to the reachable target."""
         stop_event = threading.Event()
         theta, success, error = self.solver._sqp_solver(
             self.T_desired,
@@ -451,6 +464,7 @@ class TestSQPSolver(unittest.TestCase, _RobotFixtureMixin):
         self.assertTrue(success)
 
     def test_sqp_respects_stop_event(self) -> None:
+        """A pre-set stop_event should prevent SQP from converging."""
         stop_event = threading.Event()
         stop_event.set()
         theta, success, error = self.solver._sqp_solver(
@@ -472,6 +486,7 @@ class TestDefaultErrorFunc(unittest.TestCase, _RobotFixtureMixin):
     """Tests for _default_error_func."""
 
     def setUp(self) -> None:
+        """Build a solver for _default_error_func tests."""
         self.solver = self._make_solver()
 
     def test_identical_poses_zero_error(self) -> None:
@@ -551,20 +566,24 @@ class TestDelegatingHelpers(unittest.TestCase, _RobotFixtureMixin):
     """Verify the helpers delegate to ik_helpers correctly."""
 
     def setUp(self) -> None:
+        """Build a solver and reachable target for delegating-helper tests."""
         self.solver = self._make_solver()
         self.T_desired, _ = self._reachable_target()
 
     def test_workspace_heuristic_shape(self) -> None:
+        """Workspace-heuristic guess should have shape (6,)."""
         guess = self.solver._workspace_heuristic(self.T_desired)
         self.assertEqual(guess.shape, (6,))
 
     def test_midpoint_guess_shape(self) -> None:
+        """Midpoint guess should have shape (6,) and be zero for symmetric limits."""
         guess = self.solver._midpoint_guess()
         self.assertEqual(guess.shape, (6,))
         # For symmetric limits (-pi, pi), midpoint should be 0
         np.testing.assert_array_almost_equal(guess, np.zeros(6))
 
     def test_random_guess_within_limits(self) -> None:
+        """Random guesses should always lie within the joint limits."""
         for _ in range(10):
             guess = self.solver._random_guess()
             for i, (mn, mx) in enumerate(self.solver.joint_limits):
@@ -574,6 +593,7 @@ class TestDelegatingHelpers(unittest.TestCase, _RobotFixtureMixin):
                     self.assertLessEqual(guess[i], mx)
 
     def test_clip_to_limits(self) -> None:
+        """Out-of-range angles should be clipped to the joint limits."""
         theta = np.array([10.0, -10.0, 0.0, 0.0, 0.0, 0.0])
         clipped = self.solver._clip_to_limits(theta)
         self.assertAlmostEqual(clipped[0], np.pi)
@@ -587,10 +607,12 @@ class TestTracIKSolveConvenience(unittest.TestCase, _RobotFixtureMixin):
     """Tests for the module-level trac_ik_solve() function."""
 
     def setUp(self) -> None:
+        """Build robot and reachable target for trac_ik_solve() tests."""
         self.robot = self._make_robot()
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
     def test_convenience_function_success(self) -> None:
+        """trac_ik_solve() should succeed for a reachable target with theta0."""
         theta, success, solve_time = trac_ik_solve(
             self.robot, self.T_desired, theta0=self.theta_known, timeout=2.0
         )
@@ -598,6 +620,7 @@ class TestTracIKSolveConvenience(unittest.TestCase, _RobotFixtureMixin):
         self.assertEqual(theta.shape, (6,))
 
     def test_convenience_function_no_theta0(self) -> None:
+        """trac_ik_solve() without theta0 should still return a (6,) result."""
         theta, success, solve_time = trac_ik_solve(
             self.robot, self.T_desired, timeout=2.0
         )
@@ -612,10 +635,12 @@ class TestSerialManipulatorTracIK(unittest.TestCase, _RobotFixtureMixin):
     """Test the trac_ik() method on SerialManipulator."""
 
     def setUp(self) -> None:
+        """Build robot and reachable target for SerialManipulator.trac_ik() tests."""
         self.robot = self._make_robot()
         self.T_desired, self.theta_known = self._reachable_target(self.robot)
 
     def test_method_returns_tuple(self) -> None:
+        """trac_ik() should return a 3-element tuple."""
         result = self.robot.trac_ik(
             self.T_desired, theta0=self.theta_known, timeout=2.0
         )
@@ -623,6 +648,7 @@ class TestSerialManipulatorTracIK(unittest.TestCase, _RobotFixtureMixin):
         self.assertEqual(len(result), 3)
 
     def test_method_success(self) -> None:
+        """trac_ik() should succeed for a reachable target."""
         theta, success, solve_time = self.robot.trac_ik(
             self.T_desired, theta0=self.theta_known, timeout=2.0
         )

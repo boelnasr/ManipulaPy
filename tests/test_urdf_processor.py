@@ -10,6 +10,7 @@ from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 class TestURDFProcessor(unittest.TestCase):
     def setUp(self) -> None:
+        """Set the xArm URDF path used by the processor tests."""
         self.urdf_path = xarm_urdf_file
 
     def test_urdf_load(self) -> None:

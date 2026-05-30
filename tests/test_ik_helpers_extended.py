@@ -60,6 +60,7 @@ class TestWorkspaceHeuristicBranches(unittest.TestCase):
         self.assertEqual(theta.shape, (4,))
 
     def test_5_joints_normal(self) -> None:
+        """Workspace heuristic returns a 5-vector guess for a 5-joint target."""
         T = np.eye(4)
         T[:3, :3] = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1.0]])
         theta = workspace_heuristic_guess(T, 5, self._limits(5))

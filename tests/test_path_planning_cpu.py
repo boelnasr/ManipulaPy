@@ -11,6 +11,7 @@ from ManipulaPy.path_planning import _traj_cpu_njit, _trajectory_cpu_fallback
 
 
 def test_trajectory_cpu_fallback_cubic_endpoints() -> None:
+    """Cubic fallback hits start/end exactly with zero boundary velocity."""
     thetastart = np.array([0.0, 1.0], dtype=np.float32)
     thetaend = np.array([1.0, 3.0], dtype=np.float32)
     Tf, N, method = 1.0, 3, 3  # cubic: endpoints should match, vel/acc zero at ends
@@ -26,6 +27,7 @@ def test_trajectory_cpu_fallback_cubic_endpoints() -> None:
 
 
 def test_trajectory_cpu_fallback_quintic_midpoint_values() -> None:
+    """Quintic fallback reaches the expected midpoint value with finite velocities."""
     thetastart = np.array([0.0], dtype=np.float32)
     thetaend = np.array([1.0], dtype=np.float32)
     Tf, N, method = 2.0, 5, 5  # quintic
@@ -42,6 +44,7 @@ def test_trajectory_cpu_fallback_quintic_midpoint_values() -> None:
 
 
 def test_trajectory_cpu_fallback_unsupported_method_returns_constant() -> None:
+    """An unsupported method holds position constant with zero velocity and acceleration."""
     thetastart = np.array([1.0, 2.0], dtype=np.float32)
     thetaend = np.array([3.0, 4.0], dtype=np.float32)
     Tf, N, method = 1.0, 4, 7  # unsupported → s=0
@@ -55,6 +58,7 @@ def test_trajectory_cpu_fallback_unsupported_method_returns_constant() -> None:
 
 
 def test_traj_cpu_njit_matches_fallback() -> None:
+    """The njit-compiled trajectory matches the pure-Python fallback output."""
     thetastart = np.array([0.5], dtype=np.float32)
     thetaend = np.array([1.5], dtype=np.float32)
     Tf, N, method = 1.5, 6, 3

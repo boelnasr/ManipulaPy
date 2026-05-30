@@ -46,6 +46,7 @@ class PyBulletReference:
     """Helper class for PyBullet reference computations."""
 
     def __init__(self, urdf_path) -> None:
+        """Connect a DIRECT PyBullet client and load the given URDF for reference."""
         import pybullet as p
         import pybullet_data
         from ManipulaPy.urdf.resolver import PackageResolver
