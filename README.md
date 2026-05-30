@@ -411,7 +411,7 @@ Bug reports, feature requests, and pull requests welcome. The flow is documented
 
 1. Fork → branch → make the change → `python -m pytest tests/ -q` should be green.
 2. New behavior needs a regression test in `tests/test_v132_regressions.py` (or a sibling file).
-3. Surgical edits over speculative refactors — see CLAUDE.md if you're collaborating with an AI assistant.
+3. Surgical edits over speculative refactors.
 4. Open a PR against `main`. CI runs Python 3.9 – 3.12.
 
 ---
