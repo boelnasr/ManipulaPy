@@ -258,7 +258,8 @@ class Vision:
         physics_client: Optional[int] = None,
     ) -> None:
         """
-        Initializes the Vision system with optional monocular/stereo cameras, PyBullet debug tools, and YOLO object detection.
+        Initializes the Vision system with optional cameras, PyBullet debug
+        tools, and YOLO object detection.
 
         Parameters:
             - camera_configs: List of dictionaries for monocular cameras or stereo pairs.

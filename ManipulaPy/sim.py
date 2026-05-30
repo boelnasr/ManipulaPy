@@ -862,7 +862,9 @@ class Simulation:
                 joint_positions = self.get_joint_parameters()
                 if len(joint_positions) != len(self.non_fixed_joints):
                     raise ValueError(
-                        f"Number of joint positions ({len(joint_positions)}) does not match number of non-fixed joints ({len(self.non_fixed_joints)})."
+                        "Number of joint positions "
+                        f"({len(joint_positions)}) does not match number of "
+                        f"non-fixed joints ({len(self.non_fixed_joints)})."
                     )
                 self.set_joint_positions(joint_positions)
                 self.check_collisions()  # Check for collisions in each step
