@@ -13,7 +13,7 @@ from ManipulaPy.potential_field import PotentialField
 
 def finite_difference_gradient(
     pf: PotentialField, q: np.ndarray, q_goal: np.ndarray, obstacles
-):
+) -> np.ndarray:
     """Numerical gradient of total potential (attractive + repulsive) via central difference."""
     eps = 1e-6
     grad = np.zeros_like(q, dtype=float)

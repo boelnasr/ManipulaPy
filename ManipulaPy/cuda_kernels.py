@@ -85,7 +85,8 @@ def _detect_cuda_capability() -> Tuple[bool, Any, Any, Any, Optional[str]]:
 
             # Test basic kernel compilation
             @cuda.jit
-            def test_kernel(arr):
+            def test_kernel(arr) -> None:
+                """Write each thread's index into the array to validate execution."""
                 idx = cuda.grid(1)
                 if idx < arr.shape[0]:
                     arr[idx] = float32(idx)
@@ -128,8 +129,10 @@ if not CUDA_AVAILABLE:
 
     class MockCuda:
         @staticmethod
-        def jit(func=None, device=False, inline=False, fastmath=False):
-            def wrapper(*args, **kwargs):
+        def jit(func=None, device=False, inline=False, fastmath=False) -> Any:
+            """Return a stub decorator whose wrapped kernel raises on call."""
+            def wrapper(*args, **kwargs) -> NoReturn:
+                """Raise because no CUDA device is available to run the kernel."""
                 raise RuntimeError(
                     f"CUDA not available: {_cuda_error}\n"
                     "For 40x+ speedups, install CUDA support:\n"
@@ -143,35 +146,43 @@ if not CUDA_AVAILABLE:
             return wrapper if func is None else wrapper(func)
 
         @staticmethod
-        def grid(dim):
+        def grid(dim) -> int:
+            """Return 0 as the thread index since no real grid exists."""
             return 0
 
         @staticmethod
-        def device_array(*args, **kwargs):
+        def device_array(*args, **kwargs) -> NoReturn:
+            """Raise because device memory cannot be allocated without CUDA."""
             raise RuntimeError(f"CUDA not available: {_cuda_error}")
 
         @staticmethod
-        def to_device(*args, **kwargs):
+        def to_device(*args, **kwargs) -> NoReturn:
+            """Raise because host-to-device transfer needs an unavailable CUDA device."""
             raise RuntimeError(f"CUDA not available: {_cuda_error}")
 
         @staticmethod
-        def pinned_array(*args, **kwargs):
+        def pinned_array(*args, **kwargs) -> NoReturn:
+            """Raise because pinned host memory cannot be allocated without CUDA."""
             raise RuntimeError(f"CUDA not available: {_cuda_error}")
 
         @staticmethod
-        def is_available():
+        def is_available() -> bool:
+            """Report that CUDA is not available."""
             return False
 
         @staticmethod
-        def list_devices():
+        def list_devices() -> list:
+            """Return an empty device list since no CUDA device exists."""
             return []
 
         @staticmethod
-        def synchronize():
+        def synchronize() -> None:
+            """No-op synchronization stub for the CUDA-less fallback."""
             pass
 
         @staticmethod
-        def get_current_device():
+        def get_current_device() -> Any:
+            """Return a mock device exposing minimal hardware property defaults."""
             class MockDevice:
                 MULTIPROCESSOR_COUNT = 1
                 MAX_THREADS_PER_BLOCK = 1024
@@ -184,10 +195,12 @@ if not CUDA_AVAILABLE:
             return MockDevice()
 
         @staticmethod
-        def shared():
+        def shared() -> Any:
+            """Return a mock shared-memory namespace whose array() raises."""
             class SharedMock:
                 @staticmethod
-                def array(*args, **kwargs):
+                def array(*args, **kwargs) -> NoReturn:
+                    """Raise because shared memory needs an unavailable CUDA device."""
                     raise RuntimeError(f"CUDA not available: {_cuda_error}")
 
             return SharedMock()
@@ -197,7 +210,8 @@ if not CUDA_AVAILABLE:
         threadIdx = type("threadIdx", (), {"x": 0, "y": 0, "z": 0})()
 
         @staticmethod
-        def syncthreads():
+        def syncthreads() -> None:
+            """No-op thread-barrier stub for the CUDA-less fallback."""
             pass
 
     cuda = MockCuda()
@@ -563,7 +577,7 @@ if CUDA_AVAILABLE:
     jit_kwargs = {"fastmath": FAST_MATH}
 
     @cuda.jit(device=True, inline=True, **jit_kwargs)
-    def matrix_vector_multiply_6x6(M, v, result):
+    def matrix_vector_multiply_6x6(M, v, result) -> None:
         """Optimized 6x6 matrix-vector multiplication using registers."""
         # Unrolled for maximum performance
         result[0] = (
@@ -618,7 +632,7 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def trajectory_kernel(
         thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
-    ):
+    ) -> None:
         """Each thread computes its own time scaling — no shared memory race."""
         t_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         j_idx = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
@@ -657,7 +671,7 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def trajectory_kernel_vectorized(
         thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
-    ):
+    ) -> None:
         """
         FIXED: Vectorized trajectory kernel with correct 8-parameter signature.
         Each thread processes multiple time steps for better throughput.
@@ -722,7 +736,7 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def trajectory_kernel_memory_optimized(
         thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
-    ):
+    ) -> None:
         """
         FIXED: Memory-bandwidth optimized kernel with correct 8-parameter signature.
         Uses grid-stride loops for better memory utilization.
@@ -796,7 +810,7 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def trajectory_kernel_warp_optimized(
         thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
-    ):
+    ) -> None:
         """
         FIXED: Warp-level optimized kernel with correct 8-parameter signature.
         Uses warp-level primitives for maximum throughput.
@@ -847,7 +861,7 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def trajectory_kernel_cache_friendly(
         thetastart, thetaend, traj_pos, traj_vel, traj_acc, Tf, N, method
-    ):
+    ) -> None:
         """
         FIXED: Cache-friendly kernel with correct 8-parameter signature.
         Uses tiled computation to maximize cache utilization.
@@ -928,7 +942,7 @@ if CUDA_AVAILABLE:
         M,
         torques_trajectory,
         torque_limits,
-    ):
+    ) -> None:
         """
         FIXED: Inverse dynamics kernel with correct 10-parameter signature.
         Removed the problematic 'stream' parameter that was causing the mismatch.
@@ -991,7 +1005,7 @@ if CUDA_AVAILABLE:
         dthetamat,
         ddthetamat,
         joint_limits,
-    ):
+    ) -> None:
         """Forward dynamics kernel.
 
         Each thread integrates from the initial state up to its own ``t_idx``,
@@ -1053,7 +1067,7 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def cartesian_trajectory_kernel(
         pstart, pend, traj_pos, traj_vel, traj_acc, Tf, N, method
-    ):
+    ) -> None:
         """Cartesian trajectory kernel.
 
         Each thread computes its own time scaling (no shared memory) so the
@@ -1094,7 +1108,7 @@ if CUDA_AVAILABLE:
     @cuda.jit(**jit_kwargs)
     def fused_potential_gradient_kernel(
         positions, goal, obstacles, potential, gradient, influence_distance
-    ):
+    ) -> None:
         """
         FIXED: Fused potential gradient kernel with correct 6-parameter signature.
         Removed the problematic 'stream' parameter.
@@ -1173,7 +1187,7 @@ if CUDA_AVAILABLE:
         N,
         method,
         batch_size,
-    ):
+    ) -> None:
         """Generate position, velocity, and acceleration for a batch of trajectories."""
         # Compute global indices
         batch_idx = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x

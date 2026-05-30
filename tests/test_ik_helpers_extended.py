@@ -24,10 +24,12 @@ from ManipulaPy.ik_helpers import (
 class TestWorkspaceHeuristicBranches(unittest.TestCase):
     """Cover all branch conditions in workspace_heuristic_guess."""
 
-    def _limits(self, n):
+    def _limits(self, n) -> list:
+        """Return a list of n symmetric (-pi, pi) joint limits."""
         return [(-np.pi, np.pi)] * n
 
     def test_1_joint(self) -> None:
+        """1-joint heuristic guess points at the planar XY target."""
         T = np.eye(4)
         T[:3, 3] = [0.3, 0.2, 0.4]
         theta = workspace_heuristic_guess(T, 1, self._limits(1))
@@ -35,12 +37,14 @@ class TestWorkspaceHeuristicBranches(unittest.TestCase):
         self.assertAlmostEqual(theta[0], np.arctan2(0.2, 0.3), places=5)
 
     def test_2_joints(self) -> None:
+        """2-joint guess returns a 2-element vector."""
         T = np.eye(4)
         T[:3, 3] = [0.3, 0.2, 0.4]
         theta = workspace_heuristic_guess(T, 2, self._limits(2))
         self.assertEqual(theta.shape, (2,))
 
     def test_3_joints(self) -> None:
+        """3-joint guess sets the elbow joint to pi/4."""
         T = np.eye(4)
         T[:3, 3] = [0.3, 0.2, 0.4]
         theta = workspace_heuristic_guess(T, 3, self._limits(3))
@@ -84,22 +88,26 @@ class TestRandomInLimitsBranches(unittest.TestCase):
     """Cover all branches in random_in_limits."""
 
     def test_both_limits(self) -> None:
+        """Sample stays within both finite bounds."""
         limits = [(-1.0, 1.0)]
         theta = random_in_limits(limits)
         self.assertGreaterEqual(theta[0], -1.0)
         self.assertLessEqual(theta[0], 1.0)
 
     def test_only_min(self) -> None:
+        """Sample respects a lower bound when the upper is None."""
         limits = [(-1.0, None)]
         theta = random_in_limits(limits)
         self.assertGreaterEqual(theta[0], -1.0)
 
     def test_only_max(self) -> None:
+        """Sample respects an upper bound when the lower is None."""
         limits = [(None, 1.0)]
         theta = random_in_limits(limits)
         self.assertLessEqual(theta[0], 1.0)
 
     def test_no_limits(self) -> None:
+        """Sample falls back to the default (-pi, pi) range when unbounded."""
         limits = [(None, None)]
         theta = random_in_limits(limits)
         self.assertGreaterEqual(theta[0], -np.pi)
@@ -108,6 +116,7 @@ class TestRandomInLimitsBranches(unittest.TestCase):
 
 class TestMidpointOfLimits(unittest.TestCase):
     def test_none_limits_stay_zero(self) -> None:
+        """Joints with any None bound default to a midpoint of zero."""
         limits = [(None, None), (None, 2.0), (-1.0, None)]
         theta = midpoint_of_limits(limits)
         self.assertAlmostEqual(theta[0], 0.0)
@@ -115,22 +124,26 @@ class TestMidpointOfLimits(unittest.TestCase):
         self.assertAlmostEqual(theta[2], 0.0)
 
     def test_empty_limits(self) -> None:
+        """Empty limits yield an empty midpoint vector."""
         theta = midpoint_of_limits([])
         self.assertEqual(len(theta), 0)
 
 
 class TestClipToLimits(unittest.TestCase):
     def test_clips_min(self) -> None:
+        """Values below the lower bound are clipped to it."""
         theta = np.array([-5.0])
         clipped = _clip_to_limits(theta, [(-1.0, 1.0)])
         self.assertAlmostEqual(clipped[0], -1.0)
 
     def test_clips_max(self) -> None:
+        """Values above the upper bound are clipped to it."""
         theta = np.array([5.0])
         clipped = _clip_to_limits(theta, [(-1.0, 1.0)])
         self.assertAlmostEqual(clipped[0], 1.0)
 
     def test_none_limits_no_clip(self) -> None:
+        """None bounds leave the value unclipped."""
         theta = np.array([100.0])
         clipped = _clip_to_limits(theta, [(None, None)])
         self.assertAlmostEqual(clipped[0], 100.0)
@@ -153,10 +166,12 @@ class TestIKInitialGuessCacheExtended(unittest.TestCase):
     """Extended cache tests for uncovered branches."""
 
     def test_get_nearest_empty_cache(self) -> None:
+        """Querying an empty cache returns None."""
         cache = IKInitialGuessCache()
         self.assertIsNone(cache.get_nearest(np.eye(4)))
 
     def test_fifo_eviction(self) -> None:
+        """Cache evicts oldest entries once max_size is exceeded."""
         cache = IKInitialGuessCache(max_size=3)
         for i in range(5):
             T = np.eye(4)
@@ -201,12 +216,14 @@ class TestIKInitialGuessCacheExtended(unittest.TestCase):
         self.assertIsNotNone(result)
 
     def test_clear(self) -> None:
+        """clear() empties the cache."""
         cache = IKInitialGuessCache()
         cache.add(np.eye(4), np.zeros(3))
         cache.clear()
         self.assertEqual(cache.size(), 0)
 
     def test_pose_distance(self) -> None:
+        """Pose distance equals the translational offset for pure translation."""
         T1 = np.eye(4)
         T2 = np.eye(4)
         T2[0, 3] = 1.0
@@ -241,6 +258,7 @@ class TestAdaptiveMultiStartIK(unittest.TestCase):
         call_count = [0]
 
         def failing_solver(T, **kw) -> None:
+            """Mock solver that counts calls and always raises."""
             call_count[0] += 1
             raise RuntimeError("solver error")
 
@@ -254,6 +272,7 @@ class TestAdaptiveMultiStartIK(unittest.TestCase):
         """If best_solution is None (all exceptions), should return midpoint of []."""
 
         def always_fails(T, **kw) -> None:
+            """Mock solver that always raises."""
             raise RuntimeError("fail")
 
         theta, success, iters, strategy = adaptive_multi_start_ik(

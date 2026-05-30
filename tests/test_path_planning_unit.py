@@ -16,23 +16,29 @@ class StubManipulator:
 
 
 class MockDynamics:
-    def __init__(self, n=2) -> None:
+    """Lightweight dynamics stub with trivial affine/linear models."""
+
+    def __init__(self, n: int = 2) -> None:
+        """Initialize mock dynamics with ``n`` joints and placeholder matrices."""
         self.n = n
         self.Glist = np.ones((n, n, n), dtype=np.float32)
         self.S_list = np.eye(6, n, dtype=np.float32)
         self.M_list = np.eye(4, dtype=np.float32)
 
-    def inverse_dynamics(self, q, dq, ddq, g, Ftip):
+    def inverse_dynamics(self, q, dq, ddq, g, Ftip) -> np.ndarray:
+        """Return a simple affine torque model: ``ddq`` plus a gravity bias."""
         # Simple affine model: ddq + gravity bias
         return np.asarray(ddq, dtype=np.float32) + 0.1
 
-    def forward_dynamics(self, q, dq, tau, g, Ftip):
+    def forward_dynamics(self, q, dq, tau, g, Ftip) -> np.ndarray:
+        """Return a simple linear acceleration model: ``tau`` minus small damping."""
         # Simple linear response: tau minus small damping
         return np.asarray(tau, dtype=np.float32) - 0.05
 
 
 @pytest.fixture
-def planner():
+def planner() -> OptimizedTrajectoryPlanning:
+    """Provide a CPU-only 2-joint trajectory planner for the tests."""
     joint_limits = [(-1.0, 1.0), (-2.0, 2.0)]
     return OptimizedTrajectoryPlanning(
         StubManipulator(),
@@ -44,6 +50,7 @@ def planner():
 
 
 def test_joint_trajectory_cpu_path(planner: OptimizedTrajectoryPlanning) -> None:
+    """Joint trajectory on the CPU path respects endpoints and updates stats."""
     result = planner.joint_trajectory(
         thetastart=[0.0, 0.5],
         thetaend=[1.0, -0.5],
@@ -65,6 +72,7 @@ def test_joint_trajectory_cpu_path(planner: OptimizedTrajectoryPlanning) -> None
 
 
 def test_batch_joint_trajectory_cpu(planner: OptimizedTrajectoryPlanning) -> None:
+    """Batched CPU joint trajectory matches the direct CPU generator."""
     start_batch = np.array([[0.0, 0.0], [0.5, -0.5]], dtype=np.float32)
     end_batch = np.array([[1.0, 1.0], [-0.5, 0.5]], dtype=np.float32)
     res = planner.batch_joint_trajectory(start_batch, end_batch, Tf=1.0, N=3, method=3)
@@ -76,6 +84,7 @@ def test_batch_joint_trajectory_cpu(planner: OptimizedTrajectoryPlanning) -> Non
 
 
 def test_batch_joint_trajectory_clips_limits() -> None:
+    """Batched joint trajectory clips positions to the configured joint limits."""
     joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]
     planner = OptimizedTrajectoryPlanning(
         StubManipulator(),
@@ -95,6 +104,7 @@ def test_batch_joint_trajectory_clips_limits() -> None:
 
 
 def test_inverse_dynamics_cpu_clips_to_limits() -> None:
+    """Inverse dynamics on the CPU clips computed torques to the torque limits."""
     joint_limits = [(-1.0, 1.0)]
     torque_limits = [(-0.2, 0.2)]
     planner = OptimizedTrajectoryPlanning(
@@ -114,6 +124,7 @@ def test_inverse_dynamics_cpu_clips_to_limits() -> None:
 
 
 def test_forward_dynamics_cpu(planner: OptimizedTrajectoryPlanning) -> None:
+    """Forward dynamics trajectory on the CPU returns correctly shaped outputs."""
     thetalist = np.zeros(2, dtype=np.float32)
     dthetalist = np.zeros_like(thetalist)
     taumat = np.zeros((3, 2), dtype=np.float32)
@@ -129,6 +140,7 @@ def test_forward_dynamics_cpu(planner: OptimizedTrajectoryPlanning) -> None:
 
 
 def test_cartesian_trajectory_cpu(planner: OptimizedTrajectoryPlanning) -> None:
+    """Cartesian trajectory on the CPU respects endpoints and output shapes."""
     Xstart = np.eye(4, dtype=np.float32)
     Xend = np.eye(4, dtype=np.float32)
     Xend[:3, 3] = np.array([1.0, 0.0, 0.0])
@@ -145,16 +157,25 @@ def test_cartesian_trajectory_cpu(planner: OptimizedTrajectoryPlanning) -> None:
 
 
 def test_collision_avoidance_cpu_hook_runs() -> None:
+    """The CPU collision-avoidance hook is invoked and preserves output shape."""
+
     class StubCollisionChecker:
+        """Collision checker that reports a collision only on the first check."""
+
         def __init__(self) -> None:
+            """Initialize the call counter."""
             self.calls = 0
 
-        def check_collision(self, _):
+        def check_collision(self, _) -> bool:
+            """Record the call and report a collision only on the first invocation."""
             self.calls += 1
             return self.calls == 1  # collide on first check only
 
     class StubPotentialField:
-        def compute_gradient(self, step, q_goal, obstacles):
+        """Potential field stub returning a zero gradient."""
+
+        def compute_gradient(self, step, q_goal, obstacles) -> np.ndarray:
+            """Return a zero gradient matching the shape of ``step``."""
             return np.zeros_like(step)
 
     joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]
@@ -179,16 +200,25 @@ def test_collision_avoidance_cpu_hook_runs() -> None:
 
 
 def test_joint_trajectory_collision_hook_runs() -> None:
+    """Joint trajectory generation invokes the collision hook on the CPU path."""
+
     class StubCollisionChecker:
+        """Collision checker that reports a collision only for the first point."""
+
         def __init__(self) -> None:
+            """Initialize the call counter."""
             self.calls = 0
 
-        def check_collision(self, step):
+        def check_collision(self, step) -> bool:
+            """Record the call and report a collision only on the first invocation."""
             self.calls += 1
             return self.calls == 1  # only first point collides
 
     class StubPotentialField:
-        def compute_gradient(self, step, q_goal, obstacles):
+        """Potential field stub returning a zero gradient."""
+
+        def compute_gradient(self, step, q_goal, obstacles) -> np.ndarray:
+            """Return a zero gradient matching the shape of ``step``."""
             return np.zeros_like(step)
 
     joint_limits = [(-1.0, 1.0), (-1.0, 1.0)]

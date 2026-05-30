@@ -201,7 +201,7 @@ class TestTrajectoryGeneration:
     """Test trajectory generation with CUDA acceleration."""
 
     @pytest.fixture
-    def trajectory_params(self):
+    def trajectory_params(self) -> dict:
         """Common trajectory parameters for testing."""
         return {
             "thetastart": np.array([0.0, 0.5, 1.0, -0.5, 0.2, -0.3], dtype=np.float32),
@@ -360,7 +360,7 @@ class TestBatchTrajectoryGeneration:
     """Test batch trajectory generation functionality."""
 
     @pytest.fixture
-    def batch_params(self):
+    def batch_params(self) -> dict:
         """Batch trajectory parameters."""
         batch_size = 5
         num_joints = 6
@@ -432,7 +432,7 @@ class TestPotentialField:
     """Test potential field computation functionality."""
 
     @pytest.fixture
-    def potential_field_params(self):
+    def potential_field_params(self) -> dict:
         """Potential field parameters."""
         return {
             "positions": np.random.rand(64, 3).astype(np.float32),
@@ -791,7 +791,7 @@ class TestIntegrationScenarios:
     """Test integration scenarios and realistic use cases."""
 
     @pytest.fixture
-    def robot_params(self):
+    def robot_params(self) -> dict:
         """Realistic robot parameters for testing."""
         return {
             "num_joints": 6,
@@ -1351,10 +1351,12 @@ class TestPerformanceBenchmarks:
         thetastart = np.zeros(6, dtype=np.float32)
         thetaend = np.ones(6, dtype=np.float32)
 
-        def cpu_version():
+        def cpu_version() -> tuple:
+            """Generate the small trajectory on the CPU."""
             return trajectory_cpu_fallback(thetastart, thetaend, 1.0, 100, 5)
 
-        def gpu_version():
+        def gpu_version() -> tuple:
+            """Generate the small trajectory on the GPU."""
             return optimized_trajectory_generation(thetastart, thetaend, 1.0, 100, 5)
 
         # Run benchmarks
@@ -1370,10 +1372,12 @@ class TestPerformanceBenchmarks:
         thetastart = np.random.uniform(-1, 1, 12).astype(np.float32)
         thetaend = np.random.uniform(-1, 1, 12).astype(np.float32)
 
-        def cpu_version():
+        def cpu_version() -> tuple:
+            """Generate the large trajectory on the CPU."""
             return trajectory_cpu_fallback(thetastart, thetaend, 5.0, 10000, 5)
 
-        def gpu_version():
+        def gpu_version() -> tuple:
+            """Generate the large trajectory on the GPU."""
             return optimized_trajectory_generation(
                 thetastart, thetaend, 5.0, 10000, 5, use_pinned=True
             )

@@ -480,7 +480,7 @@ def get_all_available_robots() -> Dict[str, Dict]:
     return available
 
 
-def print_robot_catalog():
+def print_robot_catalog() -> None:
     """
     Print a formatted catalog of all available robots.
     """

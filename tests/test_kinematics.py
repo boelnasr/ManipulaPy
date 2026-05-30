@@ -510,6 +510,7 @@ class TestKinematics(unittest.TestCase):
         self.assertTrue(success or pos_err < 0.05)
 
     def test_smart_inverse_kinematics_invalid_strategy(self) -> None:
+        """Smart IK should reject an unknown strategy name."""
         with self.assertRaises(ValueError):
             self.robot.smart_inverse_kinematics(self.M, strategy="unknown")
 
@@ -638,6 +639,7 @@ class TestKinematics(unittest.TestCase):
         np.testing.assert_array_almost_equal(T[:3, 3], pose[:3])
 
     def test_robust_inverse_kinematics_success(self) -> None:
+        """Robust IK should converge near the home pose and report a valid strategy."""
         target_pose = np.copy(self.M)
 
         theta, success, total_iters, strategy = self.robot.robust_inverse_kinematics(
@@ -658,9 +660,11 @@ class TestKinematics(unittest.TestCase):
         self.assertLess(np.linalg.norm(final_pose[:3, 3] - target_pose[:3, 3]), 5e-2)
 
     def test_adaptive_multi_start_ik_sequence(self) -> None:
+        """Adaptive multi-start IK should try strategies in order until one succeeds."""
         call_order = []
 
-        def fake_solver(T_desired, strategy, **kwargs):
+        def fake_solver(T_desired, strategy, **kwargs) -> tuple:
+            """Stub IK solver that only succeeds for the 'random' strategy."""
             call_order.append(strategy)
             if strategy == "random":
                 return np.ones(6), True, 4

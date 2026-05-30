@@ -15,6 +15,7 @@ import time
 import types
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 import numpy as np
 import pytest
@@ -31,7 +32,7 @@ UR5_URDF = (
 )
 
 
-def has_pybullet():
+def has_pybullet() -> bool:
     """Check if pybullet is available."""
     try:
         import pybullet
@@ -88,7 +89,7 @@ class PyBulletReference:
             if joint_type in [0, 1]:  # Revolute or Prismatic
                 self.actuated_joints.append(i)
 
-    def _resolve_urdf_for_pybullet(self, urdf_path, resolver_cls):
+    def _resolve_urdf_for_pybullet(self, urdf_path, resolver_cls) -> Path:
         """Write a temporary URDF with package:// mesh paths resolved."""
         data_root = Path(__file__).parent.parent / "ManipulaPy" / "ManipulaPy_data"
         resolver = resolver_cls(base_path=urdf_path.parent, use_ros=False)
@@ -121,7 +122,7 @@ class PyBulletReference:
             if i < len(config):
                 self.p.resetJointState(self.robot_id, joint_idx, config[i])
 
-    def get_link_poses(self, config):
+    def get_link_poses(self, config) -> Dict[str, np.ndarray]:
         """Get all link poses at given configuration."""
         self.set_configuration(config)
 
@@ -144,7 +145,7 @@ class PyBulletReference:
 
         return poses
 
-    def get_end_effector_pose(self, config):
+    def get_end_effector_pose(self, config) -> Optional[np.ndarray]:
         """Get end effector pose."""
         poses = self.get_link_poses(config)
         # Return last link's pose
@@ -152,13 +153,13 @@ class PyBulletReference:
         last_link_name = self.joint_info[last_joint_idx]["link_name"]
         return poses.get(last_link_name)
 
-    def get_mass_matrix(self, config):
+    def get_mass_matrix(self, config) -> np.ndarray:
         """Get mass matrix at given configuration."""
         self.set_configuration(config)
         mass_matrix = self.p.calculateMassMatrix(self.robot_id, list(config))
         return np.array(mass_matrix)
 
-    def get_dynamics_info(self, link_idx):
+    def get_dynamics_info(self, link_idx) -> Dict[str, Any]:
         """Get dynamics info for a link."""
         info = self.p.getDynamicsInfo(self.robot_id, link_idx)
         return {
@@ -168,7 +169,7 @@ class PyBulletReference:
             "local_inertia_orn": np.array(info[4]),
         }
 
-    def _quat_to_rot(self, quat):
+    def _quat_to_rot(self, quat) -> np.ndarray:
         """Convert quaternion (xyzw) to rotation matrix."""
         x, y, z, w = quat
 
@@ -206,7 +207,7 @@ class TestFKAccuracy:
     """Test forward kinematics accuracy against PyBullet."""
 
     @pytest.fixture
-    def simple_arm_comparison(self):
+    def simple_arm_comparison(self) -> Iterator[Tuple[Any, "PyBulletReference"]]:
         """Load simple arm with both backends."""
         from ManipulaPy.urdf import URDF
 
@@ -219,7 +220,7 @@ class TestFKAccuracy:
         pybullet_ref.disconnect()
 
     @pytest.fixture
-    def ur5_comparison(self):
+    def ur5_comparison(self) -> Iterator[Tuple[Any, "PyBulletReference"]]:
         """Load UR5 with both backends."""
         from ManipulaPy.urdf import URDF
 
@@ -375,7 +376,7 @@ class TestDynamicsAccuracy:
     """Test dynamics accuracy against PyBullet."""
 
     @pytest.fixture
-    def simple_arm_dynamics(self):
+    def simple_arm_dynamics(self) -> Iterator[Tuple[Any, "PyBulletReference"]]:
         """Load simple arm for dynamics testing (more reliable than complex robots)."""
         from ManipulaPy.urdf import URDF
 
@@ -387,7 +388,7 @@ class TestDynamicsAccuracy:
         pybullet_ref.disconnect()
 
     @pytest.fixture
-    def ur5_dynamics(self):
+    def ur5_dynamics(self) -> Iterator[Tuple[Any, "PyBulletReference"]]:
         """Load UR5 for dynamics testing."""
         from ManipulaPy.urdf import URDF
 
@@ -461,7 +462,7 @@ class TestJointPropertiesAccuracy:
     """Test joint properties accuracy."""
 
     @pytest.fixture
-    def ur5_joints(self):
+    def ur5_joints(self) -> Iterator[Tuple[Any, "PyBulletReference"]]:
         """Load UR5 for joint testing."""
         from ManipulaPy.urdf import URDF
 
@@ -592,7 +593,7 @@ class TestPrismaticJointAccuracy:
     """Test prismatic joint FK accuracy."""
 
     @pytest.fixture
-    def prismatic_robot(self):
+    def prismatic_robot(self) -> Any:
         """Load prismatic joint robot."""
         from ManipulaPy.urdf import URDF
 
@@ -676,7 +677,7 @@ class TestBatchFKAccuracy:
                     )
 
 
-def run_accuracy_report():
+def run_accuracy_report() -> Dict[str, Any]:
     """Generate detailed accuracy report."""
     from ManipulaPy.urdf import URDF
 
@@ -868,7 +869,7 @@ def run_accuracy_report():
     return results
 
 
-def convert_to_serializable(obj):
+def convert_to_serializable(obj) -> Any:
     """Convert numpy types to Python native types for JSON serialization."""
     if isinstance(obj, np.bool_):
         return bool(obj)

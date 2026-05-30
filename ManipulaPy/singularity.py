@@ -138,7 +138,8 @@ class Singularity:
 
         # Define the CUDA kernel for generating joint angles
         @cuda.jit
-        def generate_joint_samples(rng_states, joint_limits, joint_samples):
+        def generate_joint_samples(rng_states, joint_limits, joint_samples) -> None:
+            """CUDA kernel filling joint_samples with uniform random angles."""
             pos = cuda.grid(1)
             if pos < joint_samples.shape[0]:
                 for i in range(joint_samples.shape[1]):

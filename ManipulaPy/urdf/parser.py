@@ -220,6 +220,7 @@ class URDFParser:
         """Create a filename resolution handler."""
 
         def handler(filename: str) -> str:
+            """Resolve a mesh filename, expanding package:// and file:// URIs."""
             if not filename:
                 return filename
 

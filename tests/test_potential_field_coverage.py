@@ -64,7 +64,7 @@ class TestPotentialFieldExtended(unittest.TestCase):
 class TestCollisionCheckerMocked(unittest.TestCase):
     """Test CollisionChecker with mocked URDF objects."""
 
-    def _make_convex_hull(self, offset=None):
+    def _make_convex_hull(self, offset=None) -> ConvexHull:
         """Create a small tetrahedron convex hull."""
         pts = np.array(
             [

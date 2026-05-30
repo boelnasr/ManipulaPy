@@ -10,6 +10,7 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 import threading
 import unittest
 from collections import deque
+from typing import Tuple
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -21,7 +22,8 @@ from ManipulaPy.trac_ik import TracIKSolver, trac_ik_solve
 class _RobotFixtureMixin:
     """Shared 6-DOF robot fixture for trac_ik tests."""
 
-    def _make_robot(self):
+    def _make_robot(self) -> SerialManipulator:
+        """Build the shared 6-DOF SerialManipulator fixture."""
         Slist = np.array(
             [
                 [0, 0, 1, 0, 0, 0],
@@ -44,7 +46,8 @@ class _RobotFixtureMixin:
             joint_limits=joint_limits,
         )
 
-    def _make_solver(self, robot=None):
+    def _make_solver(self, robot=None) -> TracIKSolver:
+        """Build a TracIKSolver wired to the fixture robot's FK/Jacobian."""
         if robot is None:
             robot = self._make_robot()
         return TracIKSolver(
@@ -54,8 +57,8 @@ class _RobotFixtureMixin:
             n_joints=len(robot.joint_limits),
         )
 
-    def _reachable_target(self, robot=None):
-        """Return a T_desired known to be reachable."""
+    def _reachable_target(self, robot=None) -> Tuple[np.ndarray, np.ndarray]:
+        """Return a (T_desired, theta) pair known to be reachable."""
         if robot is None:
             robot = self._make_robot()
         theta_known = np.array([0.1, 0.2, -0.3, 0.4, -0.5, 0.6])

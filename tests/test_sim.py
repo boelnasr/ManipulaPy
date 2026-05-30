@@ -31,6 +31,7 @@ import os
 import tempfile
 import time
 from pathlib import Path
+from typing import Iterator
 from unittest.mock import MagicMock, Mock, call, patch
 
 import numpy as np
@@ -57,6 +58,7 @@ class MockPyBullet:
     GEOM_SPHERE = 2
 
     def __init__(self) -> None:
+        """Initialize the mock and reset its internal state."""
         self.reset()
 
     def reset(self) -> None:
@@ -67,7 +69,8 @@ class MockPyBullet:
         self._joint_states = {}
         self._physics_client = None
 
-    def connect(self, mode):
+    def connect(self, mode) -> int:
+        """Pretend to connect and return a fake physics-client id."""
         self._physics_client = 1
         return 1
 
@@ -75,24 +78,31 @@ class MockPyBullet:
         self._physics_client = None
 
     def resetSimulation(self) -> None:
+        """No-op stand-in for PyBullet's resetSimulation."""
         pass
 
     def setAdditionalSearchPath(self, path) -> None:
+        """No-op stand-in for PyBullet's setAdditionalSearchPath."""
         pass
 
     def setGravity(self, x, y, z) -> None:
+        """No-op stand-in for PyBullet's setGravity."""
         pass
 
     def setTimeStep(self, dt) -> None:
+        """No-op stand-in for PyBullet's setTimeStep."""
         pass
 
-    def loadURDF(self, path, *args, **kwargs):
+    def loadURDF(self, path, *args, **kwargs) -> int:
+        """Return a fake URDF body id."""
         return 1
 
-    def getNumJoints(self, robot_id):
+    def getNumJoints(self, robot_id) -> int:
+        """Return a fixed joint count for the mocked robot."""
         return 6
 
-    def getJointInfo(self, robot_id, joint_idx):
+    def getJointInfo(self, robot_id, joint_idx) -> tuple:
+        """Return a synthetic joint-info tuple for the given joint index."""
         joint_types = [self.JOINT_REVOLUTE] * 6
         return (
             joint_idx,
@@ -109,44 +119,56 @@ class MockPyBullet:
             0,
         )
 
-    def getJointState(self, robot_id, joint_idx):
+    def getJointState(self, robot_id, joint_idx) -> tuple:
+        """Return a synthetic (position, velocity) pair for the joint."""
         return (joint_idx * 0.1, joint_idx * 0.05)
 
     def setJointMotorControlArray(self, *args, **kwargs) -> None:
+        """No-op stand-in for PyBullet's setJointMotorControlArray."""
         pass
 
-    def createCollisionShape(self, *args, **kwargs):
+    def createCollisionShape(self, *args, **kwargs) -> int:
+        """Return an incrementing fake collision-shape id."""
         self._shape_counter += 1
         return self._shape_counter
 
-    def createVisualShape(self, *args, **kwargs):
+    def createVisualShape(self, *args, **kwargs) -> int:
+        """Return an incrementing fake visual-shape id."""
         self._shape_counter += 1
         return self._shape_counter
 
-    def createMultiBody(self, *args, **kwargs):
+    def createMultiBody(self, *args, **kwargs) -> int:
+        """Return an incrementing fake multi-body id."""
         self._body_counter += 1
         return self._body_counter
 
     def removeBody(self, body_id) -> None:
+        """No-op stand-in for PyBullet's removeBody."""
         pass
 
-    def getQuaternionFromEuler(self, euler):
+    def getQuaternionFromEuler(self, euler) -> list:
+        """Return a fixed identity quaternion."""
         return [0, 0, 0, 1]
 
-    def getQuaternionFromAxisAngle(self, axis, angle):
+    def getQuaternionFromAxisAngle(self, axis, angle) -> list:
+        """Return a fixed identity quaternion."""
         return [0, 0, 0, 1]
 
-    def addUserDebugParameter(self, name, low, high, init):
+    def addUserDebugParameter(self, name, low, high, init) -> int:
+        """Return an incrementing fake debug-parameter id."""
         self._param_counter += 1
         return self._param_counter
 
-    def readUserDebugParameter(self, param_id):
+    def readUserDebugParameter(self, param_id) -> float:
+        """Return a fixed debug-parameter value."""
         return 0.5
 
     def stepSimulation(self) -> None:
+        """No-op stand-in for PyBullet's stepSimulation."""
         pass
 
-    def getLinkState(self, robot_id, link_idx):
+    def getLinkState(self, robot_id, link_idx) -> tuple:
+        """Return a synthetic link-state tuple with a fake world position."""
         return (
             None,
             None,
@@ -156,7 +178,8 @@ class MockPyBullet:
             None,
         )
 
-    def getContactPoints(self, *args, **kwargs):
+    def getContactPoints(self, *args, **kwargs) -> list:
+        """Return an empty contact-point list by default."""
         return []
 
 
@@ -165,7 +188,7 @@ mock_pybullet = MockPyBullet()
 
 
 @pytest.fixture(autouse=True)
-def mock_pybullet_module(monkeypatch: pytest.MonkeyPatch):
+def mock_pybullet_module(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Replace pybullet module completely"""
     # Patch all pybullet functions used in sim.py
     monkeypatch.setattr("ManipulaPy.sim.p", mock_pybullet)
@@ -208,14 +231,14 @@ def mock_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def basic_sim():
+def basic_sim() -> Simulation:
     """Create a basic simulation instance for testing"""
     joint_limits = [(-np.pi, np.pi)] * 6
     return Simulation("test_robot.urdf", joint_limits)
 
 
 @pytest.fixture
-def mock_urdf_processor(monkeypatch: pytest.MonkeyPatch):
+def mock_urdf_processor(monkeypatch: pytest.MonkeyPatch) -> Mock:
     """Mock the URDFToSerialManipulator"""
     mock_processor = Mock()
     mock_robot = Mock()
@@ -224,7 +247,8 @@ def mock_urdf_processor(monkeypatch: pytest.MonkeyPatch):
     mock_processor.serial_manipulator = mock_robot
     mock_processor.dynamics = mock_dynamics
 
-    def mock_urdf_processor_init(urdf_path):
+    def mock_urdf_processor_init(urdf_path) -> Mock:
+        """Return the shared mocked URDF processor."""
         return mock_processor
 
     monkeypatch.setattr(
@@ -385,6 +409,7 @@ class TestJointManagement:
         """Test reset button addition failure handling"""
 
         def failing_add_param(*args, **kwargs) -> None:
+            """Raise to simulate a failing debug-parameter call."""
             raise Exception("Debug parameter failed")
 
         # Patch the specific mock method
@@ -401,6 +426,7 @@ class TestJointManagement:
         control_calls = []
 
         def mock_control(robot_id, joints, mode, targetPositions=None, **kwargs) -> None:
+            """Record the arguments of each joint-control call."""
             control_calls.append(
                 {
                     "robot_id": robot_id,
@@ -438,7 +464,8 @@ class TestJointManagement:
         """Test reading joint parameter values"""
 
         # Set up mock to return specific values
-        def mock_read_param(param_id):
+        def mock_read_param(param_id) -> float:
+            """Return a preset debug-parameter value for the given id."""
             param_values = {1: 0.5, 2: -0.3, 3: 1.2}
             return param_values.get(param_id, 0)
 
@@ -498,7 +525,8 @@ class TestParameterManagement:
         """Test updating simulation parameters from GUI"""
         param_values = {}
 
-        def mock_read_param(param_id):
+        def mock_read_param(param_id) -> float:
+            """Return the staged debug-parameter value for the given id."""
             return param_values.get(param_id, 0)
 
         monkeypatch.setattr(mock_pybullet, "readUserDebugParameter", mock_read_param)
@@ -507,9 +535,11 @@ class TestParameterManagement:
         timestep_calls = []
 
         def mock_set_gravity(x, y, z) -> None:
+            """Record each gravity-setting call."""
             gravity_calls.append((x, y, z))
 
         def mock_set_timestep(t) -> None:
+            """Record each time-step-setting call."""
             timestep_calls.append(t)
 
         monkeypatch.setattr(mock_pybullet, "setGravity", mock_set_gravity)
@@ -697,7 +727,8 @@ class TestResourceManagement:
         disconnect_called = []
         original_disconnect = mock_pybullet.disconnect
 
-        def track_disconnect():
+        def track_disconnect() -> None:
+            """Record the disconnect call and delegate to the original."""
             disconnect_called.append(True)
             return original_disconnect()
 
@@ -739,7 +770,8 @@ class TestManualControl:
         # Mock manual control to exit after first iteration
         call_count = [0]
 
-        def mock_read_param(param_id):
+        def mock_read_param(param_id) -> float:
+            """Return a fixed value, raising KeyboardInterrupt after a few calls."""
             call_count[0] += 1
             if call_count[0] > 5:  # Exit after a few calls
                 raise KeyboardInterrupt("Test exit")
@@ -819,6 +851,7 @@ class MockPyBullet:
     GEOM_SPHERE = 2
 
     def __init__(self) -> None:
+        """Initialize the mock and reset its internal state."""
         self.reset()
 
     def reset(self) -> None:
@@ -829,7 +862,8 @@ class MockPyBullet:
         self._joint_states = {}
         self._physics_client = None
 
-    def connect(self, mode):
+    def connect(self, mode) -> int:
+        """Pretend to connect and return a fake physics-client id."""
         self._physics_client = 1
         return 1
 
@@ -837,24 +871,31 @@ class MockPyBullet:
         self._physics_client = None
 
     def resetSimulation(self) -> None:
+        """No-op stand-in for PyBullet's resetSimulation."""
         pass
 
     def setAdditionalSearchPath(self, path) -> None:
+        """No-op stand-in for PyBullet's setAdditionalSearchPath."""
         pass
 
     def setGravity(self, x, y, z) -> None:
+        """No-op stand-in for PyBullet's setGravity."""
         pass
 
     def setTimeStep(self, dt) -> None:
+        """No-op stand-in for PyBullet's setTimeStep."""
         pass
 
-    def loadURDF(self, path, *args, **kwargs):
+    def loadURDF(self, path, *args, **kwargs) -> int:
+        """Return a fake URDF body id."""
         return 1
 
-    def getNumJoints(self, robot_id):
+    def getNumJoints(self, robot_id) -> int:
+        """Return a fixed joint count for the mocked robot."""
         return 6
 
-    def getJointInfo(self, robot_id, joint_idx):
+    def getJointInfo(self, robot_id, joint_idx) -> tuple:
+        """Return a synthetic joint-info tuple for the given joint index."""
         joint_types = [self.JOINT_REVOLUTE] * 6
         return (
             joint_idx,
@@ -871,38 +912,48 @@ class MockPyBullet:
             0,
         )
 
-    def getJointState(self, robot_id, joint_idx):
+    def getJointState(self, robot_id, joint_idx) -> tuple:
+        """Return a synthetic (position, velocity) pair for the joint."""
         return (joint_idx * 0.1, joint_idx * 0.05)
 
     def setJointMotorControlArray(self, *args, **kwargs) -> None:
+        """No-op stand-in for PyBullet's setJointMotorControlArray."""
         pass
 
-    def createCollisionShape(self, *args, **kwargs):
+    def createCollisionShape(self, *args, **kwargs) -> int:
+        """Return an incrementing fake collision-shape id."""
         self._shape_counter += 1
         return self._shape_counter
 
-    def createVisualShape(self, *args, **kwargs):
+    def createVisualShape(self, *args, **kwargs) -> int:
+        """Return an incrementing fake visual-shape id."""
         self._shape_counter += 1
         return self._shape_counter
 
-    def createMultiBody(self, *args, **kwargs):
+    def createMultiBody(self, *args, **kwargs) -> int:
+        """Return an incrementing fake multi-body id."""
         self._body_counter += 1
         return self._body_counter
 
     def removeBody(self, body_id) -> None:
+        """No-op stand-in for PyBullet's removeBody."""
         pass
 
-    def getQuaternionFromEuler(self, euler):
+    def getQuaternionFromEuler(self, euler) -> list:
+        """Return a fixed identity quaternion."""
         return [0, 0, 0, 1]
 
-    def getQuaternionFromAxisAngle(self, axis, angle):
+    def getQuaternionFromAxisAngle(self, axis, angle) -> list:
+        """Return a fixed identity quaternion."""
         return [0, 0, 0, 1]
 
-    def addUserDebugParameter(self, name, low, high, init):
+    def addUserDebugParameter(self, name, low, high, init) -> int:
+        """Return an incrementing fake debug-parameter id."""
         self._param_counter += 1
         return self._param_counter
 
-    def readUserDebugParameter(self, param_id):
+    def readUserDebugParameter(self, param_id) -> float:
+        """Return a fixed debug-parameter value."""
         return 0.5
 
     def step_simulation(self) -> None:

@@ -19,7 +19,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 
-def is_module_available(module_name):
+def is_module_available(module_name) -> bool:
     """Check if a module is really available (not mocked)."""
     try:
         module = __import__(module_name)

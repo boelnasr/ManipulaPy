@@ -176,6 +176,7 @@ class XacroProcessor:
         include_pattern = re.compile(r'<include\s+filename="([^"]+)"\s*/>')
 
         def replace_include(match: re.Match) -> str:
+            """Inline the contents of an <include> directive."""
             include_file = match.group(1)
 
             # Resolve relative path

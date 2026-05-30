@@ -57,24 +57,28 @@ class TestExtractScrewListEdgeCases(unittest.TestCase):
         self.assertEqual(S.shape, (6, 2))
 
     def test_mismatched_shapes_raises(self) -> None:
+        """Mismatched omega/r column counts should raise ValueError."""
         omega = np.array([[0, 0], [0, 1], [1, 0]])
         r = np.array([[0.1, 0.2, 0.3], [0.0, 0.1, 0.2], [0.0, 0.0, 0.0]])
         with self.assertRaises(ValueError):
             utils.extract_screw_list(omega, r)
 
     def test_non_3_row_raises(self) -> None:
+        """omega without 3 rows should raise ValueError."""
         omega = np.array([[0, 0], [0, 1]])  # Only 2 rows
         r = np.array([[0.1, 0.2], [0.0, 0.1]])
         with self.assertRaises(ValueError):
             utils.extract_screw_list(omega, r)
 
     def test_1d_not_multiple_of_3_raises(self) -> None:
+        """1D r whose size is not a multiple of 3 should raise ValueError."""
         omega = np.array([0, 0, 1])
         r = np.array([0.1, 0.2])  # Size 2, not multiple of 3
         with self.assertRaises(ValueError):
             utils.extract_screw_list(omega, r)
 
     def test_1d_omega_not_multiple_of_3_raises(self) -> None:
+        """1D omega whose size is not a multiple of 3 should raise ValueError."""
         omega = np.array([0, 0])  # Size 2
         r = np.array([[0.1], [0.2], [0.0]])
         with self.assertRaises(ValueError):
@@ -96,6 +100,7 @@ class TestRotationLogm(unittest.TestCase):
         np.testing.assert_array_almost_equal(omega, [0, 0, 1], decimal=3)
 
     def test_non_3x3_raises(self) -> None:
+        """A non-3x3 matrix should raise ValueError."""
         with self.assertRaises(ValueError):
             utils.rotation_logm(np.eye(4))
 
@@ -179,6 +184,7 @@ class TestLogmToTwist(unittest.TestCase):
         np.testing.assert_array_almost_equal(twist, np.zeros(6))
 
     def test_invalid_shape_raises(self) -> None:
+        """A non-4x4 logarithm matrix should raise ValueError."""
         with self.assertRaises(ValueError):
             utils.logm_to_twist(np.zeros((3, 3)))
 

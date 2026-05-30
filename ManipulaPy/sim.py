@@ -51,6 +51,7 @@ except ImportError:
         # arguments are unsupported. Do NOT import this as ManipulaPy.sim.cp
         # from external code; depend on cupy directly if you need GPU semantics.
         def __getattr__(self, name: str) -> Any:
+            """Delegate attribute access to the NumPy module."""
             return getattr(np, name)
 
         def asnumpy(self, x: Any) -> np.ndarray:
@@ -105,6 +106,19 @@ class Simulation:
         enable_self_collision: bool = False,
         disable_pairs: Optional[Sequence[Tuple[str, str]]] = None,
     ) -> None:
+        """
+        Initialize the simulation and set up the PyBullet world.
+
+        Args:
+            urdf_file_path: Path to the robot's URDF file.
+            joint_limits: Per-joint (lower, upper) position limits.
+            torque_limits: Optional per-joint torque limits.
+            time_step: Simulation time step in seconds.
+            real_time_factor: Real-time playback factor.
+            physics_client: Existing PyBullet client id to reuse, if any.
+            enable_self_collision: Whether to enable self-collision checking.
+            disable_pairs: Link name pairs to exclude from self-collision.
+        """
         if not _PYBULLET_AVAILABLE:
             raise ImportError(
                 "Simulation requires pybullet. Install with: "

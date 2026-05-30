@@ -22,7 +22,7 @@ from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 
-def is_module_available(module_name):
+def is_module_available(module_name) -> bool:
     """Check if a module is available and usable by this test process."""
     try:
         module = __import__(module_name)
@@ -88,17 +88,21 @@ class TestManipulatorController(unittest.TestCase):
         # Create a simplified dynamics object for testing
         class MockDynamics:
             def __init__(self) -> None:
+                """Initialize the simplified 2-DOF dynamics fixture."""
                 self.Glist = np.array([np.eye(6), np.eye(6)])
                 self.S_list = np.array([[0, 0, 1, 0, 0, 0], [0, 0, 1, 0, 0.1, 0]]).T
                 self.M_list = np.eye(4)
 
-            def mass_matrix(self, thetalist):
+            def mass_matrix(self, thetalist) -> np.ndarray:
+                """Return a constant diagonal mass matrix."""
                 return np.diag([1.0, 0.8])
 
-            def velocity_quadratic_forces(self, thetalist, dthetalist):
+            def velocity_quadratic_forces(self, thetalist, dthetalist) -> np.ndarray:
+                """Return the velocity-dependent (Coriolis/centrifugal) forces."""
                 return np.array([0.01 * dthetalist[1] ** 2, 0.01 * dthetalist[0] ** 2])
 
-            def gravity_forces(self, thetalist, g):
+            def gravity_forces(self, thetalist, g) -> np.ndarray:
+                """Return the gravity torques for the given configuration."""
                 return np.array(
                     [
                         0.5 * g[2] * np.sin(thetalist[0]),
@@ -106,19 +110,22 @@ class TestManipulatorController(unittest.TestCase):
                     ]
                 )
 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
+            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+                """Return the joint torques required to follow the given motion."""
                 M = self.mass_matrix(thetalist)
                 c = self.velocity_quadratic_forces(thetalist, dthetalist)
                 grav = self.gravity_forces(thetalist, g)
                 return M.dot(ddthetalist) + c + grav
 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+                """Return the joint accelerations produced by the given torques."""
                 M = self.mass_matrix(thetalist)
                 c = self.velocity_quadratic_forces(thetalist, dthetalist)
                 grav = self.gravity_forces(thetalist, g)
                 return np.linalg.solve(M, taulist - c - grav)
 
-            def forward_kinematics(self, thetalist):
+            def forward_kinematics(self, thetalist) -> np.ndarray:
+                """Return the end-effector pose for a simple 2-DOF planar arm."""
                 # Simple 2-DOF planar forward kinematics
                 l1, l2 = 0.5, 0.3
                 c1 = np.cos(thetalist[0])
@@ -131,7 +138,8 @@ class TestManipulatorController(unittest.TestCase):
                 T[1, 3] = l1 * s1 + l2 * s12
                 return T
 
-            def jacobian(self, thetalist):
+            def jacobian(self, thetalist) -> np.ndarray:
+                """Return the 6x2 space Jacobian for the planar 2-DOF arm."""
                 l1 = 0.5
                 l2 = 0.3
                 s1 = np.sin(thetalist[0])

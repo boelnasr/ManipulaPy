@@ -23,7 +23,7 @@ from ManipulaPy.path_planning import (
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 
-def is_module_available(module_name):
+def is_module_available(module_name) -> bool:
     """Check if a module is available and not mocked."""
     try:
         module = __import__(module_name)
@@ -173,30 +173,37 @@ class TestTrajectoryPlanning(unittest.TestCase):
                 self.S_list = np.random.randn(6, 6).astype(np.float32)
                 self.M_list = np.eye(4)
 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+                """Return mock joint accelerations."""
                 return np.random.randn(*thetalist.shape) * 0.1
 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
+            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+                """Return mock joint torques."""
                 return np.random.randn(*thetalist.shape) * 10.0
 
-            def jacobian(self, thetalist):
+            def jacobian(self, thetalist) -> np.ndarray:
+                """Return a mock Jacobian matrix."""
                 J = np.random.randn(6, len(thetalist))
                 return J
 
-            def mass_matrix(self, thetalist):
+            def mass_matrix(self, thetalist) -> np.ndarray:
+                """Return a mock positive-definite mass matrix."""
                 n = len(thetalist)
                 M = np.random.randn(n, n)
                 return M @ M.T + np.eye(n)  # Ensure positive definite
 
-            def velocity_quadratic_forces(self, thetalist, dthetalist):
+            def velocity_quadratic_forces(self, thetalist, dthetalist) -> np.ndarray:
+                """Return mock velocity-dependent quadratic forces."""
                 return np.random.randn(*thetalist.shape) * 0.5
 
-            def gravity_forces(self, thetalist, g=[0, 0, -9.81]):
+            def gravity_forces(self, thetalist, g=[0, 0, -9.81]) -> np.ndarray:
+                """Return mock gravity forces."""
                 return np.random.randn(*thetalist.shape) * 5.0
 
         # Mock Serial Manipulator with more methods
         class MockSerialManipulator:
-            def forward_kinematics(self, thetalist, frame="space"):
+            def forward_kinematics(self, thetalist, frame="space") -> np.ndarray:
+                """Return a mock end-effector SE(3) pose."""
                 T = np.eye(4)
                 # Create realistic end-effector position
                 T[:3, 3] = [
@@ -215,17 +222,20 @@ class TestTrajectoryPlanning(unittest.TestCase):
                 )
                 return T
 
-            def iterative_inverse_kinematics(self, T_desired, thetalist0, **kwargs):
+            def iterative_inverse_kinematics(self, T_desired, thetalist0, **kwargs) -> tuple:
+                """Return a mock IK solution near the initial guess."""
                 # Simple mock IK that returns a solution close to initial guess
                 solution = np.array(thetalist0) + np.random.randn(len(thetalist0)) * 0.1
                 success = True
                 iterations = np.random.randint(10, 100)
                 return solution, success, iterations
 
-            def jacobian(self, thetalist, frame="space"):
+            def jacobian(self, thetalist, frame="space") -> np.ndarray:
+                """Return a mock Jacobian matrix."""
                 return np.random.randn(6, len(thetalist))
 
-            def end_effector_velocity(self, thetalist, dthetalist, frame="space"):
+            def end_effector_velocity(self, thetalist, dthetalist, frame="space") -> np.ndarray:
+                """Return a mock end-effector twist."""
                 return np.random.randn(6) * 0.1
 
         # Create mock objects with different DOF for testing
@@ -245,11 +255,13 @@ class TestTrajectoryPlanning(unittest.TestCase):
             def __init__(self, urdf_path=None) -> None:
                 self.collision_probability = 0.1  # 10% chance of collision
 
-            def check_collision(self, thetalist):
+            def check_collision(self, thetalist) -> bool:
+                """Return a random mock collision verdict."""
                 return np.random.random() < self.collision_probability
 
         class MockPotentialField:
-            def compute_gradient(self, q, q_goal, obstacles):
+            def compute_gradient(self, q, q_goal, obstacles) -> np.ndarray:
+                """Return a mock potential-field gradient pointing toward the goal."""
                 # Return gradient that points toward goal
                 return 0.1 * (np.array(q) - np.array(q_goal))
 
@@ -1895,7 +1907,8 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                 self.S_list = np.random.randn(6, 6).astype(np.float32)
                 self.M_list = np.eye(4)
 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+                """Return mock joint accelerations with bounded noise."""
                 # Add some realistic noise/complexity but keep values finite
                 result = np.random.randn(*thetalist.shape) * 0.01  # Small noise
                 result += 0.001 * np.sin(np.sum(thetalist))  # Small nonlinear coupling
@@ -1904,7 +1917,8 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                 result = np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
                 return result
 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
+            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+                """Return mock joint torques with bounded magnitude."""
                 # Simulate complex dynamics with gravity and coupling
                 result = 1.0 * ddthetalist  # Mass effect (reduced from 10.0)
                 result += 0.01 * dthetalist**2  # Velocity coupling (reduced from 0.1)
@@ -1916,7 +1930,8 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                 return result
 
         class StressMockRobot:
-            def forward_kinematics(self, thetalist, frame="space"):
+            def forward_kinematics(self, thetalist, frame="space") -> np.ndarray:
+                """Return a mock end-effector SE(3) pose."""
                 T = np.eye(4)
                 # More realistic end-effector position
                 cumulative_angle = np.cumsum(thetalist)
@@ -2067,7 +2082,7 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
             max_successful_N, 1000, "Should handle at least 1000 point trajectories"
         )
 
-    def _get_memory_info(self):
+    def _get_memory_info(self) -> int:
         """Get current memory usage (simplified)."""
         try:
             import psutil
@@ -2221,7 +2236,7 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
 
 
 # Test suite organization
-def suite():
+def suite() -> unittest.TestSuite:
     """Create comprehensive test suite."""
     suite = unittest.TestSuite()
 

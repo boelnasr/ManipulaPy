@@ -67,6 +67,7 @@ class Origin:
     _matrix_cache: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        """Coerce xyz and rpy into float64 numpy arrays."""
         self.xyz = np.asarray(self.xyz, dtype=np.float64)
         self.rpy = np.asarray(self.rpy, dtype=np.float64)
 
@@ -130,11 +131,13 @@ class Origin:
         return cls()
 
     def __eq__(self, other: object) -> bool:
+        """Compare two origins by xyz and rpy within tolerance."""
         if not isinstance(other, Origin):
             return NotImplemented
         return _array_eq(self.xyz, other.xyz) and _array_eq(self.rpy, other.rpy)
 
     def __hash__(self) -> int:
+        """Hash the origin by its xyz and rpy components."""
         return hash((tuple(self.xyz), tuple(self.rpy)))
 
 
@@ -153,6 +156,7 @@ class Inertial:
     )
 
     def __post_init__(self) -> None:
+        """Coerce the inertia tensor into a float64 numpy array."""
         self.inertia = np.asarray(self.inertia, dtype=np.float64)
 
     @property
@@ -258,14 +262,17 @@ class Box:
     size: np.ndarray = field(default_factory=lambda: np.ones(3, dtype=np.float64))
 
     def __post_init__(self) -> None:
+        """Coerce the box size into a float64 numpy array."""
         self.size = np.asarray(self.size, dtype=np.float64)
 
     def __eq__(self, other: object) -> bool:
+        """Compare two boxes by size within tolerance."""
         if not isinstance(other, Box):
             return NotImplemented
         return _array_eq(self.size, other.size)
 
     def __hash__(self) -> int:
+        """Hash the box by its size."""
         return hash(tuple(self.size))
 
 
@@ -302,6 +309,7 @@ class Mesh:
     _load_attempted: bool = field(default=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        """Coerce scale to a float64 array, broadcasting a scalar to 3 axes."""
         self.scale = np.asarray(self.scale, dtype=np.float64)
         if self.scale.size == 1:
             self.scale = np.full(3, self.scale.item(), dtype=np.float64)
@@ -321,6 +329,7 @@ class Mesh:
         return self._faces
 
     def _load_mesh(self) -> None:
+        """Attempt to load mesh vertices and faces from the filename via trimesh."""
         # Filename and exception text are interpolated with !r so newlines or
         # control characters in user-supplied URDFs cannot forge log lines.
         self._load_attempted = True
@@ -349,11 +358,13 @@ class Mesh:
             logger.warning(f"Failed to load mesh {self.filename!r}: {e!r}")
 
     def __eq__(self, other: object) -> bool:
+        """Compare two meshes by filename and scale within tolerance."""
         if not isinstance(other, Mesh):
             return NotImplemented
         return self.filename == other.filename and _array_eq(self.scale, other.scale)
 
     def __hash__(self) -> int:
+        """Hash the mesh by its filename and scale."""
         return hash((self.filename, tuple(self.scale)))
 
 
@@ -370,10 +381,12 @@ class Material:
     texture: Optional[str] = None
 
     def __post_init__(self) -> None:
+        """Coerce a non-None color into a float64 numpy array."""
         if self.color is not None:
             self.color = np.asarray(self.color, dtype=np.float64)
 
     def __eq__(self, other: object) -> bool:
+        """Compare two materials by name, color, and texture."""
         if not isinstance(other, Material):
             return NotImplemented
         return (
@@ -383,6 +396,7 @@ class Material:
         )
 
     def __hash__(self) -> int:
+        """Hash the material by its name, color, and texture."""
         color_tuple = tuple(self.color) if self.color is not None else None
         return hash((self.name, color_tuple, self.texture))
 
@@ -494,9 +508,11 @@ class Transmission:
     actuators: List[Actuator] = field(default_factory=list)
 
     def __hash__(self) -> int:
+        """Hash the transmission by its name."""
         return hash(self.name)
 
     def __eq__(self, other: object) -> bool:
+        """Compare two transmissions by name."""
         if not isinstance(other, Transmission):
             return NotImplemented
         return self.name == other.name
@@ -519,9 +535,11 @@ class Link:
     collisions: List[Collision] = field(default_factory=list)
 
     def __hash__(self) -> int:
+        """Hash the link by its name."""
         return hash(self.name)
 
     def __eq__(self, other: object) -> bool:
+        """Compare two links by name."""
         if not isinstance(other, Link):
             return NotImplemented
         return self.name == other.name
@@ -548,6 +566,7 @@ class Joint:
     calibration: Optional[JointCalibration] = None
 
     def __post_init__(self) -> None:
+        """Coerce the joint axis to a float64 array and normalize it."""
         self.axis = np.asarray(self.axis, dtype=np.float64)
         # Normalize axis
         norm = np.linalg.norm(self.axis)
@@ -750,9 +769,11 @@ class Joint:
         return R
 
     def __hash__(self) -> int:
+        """Hash the joint by its name."""
         return hash(self.name)
 
     def __eq__(self, other: object) -> bool:
+        """Compare two joints by name."""
         if not isinstance(other, Joint):
             return NotImplemented
         return self.name == other.name

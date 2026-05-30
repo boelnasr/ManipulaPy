@@ -19,7 +19,8 @@ from ManipulaPy.singularity import Singularity
 class MockSerialManipulator:
     """Mock class for SerialManipulator to provide a test Jacobian."""
 
-    def jacobian(self, thetalist, frame="space"):
+    def jacobian(self, thetalist, frame: str = "space") -> np.ndarray:
+        """Return a mock 6x6 Jacobian, singular at the zero configuration."""
         assert frame == "space"
 
         # Return an arbitrary 6x6 Jacobian
@@ -32,24 +33,28 @@ class MockSerialManipulator:
             J[5, 5] = 0.5  # Reduce manipulability
             return J
 
-    def forward_kinematics(self, thetas):
+    def forward_kinematics(self, thetas) -> np.ndarray:
+        """Return a mock homogeneous transform built from the joint sum."""
         T = np.eye(4)
         T[:3, 3] = np.sum(thetas)
         return T
 
 
 @pytest.fixture
-def singularity_analyzer():
+def singularity_analyzer() -> Singularity:
+    """Provide a Singularity analyzer backed by a mock manipulator."""
     robot = MockSerialManipulator()
     return Singularity(robot)
 
 
 def test_singularity_detection(singularity_analyzer) -> None:
+    """Detect singular and non-singular configurations."""
     assert singularity_analyzer.singularity_analysis(np.zeros(6)) == True
     assert singularity_analyzer.singularity_analysis(np.ones(6)) == False
 
 
 def test_condition_number(singularity_analyzer) -> None:
+    """Condition number is infinite at a singularity and finite otherwise."""
     cond_singular = singularity_analyzer.condition_number(np.zeros(6))
     cond_regular = singularity_analyzer.condition_number(np.ones(6))
 
@@ -58,18 +63,21 @@ def test_condition_number(singularity_analyzer) -> None:
 
 
 def test_near_singularity_detection(singularity_analyzer) -> None:
+    """Near-singularity detection flags both test configurations."""
     assert singularity_analyzer.near_singularity_detection(np.zeros(6))
     assert singularity_analyzer.near_singularity_detection(np.ones(6))
 
 
 def test_manipulability_ellipsoid_plot(singularity_analyzer) -> None:
+    """Plotting the manipulability ellipsoid does not raise."""
     try:
         # Just test it doesn't crash (plotting optional)
         singularity_analyzer.manipulability_ellipsoid(np.ones(6))
     except Exception as e:
         pytest.fail(f"manipulability_ellipsoid raised exception: {e}")
 
-    def jacobian(self, thetalist, frame="space"):
+    def jacobian(self, thetalist, frame: str = "space") -> np.ndarray:
+        """Return a mock 6x6 Jacobian, singular at the zero configuration."""
         assert frame == "space"
         if np.allclose(thetalist, 0):
             return np.zeros((6, 6))  # Singular
@@ -78,20 +86,24 @@ def test_manipulability_ellipsoid_plot(singularity_analyzer) -> None:
             J[5, 5] = 0.5
             return J
 
-    def forward_kinematics(self, thetas):
+    def forward_kinematics(self, thetas) -> np.ndarray:
+        """Return a mock homogeneous transform built from the joint sum."""
         T = np.eye(4)
         T[:3, 3] = np.full(3, np.sum(thetas))
         return T
 
     @pytest.fixture
-    def singularity_analyzer():
+    def singularity_analyzer() -> Singularity:
+        """Provide a Singularity analyzer backed by a mock manipulator."""
         return Singularity(MockSerialManipulator())
 
     def test_singularity_detection(singularity_analyzer) -> None:
+        """Detect singular and non-singular configurations."""
         assert singularity_analyzer.singularity_analysis(np.zeros(6))
         assert not singularity_analyzer.singularity_analysis(np.ones(6))
 
     def test_condition_number(singularity_analyzer) -> None:
+        """Condition number is infinite at a singularity and finite otherwise."""
         cond_singular = singularity_analyzer.condition_number(np.zeros(6))
         cond_regular = singularity_analyzer.condition_number(np.ones(6))
 
@@ -99,11 +111,13 @@ def test_manipulability_ellipsoid_plot(singularity_analyzer) -> None:
         assert cond_regular > 1.0
 
     def test_near_singularity_detection(singularity_analyzer) -> None:
+        """Near-singularity detection flags both test configurations."""
         assert singularity_analyzer.near_singularity_detection(np.zeros(6))
         assert singularity_analyzer.near_singularity_detection(np.ones(6))
 
     @patch("matplotlib.pyplot.show")  # Suppress actual plot
     def test_manipulability_ellipsoid_plot(mock_show, singularity_analyzer) -> None:
+        """Plotting the manipulability ellipsoid does not raise."""
         try:
             singularity_analyzer.manipulability_ellipsoid(np.ones(6))
         except Exception as e:
@@ -112,6 +126,7 @@ def test_manipulability_ellipsoid_plot(singularity_analyzer) -> None:
     @pytest.mark.skipif(not CUDA_AVAILABLE, reason="CUDA not available")
     @patch("matplotlib.pyplot.show")
     def test_plot_workspace_monte_carlo(mock_show, singularity_analyzer) -> None:
+        """Monte Carlo workspace plotting runs without raising."""
         joint_limits = [(-1, 1), (-2, 2), (-np.pi, np.pi)]
         try:
             singularity_analyzer.plot_workspace_monte_carlo(

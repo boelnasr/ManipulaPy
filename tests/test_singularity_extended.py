@@ -33,7 +33,7 @@ class MockSerialManipulator:
         """
         self.singular_configs = singular_configs or []
 
-    def jacobian(self, thetalist, frame="space"):
+    def jacobian(self, thetalist, frame="space") -> np.ndarray:
         """Return mock Jacobian based on configuration."""
         if frame != "space":
             raise ValueError("Only space frame supported in mock")
@@ -58,7 +58,7 @@ class MockSerialManipulator:
             J[5, 5] = 0.5  # Reduce manipulability slightly
             return J
 
-    def forward_kinematics(self, thetas):
+    def forward_kinematics(self, thetas) -> np.ndarray:
         """Return mock forward kinematics transformation."""
         T = np.eye(4)
         # Simple mock: end-effector position is sum of joint angles
@@ -435,7 +435,8 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
         """Test singularity analysis on under-actuated (3-DOF) robot via SVD."""
 
         class Mock3DOFRobot:
-            def jacobian(self, thetalist, frame="space"):
+            def jacobian(self, thetalist, frame="space") -> np.ndarray:
+                """Return a 6x3 mock Jacobian for a 3-DOF robot."""
                 # 6x3 Jacobian for 3-DOF robot
                 if np.allclose(thetalist, 0):
                     return np.zeros((6, 3))
@@ -443,7 +444,8 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
                     J = np.random.rand(6, 3)
                     return J
 
-            def forward_kinematics(self, thetas):
+            def forward_kinematics(self, thetas) -> np.ndarray:
+                """Return a mock forward kinematics transformation matrix."""
                 T = np.eye(4)
                 T[:3, 3] = np.random.rand(3)
                 return T
@@ -462,7 +464,8 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
         """Test singularity analysis on redundant (7-DOF) robot via SVD."""
 
         class Mock7DOFRobot:
-            def jacobian(self, thetalist, frame="space"):
+            def jacobian(self, thetalist, frame="space") -> np.ndarray:
+                """Return a 6x7 mock Jacobian for a redundant 7-DOF robot."""
                 # 6x7 Jacobian for 7-DOF robot (redundant)
                 if np.allclose(thetalist, 0):
                     # Singular configuration
@@ -473,7 +476,8 @@ class TestDifferentRobotConfigurations(unittest.TestCase):
                     J = np.random.rand(6, 7)
                     return J
 
-            def forward_kinematics(self, thetas):
+            def forward_kinematics(self, thetas) -> np.ndarray:
+                """Return a mock forward kinematics transformation matrix."""
                 T = np.eye(4)
                 T[:3, 3] = np.random.rand(3)
                 return T

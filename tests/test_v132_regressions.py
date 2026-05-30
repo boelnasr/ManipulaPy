@@ -6,6 +6,7 @@ caught the original behavior. Tests grouped by source file.
 """
 
 import unittest
+from typing import Any
 
 import numpy as np
 import pytest
@@ -318,7 +319,8 @@ class TestDynamicsRegressions(unittest.TestCase):
 class TestKinematicsRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/kinematics.py bugs."""
 
-    def _load_simple_arm(self):
+    def _load_simple_arm(self) -> Any:
+        """Load the bundled simple_arm fixture and return its SerialManipulator."""
         import os
 
         from ManipulaPy.urdf_processor import URDFToSerialManipulator
@@ -503,10 +505,12 @@ class TestPathPlanningRegressions(unittest.TestCase):
     def test_quintic_polynomial_endpoints(self) -> None:
         """Pure math test: quintic time-scaling endpoints."""
 
-        def s(tau):
+        def s(tau) -> float:
+            """Quintic time-scaling position s(tau)."""
             return 10 * tau**3 - 15 * tau**4 + 6 * tau**5
 
-        def s_ddot(tau, Tf=1.0):
+        def s_ddot(tau, Tf: float = 1.0) -> float:
+            """Quintic time-scaling acceleration s_ddot(tau)."""
             return (60 * tau - 180 * tau**2 + 120 * tau**3) / (Tf * Tf)
 
         self.assertAlmostEqual(s(0.0), 0.0)
@@ -578,11 +582,13 @@ class TestControlRegressions(unittest.TestCase):
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
-            def forward_kinematics(self, current_joint_angles):
+            def forward_kinematics(self, current_joint_angles) -> np.ndarray:
+                """Return a fixed identity end-effector pose."""
                 T = np.eye(4)
                 return T
 
-            def jacobian(self, current_joint_angles):
+            def jacobian(self, current_joint_angles) -> np.ndarray:
+                """Return a fixed translational Jacobian stub."""
                 return np.vstack([np.eye(3), np.zeros((3, 3))])
 
         ctrl = ManipulatorController(Dynamics())
@@ -764,10 +770,12 @@ class TestControlRegressions(unittest.TestCase):
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
-            def mass_matrix(self, thetalist):
+            def mass_matrix(self, thetalist) -> np.ndarray:
+                """Return an identity mass matrix sized to thetalist."""
                 return np.eye(len(thetalist))
 
-            def inverse_dynamics(self, *args):
+            def inverse_dynamics(self, *args) -> np.ndarray:
+                """Return a zero inverse-dynamics torque stub."""
                 return np.zeros(2)
 
         ctrl = ManipulatorController(Dynamics())
@@ -826,10 +834,12 @@ class TestControlRegressions(unittest.TestCase):
         from ManipulaPy.control import ManipulatorController
 
         class Dynamics:
-            def mass_matrix(self, thetalist):
+            def mass_matrix(self, thetalist) -> np.ndarray:
+                """Return an identity mass matrix sized to thetalist."""
                 return np.eye(len(thetalist))
 
-            def inverse_dynamics(self, *args):
+            def inverse_dynamics(self, *args) -> np.ndarray:
+                """Return a zero inverse-dynamics torque stub."""
                 return np.zeros(2)
 
         ctrl = ManipulatorController(Dynamics())
@@ -913,14 +923,16 @@ class TestControlRegressions(unittest.TestCase):
             def __init__(self, value) -> None:
                 self.value = np.asarray(value)
 
-            def get(self):
+            def get(self) -> np.ndarray:
+                """Return the wrapped NumPy array (CuPy-style .get())."""
                 return self.value
 
             def __array__(self, dtype=None) -> None:
                 raise TypeError("Implicit conversion to a NumPy array is not allowed")
 
         class Dynamics:
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+                """Return zero joint accelerations matching thetalist."""
                 return np.zeros_like(thetalist)
 
         ctrl = ManipulatorController(Dynamics())
@@ -1009,7 +1021,8 @@ class TestSingularityRegressions(unittest.TestCase):
         from ManipulaPy.singularity import Singularity
 
         class MockManip:
-            def jacobian(self, thetalist, frame="space"):
+            def jacobian(self, thetalist, frame="space") -> np.ndarray:
+                """Return a random 6x7 (redundant) Jacobian stub."""
                 return np.random.randn(6, 7)  # 7-DOF redundant
 
         sing = Singularity(MockManip())
@@ -1021,7 +1034,8 @@ class TestSingularityRegressions(unittest.TestCase):
         from ManipulaPy.singularity import Singularity
 
         class MockManip:
-            def jacobian(self, thetalist, frame="space"):
+            def jacobian(self, thetalist, frame="space") -> np.ndarray:
+                """Return a singular (all-zero) 6x6 Jacobian stub."""
                 return np.zeros((6, 6))
 
         class RecordingAxis:
@@ -1046,7 +1060,8 @@ class TestSingularityRegressions(unittest.TestCase):
         from ManipulaPy.singularity import Singularity
 
         class MockManip:
-            def jacobian(self, thetalist, frame="space"):
+            def jacobian(self, thetalist, frame="space") -> np.ndarray:
+                """Return an underactuated (6x1) Jacobian stub."""
                 return np.array([[1.0], [0.0], [0.0], [0.0], [1.0], [0.0]])
 
         class RecordingAxis:
@@ -1335,7 +1350,8 @@ class TestSimRegressions(unittest.TestCase):
 
         from ManipulaPy.sim import Simulation
 
-        def make_sim():
+        def make_sim() -> "Simulation":
+            """Build a Simulation with all loop dependencies mocked out."""
             sim = Simulation.__new__(Simulation)
             sim.logger = MagicMock()
             sim.physics_client = 1
@@ -1545,7 +1561,8 @@ class TestSimPybulletGuards(unittest.TestCase):
         ("plot_trajectory_in_scene", lambda: (np.zeros((1, 6)), np.zeros((1, 3)))),
     ]
 
-    def _make_bare_sim(self):
+    def _make_bare_sim(self) -> "Simulation":
+        """Build a minimally-populated Simulation instance for guard tests."""
         from unittest.mock import MagicMock
         from ManipulaPy.sim import Simulation
 
@@ -1904,7 +1921,8 @@ class TestUrdfRegressions(unittest.TestCase):
 
         real_import = builtins.__import__
 
-        def fake_import(name, *args, **kwargs):
+        def fake_import(name, *args, **kwargs) -> Any:
+            """Block importing trimesh; defer everything else to the real import."""
             if name == "trimesh":
                 raise ImportError("blocked trimesh")
             return real_import(name, *args, **kwargs)
@@ -1931,7 +1949,8 @@ class TestUrdfRegressions(unittest.TestCase):
 
         real_import = builtins.__import__
 
-        def fake_import(name, *args, **kwargs):
+        def fake_import(name, *args, **kwargs) -> Any:
+            """Block importing trimesh; defer everything else to the real import."""
             if name == "trimesh":
                 raise ImportError("blocked trimesh")
             return real_import(name, *args, **kwargs)
@@ -2119,7 +2138,8 @@ class TestCudaKernelRegressions(unittest.TestCase):
     # Tasks 30, 31, 32, 33 — remaining CUDA kernel adversarial findings
     # ------------------------------------------------------------------
 
-    def _kernel_source(self, name):
+    def _kernel_source(self, name) -> str:
+        """Return the source text of a single named CUDA kernel function."""
         import inspect
         from ManipulaPy import cuda_kernels
 
@@ -2492,7 +2512,8 @@ class TestTestInfraRegressions(unittest.TestCase):
 class TestPackagingRegressions(unittest.TestCase):
     """Regressions for pyproject.toml / setup.py / wheel metadata (Tasks 45-48)."""
 
-    def _load_pyproject(self):
+    def _load_pyproject(self) -> tuple:
+        """Parse pyproject.toml and return ``(parsed_dict, repo_root)``."""
         import sys
         from pathlib import Path
 
@@ -2576,7 +2597,7 @@ class TestPackagingRegressions(unittest.TestCase):
             f"setup.py version {m.group(1)!r} != pyproject {target!r}",
         )
 
-    def _setup_py_keyword(self, keyword_name):
+    def _setup_py_keyword(self, keyword_name) -> Any:
         """Return a literal setup.py keyword argument from the setup() call."""
         import ast
         from pathlib import Path
@@ -2976,7 +2997,8 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         # object so the assignment + to_device still works.
         captured = {}
 
-        def fake_pinned_array(shape, dtype):
+        def fake_pinned_array(shape, dtype) -> np.ndarray:
+            """Record the call and return a plain NumPy array stand-in."""
             captured["called"] = True
             captured["shape"] = shape
             captured["dtype"] = dtype
@@ -3096,7 +3118,7 @@ class TestSelfCollision(unittest.TestCase):
     # Helpers
     # ------------------------------------------------------------------
 
-    def _make_tetra_hull(self, offset=None):
+    def _make_tetra_hull(self, offset=None) -> Any:
         """Return a small tetrahedron ConvexHull, optionally translated."""
         from scipy.spatial import ConvexHull
 
@@ -3112,7 +3134,7 @@ class TestSelfCollision(unittest.TestCase):
             pts = pts + np.asarray(offset)
         return ConvexHull(pts)
 
-    def _make_mock_checker(self, hull_map, acm=None):
+    def _make_mock_checker(self, hull_map, acm=None) -> "CollisionChecker":
         """Build a CollisionChecker with injected hulls and ACM, bypassing URDF loading."""
         from unittest.mock import MagicMock, patch
         from ManipulaPy.potential_field import CollisionChecker
@@ -3125,7 +3147,7 @@ class TestSelfCollision(unittest.TestCase):
         checker._visual_fallback_warned = set()
         return checker
 
-    def _make_self_contact_urdf(self):
+    def _make_self_contact_urdf(self) -> str:
         """Create a primitive URDF with deterministic base<->link self contact."""
         import os
         import tempfile
@@ -3390,7 +3412,8 @@ class TestSelfCollision(unittest.TestCase):
             ]
         )
 
-        def make_geom_element(vertices):
+        def make_geom_element(vertices) -> Any:
+            """Build a mock collision/visual element exposing mesh vertices."""
             elem = MagicMock()
             elem.geometry = MagicMock()
             elem.geometry.mesh_data = MagicMock()
@@ -3514,7 +3537,8 @@ class TestSelfCollision(unittest.TestCase):
             load_calls = []
             original_loadURDF = p.loadURDF
 
-            def capturing_loadURDF(*args, **kwargs):
+            def capturing_loadURDF(*args, **kwargs) -> Any:
+                """Record loadURDF calls, then delegate to the real loader."""
                 load_calls.append((args, kwargs))
                 return original_loadURDF(*args, **kwargs)
 

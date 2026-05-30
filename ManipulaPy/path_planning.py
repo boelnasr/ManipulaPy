@@ -145,7 +145,9 @@ logging.getLogger("numba.cuda.cudadrv.driver").setLevel(logging.WARNING)
 
 
 @njit(parallel=True, fastmath=True)
-def _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method):
+def _trajectory_cpu_fallback(
+    thetastart, thetaend, Tf, N, method
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Numba-optimised CPU trajectory generation (parallel)."""
     num_joints = len(thetastart)
 
@@ -188,7 +190,9 @@ def _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method):
 
 # Thin wrapper – unchanged signature, now just calls the new kernel above
 @njit(fastmath=True)
-def _traj_cpu_njit(thetastart, thetaend, Tf, N, method):
+def _traj_cpu_njit(
+    thetastart, thetaend, Tf, N, method
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Dispatch to the optimized CPU fallback kernel."""
     return _trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
 

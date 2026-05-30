@@ -243,16 +243,21 @@ class TestVisionObstacleDetection(unittest.TestCase):
                 # Create properly working mock YOLO
                 class FixedMockYOLO:
                     def __init__(self, model_path) -> None:
+                        """Store the mock model path."""
                         self.model_path = model_path
 
-                    def __call__(self, image, conf=0.3):
+                    def __call__(self, image, conf=0.3) -> list:
+                        """Return mock YOLO detection results with one bounding box."""
+
                         class FixedMockBox:
                             def __init__(self) -> None:
+                                """Store a single mock bounding box in xyxy format."""
                                 # Fix: xyxy should contain coordinates directly, not nested arrays
                                 self.xyxy = np.array([[160, 120, 480, 360]])
 
                         class FixedMockResults:
                             def __init__(self) -> None:
+                                """Store an iterable list of mock detection boxes."""
                                 self.boxes = [
                                     FixedMockBox()
                                 ]  # Make it a list to be iterable
@@ -845,7 +850,8 @@ class TestVisionPyBulletIntegration(unittest.TestCase):
             mock_add_param.return_value = 1
 
             # Create a mock that returns different values for different parameters
-            def mock_read_param_side_effect(param_id):
+            def mock_read_param_side_effect(param_id) -> float:
+                """Return safe non-zero debug parameter values keyed by param id."""
                 # Return safe non-zero values for width/height and other parameters
                 param_values = {
                     1: 0.0,  # target_x

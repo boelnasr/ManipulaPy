@@ -34,6 +34,7 @@ class RobotInstance:
     namespace: str = ""
 
     def __post_init__(self) -> None:
+        """Coerce the base transform to a 4x4 float64 matrix and validate it."""
         self.base_transform = np.asarray(self.base_transform, dtype=np.float64)
         if self.base_transform.shape != (4, 4):
             raise ValueError("base_transform must be a 4x4 matrix")
