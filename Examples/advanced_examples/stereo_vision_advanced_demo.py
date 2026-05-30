@@ -17,7 +17,7 @@ import numpy as np
 import cv2
 from ManipulaPy.vision import Vision
 
-def main():
+def main() -> None:
     """Demonstrate advanced stereo vision operations."""
     print("=== ManipulaPy: Advanced Stereo Vision Demo ===")
     

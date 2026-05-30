@@ -54,7 +54,7 @@ class BasicControlDemo:
     Demonstrates basic control algorithms for robotic manipulators using the built-in XArm robot.
     """
     
-    def __init__(self, use_simple_robot=False):
+    def __init__(self, use_simple_robot=False) -> None:
         """
         Initialize the control demo.
         
@@ -66,14 +66,14 @@ class BasicControlDemo:
         self.setup_robot()
         self.setup_controller()
         
-    def setup_robot(self):
+    def setup_robot(self) -> None:
         """Set up the robot model (either XArm or simple)."""
         if self.use_simple_robot:
             self.setup_simple_robot()
         else:
             self.setup_xarm_robot()
             
-    def setup_xarm_robot(self):
+    def setup_xarm_robot(self) -> None:
         """Load the built-in XArm robot from ManipulaPy data."""
         logger.info("Setting up XArm robot from built-in data...")
         
@@ -117,7 +117,7 @@ class BasicControlDemo:
             self.use_simple_robot = True
             self.setup_simple_robot()
             
-    def setup_simple_robot(self):
+    def setup_simple_robot(self) -> None:
         """Create a simple 3-DOF planar robot for demonstration (fallback)."""
         logger.info("Setting up simple 3-DOF planar robot as fallback...")
         
@@ -202,7 +202,7 @@ class BasicControlDemo:
         
         logger.info("✅ Simple robot setup complete")
     
-    def get_safe_joint_targets(self):
+    def get_safe_joint_targets(self) -> list:
         """Get safe joint target positions within limits for the current robot."""
         num_joints = len(self.joint_limits)
         
@@ -234,7 +234,7 @@ class BasicControlDemo:
         
         return targets
     
-    def get_trajectory_amplitudes(self):
+    def get_trajectory_amplitudes(self) -> list:
         """Get safe trajectory amplitudes for the current robot."""
         num_joints = len(self.joint_limits)
         
@@ -256,17 +256,17 @@ class BasicControlDemo:
         
         return amplitudes
         
-    def setup_urdf_robot(self):
+    def setup_urdf_robot(self) -> None:
         """Legacy method - now redirects to XArm setup."""
         logger.info("Redirecting to built-in XArm robot...")
         self.setup_xarm_robot()
         
-    def setup_controller(self):
+    def setup_controller(self) -> None:
         """Initialize the manipulator controller."""
         self.controller = ManipulatorController(self.dynamics)
         logger.info("✅ Controller initialized")
         
-    def demonstrate_pid_control(self):
+    def demonstrate_pid_control(self) -> None:
         """Demonstrate PID control with step response analysis."""
         logger.info("\n🎯 Demonstrating PID Control...")
         
@@ -366,7 +366,7 @@ class BasicControlDemo:
         
         logger.info("✅ PID control demonstration complete")
         
-    def plot_pid_results(self, time_hist, pos_hist, vel_hist, torque_hist, error_hist, targets):
+    def plot_pid_results(self, time_hist, pos_hist, vel_hist, torque_hist, error_hist, targets) -> None:
         """Plot PID control results."""
         num_joints = pos_hist.shape[1]
         
@@ -419,7 +419,7 @@ class BasicControlDemo:
         logger.info("📊 PID control plot saved as 'pid_control_results.png'")
         plt.close()  # Close figure to prevent display issues
         
-    def analyze_step_response(self, time_hist, pos_hist, targets):
+    def analyze_step_response(self, time_hist, pos_hist, targets) -> None:
         """Analyze step response characteristics."""
         logger.info("\n📊 Step Response Analysis:")
         
@@ -458,7 +458,7 @@ class BasicControlDemo:
             logger.info(f"    Steady-state error: {steady_state_error:.4f} rad")
             
 
-    def demonstrate_computed_torque_control(self):
+    def demonstrate_computed_torque_control(self) -> None:
         """Demonstrate computed torque control for trajectory tracking."""
         logger.info("\n🎯 Demonstrating Computed Torque Control...")
         
@@ -568,7 +568,7 @@ class BasicControlDemo:
 
 
 
-    def plot_computed_torque_results(self, time_hist, desired_pos, actual_pos, torques, errors):
+    def plot_computed_torque_results(self, time_hist, desired_pos, actual_pos, torques, errors) -> None:
         """Plot computed torque control results."""
         num_joints = actual_pos.shape[1]
         
@@ -631,7 +631,7 @@ class BasicControlDemo:
         logger.info("📊 Computed torque control plot saved as 'computed_torque_results.png'")
         plt.close()  # Close figure to prevent display issues
         
-    def demonstrate_controller_tuning(self):
+    def demonstrate_controller_tuning(self) -> None:
         """Demonstrate automatic controller tuning using Ziegler-Nichols method."""
         logger.info("\n🎯 Demonstrating Controller Tuning (Ziegler-Nichols)...")
         
@@ -684,7 +684,7 @@ class BasicControlDemo:
             
         logger.info("✅ Controller tuning demonstration complete")
         
-    def plot_tuning_results(self, gain_history, error_history):
+    def plot_tuning_results(self, gain_history, error_history) -> None:
         """Plot controller tuning results."""
         fig, axes = plt.subplots(2, 1, figsize=(12, 8))
         fig.suptitle('Controller Tuning Results', fontsize=16, fontweight='bold')
@@ -717,7 +717,7 @@ class BasicControlDemo:
         logger.info("📊 Controller tuning plot saved as 'controller_tuning_results.png'")
         plt.close()  # Close figure to prevent display issues
         
-    def demonstrate_cartesian_control(self):
+    def demonstrate_cartesian_control(self) -> None:
         """Demonstrate Cartesian space control."""
         logger.info("\n🎯 Demonstrating Cartesian Space Control...")
         
@@ -778,7 +778,7 @@ class BasicControlDemo:
             
         logger.info("✅ Cartesian space control demonstration complete")
         
-    def plot_cartesian_control_results(self, current_pos, desired_pos, error, torques):
+    def plot_cartesian_control_results(self, current_pos, desired_pos, error, torques) -> None:
         """Plot Cartesian control results."""
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         fig.suptitle('Cartesian Space Control Results', fontsize=16, fontweight='bold')
@@ -838,7 +838,7 @@ class BasicControlDemo:
         logger.info("📊 Cartesian control plot saved as 'cartesian_control_results.png'")
         plt.close()  # Close figure to prevent display issues
         
-    def demonstrate_feedforward_control(self):
+    def demonstrate_feedforward_control(self) -> None:
         """Demonstrate PD control with feedforward compensation."""
         logger.info("\n🎯 Demonstrating PD + Feedforward Control...")
         
@@ -925,7 +925,7 @@ class BasicControlDemo:
             
         logger.info("✅ PD + Feedforward control demonstration complete")
         
-    def plot_feedforward_results(self, pd_torques, ff_torques, combined_torques):
+    def plot_feedforward_results(self, pd_torques, ff_torques, combined_torques) -> None:
         """Plot feedforward control analysis."""
         num_joints = len(pd_torques)
         
@@ -975,7 +975,7 @@ class BasicControlDemo:
 
 
 
-    def demonstrate_control_comparison(self):
+    def demonstrate_control_comparison(self) -> None:
         """Compare different control strategies on the same task."""
         logger.info("\n🎯 Demonstrating Control Strategy Comparison...")
         
@@ -1099,7 +1099,7 @@ class BasicControlDemo:
         logger.info("✅ Control strategy comparison complete")
 
 
-    def plot_control_comparison(self, results, desired_positions):
+    def plot_control_comparison(self, results, desired_positions) -> None:
         """Plot control strategy comparison."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('Control Strategy Comparison', fontsize=16, fontweight='bold')
@@ -1174,7 +1174,7 @@ class BasicControlDemo:
         logger.info("📊 Control comparison plot saved as 'control_strategy_comparison.png'")
         plt.close()  # Close figure to prevent display issues
         
-    def run_all_demonstrations(self):
+    def run_all_demonstrations(self) -> None:
         """Run all control demonstrations."""
         logger.info("🚀 Starting Basic Control Demonstrations")
         logger.info("=" * 60)
@@ -1207,7 +1207,7 @@ class BasicControlDemo:
             import traceback
             traceback.print_exc()
 
-def main():
+def main() -> int:
     """Main function to run the basic control demo."""
     print("🤖 ManipulaPy Basic Control Demo - XArm Edition")
     print("=" * 60)

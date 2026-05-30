@@ -17,7 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from ManipulaPy.control import ManipulatorController
 
-def main():
+def main() -> None:
     """Demonstrate advanced optimal control operations."""
     print("=== ManipulaPy: Advanced Optimal Control Demo ===")
     

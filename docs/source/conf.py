@@ -10,7 +10,8 @@ from unittest.mock import MagicMock
 # ── CRITICAL: Mock heavy dependencies FIRST ─────────────
 class Mock(MagicMock):
     @classmethod
-    def __getattr__(cls, name):
+    def __getattr__(cls, name) -> MagicMock:
+        """Return a mock for any attribute accessed during autodoc imports."""
         return MagicMock()
 
 # Mock all heavy dependencies before any other imports
@@ -72,7 +73,7 @@ extensions = [
 ]
 
 # ── Safely add optional extensions ──────────────────────
-def try_add_extension(ext_name):
+def try_add_extension(ext_name) -> bool:
     """Safely try to add an extension."""
     try:
         __import__(ext_name)
@@ -104,7 +105,8 @@ if not os.environ.get('READTHEDOCS'):
     })
 
 # ── Theme selection (RTD-compatible priority) ───────────
-def _try_theme(name, mod_name, **kw):
+def _try_theme(name, mod_name, **kw) -> tuple:
+    """Return a theme configuration only when its package is importable."""
     try:
         __import__(mod_name)
         return name, kw.get("extra", {})
@@ -338,7 +340,7 @@ suppress_warnings = [
 # Don't fail on warnings
 keep_warnings = True
 
-def setup(app):
+def setup(app) -> None:
     """Sphinx setup hook for custom configuration."""
     
     # Always add our custom stylesheet

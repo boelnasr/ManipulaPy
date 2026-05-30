@@ -65,7 +65,7 @@ class SimulationIntermediateDemo:
     automatic plot saving and performance analysis.
     """
     
-    def __init__(self, urdf_path=None, save_plots=True):
+    def __init__(self, urdf_path=None, save_plots=True) -> None:
         """
         Initialize the demonstration.
         
@@ -100,7 +100,7 @@ class SimulationIntermediateDemo:
         # Performance tracking
         self.performance_results = {}
         
-    def setup_logging(self):
+    def setup_logging(self) -> None:
         """Setup logging configuration."""
         log_file = self.script_dir / 'simulation_demo.log'
         
@@ -118,7 +118,7 @@ class SimulationIntermediateDemo:
         )
         self.logger = logging.getLogger('SimulationDemo')
         
-    def create_sample_urdf(self):
+    def create_sample_urdf(self) -> str:
         """Create a simple sample URDF for demonstration if none is provided."""
         urdf_content = '''<?xml version="1.0"?>
 <robot name="simple_arm">
@@ -191,7 +191,7 @@ class SimulationIntermediateDemo:
         self.logger.info(f"Created sample URDF: {urdf_path}")
         return str(urdf_path)
     
-    def initialize_robot(self):
+    def initialize_robot(self) -> None:
         """Initialize robot from URDF and setup components."""
         self.logger.info("Initializing robot components...")
         
@@ -234,7 +234,7 @@ class SimulationIntermediateDemo:
             traceback.print_exc()
             raise
     
-    def save_plot(self, filename, title=None):
+    def save_plot(self, filename, title=None) -> None:
         """Save current plot with timestamp and title."""
         if not self.save_plots:
             return
@@ -253,7 +253,7 @@ class SimulationIntermediateDemo:
         except Exception as e:
             self.logger.error(f"Failed to save plot {filepath}: {e}")
     
-    def demonstrate_forward_kinematics(self):
+    def demonstrate_forward_kinematics(self) -> None:
         """Demonstrate forward kinematics with visualization."""
         self.logger.info("=== Forward Kinematics Demonstration ===")
         
@@ -315,7 +315,7 @@ class SimulationIntermediateDemo:
             self.logger.error(f"Forward kinematics demo failed: {e}")
             plt.close()
     
-    def demonstrate_inverse_kinematics(self):
+    def demonstrate_inverse_kinematics(self) -> list:
         """Demonstrate inverse kinematics with convergence analysis."""
         self.logger.info("=== Inverse Kinematics Demonstration ===")
         
@@ -428,7 +428,7 @@ class SimulationIntermediateDemo:
             plt.close()
             return []
     
-    def demonstrate_trajectory_planning(self):
+    def demonstrate_trajectory_planning(self) -> list:
         """Demonstrate trajectory planning with performance comparison."""
         self.logger.info("=== Trajectory Planning Demonstration ===")
         
@@ -549,7 +549,7 @@ class SimulationIntermediateDemo:
             plt.close()
             return []
     
-    def demonstrate_singularity_analysis(self):
+    def demonstrate_singularity_analysis(self) -> dict:
         """Demonstrate singularity analysis and workspace visualization."""
         self.logger.info("=== Singularity Analysis Demonstration ===")
         
@@ -694,7 +694,7 @@ class SimulationIntermediateDemo:
             plt.close()
             return {}
     
-    def demonstrate_performance_benchmarking(self):
+    def demonstrate_performance_benchmarking(self) -> dict:
         """Benchmark different computational approaches."""
         self.logger.info("=== Performance Benchmarking ===")
         
@@ -773,7 +773,7 @@ class SimulationIntermediateDemo:
             plt.close()
             return {}
     
-    def demonstrate_controller_features(self):
+    def demonstrate_controller_features(self) -> dict:
         """Demonstrate controller tuning and analysis."""
         self.logger.info("=== Controller Features Demonstration ===")
         
@@ -884,7 +884,7 @@ class SimulationIntermediateDemo:
             plt.close()
             return {}
     
-    def generate_summary_report(self):
+    def generate_summary_report(self) -> dict:
         """Generate a comprehensive summary report."""
         self.logger.info("=== Generating Summary Report ===")
         
@@ -1056,7 +1056,7 @@ class SimulationIntermediateDemo:
             plt.close()
             return {}
     
-    def run_complete_demonstration(self):
+    def run_complete_demonstration(self) -> dict:
         """Run the complete demonstration sequence."""
         self.logger.info("Starting ManipulaPy Intermediate Simulation Demo")
         self.logger.info("=" * 60)
@@ -1105,7 +1105,7 @@ class SimulationIntermediateDemo:
                     pass
 
 
-def main():
+def main() -> None:
     """Main function to run the demonstration."""
     print("ManipulaPy Intermediate Simulation Demo")
     print("======================================")

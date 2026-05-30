@@ -74,7 +74,7 @@ class PerceptionIntermediateDemo:
     with automatic image and plot saving.
     """
     
-    def __init__(self, use_real_camera=False, save_outputs=True):
+    def __init__(self, use_real_camera=False, save_outputs=True) -> None:
         """
         Initialize the perception demonstration.
         
@@ -104,7 +104,7 @@ class PerceptionIntermediateDemo:
         
         self.logger.info("Perception demo initialized")
         
-    def setup_logging(self):
+    def setup_logging(self) -> None:
         """Setup logging configuration."""
         log_file = self.script_dir / 'perception_demo.log'
         
@@ -122,7 +122,7 @@ class PerceptionIntermediateDemo:
         )
         self.logger = logging.getLogger('PerceptionDemo')
     
-    def save_image(self, image, filename, title=None):
+    def save_image(self, image, filename, title=None) -> None:
         """Save image with timestamp and title."""
         if not self.save_outputs:
             return
@@ -151,7 +151,7 @@ class PerceptionIntermediateDemo:
         except Exception as e:
             self.logger.error(f"Failed to save image {filepath}: {e}")
     
-    def save_plot(self, filename, title=None):
+    def save_plot(self, filename, title=None) -> None:
         """Save current plot with timestamp and title."""
         if not self.save_outputs:
             return
@@ -170,7 +170,7 @@ class PerceptionIntermediateDemo:
         except Exception as e:
             self.logger.error(f"Failed to save plot {filepath}: {e}")
     
-    def setup_pybullet_simulation(self):
+    def setup_pybullet_simulation(self) -> bool:
         """Setup PyBullet simulation environment for perception testing."""
         self.logger.info("=== Setting up PyBullet Simulation ===")
         
@@ -213,7 +213,7 @@ class PerceptionIntermediateDemo:
             self.logger.error(f"Failed to setup PyBullet simulation: {e}")
             return False
     
-    def setup_vision_system(self):
+    def setup_vision_system(self) -> bool:
         """Setup vision system with different camera configurations."""
         self.logger.info("=== Setting up Vision System ===")
         
@@ -302,7 +302,7 @@ class PerceptionIntermediateDemo:
             traceback.print_exc()
             return False
     
-    def demonstrate_basic_image_capture(self):
+    def demonstrate_basic_image_capture(self) -> None:
         """Demonstrate basic image capture capabilities."""
         self.logger.info("=== Basic Image Capture Demonstration ===")
         
@@ -387,7 +387,7 @@ class PerceptionIntermediateDemo:
             self.logger.error(f"Image capture demonstration failed: {e}")
             plt.close()
     
-    def demonstrate_obstacle_detection(self):
+    def demonstrate_obstacle_detection(self) -> None:
         """Demonstrate obstacle detection using depth and YOLO."""
         self.logger.info("=== Obstacle Detection Demonstration ===")
         
@@ -528,7 +528,7 @@ class PerceptionIntermediateDemo:
             traceback.print_exc()
             plt.close()
     
-    def demonstrate_stereo_vision(self):
+    def demonstrate_stereo_vision(self) -> None:
         """Demonstrate stereo vision and 3D point cloud generation."""
         self.logger.info("=== Stereo Vision Demonstration ===")
         
@@ -647,7 +647,7 @@ class PerceptionIntermediateDemo:
             self.logger.error(f"Stereo vision demonstration failed: {e}")
             plt.close()
     
-    def demonstrate_advanced_perception(self):
+    def demonstrate_advanced_perception(self) -> None:
         """Demonstrate advanced perception features and analysis."""
         self.logger.info("=== Advanced Perception Demonstration ===")
         
@@ -899,7 +899,7 @@ class PerceptionIntermediateDemo:
             traceback.print_exc()
             plt.close()
     
-    def demonstrate_clustering_analysis(self):
+    def demonstrate_clustering_analysis(self) -> None:
         """Demonstrate clustering analysis on synthetic 3D point data."""
         self.logger.info("=== Clustering Analysis Demonstration ===")
         
@@ -1177,7 +1177,7 @@ Parameter Ranges Tested:
             traceback.print_exc()
             plt.close()
     
-    def demonstrate_vision_features(self):
+    def demonstrate_vision_features(self) -> None:
         """Demonstrate various vision system features."""
         self.logger.info("=== Vision Features Demonstration ===")
         
@@ -1330,7 +1330,7 @@ Parameter Ranges Tested:
             traceback.print_exc()
             plt.close()
     
-    def create_test_images(self):
+    def create_test_images(self) -> dict:
         """Create synthetic test images for vision processing."""
         test_images = {}
         
@@ -1369,7 +1369,7 @@ Parameter Ranges Tested:
         
         return test_images
     
-    def generate_summary_report(self):
+    def generate_summary_report(self) -> dict:
         """Generate a comprehensive summary report."""
         self.logger.info("=== Generating Summary Report ===")
         
@@ -1625,7 +1625,7 @@ Key Results:
             plt.close()
             return {}
     
-    def cleanup_resources(self):
+    def cleanup_resources(self) -> None:
         """Clean up PyBullet and other resources."""
         self.logger.info("Cleaning up resources...")
         
@@ -1648,7 +1648,7 @@ Key Results:
         except Exception as e:
             self.logger.warning(f"Error during cleanup: {e}")
     
-    def run_complete_demonstration(self):
+    def run_complete_demonstration(self) -> dict:
         """Run the complete perception demonstration sequence."""
         self.logger.info("Starting ManipulaPy Perception Intermediate Demo")
         self.logger.info("=" * 60)
@@ -1714,7 +1714,7 @@ Key Results:
             plt.close('all')
 
 
-def main():
+def main() -> None:
     """Main function to run the perception demonstration."""
     print("ManipulaPy Perception Intermediate Demo")
     print("======================================")

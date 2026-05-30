@@ -60,16 +60,17 @@ class JointSpacePotentialField:
     Works with joint configurations instead of Cartesian coordinates.
     """
     
-    def __init__(self, attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5):
+    def __init__(self, attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5) -> None:
+        """Initialize joint-space potential field gains and obstacle radius."""
         self.attractive_gain = attractive_gain
         self.repulsive_gain = repulsive_gain
         self.influence_distance = influence_distance
 
-    def compute_attractive_potential(self, q, q_goal):
+    def compute_attractive_potential(self, q, q_goal) -> float:
         """Compute attractive potential in joint space."""
         return 0.5 * self.attractive_gain * np.sum((q - q_goal) ** 2)
 
-    def compute_repulsive_potential(self, q, obstacle_configs):
+    def compute_repulsive_potential(self, q, obstacle_configs) -> float:
         """Compute repulsive potential from obstacle configurations."""
         repulsive_potential = 0
         for obstacle_config in obstacle_configs:
@@ -81,7 +82,7 @@ class JointSpacePotentialField:
                 )
         return repulsive_potential
 
-    def compute_gradient(self, q, q_goal, obstacle_configs):
+    def compute_gradient(self, q, q_goal, obstacle_configs) -> np.ndarray:
         """Compute gradient of the potential field in joint space."""
         # Attractive gradient
         attractive_gradient = self.attractive_gain * (q - q_goal)
@@ -112,7 +113,7 @@ class AdvancedCollisionAvoidanceDemo:
     - Advanced visualization with multiple plot types
     """
     
-    def __init__(self, save_plots: bool = True, use_gpu: Optional[bool] = None):
+    def __init__(self, save_plots: bool = True, use_gpu: Optional[bool] = None) -> None:
         """
         Initialize the advanced collision avoidance demo.
         
@@ -137,7 +138,7 @@ class AdvancedCollisionAvoidanceDemo:
         
         logger.info(f"Demo initialized - GPU available: {self.use_gpu}")
     
-    def setup_robot(self):
+    def setup_robot(self) -> None:
         """Setup a 6-DOF robot manipulator for demonstration."""
         # Define robot parameters (simplified 6-DOF arm)
         self.num_joints = 6
@@ -165,7 +166,7 @@ class AdvancedCollisionAvoidanceDemo:
         # Create simplified robot kinematics
         self.setup_robot_kinematics()
         
-    def setup_robot_kinematics(self):
+    def setup_robot_kinematics(self) -> None:
         """Setup robot kinematics and dynamics."""
         # Simplified DH parameters for 6-DOF arm
         link_lengths = [0.3, 0.4, 0.35, 0.2, 0.15, 0.1]
@@ -236,7 +237,7 @@ class AdvancedCollisionAvoidanceDemo:
         
         logger.info("Robot kinematics and dynamics initialized")
     
-    def setup_environment(self):
+    def setup_environment(self) -> None:
         """Setup the collision environment with various obstacle types."""
         self.workspace_bounds = {
             'x': (-1.0, 1.5),
@@ -398,7 +399,7 @@ class AdvancedCollisionAvoidanceDemo:
         else:
             return np.empty((0, 3))
     
-    def setup_planners(self):
+    def setup_planners(self) -> None:
         """Setup different trajectory planners for comparison."""
         # Create optimized planner
         try:
@@ -1757,7 +1758,7 @@ class AdvancedCollisionAvoidanceDemo:
         return report
 
 
-def main():
+def main() -> None:
     """
     Main function to run the advanced collision avoidance demonstration.
     """

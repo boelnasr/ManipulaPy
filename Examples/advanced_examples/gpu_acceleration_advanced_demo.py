@@ -16,7 +16,7 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 import numpy as np
 from ManipulaPy.cuda_kernels import check_cuda_availability
 
-def main():
+def main() -> None:
     """Demonstrate advanced GPU acceleration operations."""
     print("=== ManipulaPy: Advanced GPU Acceleration Demo ===")
     

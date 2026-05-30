@@ -76,7 +76,7 @@ class BatchProcessingDemo:
     - Statistical batch analysis
     """
     
-    def __init__(self, save_plots: bool = True, use_gpu: Optional[bool] = None):
+    def __init__(self, save_plots: bool = True, use_gpu: Optional[bool] = None) -> None:
         """
         Initialize the batch processing demo.
         
@@ -109,7 +109,7 @@ class BatchProcessingDemo:
         logger.info(f"Batch demo initialized - GPU: {self.use_gpu}, CPU cores: {self.num_cpu_cores}")
         logger.info(f"System memory: {self.memory_gb:.1f} GB")
     
-    def setup_robot(self):
+    def setup_robot(self) -> None:
         """Setup a 6-DOF robot manipulator for batch processing."""
         self.num_joints = 6
         
@@ -134,7 +134,7 @@ class BatchProcessingDemo:
         
         logger.info("Robot kinematics and dynamics initialized for batch processing")
     
-    def setup_robot_kinematics(self):
+    def setup_robot_kinematics(self) -> None:
         """Setup robot kinematics and dynamics for batch operations."""
         # Link parameters
         link_lengths = [0.3, 0.4, 0.35, 0.2, 0.15, 0.1]
@@ -216,7 +216,7 @@ class BatchProcessingDemo:
             logger.warning(f"Could not create planner: {e}")
             self.planner = None
     
-    def setup_batch_scenarios(self):
+    def setup_batch_scenarios(self) -> None:
         """Setup various batch processing scenarios."""
         # Define different batch scenarios for testing
         self.batch_scenarios = {
@@ -426,12 +426,12 @@ class BatchProcessingDemo:
         logger.info(f"CPU parallel processing ({num_workers} workers) completed in {computation_time:.3f}s")
         return results, computation_time
     
-    def _compute_single_trajectory(self, args):
+    def _compute_single_trajectory(self, args) -> tuple:
         """Helper function for parallel trajectory computation."""
         start_config, end_config, traj_time, N, method = args
         return self._generate_simple_trajectory(start_config, end_config, traj_time, N, method)
     
-    def _generate_simple_trajectory(self, start, end, Tf, N, method):
+    def _generate_simple_trajectory(self, start, end, Tf, N, method) -> tuple:
         """Generate a simple trajectory between two configurations."""
         positions = np.zeros((N, self.num_joints), dtype=np.float32)
         velocities = np.zeros((N, self.num_joints), dtype=np.float32)
@@ -1241,7 +1241,7 @@ class BatchProcessingDemo:
         return report
 
 
-def main():
+def main() -> None:
     """
     Main function to run the batch processing demonstration.
     """

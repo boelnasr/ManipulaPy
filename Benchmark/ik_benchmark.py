@@ -84,7 +84,7 @@ class IKBenchmark:
         max_iterations: int = 5000,
         output_dir: str = "ik_benchmark_results",
         verbose: bool = False
-    ):
+    ) -> None:
         """
         Initialize the IK benchmark suite.
 
@@ -123,7 +123,7 @@ class IKBenchmark:
 
         logger.info(f"IK Benchmark initialized: {num_tests} tests, tol=(pos:{tolerance_position}, ori:{tolerance_orientation})")
 
-    def load_robot(self):
+    def load_robot(self) -> bool:
         """Load the robot model from URDF."""
         logger.info("Loading xArm 6-DOF robot from URDF...")
 
@@ -764,7 +764,7 @@ class IKBenchmark:
 
         return self.results
 
-    def print_comparison(self, all_results: List[Dict]):
+    def print_comparison(self, all_results: List[Dict]) -> None:
         """Print comparison table of all methods."""
         logger.info("\n" + "="*70)
         logger.info("COMPARISON SUMMARY")
@@ -794,7 +794,7 @@ class IKBenchmark:
                   f"({np.mean(best_time['times'])*1000:.1f} ms avg)")
         print("="*70)
 
-    def save_results(self, filename: Optional[str] = None):
+    def save_results(self, filename: Optional[str] = None) -> None:
         """Save benchmark results to JSON file."""
         if filename is None:
             filename = os.path.join(self.output_dir, 'ik_benchmark_results.json')
@@ -815,7 +815,7 @@ class IKBenchmark:
 
         logger.info(f"\n✅ Results saved to: {filename}")
 
-    def generate_plots(self):
+    def generate_plots(self) -> None:
         """Generate visualization plots for benchmark results."""
         try:
             import matplotlib.pyplot as plt
@@ -941,7 +941,7 @@ class IKBenchmark:
         plt.close()
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="ManipulaPy Inverse Kinematics Benchmark Suite",
@@ -1000,7 +1000,7 @@ Examples:
     return parser.parse_args()
 
 
-def main():
+def main() -> None:
     """Main entry point for the IK benchmark."""
     args = parse_arguments()
 

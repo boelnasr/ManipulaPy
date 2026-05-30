@@ -14,6 +14,7 @@ from ManipulaPy.urdf import URDF
 
 
 def _collect_urdfs(data_root: Path, name_filter: str) -> list[Path]:
+    """Collect matching URDF files under the data root."""
     urdfs = sorted(data_root.rglob("crx20ia_l.urdf"))  # Example specific model
     if name_filter:
         name_filter = name_filter.lower()
@@ -22,6 +23,7 @@ def _collect_urdfs(data_root: Path, name_filter: str) -> list[Path]:
 
 
 def main() -> int:
+    """Run the interactive URDF visualization helper."""
     parser = argparse.ArgumentParser(
         description="Step through URDF models and open a viewer for each."
     )

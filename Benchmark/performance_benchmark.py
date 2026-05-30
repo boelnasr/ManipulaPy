@@ -88,7 +88,7 @@ class PathPlanningBenchmark:
     Comprehensive benchmark suite for ManipulaPy path planning performance.
     """
     
-    def __init__(self, config: BenchmarkConfig):
+    def __init__(self, config: BenchmarkConfig) -> None:
         """
         Initialize the benchmark suite.
         
@@ -1411,7 +1411,7 @@ def create_default_config() -> BenchmarkConfig:
     )
 
 
-def main():
+def main() -> None:
     """Main benchmark execution function"""
     print("=" * 60)
     print("ManipulaPy Path Planning Performance Benchmark")

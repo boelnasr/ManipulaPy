@@ -16,7 +16,7 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 import numpy as np
 from ManipulaPy.control import ManipulatorController
 
-def main():
+def main() -> None:
     """Demonstrate advanced real robot integration operations."""
     print("=== ManipulaPy: Advanced Real Robot Integration Demo ===")
     

@@ -64,10 +64,11 @@ class PatchedSingularity:
     """
     Patched version of Singularity class that handles non-square Jacobians properly.
     """
-    def __init__(self, serial_manipulator):
+    def __init__(self, serial_manipulator) -> None:
+        """Store the manipulator used by singularity benchmark helpers."""
         self.serial_manipulator = serial_manipulator
 
-    def singularity_analysis(self, thetalist):
+    def singularity_analysis(self, thetalist) -> bool:
         """
         Analyze if the manipulator is at a singularity based on the manipulability measure.
         """
@@ -90,7 +91,7 @@ class PatchedSingularity:
             # If calculation fails, assume singular
             return True
 
-    def condition_number(self, thetalist):
+    def condition_number(self, thetalist) -> float:
         """
         Calculate the condition number of the Jacobian for a given set of joint angles.
         For non-square Jacobians, uses the condition number of J*J^T.
@@ -109,7 +110,7 @@ class PatchedSingularity:
             # Return a large number if condition number cannot be computed
             return 1e12
 
-    def near_singularity_detection(self, thetalist, threshold=1e2):
+    def near_singularity_detection(self, thetalist, threshold=1e2) -> bool:
         """
         Detect if the manipulator is near a singularity by comparing the condition number with a threshold.
         """
@@ -142,7 +143,7 @@ class AccuracyBenchmark:
         ik_tests: int = 100,
         jacobian_tests: int = 500,
         dynamics_tests: int = 200,
-    ):
+    ) -> None:
         """
         Initialize the benchmark suite.
 
@@ -188,7 +189,7 @@ class AccuracyBenchmark:
         
         logger.info(f"Accuracy benchmark initialized. Results will be saved to: {output_dir}")
         
-    def _setup_xarm_robot(self):
+    def _setup_xarm_robot(self) -> None:
         """Setup the X-Arm robot from ManipulaPy data."""
         try:
             logger.info(f"Loading X-Arm from: {urdf_file}")
@@ -223,7 +224,7 @@ class AccuracyBenchmark:
             logger.error(f"Failed to load X-Arm: {e}")
             raise
 
-    def _test_basic_functionality(self):
+    def _test_basic_functionality(self) -> bool:
         """Test that basic robot functions work."""
         logger.info("Testing basic X-Arm functionality...")
         
@@ -1129,12 +1130,13 @@ class AccuracyBenchmark:
         
         return self.results
 
-    def save_results(self):
+    def save_results(self) -> None:
         """Save benchmark results to JSON file."""
         results_file = os.path.join(self.output_dir, 'accuracy_benchmark_results.json')
         
         # Convert numpy arrays and other non-serializable types
-        def convert_for_json(obj):
+        def convert_for_json(obj) -> Any:
+            """Convert benchmark values into JSON-serializable containers."""
             if isinstance(obj, np.ndarray):
                 return obj.tolist()
             elif isinstance(obj, (np.integer, np.floating)):
@@ -1153,7 +1155,7 @@ class AccuracyBenchmark:
         
         logger.info(f"Results saved to: {results_file}")
 
-    def generate_summary_report(self):
+    def generate_summary_report(self) -> None:
         """Generate a human-readable summary report."""
         report_file = os.path.join(self.output_dir, 'accuracy_benchmark_summary.txt')
         
@@ -1235,7 +1237,7 @@ class AccuracyBenchmark:
         
         logger.info(f"Summary report saved to: {report_file}")
 
-    def create_visualizations(self):
+    def create_visualizations(self) -> None:
         """Create visualization plots for benchmark results."""
         try:
             # Performance comparison plot
@@ -1250,7 +1252,7 @@ class AccuracyBenchmark:
         except Exception as e:
             logger.error(f"Failed to create visualizations: {e}")
 
-    def _create_performance_comparison_plot(self):
+    def _create_performance_comparison_plot(self) -> None:
         """Create performance comparison visualization."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('ManipulaPy Performance Benchmark Results', fontsize=16)
@@ -1371,7 +1373,7 @@ class AccuracyBenchmark:
         
         logger.info(f"Performance comparison plot saved to: {plot_file}")
 
-    def _create_accuracy_comparison_plot(self):
+    def _create_accuracy_comparison_plot(self) -> None:
         """Create accuracy-focused visualization."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('ManipulaPy Accuracy Analysis', fontsize=16)
@@ -1468,7 +1470,7 @@ class AccuracyBenchmark:
         
         logger.info(f"Accuracy analysis plot saved to: {plot_file}")
 
-    def _create_time_distribution_plots(self):
+    def _create_time_distribution_plots(self) -> None:
         """Create time distribution analysis plots."""
         fig, axes = plt.subplots(2, 3, figsize=(18, 10))
         fig.suptitle('Computation Time Distribution Analysis', fontsize=16)
@@ -1632,7 +1634,7 @@ class AccuracyBenchmark:
         
         logger.info(f"Time distribution analysis plot saved to: {plot_file}")
 
-    def generate_csv_summary(self):
+    def generate_csv_summary(self) -> None:
         """Generate a CSV summary of key metrics for easy analysis."""
         summary_data = []
         
@@ -1685,7 +1687,7 @@ class AccuracyBenchmark:
             logger.info(f"CSV summary saved to: {csv_file}")
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
         description="Run the ManipulaPy accuracy benchmark suite."
@@ -1736,7 +1738,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def main() -> int:
     """Main function to run the comprehensive accuracy benchmark."""
     args = parse_args()
     

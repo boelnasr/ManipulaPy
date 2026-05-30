@@ -23,6 +23,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import time
 import logging
 from pathlib import Path
+from typing import Optional
 import matplotlib
 matplotlib.use('TkAgg')
 
@@ -71,7 +72,7 @@ class IntermediateSingularityDemo:
     Demonstrates advanced singularity analysis techniques for robotic manipulators.
     """
     
-    def __init__(self, use_simple_robot=False):
+    def __init__(self, use_simple_robot=False) -> None:
         """
         Initialize the singularity analysis demo.
         
@@ -83,14 +84,14 @@ class IntermediateSingularityDemo:
         self.setup_robot()
         self.setup_singularity_analyzer()
         
-    def setup_robot(self):
+    def setup_robot(self) -> None:
         """Set up the robot model (either XArm or simple)."""
         if self.use_simple_robot:
             self.setup_simple_robot()
         else:
             self.setup_xarm_robot()
             
-    def setup_xarm_robot(self):
+    def setup_xarm_robot(self) -> None:
         """Load the built-in XArm robot from ManipulaPy data."""
         logger.info("Setting up XArm robot from built-in data...")
         
@@ -114,7 +115,7 @@ class IntermediateSingularityDemo:
             self.use_simple_robot = True
             self.setup_simple_robot()
             
-    def setup_simple_robot(self):
+    def setup_simple_robot(self) -> None:
         """Create a simple 3-DOF planar robot for demonstration (fallback)."""
         logger.info("Setting up simple 3-DOF planar robot as fallback...")
         
@@ -198,7 +199,7 @@ class IntermediateSingularityDemo:
         
         logger.info("✅ Simple robot setup complete")
         
-    def setup_singularity_analyzer(self):
+    def setup_singularity_analyzer(self) -> None:
         """Initialize the singularity analysis tools."""
         logger.info("Setting up singularity analyzer...")
         
@@ -216,7 +217,7 @@ class IntermediateSingularityDemo:
             logger.error(f"Failed to initialize singularity analyzer: {e}")
             raise
     
-    def demonstrate_basic_singularity_detection(self):
+    def demonstrate_basic_singularity_detection(self) -> dict:
         """Demonstrate basic singularity detection and analysis."""
         logger.info("\n🎯 Demonstrating Basic Singularity Detection...")
         
@@ -303,7 +304,7 @@ class IntermediateSingularityDemo:
         
         return singularity_results
     
-    def plot_singularity_comparison(self, results):
+    def plot_singularity_comparison(self, results) -> None:
         """Plot comparison of singularity metrics across configurations."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('Singularity Analysis Comparison', fontsize=16, fontweight='bold')
@@ -386,7 +387,7 @@ class IntermediateSingularityDemo:
         logger.info(f"📊 Singularity comparison plot saved as '{save_path}'")
         plt.close()
     
-    def analyze_singular_value_patterns(self, results):
+    def analyze_singular_value_patterns(self, results) -> None:
         """Analyze patterns in singular values across configurations."""
         logger.info("\n📊 Singular Value Pattern Analysis:")
         
@@ -409,7 +410,7 @@ class IntermediateSingularityDemo:
             rank = np.sum(sv > tolerance)
             logger.info(f"    Effective rank: {rank}/{len(sv)}")
     
-    def demonstrate_manipulability_ellipsoid_analysis(self):
+    def demonstrate_manipulability_ellipsoid_analysis(self) -> dict:
         """Demonstrate manipulability ellipsoid visualization and analysis."""
         logger.info("\n🎯 Demonstrating Manipulability Ellipsoid Analysis...")
         
@@ -459,7 +460,7 @@ class IntermediateSingularityDemo:
         
         return ellipsoid_data
     
-    def compute_ellipsoid_data(self, J):
+    def compute_ellipsoid_data(self, J) -> dict:
         """Compute ellipsoid data from Jacobian matrix."""
         # Compute JJ^T for velocity ellipsoid
         A = J @ J.T
@@ -482,7 +483,7 @@ class IntermediateSingularityDemo:
             'volume': np.prod(semi_axes) * 4/3 * np.pi if len(semi_axes) == 3 else np.prod(semi_axes) * np.pi
         }
     
-    def plot_manipulability_ellipsoids(self, ellipsoid_data):
+    def plot_manipulability_ellipsoids(self, ellipsoid_data) -> None:
         """Plot manipulability ellipsoids for different configurations."""
         fig = plt.figure(figsize=(15, 10))
         
@@ -560,7 +561,7 @@ class IntermediateSingularityDemo:
         logger.info(f"📊 Manipulability ellipsoids plot saved as '{save_path}'")
         plt.close()
     
-    def plot_ellipsoid_3d(self, ax, ellipsoid_data, color, label, alpha=0.3):
+    def plot_ellipsoid_3d(self, ax, ellipsoid_data, color, label, alpha=0.3) -> None:
         """Plot a 3D ellipsoid on given axes."""
         # Generate sphere points
         u = np.linspace(0, 2 * np.pi, 50)
@@ -589,7 +590,7 @@ class IntermediateSingularityDemo:
             
             ax.plot_surface(x_final, y_final, z_final, color=color, alpha=alpha, label=label)
     
-    def analyze_ellipsoid_properties(self, ellipsoid_data):
+    def analyze_ellipsoid_properties(self, ellipsoid_data) -> None:
         """Analyze properties of manipulability ellipsoids."""
         logger.info("\n📊 Ellipsoid Properties Analysis:")
         
@@ -614,7 +615,7 @@ class IntermediateSingularityDemo:
                 logger.info(f"    Angular isotropy ratio: {np.min(angular_axes)/np.max(angular_axes):.4f}")
                 logger.info(f"    Angular volume: {angular_ellipsoid['volume']:.6f}")
     
-    def demonstrate_workspace_analysis(self):
+    def demonstrate_workspace_analysis(self) -> dict:
         """Demonstrate workspace analysis with singularity detection."""
         logger.info("\n🎯 Demonstrating Workspace Analysis...")
         
@@ -637,14 +638,14 @@ class IntermediateSingularityDemo:
         
         return workspace_data
     
-    def sample_workspace(self, num_samples):
+    def sample_workspace(self, num_samples) -> dict:
         """Sample the robot workspace and analyze singularities."""
         if GPU_AVAILABLE and CUDA_AVAILABLE:
             return self.sample_workspace_gpu(num_samples)
         else:
             return self.sample_workspace_cpu(num_samples)
     
-    def sample_workspace_cpu(self, num_samples):
+    def sample_workspace_cpu(self, num_samples) -> dict:
         """CPU-based workspace sampling."""
         logger.info("Using CPU for workspace sampling...")
         
@@ -701,7 +702,7 @@ class IntermediateSingularityDemo:
             'method': 'CPU'
         }
     
-    def sample_workspace_gpu(self, num_samples):
+    def sample_workspace_gpu(self, num_samples) -> dict:
         """GPU-accelerated workspace sampling."""
         logger.info("Using GPU for workspace sampling...")
         
@@ -722,7 +723,7 @@ class IntermediateSingularityDemo:
             logger.warning(f"GPU workspace sampling failed: {e}, falling back to CPU")
             return self.sample_workspace_cpu(num_samples)
     
-    def analyze_workspace_properties(self, workspace_data):
+    def analyze_workspace_properties(self, workspace_data) -> None:
         """Analyze properties of the sampled workspace."""
         logger.info("\n📊 Workspace Properties Analysis:")
         
@@ -765,7 +766,7 @@ class IntermediateSingularityDemo:
         logger.info(f"    Mean manipulability: {np.mean(manipulabilities):.6f}")
         logger.info(f"    Min singular value range: [{np.min(min_svs):.6f}, {np.max(min_svs):.6f}]")
     
-    def plot_workspace_analysis(self, workspace_data):
+    def plot_workspace_analysis(self, workspace_data) -> None:
         """Plot workspace analysis results."""
         workspace_points = workspace_data['workspace_points']
         singularity_metrics = workspace_data['singularity_metrics']
@@ -858,7 +859,7 @@ class IntermediateSingularityDemo:
         logger.info(f"📊 Workspace analysis plot saved as '{save_path}'")
         plt.close()
     
-    def find_workspace_boundaries(self, workspace_data):
+    def find_workspace_boundaries(self, workspace_data) -> None:
         """Find and analyze workspace boundaries."""
         logger.info("\n📊 Workspace Boundary Analysis:")
         
@@ -900,7 +901,7 @@ class IntermediateSingularityDemo:
         except Exception as e:
             logger.error(f"Boundary analysis failed: {e}")
     
-    def plot_boundary_analysis(self, workspace_points, hull, boundary_singularities):
+    def plot_boundary_analysis(self, workspace_points, hull, boundary_singularities) -> None:
         """Plot workspace boundary analysis."""
         fig = plt.figure(figsize=(15, 10))
         
@@ -952,7 +953,7 @@ class IntermediateSingularityDemo:
         logger.info(f"📊 Boundary analysis plot saved as '{save_path}'")
         plt.close()
     
-    def demonstrate_singularity_avoidance(self):
+    def demonstrate_singularity_avoidance(self) -> dict:
         """Demonstrate singularity avoidance strategies."""
         logger.info("\n🎯 Demonstrating Singularity Avoidance Strategies...")
         
@@ -997,7 +998,7 @@ class IntermediateSingularityDemo:
         
         return trajectory_results
     
-    def plan_direct_trajectory(self, start_config, end_config, num_points=50):
+    def plan_direct_trajectory(self, start_config, end_config, num_points=50) -> dict:
         """Plan a direct linear trajectory in joint space."""
         trajectory = []
         
@@ -1011,7 +1012,7 @@ class IntermediateSingularityDemo:
             'method': 'Direct Linear Interpolation'
         }
     
-    def plan_singularity_aware_trajectory(self, start_config, end_config, num_points=50):
+    def plan_singularity_aware_trajectory(self, start_config, end_config, num_points=50) -> dict:
         """Plan trajectory with singularity awareness."""
         trajectory = [start_config.copy()]
         current_config = start_config.copy()
@@ -1060,7 +1061,7 @@ class IntermediateSingularityDemo:
             'method': 'Singularity-Aware Planning'
         }
     
-    def plan_damped_trajectory(self, start_config, end_config, num_points=50):
+    def plan_damped_trajectory(self, start_config, end_config, num_points=50) -> dict:
         """Plan trajectory using damped least squares approach."""
         trajectory = []
         
@@ -1077,7 +1078,7 @@ class IntermediateSingularityDemo:
             'method': 'Damped Interpolation'
         }
     
-    def analyze_trajectory_singularities(self, trajectory_result, strategy_name):
+    def analyze_trajectory_singularities(self, trajectory_result, strategy_name) -> None:
         """Analyze singularities along a trajectory."""
         trajectory = trajectory_result['trajectory']
         
@@ -1118,7 +1119,7 @@ class IntermediateSingularityDemo:
         trajectory_result['manipulabilities'] = manipulabilities
         trajectory_result['min_singular_values'] = min_singular_values
     
-    def plot_trajectory_comparison(self, trajectory_results):
+    def plot_trajectory_comparison(self, trajectory_results) -> None:
         """Plot comparison of different trajectory strategies."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('Singularity Avoidance Strategy Comparison', fontsize=16, fontweight='bold')
@@ -1235,7 +1236,7 @@ class IntermediateSingularityDemo:
         logger.info(f"📊 Singularity avoidance plot saved as '{save_path}'")
         plt.close()
     
-    def demonstrate_dexterity_optimization(self):
+    def demonstrate_dexterity_optimization(self) -> Optional[dict]:
         """Demonstrate dexterity optimization and analysis."""
         logger.info("\n🎯 Demonstrating Dexterity Optimization...")
         
@@ -1281,7 +1282,7 @@ class IntermediateSingularityDemo:
         
         return optimization_results
 
-    def maximize_manipulability_objective(self, config, target_position):
+    def maximize_manipulability_objective(self, config, target_position) -> float:
         """Objective function to maximize manipulability."""
         # Check if configuration reaches target
         T = self.robot.forward_kinematics(config)
@@ -1297,7 +1298,7 @@ class IntermediateSingularityDemo:
         
         return -manipulability  # Negative for maximization
     
-    def minimize_condition_objective(self, config, target_position):
+    def minimize_condition_objective(self, config, target_position) -> float:
         """Objective function to minimize condition number."""
         # Check if configuration reaches target
         T = self.robot.forward_kinematics(config)
@@ -1313,7 +1314,7 @@ class IntermediateSingularityDemo:
         
         return condition_number
     
-    def maximize_min_sv_objective(self, config, target_position):
+    def maximize_min_sv_objective(self, config, target_position) -> float:
         """Objective function to maximize minimum singular value."""
         # Check if configuration reaches target
         T = self.robot.forward_kinematics(config)
@@ -1330,7 +1331,7 @@ class IntermediateSingularityDemo:
         
         return -min_sv  # Negative for maximization
     
-    def optimize_configuration(self, target_position, objective_func):
+    def optimize_configuration(self, target_position, objective_func) -> dict:
         """Optimize robot configuration for given objective."""
         num_joints = len(self.joint_limits)
         
@@ -1370,7 +1371,7 @@ class IntermediateSingularityDemo:
             'min_singular_value': np.min(s)
         }
     
-    def analyze_dexterity_results(self, optimization_results, target_position):
+    def analyze_dexterity_results(self, optimization_results, target_position) -> None:
         """Analyze dexterity optimization results."""
         logger.info("\n📊 Dexterity Optimization Results Analysis:")
         
@@ -1383,7 +1384,7 @@ class IntermediateSingularityDemo:
             logger.info(f"    Condition number: {result['condition_number']:.2f}")
             logger.info(f"    Min singular value: {result['min_singular_value']:.6f}")
     
-    def plot_dexterity_optimization(self, optimization_results, target_position):
+    def plot_dexterity_optimization(self, optimization_results, target_position) -> None:
         """Plot dexterity optimization results."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('Dexterity Optimization Results', fontsize=16, fontweight='bold')
@@ -1468,7 +1469,7 @@ class IntermediateSingularityDemo:
         logger.info(f"📊 Dexterity optimization plot saved as '{save_path}'")
         plt.close()
     
-    def demonstrate_real_time_monitoring(self):
+    def demonstrate_real_time_monitoring(self) -> tuple:
         """Demonstrate real-time singularity monitoring."""
         logger.info("\n🎯 Demonstrating Real-Time Singularity Monitoring...")
         
@@ -1508,7 +1509,7 @@ class IntermediateSingularityDemo:
         
         return trajectory_points, monitoring_data
     
-    def monitor_singularity_real_time(self, config):
+    def monitor_singularity_real_time(self, config) -> dict:
         """Monitor singularities for a single configuration in real-time."""
         # Fast singularity metrics computation
         J = self.robot.jacobian(config)
@@ -1538,7 +1539,7 @@ class IntermediateSingularityDemo:
             'safety_level': self.compute_safety_level(condition_number, min_sv)
         }
     
-    def compute_safety_level(self, condition_number, min_sv):
+    def compute_safety_level(self, condition_number, min_sv) -> str:
         """Compute safety level based on singularity metrics."""
         # Define safety thresholds
         if min_sv < 1e-4 or condition_number > 1000:
@@ -1550,7 +1551,7 @@ class IntermediateSingularityDemo:
         else:
             return 'SAFE'      # Safe operation
     
-    def analyze_monitoring_results(self, trajectory_points, monitoring_data):
+    def analyze_monitoring_results(self, trajectory_points, monitoring_data) -> None:
         """Analyze real-time monitoring results."""
         logger.info("\n📊 Real-Time Monitoring Analysis:")
         
@@ -1587,7 +1588,7 @@ class IntermediateSingularityDemo:
         logger.info(f"  Condition number range: [{np.min(condition_numbers):.2f}, {np.max(condition_numbers):.2f}]")
         logger.info(f"  Manipulability range: [{np.min(manipulabilities):.6f}, {np.max(manipulabilities):.6f}]")
     
-    def plot_real_time_monitoring(self, trajectory_points, monitoring_data):
+    def plot_real_time_monitoring(self, trajectory_points, monitoring_data) -> None:
         """Plot real-time monitoring results."""
         fig, axes = plt.subplots(3, 2, figsize=(15, 12))
         fig.suptitle('Real-Time Singularity Monitoring', fontsize=16, fontweight='bold')
@@ -1704,7 +1705,7 @@ class IntermediateSingularityDemo:
         logger.info(f"📊 Real-time monitoring plot saved as '{save_path}'")
         plt.close()
     
-    def run_complete_demonstration(self):
+    def run_complete_demonstration(self) -> None:
         """Run the complete intermediate singularity analysis demonstration."""
         logger.info("🚀 Starting Intermediate Singularity Analysis Demonstration")
         logger.info("=" * 70)
@@ -1742,7 +1743,7 @@ class IntermediateSingularityDemo:
         logger.info("🎉 Intermediate Singularity Analysis Demonstration Complete!")
         logger.info("=" * 70)
     
-    def print_demonstration_summary(self):
+    def print_demonstration_summary(self) -> None:
         """Print a summary of the demonstration results."""
         logger.info("\n📋 Demonstration Summary:")
         logger.info("  ✅ Basic singularity detection and analysis")
@@ -1776,7 +1777,7 @@ class IntermediateSingularityDemo:
                 logger.info(f"  ❌ {filename} (not generated)")
 
 
-def main():
+def main() -> int:
     """Main function to run the intermediate singularity analysis demonstration."""
     print("🔧 Intermediate Singularity Analysis Demo - ManipulaPy")
     print("=" * 60)

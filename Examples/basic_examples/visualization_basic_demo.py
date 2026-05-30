@@ -40,7 +40,7 @@ except ImportError as e:
     logger.error(f"❌ Failed to import ManipulaPy: {e}")
     sys.exit(1)
 
-def create_visualization_urdf():
+def create_visualization_urdf() -> str:
     """
     Create a simple 4-DOF robot URDF file optimized for visualization demos.
     This creates a basic robot arm that's easy to visualize and animate.
@@ -174,7 +174,7 @@ def create_visualization_urdf():
     logger.info(f"✅ Created visualization demo URDF: {urdf_file}")
     return urdf_file
 
-def demonstrate_robot_visualization(urdf_processor):
+def demonstrate_robot_visualization(urdf_processor) -> None:
     """
     Demonstrate basic robot model visualization using ManipulaPy.
     
@@ -205,7 +205,7 @@ def demonstrate_robot_visualization(urdf_processor):
         logger.warning(f"   ⚠️ Robot visualization not available in this environment: {e}")
         print(f"   💡 Try running in an environment with display capabilities")
 
-def demonstrate_trajectory_animation(urdf_processor):
+def demonstrate_trajectory_animation(urdf_processor) -> None:
     """
     Demonstrate trajectory animation using ManipulaPy's trajectory visualization.
     
@@ -279,7 +279,7 @@ def demonstrate_trajectory_animation(urdf_processor):
         except Exception as e:
             logger.warning(f"   ⚠️ Trajectory animation error: {e}")
 
-def plot_workspace_visualization(urdf_processor):
+def plot_workspace_visualization(urdf_processor) -> None:
     """
     Create 3D workspace visualization plots using ManipulaPy.
     
@@ -371,7 +371,7 @@ def plot_workspace_visualization(urdf_processor):
     except:
         plt.close()
 
-def plot_manipulability_analysis(urdf_processor):
+def plot_manipulability_analysis(urdf_processor) -> None:
     """
     Demonstrate manipulability analysis and visualization using ManipulaPy.
     
@@ -513,7 +513,7 @@ def plot_manipulability_analysis(urdf_processor):
         except:
             plt.close()
 
-def demonstrate_trajectory_plotting(urdf_processor):
+def demonstrate_trajectory_plotting(urdf_processor) -> None:
     """
     Demonstrate trajectory plotting and analysis using ManipulaPy path planning.
     
@@ -612,7 +612,7 @@ def demonstrate_trajectory_plotting(urdf_processor):
     except Exception as e:
         logger.warning(f"⚠️ Trajectory generation error: {e}")
 
-def demonstrate_end_effector_visualization(urdf_processor):
+def demonstrate_end_effector_visualization(urdf_processor) -> None:
     """
     Demonstrate end-effector path visualization and analysis.
     
@@ -708,7 +708,7 @@ def demonstrate_end_effector_visualization(urdf_processor):
     except:
         plt.close()
 
-def demonstrate_configuration_space_visualization(urdf_processor):
+def demonstrate_configuration_space_visualization(urdf_processor) -> None:
     """
     Demonstrate configuration space analysis and visualization.
     
@@ -837,7 +837,7 @@ def demonstrate_configuration_space_visualization(urdf_processor):
     except:
         plt.close()
 
-def create_summary_visualization(urdf_processor):
+def create_summary_visualization(urdf_processor) -> list:
     """
     Create a comprehensive summary visualization showing all key robot properties.
     
@@ -1145,7 +1145,7 @@ def create_summary_visualization(urdf_processor):
     except:
         plt.close()
 
-def cleanup_visualization_files():
+def cleanup_visualization_files() -> None:
     """Clean up visualization files created during the demonstration."""
     files_to_clean = [
         "visualization_demo_robot.urdf",
@@ -1165,7 +1165,7 @@ def cleanup_visualization_files():
             except Exception as e:
                 logger.warning(f"⚠️ Could not remove {file}: {e}")
 
-def main():
+def main() -> int:
     """Demonstrate ManipulaPy visualization capabilities."""
     print("=== ManipulaPy: Basic Visualization Demo ===")
     print("🎨 Comprehensive demonstration of ManipulaPy's visualization capabilities")

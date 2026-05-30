@@ -34,7 +34,7 @@ except ImportError as e:
     logger.error(f"❌ Failed to import ManipulaPy: {e}")
     sys.exit(1)
 
-def create_sample_urdf():
+def create_sample_urdf() -> str:
     """
     Create a simple 6-DOF robot URDF file for demonstration.
     This creates a basic robot arm with 6 revolute joints.
@@ -218,7 +218,7 @@ def create_sample_urdf():
     logger.info(f"✅ Created sample URDF file: {urdf_file}")
     return urdf_file
 
-def load_and_inspect_urdf(urdf_file):
+def load_and_inspect_urdf(urdf_file: str) -> URDFToSerialManipulator:
     """
     Load a URDF file using ManipulaPy's URDFToSerialManipulator and inspect its properties.
     
@@ -255,7 +255,7 @@ def load_and_inspect_urdf(urdf_file):
         logger.error(f"❌ Failed to load URDF with ManipulaPy: {e}")
         raise
 
-def inspect_robot_model(urdf_processor):
+def inspect_robot_model(urdf_processor) -> None:
     """
     Inspect the extracted robot model parameters using ManipulaPy's internal data structures.
     
@@ -304,7 +304,7 @@ def inspect_robot_model(urdf_processor):
         else:
             print(f"   Link {i+1} has complex inertia structure")
 
-def demonstrate_manipulapy_transformations(urdf_processor):
+def demonstrate_manipulapy_transformations(urdf_processor) -> None:
     """
     Demonstrate ManipulaPy's specific transformation utilities and methods.
     
@@ -348,7 +348,7 @@ def demonstrate_manipulapy_transformations(urdf_processor):
     print(f"   • Adjoint of M^-1 shape: {Ad_inv.shape}")
     print(f"   • Used to compute Blist from Slist")
 
-def test_manipulapy_objects(urdf_processor):
+def test_manipulapy_objects(urdf_processor) -> None:
     """
     Test the SerialManipulator and ManipulatorDynamics objects created by ManipulaPy.
     
@@ -407,7 +407,7 @@ def test_manipulapy_objects(urdf_processor):
     except Exception as e:
         logger.warning(f"   ⚠️ Dynamics computation error: {e}")
 
-def demonstrate_manipulapy_pybullet_integration(urdf_processor):
+def demonstrate_manipulapy_pybullet_integration(urdf_processor) -> None:
     """
     Demonstrate ManipulaPy's PyBullet integration features.
     
@@ -435,7 +435,7 @@ def demonstrate_manipulapy_pybullet_integration(urdf_processor):
     print(f"   • PyBullet integration provides URDF-specific limits")
     print(f"   • ManipulaPy's use_pybullet_limits=True enables this feature")
 
-def test_manipulapy_visualization_support(urdf_processor):
+def test_manipulapy_visualization_support(urdf_processor) -> None:
     """
     Test ManipulaPy's visualization and trajectory support.
     
@@ -470,7 +470,7 @@ def test_manipulapy_visualization_support(urdf_processor):
     except Exception as e:
         logger.warning(f"   ⚠️ Visualization test error: {e}")
 
-def analyze_workspace(serial_manipulator):
+def analyze_workspace(serial_manipulator) -> None:
     """
     Analyze the robot workspace through Monte Carlo sampling.
     
@@ -504,7 +504,7 @@ def analyze_workspace(serial_manipulator):
     else:
         print(f"   ⚠️ No valid workspace points found")
 
-def main():
+def main() -> int:
     """Demonstrate ManipulaPy URDF processing operations."""
     print("=== ManipulaPy: Basic URDF Processing Demo ===")
     print("📄 Focused demonstration of ManipulaPy's URDF processing capabilities")
@@ -598,7 +598,7 @@ def main():
         print(f"   Z range: [{workspace_points[:, 2].min():.3f}, {workspace_points[:, 2].max():.3f}]")
         print(f"   Max reach: {np.max(np.linalg.norm(workspace_points, axis=1)):.3f}")
 
-def cleanup_demo_files():
+def cleanup_demo_files() -> None:
     """Clean up demo files created during the demonstration."""
     files_to_clean = ["sample_6dof_robot.urdf"]
     

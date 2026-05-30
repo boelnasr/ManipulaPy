@@ -17,7 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from ManipulaPy.control import ManipulatorController
 
-def main():
+def main() -> None:
     """Demonstrate intermediate control comparison operations."""
     print("=== ManipulaPy: Intermediate Control Comparison Demo ===")
     
