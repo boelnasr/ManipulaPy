@@ -28,7 +28,7 @@ import os
 import warnings
 from functools import lru_cache
 from time import perf_counter
-from typing import Any, Dict, List, NoReturn, Optional, Tuple
+from typing import Any, Dict, NoReturn, Optional, Tuple
 
 import numpy as np
 from numba import config as _nb_cfg

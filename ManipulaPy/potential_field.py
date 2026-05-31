@@ -207,32 +207,47 @@ class CollisionChecker:
             if not sources:
                 continue
 
+            # Aggregate vertices from EVERY geometry element on the link, so a
+            # link with multiple collision meshes is enclosed by a single hull
+            # spanning all of them. (Previously the loop overwrote the entry on
+            # each iteration, keeping only the last mesh and silently dropping
+            # the rest — which could miss self-collisions.)
+            link_vertices = []
             for geom_element in sources:
                 if geom_element.geometry is None:
                     continue
-
                 geom = geom_element.geometry
 
-                # Check if it's a mesh with loaded vertices
+                vertices = None
                 if hasattr(geom, "mesh_data") and geom.mesh_data is not None:
                     vertices = geom.mesh_data.vertices
-                    if vertices is not None and len(vertices) >= 4:
-                        try:
-                            convex_hull = ConvexHull(vertices)
-                            convex_hulls[link.name] = convex_hull
-                        except Exception:
-                            pass
-                # Fallback for legacy mesh attribute
                 elif hasattr(geom, "mesh") and geom.mesh is not None:
                     mesh = geom.mesh
-                    if hasattr(mesh, "vertices") and mesh.vertices is not None:
-                        vertices = np.array(mesh.vertices)
-                        if len(vertices) >= 4:
-                            try:
-                                convex_hull = ConvexHull(vertices)
-                                convex_hulls[link.name] = convex_hull
-                            except Exception:
-                                pass
+                    if hasattr(mesh, "vertices"):
+                        vertices = mesh.vertices
+
+                if vertices is None:
+                    continue
+                vertices = np.asarray(vertices, dtype=float)
+                if vertices.ndim != 2 or vertices.shape[0] < 1:
+                    continue
+                link_vertices.append(vertices)
+
+            if not link_vertices:
+                continue
+
+            all_vertices = np.vstack(link_vertices)
+            if len(all_vertices) < 4:
+                continue  # need >= 4 points for a 3-D convex hull
+            try:
+                convex_hulls[link.name] = ConvexHull(all_vertices)
+            except Exception as exc:
+                _logger.warning(
+                    "Skipping convex hull for link %r (%d vertices): %s",
+                    link.name,
+                    len(all_vertices),
+                    exc,
+                )
 
         return convex_hulls
 

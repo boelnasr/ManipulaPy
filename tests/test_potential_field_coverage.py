@@ -223,6 +223,52 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         hulls = checker._create_convex_hulls()
         self.assertIn("test_link", hulls)
 
+    def test_create_convex_hulls_aggregates_multiple_meshes(self) -> None:
+        """A link with multiple collision meshes must be enclosed by a single
+        hull spanning ALL of them. Regression: the builder used to overwrite the
+        per-link entry on each iteration, keeping only the last mesh and silently
+        dropping the rest, which could miss self-collisions."""
+        from ManipulaPy.potential_field import CollisionChecker
+
+        def _tetra(offset):
+            base = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=float)
+            return base + np.asarray(offset, dtype=float)
+
+        # First mesh is far away; the last is near the origin. The old
+        # "keep last" behaviour would drop the far mesh entirely.
+        far_geom = MagicMock()
+        far_geom.mesh_data = MagicMock()
+        far_geom.mesh_data.vertices = _tetra([10.0, 10.0, 10.0])
+        far_col = MagicMock()
+        far_col.geometry = far_geom
+
+        near_geom = MagicMock()
+        near_geom.mesh_data = MagicMock()
+        near_geom.mesh_data.vertices = _tetra([0.0, 0.0, 0.0])
+        near_col = MagicMock()
+        near_col.geometry = near_geom
+
+        mock_link = MagicMock()
+        mock_link.name = "multi_link"
+        mock_link.collisions = [far_col, near_col]
+        mock_link.visuals = []
+
+        mock_robot = MagicMock()
+        mock_robot.links = [mock_link]
+
+        with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
+            checker = CollisionChecker.__new__(CollisionChecker)
+            checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
+
+        hulls = checker._create_convex_hulls()
+        self.assertIn("multi_link", hulls)
+        pts = hulls["multi_link"].points
+        # The far mesh (~[10,10,10]) must be represented in the hull, not dropped...
+        self.assertGreaterEqual(pts.max(), 10.0)
+        # ...and the near mesh (~origin) too.
+        self.assertLessEqual(pts.min(), 0.5)
+
     def test_create_convex_hulls_legacy_mesh(self) -> None:
         """_create_convex_hulls with legacy mesh attribute (via visual fallback)."""
         from ManipulaPy.potential_field import CollisionChecker
