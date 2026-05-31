@@ -371,6 +371,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   intended.
 
 ### Fixed — CUDA kernels (no GPU in CI)
+- **`optimized_potential_field` crashed on an empty obstacle set** — the
+  trajectory planner's GPU collision-avoidance path passes `np.array([])`
+  (a 1-D `(0,)` array) for the no-obstacle case, but the fused kernel
+  indexes `obstacles[obs, 0]` (2-D). The 1-D type broke Numba's nopython
+  type inference and aborted every large-N GPU `joint_trajectory` run on
+  CUDA hardware (CI is GPU-less, so it never surfaced). Obstacles are now
+  normalised to `(M, 3)` at the GPU boundary.
 - **`trajectory_kernel` + 4 optimized variants**
   (`_vectorized`, `_memory_optimized`, `_warp_optimized`,
   `_cache_friendly`) — shared-memory race fixed (thread (0,0)

@@ -2397,6 +2397,13 @@ def optimized_potential_field(
 
     N = positions.shape[0]
 
+    # The fused kernel indexes ``obstacles[obs, 0..2]``, so obstacles must be a
+    # 2-D ``(M, 3)`` array. Callers (e.g. the planner's no-obstacle path) may
+    # pass an empty list -> ``np.array([])`` which is 1-D ``(0,)``; a 1-D type
+    # breaks Numba's nopython type inference and aborts the kernel launch.
+    # Normalise to ``(M, 3)`` (empty -> ``(0, 3)``).
+    obstacles = np.ascontiguousarray(obstacles, dtype=np.float32).reshape(-1, 3)
+
     # Use pinned memory for faster transfers
     if use_pinned:
         d_positions = _h2d_pinned(np.ascontiguousarray(positions, dtype=np.float32))

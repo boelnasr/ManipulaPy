@@ -3066,6 +3066,30 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         self.assertTrue(captured.get("called"))
         self.assertEqual(captured["shape"], arr.shape)
 
+    def test_optimized_potential_field_accepts_empty_obstacles(self) -> None:
+        """optimized_potential_field must not crash on an empty obstacle set.
+
+        The trajectory planner's GPU collision-avoidance path passes
+        ``np.array([])`` (a 1-D ``(0,)`` array) for the no-obstacle case. The
+        fused kernel indexes ``obstacles[obs, 0]`` (2-D), so a 1-D array breaks
+        Numba's nopython type inference and aborts the entire large-N GPU
+        trajectory run. The wrapper must normalise obstacles to ``(M, 3)``.
+        """
+        import ManipulaPy.cuda_kernels as ck
+
+        if not ck.CUDA_AVAILABLE:
+            self.skipTest("CUDA path not exercised when CUDA is unavailable")
+
+        positions = np.zeros((4, 3), dtype=np.float64)
+        goal = np.array([1.0, 0.0, 0.0])
+        empty_obstacles = np.array([])  # 1-D (0,) — exactly what the planner passes
+
+        potential, gradient = ck.optimized_potential_field(
+            positions, goal, empty_obstacles, influence_distance=0.5, use_pinned=False
+        )
+        self.assertEqual(potential.shape, (4,))
+        self.assertEqual(gradient.shape, (4, 3))
+
     def test_trajectory_cpu_fallback_handles_zero_Tf_without_warnings(self) -> None:
         """trajectory_cpu_fallback used to emit a numpy RuntimeWarning
         ("invalid value encountered in divide") when called with Tf=0
