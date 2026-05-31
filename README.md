@@ -50,9 +50,18 @@ pip install "ManipulaPy[cuda]"         # CuPy 12.x for CUDA 12.x toolchains
 pip install "ManipulaPy[all]"          # everything above
 ```
 
-**Apple Silicon (M1/M2/M3):** the default `pip install ManipulaPy` installs cleanly — the heavy deps without prebuilt ARM-macOS wheels (e.g. PyBullet) are now optional, and the `[cuda]` extra is skipped automatically on macOS.
-
 For CUDA 11.x toolchains use `[gpu-cuda11]`; for AMD/ROCm use `[gpu-rocm]`. Full matrix in the [Installation Guide](docs/source/Installation%20Guide.rst).
+
+#### Apple Silicon (M1/M2/M3)
+
+The default `pip install ManipulaPy` installs cleanly — all CPU features (kinematics, IK, dynamics, trajectory planning) work natively on macOS ARM. PyPI ships no `pybullet` wheel for Apple Silicon, so a source build can fail under Clang; if you need the `[simulation]` extra, install PyBullet from conda-forge first:
+
+```bash
+conda install -c conda-forge pybullet
+pip install ManipulaPy            # or: pip install "ManipulaPy[simulation]"
+```
+
+CUDA/GPU features are not available on macOS — the `[cuda]` extra is skipped automatically (`sys_platform != 'darwin'`).
 
 ### Requirements
 
