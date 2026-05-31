@@ -29,7 +29,7 @@ print(np.__version__)
 
 # The native parser supports NumPy 2.0+
 # If using NumPy 2.0+, ensure scipy is also updated:
-# pip install 'scipy>=1.14'
+# pip install 'scipy>=1.13'
 ```
 
 ### Missing Optional Dependencies
@@ -395,7 +395,7 @@ def get_robot(urdf_path):
 ```python
 # The native URDF parser supports NumPy 2.0
 # Make sure scipy is also updated:
-# pip install 'scipy>=1.14'
+# pip install 'scipy>=1.13'
 
 # Check versions
 import numpy as np

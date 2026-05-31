@@ -23,7 +23,7 @@ setup(
     # Heavy/platform-specific dependencies live in extras below.
     install_requires=[
         "numpy>=2.0,<3.0",
-        "scipy>=1.14",
+        "scipy>=1.13",
         "matplotlib>=3.9",
         "numba>=0.60",
         "pillow>=8.0.0",
@@ -34,7 +34,7 @@ setup(
     extras_require={
         "minimal": [
             "numpy>=2.0,<3.0",
-            "scipy>=1.14",
+            "scipy>=1.13",
             "matplotlib>=3.9",
             "numba>=0.60",
             "pybullet>=3.2.5,<4.0",

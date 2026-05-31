@@ -1,5 +1,5 @@
 numpy>=2.0,<3.0
-scipy>=1.14
+scipy>=1.13
 pybullet>=3.0.6
 pycuda>=2021.1
 trimesh>=3.9.14
