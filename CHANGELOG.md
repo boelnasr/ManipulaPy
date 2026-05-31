@@ -5,16 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.2] — 2026-05-10
+## [1.3.2] — 2026-05-31
 
-> **Status:** All functional fixes and documentation reconciliation for
-> v1.3.2 are landed on `release/v1.3.2-fix-patch`. The CHANGELOG below
-> is current and includes the self-collision work (allowed-collision
-> matrix, collision-mesh source preference, opt-in PyBullet
-> `URDF_USE_SELF_COLLISION` flag, and the `check_collisions` return
-> contract). The release ritual (STATUS.md sync, final test-suite
-> verification, version tag, PR, PyPI publish) is the only remaining
-> step before tagging v1.3.2.
+> **Status:** Final — all fixes complete and verified (full CPU test suite
+> green; GPU paths verified on CUDA hardware). Includes the core-math
+> correctness audit (CM-1–CM-6), the GPU potential-field obstacles fix, the
+> self-collision work (allowed-collision matrix, collision-mesh source
+> preference, opt-in PyBullet `URDF_USE_SELF_COLLISION` flag, and the
+> `check_collisions` return contract), documentation reconciliation, and
+> version alignment.
 >
 > **Summary:** Comprehensive stability and correctness patch addressing bugs
 > across utilities, dynamics, kinematics, path planning, control, singularity
@@ -1209,7 +1208,8 @@ When making changes, add entries under `[Unreleased]` in the appropriate categor
 
 ---
 
-[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.1.3...v1.2.0
