@@ -132,6 +132,35 @@ was validated against on driver 580. For older CUDA 11.x toolchains
 If GPU acceleration is unavailable, ManipulaPy automatically falls
 back to NumPy/Numba CPU paths -- no code changes needed.
 
+Apple Silicon (M1 / M2 / M3)
+============================
+
+The default ``pip install ManipulaPy`` installs cleanly on macOS ARM --
+all CPU features (kinematics, IK, dynamics, trajectory planning, native
+URDF parsing, perception clustering) work natively.
+
+PyPI does not ship a ``pybullet`` wheel for Apple Silicon, so a plain
+``pip install "ManipulaPy[simulation]"`` triggers a from-source Clang
+build that fails on some macOS ARM toolchains. If you need the
+``[simulation]`` extra, install PyBullet from conda-forge first (it
+provides prebuilt ARM64 wheels):
+
+.. code-block:: bash
+
+   conda create -n manipulapy python=3.11
+   conda activate manipulapy
+   conda install -c conda-forge pybullet
+   pip install ManipulaPy            # pybullet already satisfied -- no compile
+
+Alternatively, run ManipulaPy inside a Linux container on Apple Silicon;
+installation succeeds there, including the simulation extra.
+
+.. note::
+
+   CUDA / GPU acceleration is not available on macOS by design -- the
+   ``[cuda]`` extra is skipped automatically (``sys_platform != 'darwin'``)
+   and ManipulaPy falls back to the NumPy / Numba CPU paths.
+
 Development install
 ===================
 
