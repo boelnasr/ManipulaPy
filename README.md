@@ -232,7 +232,7 @@ points, cluster_labels = perception.detect_and_cluster_obstacles(
 )
 ```
 
-Stereo rectification, disparity, and 3D point-cloud generation live on the same `Vision` class — see `Examples/advanced_examples/perception_demo.py`.
+Stereo rectification, disparity, and 3D point-cloud generation live on the same `Vision` class — see [`Examples/advanced_examples/stereo_vision_advanced_demo.py`](Examples/advanced_examples/stereo_vision_advanced_demo.py).
 
 ---
 
@@ -362,6 +362,51 @@ Full inventory and per-robot details in [`ManipulaPy/ManipulaPy_data/MANIFEST.md
 | **Release history** | [`CHANGELOG.md`](CHANGELOG.md) |
 
 The `Examples/` tree is the fastest way in. Start at `Examples/basic_examples/` (no extras required), move to `Examples/intermediate_examples/`, then `Examples/advanced_examples/` for the full GPU + vision pipelines.
+
+---
+
+## Examples
+
+The [`Examples/`](Examples/) directory has three tracks — each script is self-contained and runnable directly. Full details in [`Examples/README.md`](Examples/README.md).
+
+### Basic (⭐) — CPU, no extras
+
+| Script | Demonstrates |
+|---|---|
+| [`kinematics_basic_demo.py`](Examples/basic_examples/kinematics_basic_demo.py) | Forward & inverse kinematics fundamentals |
+| [`dynamics_basic_demo.py`](Examples/basic_examples/dynamics_basic_demo.py) | Mass matrix, Coriolis, gravity, inverse/forward dynamics |
+| [`control_basic_demo.py`](Examples/basic_examples/control_basic_demo.py) | PID and computed-torque control basics |
+| [`urdf_processing_basic_demo.py`](Examples/basic_examples/urdf_processing_basic_demo.py) | Loading & inspecting a robot from URDF |
+| [`visualization_basic_demo.py`](Examples/basic_examples/visualization_basic_demo.py) | Robot analysis and Matplotlib plotting |
+
+### Intermediate (⭐⭐)
+
+| Script | Demonstrates | Needs |
+|---|---|---|
+| [`trajectory_planning_intermediate_demo.py`](Examples/intermediate_examples/trajectory_planning_intermediate_demo.py) | Quintic/cubic trajectories with CPU/GPU auto-dispatch | core · `[cuda]` optional |
+| [`control_comparison_intermediate_demo.py`](Examples/intermediate_examples/control_comparison_intermediate_demo.py) | Side-by-side PID / computed-torque / robust control | core |
+| [`singularity_analysis_intermediate_demo.py`](Examples/intermediate_examples/singularity_analysis_intermediate_demo.py) | Manipulability ellipsoid, condition number, workspace | core |
+| [`simulation_intermediate_demo.py`](Examples/intermediate_examples/simulation_intermediate_demo.py) | PyBullet physics and trajectory replay | `[simulation]` |
+| [`perception_intermediate_demo.py`](Examples/intermediate_examples/perception_intermediate_demo.py) | YOLO detection + obstacle clustering | `[vision]` |
+
+### Advanced (⭐⭐⭐)
+
+| Script | Demonstrates | Needs |
+|---|---|---|
+| [`gpu_acceleration_advanced_demo.py`](Examples/advanced_examples/gpu_acceleration_advanced_demo.py) | CUDA kernels and CPU↔GPU speedup comparison | core · `[cuda]` for GPU |
+| [`batch_processing_advanced_demo.py`](Examples/advanced_examples/batch_processing_advanced_demo.py) | Batched trajectory generation across many goals | core · `[cuda]` optional |
+| [`optimal_control_advanced_demo.py`](Examples/advanced_examples/optimal_control_advanced_demo.py) | Trajectory-tracking control comparison | core |
+| [`collision_avoidance_advanced_demo.py`](Examples/advanced_examples/collision_avoidance_advanced_demo.py) | Potential-field collision avoidance | core |
+| [`real_robot_integration_advanced_demo.py`](Examples/advanced_examples/real_robot_integration_advanced_demo.py) | End-to-end robot integration in PyBullet | `[simulation]` |
+| [`stereo_vision_advanced_demo.py`](Examples/advanced_examples/stereo_vision_advanced_demo.py) | Stereo rectification, disparity, and 3D point clouds | `[vision]` |
+
+```bash
+# basic — works on any install
+python Examples/basic_examples/kinematics_basic_demo.py
+
+# intermediate / advanced — install the extra the script needs first
+python Examples/intermediate_examples/simulation_intermediate_demo.py   # [simulation]
+```
 
 ---
 
