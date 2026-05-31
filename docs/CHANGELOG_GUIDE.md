@@ -233,9 +233,9 @@ __version__ = "1.2.0"  # ← Update this
 At the bottom of `CHANGELOG.md`:
 
 ```markdown
-[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.2.0...HEAD
-[1.2.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.1.3...v1.2.0
-[1.1.3]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/releases/tag/v1.1.3
+[Unreleased]: https://github.com/boelnasr/ManipulaPy/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/boelnasr/ManipulaPy/compare/v1.1.3...v1.2.0
+[1.1.3]: https://github.com/boelnasr/ManipulaPy/releases/tag/v1.1.3
 ```
 
 #### Step 5: Commit and Tag
@@ -261,7 +261,7 @@ git push origin v1.2.0
 
 #### Step 6: Create GitHub Release
 
-1. Go to: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/releases/new
+1. Go to: https://github.com/boelnasr/ManipulaPy/releases/new
 2. Select the tag: `v1.2.0`
 3. Title: `v1.2.0 - Performance & Correctness Improvements`
 4. Copy the changelog section into the description
