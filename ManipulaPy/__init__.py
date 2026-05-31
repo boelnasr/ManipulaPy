@@ -20,7 +20,7 @@ import sys
 from typing import Any, Dict, List, Optional
 
 # Package metadata (always available, no imports)
-__version__ = "1.3.2"
+__version__ = "1.3.2.post1"
 __author__ = "Mohamed Aboelnasr"
 __license__ = "AGPL-3.0-or-later"
 

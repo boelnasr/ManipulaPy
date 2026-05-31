@@ -4,7 +4,6 @@
 
 [![PyPI](https://img.shields.io/pypi/v/ManipulaPy)](https://pypi.org/project/ManipulaPy/)
 [![Downloads](https://static.pepy.tech/badge/ManipulaPy)](https://pepy.tech/project/ManipulaPy)
-[![Downloads/month](https://img.shields.io/pypi/dm/ManipulaPy?label=downloads%2Fmonth&color=blue)](https://pypi.org/project/ManipulaPy/)
 [![GitHub stars](https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=flat&color=yellow)](https://github.com/boelnasr/ManipulaPy/stargazers)
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
@@ -16,7 +15,7 @@
 
 [Quick start](#quick-start) • [Documentation](https://manipulapy.readthedocs.io/) • [Examples](Examples/) • [Changelog](CHANGELOG.md) • [Contributing](CONTRIBUTING.md)
 
-<img src="docs/source/_static/gifs/ur5_pick_motion.gif" alt="UR5 executing a quintic-timed reach trajectory in PyBullet" width="540">
+<img src="https://raw.githubusercontent.com/boelnasr/ManipulaPy/main/docs/source/_static/gifs/ur5_pick_motion.gif" alt="UR5 executing a quintic-timed reach trajectory in PyBullet" width="540">
 
 </div>
 
@@ -269,7 +268,7 @@ The library is layered: every higher-level module depends only on the ones above
 <tr>
 <td width="50%" align="center">
 
-<img src="docs/source/_static/gifs/pick_and_place.gif" alt="Franka Panda picking a cube and placing it at a new location" width="100%">
+<img src="https://raw.githubusercontent.com/boelnasr/ManipulaPy/main/docs/source/_static/gifs/pick_and_place.gif" alt="Franka Panda picking a cube and placing it at a new location" width="100%">
 
 **Pick and place**
 
@@ -278,7 +277,7 @@ Panda lifts a cube to a new pose along a quintic-timed path.
 </td>
 <td width="50%" align="center">
 
-<img src="docs/source/_static/gifs/joint_trajectory.gif" alt="Six joint angles unrolling through a quintic-timed trajectory" width="100%">
+<img src="https://raw.githubusercontent.com/boelnasr/ManipulaPy/main/docs/source/_static/gifs/joint_trajectory.gif" alt="Six joint angles unrolling through a quintic-timed trajectory" width="100%">
 
 **Trajectory planning**
 
@@ -289,7 +288,7 @@ Quintic time-scaled joint trajectory, CPU or CUDA.
 <tr>
 <td width="50%" align="center">
 
-<img src="docs/source/_static/gifs/ee_path.gif" alt="UR5 end-effector tracing the same path in 3D" width="100%">
+<img src="https://raw.githubusercontent.com/boelnasr/ManipulaPy/main/docs/source/_static/gifs/ee_path.gif" alt="UR5 end-effector tracing the same path in 3D" width="100%">
 
 **Forward kinematics**
 
@@ -298,7 +297,7 @@ End-effector path computed from the same trajectory.
 </td>
 <td width="50%" align="center">
 
-<img src="docs/source/_static/gifs/workspace.gif" alt="Monte-Carlo reachable workspace of the UR5" width="100%">
+<img src="https://raw.githubusercontent.com/boelnasr/ManipulaPy/main/docs/source/_static/gifs/workspace.gif" alt="Monte-Carlo reachable workspace of the UR5" width="100%">
 
 **Workspace analysis**
 
@@ -335,7 +334,7 @@ All visuals are rendered from the live API — joint and trajectory plots throug
 UR3 / UR5 / UR10 / UR3e / UR5e / UR10e / UR16e · Fanuc LR Mate 200iB, M-16iB, CRX-5/10/20/30iA · KUKA iiwa7 / iiwa14 · Kinova Gen3, Jaco 6-DOF, Jaco 7-DOF · Franka Panda · UFactory xArm6 (± gripper) · Robotiq 2F-85 / 2F-140 · ABB IRB 2400.
 
 <p align="center">
-  <img src="docs/source/_static/gifs/robot_zoo.gif" alt="UR5, Panda, iiwa14, and xArm6 in PyBullet — bundled URDFs rendered via ManipulaPy.urdf.PackageResolver" width="540">
+  <img src="https://raw.githubusercontent.com/boelnasr/ManipulaPy/main/docs/source/_static/gifs/robot_zoo.gif" alt="UR5, Panda, iiwa14, and xArm6 in PyBullet — bundled URDFs rendered via ManipulaPy.urdf.PackageResolver" width="540">
 </p>
 
 Every model loads end-to-end through `ManipulaPy.urdf.URDF.load(...)` and renders in PyBullet via `ManipulaPy.urdf.PackageResolver` — no ROS workspace or external mesh setup required.
