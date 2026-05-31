@@ -231,6 +231,19 @@ class CollisionChecker:
                 vertices = np.asarray(vertices, dtype=float)
                 if vertices.ndim != 2 or vertices.shape[0] < 1:
                     continue
+
+                # Transform vertices into the link frame via the element's
+                # <origin> so meshes with different offsets are combined in the
+                # correct relative positions (not all stacked at the link frame).
+                origin = getattr(geom_element, "origin", None)
+                T = getattr(origin, "matrix", None) if origin is not None else None
+                if (
+                    isinstance(T, np.ndarray)
+                    and T.shape == (4, 4)
+                    and vertices.shape[1] == 3
+                ):
+                    vertices = vertices @ T[:3, :3].T + T[:3, 3]
+
                 link_vertices.append(vertices)
 
             if not link_vertices:

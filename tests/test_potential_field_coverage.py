@@ -269,6 +269,50 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         # ...and the near mesh (~origin) too.
         self.assertLessEqual(pts.min(), 0.5)
 
+    def test_create_convex_hulls_applies_geometry_origin(self) -> None:
+        """Each geometry's <origin> offset must be applied to its vertices before
+        the per-link hull is built, so meshes positioned by their origin land in
+        the right place instead of all stacked at the link frame."""
+        from ManipulaPy.potential_field import CollisionChecker
+        from ManipulaPy.urdf.types import Origin
+
+        base = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=float)
+
+        near_geom = MagicMock()
+        near_geom.mesh_data = MagicMock()
+        near_geom.mesh_data.vertices = base
+        near_col = MagicMock()
+        near_col.geometry = near_geom
+        near_col.origin = Origin()  # identity
+
+        far_geom = MagicMock()
+        far_geom.mesh_data = MagicMock()
+        far_geom.mesh_data.vertices = base
+        far_col = MagicMock()
+        far_col.geometry = far_geom
+        far_col.origin = Origin(xyz=[5.0, 0.0, 0.0])  # shifted +5 in x by its origin
+
+        mock_link = MagicMock()
+        mock_link.name = "origin_link"
+        mock_link.collisions = [near_col, far_col]
+        mock_link.visuals = []
+
+        mock_robot = MagicMock()
+        mock_robot.links = [mock_link]
+
+        with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
+            checker = CollisionChecker.__new__(CollisionChecker)
+            checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
+
+        hulls = checker._create_convex_hulls()
+        self.assertIn("origin_link", hulls)
+        pts = hulls["origin_link"].points
+        # The far mesh is shifted to x≈5..6 by its origin; if origins were
+        # ignored, both meshes would sit at x<=1.
+        self.assertGreaterEqual(pts[:, 0].max(), 5.0)
+        self.assertLessEqual(pts[:, 0].min(), 0.5)
+
     def test_create_convex_hulls_legacy_mesh(self) -> None:
         """_create_convex_hulls with legacy mesh attribute (via visual fallback)."""
         from ManipulaPy.potential_field import CollisionChecker
