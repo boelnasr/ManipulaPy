@@ -69,7 +69,7 @@ CUDA/GPU features are not available on macOS — the `[cuda]` extra is skipped a
 |---|---|---|
 | **Python** | 3.9 – 3.12 | CI matrix runs all four; 3.12 added in v1.3.2 |
 | **OS** | Linux (primary) · macOS · Windows | CUDA extras Linux-only |
-| **CPU stack** | NumPy ≥ 2.0,<3.0 · SciPy ≥ 1.14 · Numba ≥ 0.60 · Matplotlib ≥ 3.9 · Pillow ≥ 8.0 | Installed by default |
+| **CPU stack** | NumPy ≥ 2.0,< 3.0 · SciPy ≥ 1.14 · Numba ≥ 0.60 · Matplotlib ≥ 3.9 · Pillow ≥ 8.0 | Installed by default |
 | **GPU stack** | CUDA 12.x via `[cuda]` · CUDA 11.x via `[gpu-cuda11]` | NVIDIA, compute capability ≥ 6.0 |
 | **Simulation** | PyBullet ≥ 3.2 | Optional, `[simulation]` extra |
 | **Vision** | OpenCV ≥ 4.5 · Ultralytics ≥ 8.4 · PyTorch ≥ 1.8 | Optional, `[vision]` extra |
