@@ -50,6 +50,8 @@ pip install "ManipulaPy[cuda]"         # CuPy 12.x for CUDA 12.x toolchains
 pip install "ManipulaPy[all]"          # everything above
 ```
 
+**Apple Silicon (M1/M2/M3):** the default `pip install ManipulaPy` installs cleanly — the heavy deps without prebuilt ARM-macOS wheels (e.g. PyBullet) are now optional, and the `[cuda]` extra is skipped automatically on macOS.
+
 For CUDA 11.x toolchains use `[gpu-cuda11]`; for AMD/ROCm use `[gpu-rocm]`. Full matrix in the [Installation Guide](docs/source/Installation%20Guide.rst).
 
 ### Requirements
