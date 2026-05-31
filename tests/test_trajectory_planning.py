@@ -23,7 +23,7 @@ from ManipulaPy.path_planning import (
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 
-def is_module_available(module_name):
+def is_module_available(module_name) -> bool:
     """Check if a module is available and not mocked."""
     try:
         module = __import__(module_name)
@@ -35,7 +35,8 @@ def is_module_available(module_name):
 
 
 class TestTrajectoryPlanning(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Set up the backend, URDF, and planner fixtures for trajectory planning tests."""
         # Determine backend
         if is_module_available("cupy"):
             self.backend = "cupy"
@@ -98,7 +99,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
             print(f"Error initializing test with real URDF: {e}")
             self.create_mock_objects()
 
-    def create_trajectory_planners(self):
+    def create_trajectory_planners(self) -> None:
         """Create multiple trajectory planners for comprehensive testing."""
         # Default optimized planner
         self.trajectory_planner = OptimizedTrajectoryPlanning(
@@ -162,41 +163,49 @@ class TestTrajectoryPlanning(unittest.TestCase):
             self.torque_limits,
         )
 
-    def create_mock_objects(self):
+    def create_mock_objects(self) -> None:
         """Create comprehensive mock objects for testing without a real URDF"""
         # Create simplified mock objects for testing
 
         # Mock Dynamics with more comprehensive methods
         class MockDynamics:
-            def __init__(self):
+            def __init__(self) -> None:
+                """Initialize the mock dynamics with identity spatial-inertia and screw lists."""
                 self.Glist = [np.eye(6) for _ in range(6)]  # 6 DOF robot
                 self.S_list = np.random.randn(6, 6).astype(np.float32)
                 self.M_list = np.eye(4)
 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+                """Return mock joint accelerations."""
                 return np.random.randn(*thetalist.shape) * 0.1
 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
+            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+                """Return mock joint torques."""
                 return np.random.randn(*thetalist.shape) * 10.0
 
-            def jacobian(self, thetalist):
+            def jacobian(self, thetalist) -> np.ndarray:
+                """Return a mock Jacobian matrix."""
                 J = np.random.randn(6, len(thetalist))
                 return J
 
-            def mass_matrix(self, thetalist):
+            def mass_matrix(self, thetalist) -> np.ndarray:
+                """Return a mock positive-definite mass matrix."""
                 n = len(thetalist)
                 M = np.random.randn(n, n)
                 return M @ M.T + np.eye(n)  # Ensure positive definite
 
-            def velocity_quadratic_forces(self, thetalist, dthetalist):
+            def velocity_quadratic_forces(self, thetalist, dthetalist) -> np.ndarray:
+                """Return mock velocity-dependent quadratic forces."""
                 return np.random.randn(*thetalist.shape) * 0.5
 
-            def gravity_forces(self, thetalist, g=[0, 0, -9.81]):
+            def gravity_forces(self, thetalist, g=[0, 0, -9.81]) -> np.ndarray:
+                """Return mock gravity forces."""
                 return np.random.randn(*thetalist.shape) * 5.0
 
         # Mock Serial Manipulator with more methods
         class MockSerialManipulator:
-            def forward_kinematics(self, thetalist, frame="space"):
+            def forward_kinematics(self, thetalist, frame="space") -> np.ndarray:
+                """Return a mock end-effector SE(3) pose."""
                 T = np.eye(4)
                 # Create realistic end-effector position
                 T[:3, 3] = [
@@ -215,17 +224,20 @@ class TestTrajectoryPlanning(unittest.TestCase):
                 )
                 return T
 
-            def iterative_inverse_kinematics(self, T_desired, thetalist0, **kwargs):
+            def iterative_inverse_kinematics(self, T_desired, thetalist0, **kwargs) -> tuple:
+                """Return a mock IK solution near the initial guess."""
                 # Simple mock IK that returns a solution close to initial guess
                 solution = np.array(thetalist0) + np.random.randn(len(thetalist0)) * 0.1
                 success = True
                 iterations = np.random.randint(10, 100)
                 return solution, success, iterations
 
-            def jacobian(self, thetalist, frame="space"):
+            def jacobian(self, thetalist, frame="space") -> np.ndarray:
+                """Return a mock Jacobian matrix."""
                 return np.random.randn(6, len(thetalist))
 
-            def end_effector_velocity(self, thetalist, dthetalist, frame="space"):
+            def end_effector_velocity(self, thetalist, dthetalist, frame="space") -> np.ndarray:
+                """Return a mock end-effector twist."""
                 return np.random.randn(6) * 0.1
 
         # Create mock objects with different DOF for testing
@@ -242,14 +254,17 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
         # Mock collision checker and potential field
         class MockCollisionChecker:
-            def __init__(self, urdf_path=None):
+            def __init__(self, urdf_path=None) -> None:
+                """Initialize the mock collision checker with a fixed collision probability."""
                 self.collision_probability = 0.1  # 10% chance of collision
 
-            def check_collision(self, thetalist):
+            def check_collision(self, thetalist) -> bool:
+                """Return a random mock collision verdict."""
                 return np.random.random() < self.collision_probability
 
         class MockPotentialField:
-            def compute_gradient(self, q, q_goal, obstacles):
+            def compute_gradient(self, q, q_goal, obstacles) -> np.ndarray:
+                """Return a mock potential-field gradient pointing toward the goal."""
                 # Return gradient that points toward goal
                 return 0.1 * (np.array(q) - np.array(q_goal))
 
@@ -266,7 +281,8 @@ class TestTrajectoryPlanning(unittest.TestCase):
             joint_limits,
             torque_limits=None,
             **kwargs,
-        ):
+        ) -> None:
+            """Patched planner initializer that injects mock collision and potential-field components."""
             # Initialize all required attributes FIRST
             self.serial_manipulator = serial_manipulator
             self.dynamics = dynamics
@@ -349,7 +365,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== BASIC FUNCTIONALITY TESTS ====================
 
-    def test_joint_trajectory_with_backend(self):
+    def test_joint_trajectory_with_backend(self) -> None:
         """Test joint trajectory generation with the available backend."""
         thetastart = np.zeros(self.num_joints)
         thetaend = np.array([0.5] * self.num_joints)
@@ -396,7 +412,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
             )
             np.testing.assert_allclose(trajectory["positions"][-1], thetaend, rtol=1e-2)
 
-    def test_trajectory_boundary_conditions(self):
+    def test_trajectory_boundary_conditions(self) -> None:
         """Comprehensive boundary condition testing."""
         test_cases = [
             # (start, end, method, description)
@@ -443,7 +459,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
                     # Allow some numerical noise
                     self.assertTrue(np.mean(differences) >= -0.01)
 
-    def test_joint_trajectory_methods(self):
+    def test_joint_trajectory_methods(self) -> None:
         """Test different time scaling methods."""
         thetastart = np.zeros(self.num_joints)
         thetaend = np.array([0.5] * self.num_joints)
@@ -491,7 +507,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== CARTESIAN TRAJECTORY TESTS ====================
 
-    def test_cartesian_trajectory_comprehensive(self):
+    def test_cartesian_trajectory_comprehensive(self) -> None:
         """Comprehensive Cartesian trajectory testing."""
         # Test different SE(3) transformations - using simpler, more stable cases
         test_cases = [
@@ -595,7 +611,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
                         f"Cartesian trajectory test failed for {description}: {e}"
                     )
 
-    def test_cartesian_trajectory_different_methods(self):
+    def test_cartesian_trajectory_different_methods(self) -> None:
         """Test Cartesian trajectories with different time scaling methods."""
         Xstart = np.eye(4)
         Xend = np.eye(4)
@@ -618,7 +634,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== DYNAMICS TESTS ====================
 
-    def test_inverse_dynamics_comprehensive(self):
+    def test_inverse_dynamics_comprehensive(self) -> None:
         """Comprehensive inverse dynamics testing."""
         # Generate test trajectory
         thetastart = np.zeros(self.num_joints)
@@ -669,7 +685,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
                 self.assertGreater(max_torque, 0.01)  # Should have some torques
                 self.assertLess(max_torque, 1000)  # But not unreasonably large
 
-    def test_forward_dynamics_comprehensive(self):
+    def test_forward_dynamics_comprehensive(self) -> None:
         """Comprehensive forward dynamics testing with improved numerical stability."""
         if self.num_joints > 6:
             self.skipTest(
@@ -823,7 +839,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== PERFORMANCE AND OPTIMIZATION TESTS ====================
 
-    def test_performance_stats_comprehensive(self):
+    def test_performance_stats_comprehensive(self) -> None:
         """Comprehensive performance statistics testing."""
         # Reset stats
         self.trajectory_planner.reset_performance_stats()
@@ -874,7 +890,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         self.assertGreaterEqual(stats["gpu_usage_percent"], 0)
         self.assertLessEqual(stats["gpu_usage_percent"], 100)
 
-    def test_memory_cleanup_comprehensive(self):
+    def test_memory_cleanup_comprehensive(self) -> None:
         """Comprehensive GPU memory cleanup testing."""
         # Test cleanup doesn't crash
         self.trajectory_planner.cleanup_gpu_memory()
@@ -897,7 +913,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         )
         self.assertIsNotNone(trajectory2)
 
-    def test_kernel_selection_comprehensive(self):
+    def test_kernel_selection_comprehensive(self) -> None:
         """Test different kernel selection strategies."""
         thetastart = np.zeros(self.num_joints)
         thetaend = np.array([0.2] * self.num_joints)
@@ -923,7 +939,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
                     )
                     self.assertIn("positions", basic_trajectory)
 
-    def test_batch_trajectory_processing(self):
+    def test_batch_trajectory_processing(self) -> None:
         """Test batch trajectory processing capabilities."""
         batch_size = 3
         thetastart_batch = np.random.uniform(-0.5, 0.5, (batch_size, self.num_joints))
@@ -976,7 +992,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== EDGE CASES AND ERROR HANDLING ====================
 
-    def test_edge_cases_joint_limits(self):
+    def test_edge_cases_joint_limits(self) -> None:
         """Test edge cases with joint limits."""
         # Test with very restrictive joint limits
         narrow_limits = np.array([[-0.1, 0.1]] * self.num_joints)
@@ -1012,7 +1028,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
             # If narrow limits cause issues, just check that we handle it gracefully
             self.assertIsInstance(e, (ValueError, RuntimeError))
 
-    def test_zero_duration_trajectory(self):
+    def test_zero_duration_trajectory(self) -> None:
         """Test edge case with zero or very small duration."""
         thetastart = np.zeros(self.num_joints)
         thetaend = np.array([0.1] * self.num_joints)
@@ -1025,7 +1041,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         self.assertEqual(trajectory["positions"].shape, (10, self.num_joints))
         self.assertTrue(np.all(np.isfinite(trajectory["positions"])))
 
-    def test_large_joint_angles(self):
+    def test_large_joint_angles(self) -> None:
         """Test with large joint angles."""
         thetastart = np.array([0.0] * self.num_joints)
         thetaend = np.array([10.0] * self.num_joints)  # Large angles
@@ -1043,7 +1059,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         )
         self.assertGreater(total_motion, 1.0)
 
-    def test_single_point_trajectory(self):
+    def test_single_point_trajectory(self) -> None:
         """Test edge case with single point trajectory."""
         thetastart = np.zeros(self.num_joints)
         thetaend = np.array([0.1] * self.num_joints)
@@ -1056,7 +1072,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         self.assertEqual(trajectory["velocities"].shape, (1, self.num_joints))
         self.assertEqual(trajectory["accelerations"].shape, (1, self.num_joints))
 
-    def test_identical_start_end_positions(self):
+    def test_identical_start_end_positions(self) -> None:
         """Test trajectory with identical start and end positions."""
         thetastart = np.array([0.5] * self.num_joints)
         thetaend = np.array([0.5] * self.num_joints)  # Same as start
@@ -1075,7 +1091,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== BACKWARD COMPATIBILITY TESTS ====================
 
-    def test_backward_compatibility_comprehensive(self):
+    def test_backward_compatibility_comprehensive(self) -> None:
         """Comprehensive backward compatibility testing."""
         # Test that TrajectoryPlanning alias works
         legacy_planner = TrajectoryPlanning(
@@ -1105,7 +1121,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         stats = legacy_planner.get_performance_stats()
         self.assertIsInstance(stats, dict)
 
-    def test_legacy_method_signatures(self):
+    def test_legacy_method_signatures(self) -> None:
         """Test that legacy method signatures still work."""
         # Test legacy joint_trajectory without new parameters
         thetastart = np.zeros(self.num_joints)
@@ -1134,7 +1150,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== UTILITY FUNCTION TESTS ====================
 
-    def test_calculate_derivatives_comprehensive(self):
+    def test_calculate_derivatives_comprehensive(self) -> None:
         """Comprehensive derivative calculation testing."""
         # Test with different mathematical functions - using simpler, more stable functions
         test_functions = [
@@ -1189,7 +1205,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
                 except Exception as e:
                     self.fail(f"Derivative calculation failed for {description}: {e}")
 
-    def test_plotting_methods_comprehensive(self):
+    def test_plotting_methods_comprehensive(self) -> None:
         """Test that plotting methods don't crash."""
         # Generate test trajectory
         thetastart = np.zeros(self.num_joints)
@@ -1234,7 +1250,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== FACTORY FUNCTION TESTS ====================
 
-    def test_create_optimized_planner_function(self):
+    def test_create_optimized_planner_function(self) -> None:
         """Test the create_optimized_planner factory function."""
         try:
             planner = create_optimized_planner(
@@ -1259,7 +1275,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
             # If factory function doesn't work, just verify manual creation works
             self.assertIsInstance(self.trajectory_planner, OptimizedTrajectoryPlanning)
 
-    def test_compare_implementations_function(self):
+    def test_compare_implementations_function(self) -> None:
         """Test the compare_implementations function."""
         try:
             results = compare_implementations(
@@ -1283,7 +1299,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== STRESS AND PERFORMANCE TESTS ====================
 
-    def test_large_trajectory_generation(self):
+    def test_large_trajectory_generation(self) -> None:
         """Test generation of large trajectories."""
         thetastart = np.zeros(self.num_joints)
         thetaend = np.array([0.5] * self.num_joints)
@@ -1313,7 +1329,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         )
         self.assertLess(total_memory, 500 * 1024 * 1024)  # Less than 500MB
 
-    def test_multiple_sequential_trajectories(self):
+    def test_multiple_sequential_trajectories(self) -> None:
         """Test generating multiple trajectories in sequence."""
         num_trajectories = 10
         thetastart = np.zeros(self.num_joints)
@@ -1347,7 +1363,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
         total_calls = stats["cpu_calls"] + stats["gpu_calls"]
         self.assertEqual(total_calls, num_trajectories)
 
-    def test_concurrent_trajectory_access(self):
+    def test_concurrent_trajectory_access(self) -> None:
         """Test concurrent access to trajectory planner (thread safety simulation)."""
         import queue
         import threading
@@ -1356,7 +1372,8 @@ class TestTrajectoryPlanning(unittest.TestCase):
         results_queue = queue.Queue()
         errors_queue = queue.Queue()
 
-        def generate_trajectory(thread_id):
+        def generate_trajectory(thread_id) -> None:
+            """Worker that generates a trajectory on a thread and records results or errors."""
             try:
                 thetastart = np.zeros(self.num_joints)
                 thetaend = np.array([0.1 * thread_id] * self.num_joints)
@@ -1402,7 +1419,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 
     # ==================== COMPREHENSIVE VALIDATION TESTS ====================
 
-    def test_trajectory_physics_consistency(self):
+    def test_trajectory_physics_consistency(self) -> None:
         """Test that generated trajectories obey basic physics."""
         thetastart = np.zeros(self.num_joints)
         thetaend = np.array([0.3] * self.num_joints)  # Smaller motion for stability
@@ -1497,7 +1514,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
             total_motion = np.sum(np.abs(positions[-1] - positions[0]))
             self.assertGreater(total_motion, 0.01, "Trajectory should show some motion")
 
-    def test_trajectory_smoothness(self):
+    def test_trajectory_smoothness(self) -> None:
         """Test trajectory smoothness properties."""
         thetastart = np.zeros(self.num_joints)
         thetaend = np.array([1.0] * self.num_joints)
@@ -1534,7 +1551,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
                     f"Acceleration jump too large for method {method}",
                 )
 
-    def test_comprehensive_error_handling(self):
+    def test_comprehensive_error_handling(self) -> None:
         """Test error handling in various scenarios."""
         # Test with invalid inputs
         error_test_cases = [
@@ -1571,7 +1588,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
                     # Check that the error type is as expected
                     self.assertIsInstance(e, expected_errors)
 
-    def _plot_for_inspection(self, trajectory, title="Test Trajectory"):
+    def _plot_for_inspection(self, trajectory, title="Test Trajectory") -> None:
         """Helper method to visualize trajectory for inspection."""
         if not os.path.exists("test_plots"):
             os.makedirs("test_plots")
@@ -1608,7 +1625,7 @@ class TestTrajectoryPlanning(unittest.TestCase):
 class TestTrajectoryPlanningIntegration(unittest.TestCase):
     """Integration tests for trajectory planning with other modules."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up integration test environment."""
         self.urdf_path = xarm_urdf_file
         try:
@@ -1631,7 +1648,7 @@ class TestTrajectoryPlanningIntegration(unittest.TestCase):
         except Exception as e:
             self.skipTest(f"Could not initialize integration test: {e}")
 
-    def test_integration_with_kinematics(self):
+    def test_integration_with_kinematics(self) -> None:
         """Test integration between trajectory planning and kinematics."""
         planner = OptimizedTrajectoryPlanning(
             self.robot,
@@ -1664,7 +1681,7 @@ class TestTrajectoryPlanningIntegration(unittest.TestCase):
             self.assertAlmostEqual(pose[3, 3], 1.0, places=10)
             self.assertTrue(np.allclose(pose[3, :3], [0, 0, 0]))
 
-    def test_integration_with_dynamics(self):
+    def test_integration_with_dynamics(self) -> None:
         """Test integration between trajectory planning and dynamics."""
         planner = OptimizedTrajectoryPlanning(
             self.robot,
@@ -1706,7 +1723,7 @@ class TestTrajectoryPlanningIntegration(unittest.TestCase):
 class TestTrajectoryPlanningBenchmarks(unittest.TestCase):
     """Benchmark tests for trajectory planning performance."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up benchmark test environment."""
         self.urdf_path = xarm_urdf_file
         try:
@@ -1729,7 +1746,7 @@ class TestTrajectoryPlanningBenchmarks(unittest.TestCase):
         except Exception as e:
             self.skipTest(f"Could not initialize benchmark test: {e}")
 
-    def test_performance_scaling(self):
+    def test_performance_scaling(self) -> None:
         """Test how performance scales with problem size."""
         planner = OptimizedTrajectoryPlanning(
             self.robot,
@@ -1767,7 +1784,7 @@ class TestTrajectoryPlanningBenchmarks(unittest.TestCase):
                 f"Performance scaling too poor: {time_ratio:.2f}x time for {size_ratio:.2f}x size",
             )
 
-    def test_memory_usage_scaling(self):
+    def test_memory_usage_scaling(self) -> None:
         """Test memory usage scaling with different problem sizes."""
         import sys
 
@@ -1810,7 +1827,7 @@ class TestTrajectoryPlanningBenchmarks(unittest.TestCase):
             )  # 4 bytes per float32, 3 arrays
             self.assertLess(memory_bytes, expected_memory * 1.5)  # Allow 50% overhead
 
-    def test_cpu_vs_gpu_performance_comparison(self):
+    def test_cpu_vs_gpu_performance_comparison(self) -> None:
         """Compare CPU vs GPU performance when both are available."""
         # Create CPU-only planner
         cpu_planner = OptimizedTrajectoryPlanning(
@@ -1881,21 +1898,23 @@ class TestTrajectoryPlanningBenchmarks(unittest.TestCase):
 class TestTrajectoryPlanningRobustness(unittest.TestCase):
     """Robustness and stress tests for trajectory planning."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up robustness test environment."""
         # Create mock environment for stress testing
         self.create_mock_environment()
 
-    def create_mock_environment(self):
+    def create_mock_environment(self) -> None:
         """Create mock environment for stress testing."""
 
         class StressMockDynamics:
-            def __init__(self):
+            def __init__(self) -> None:
+                """Initialize the stress-test mock dynamics with identity spatial-inertia and screw lists."""
                 self.Glist = [np.eye(6) for _ in range(6)]
                 self.S_list = np.random.randn(6, 6).astype(np.float32)
                 self.M_list = np.eye(4)
 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+                """Return mock joint accelerations with bounded noise."""
                 # Add some realistic noise/complexity but keep values finite
                 result = np.random.randn(*thetalist.shape) * 0.01  # Small noise
                 result += 0.001 * np.sin(np.sum(thetalist))  # Small nonlinear coupling
@@ -1904,7 +1923,8 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                 result = np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
                 return result
 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
+            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+                """Return mock joint torques with bounded magnitude."""
                 # Simulate complex dynamics with gravity and coupling
                 result = 1.0 * ddthetalist  # Mass effect (reduced from 10.0)
                 result += 0.01 * dthetalist**2  # Velocity coupling (reduced from 0.1)
@@ -1916,7 +1936,8 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                 return result
 
         class StressMockRobot:
-            def forward_kinematics(self, thetalist, frame="space"):
+            def forward_kinematics(self, thetalist, frame="space") -> np.ndarray:
+                """Return a mock end-effector SE(3) pose."""
                 T = np.eye(4)
                 # More realistic end-effector position
                 cumulative_angle = np.cumsum(thetalist)
@@ -1943,7 +1964,7 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
             enable_profiling=False,
         )
 
-    def test_extreme_joint_configurations(self):
+    def test_extreme_joint_configurations(self) -> None:
         """Test with extreme joint configurations."""
         extreme_configs = [
             (
@@ -1996,7 +2017,7 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                         e, (ValueError, RuntimeError, FloatingPointError)
                     )
 
-    def test_numerical_stability(self):
+    def test_numerical_stability(self) -> None:
         """Test numerical stability with challenging conditions."""
         # Test very small time steps
         thetastart = np.zeros(self.num_joints)
@@ -2025,7 +2046,7 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                 except Exception as e:
                     print(f"Numerical stability issue with Tf={Tf}: {e}")
 
-    def test_memory_stress(self):
+    def test_memory_stress(self) -> None:
         """Test behavior under memory stress conditions."""
         # Test with progressively larger problems until we hit limits
         thetastart = np.zeros(self.num_joints)
@@ -2067,18 +2088,18 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
             max_successful_N, 1000, "Should handle at least 1000 point trajectories"
         )
 
-    def _get_memory_info(self):
+    def _get_memory_info(self) -> int:
         """Get current memory usage (simplified)."""
-        import psutil
-
         try:
+            import psutil
+
             process = psutil.Process()
             return process.memory_info().rss
         except ImportError:
             # Fallback if psutil not available
             return 0
 
-    def test_error_recovery(self):
+    def test_error_recovery(self) -> None:
         """Test recovery from various error conditions."""
         # Test recovery from invalid inputs
         error_recovery_cases = [
@@ -2221,7 +2242,7 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
 
 
 # Test suite organization
-def suite():
+def suite() -> unittest.TestSuite:
     """Create comprehensive test suite."""
     suite = unittest.TestSuite()
 

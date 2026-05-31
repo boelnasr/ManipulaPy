@@ -1,10 +1,10 @@
-# Trajectory Planning User Guide
-===============================
+Trajectory Planning User Guide
+==============================
 
 This guide covers the trajectory planning capabilities in ManipulaPy, including joint-space and Cartesian-space trajectory generation, dynamics integration, and collision avoidance using CUDA acceleration.
 
 Introduction
------------
+------------
 
 The TrajectoryPlanning class provides comprehensive trajectory generation and execution capabilities for robotic manipulators. It combines kinematic trajectory planning with dynamic analysis and collision avoidance to generate feasible, smooth robot motions.
 
@@ -18,16 +18,17 @@ The TrajectoryPlanning class provides comprehensive trajectory generation and ex
 - Support for various trajectory optimization objectives
 
 Basic Usage
-----------
+-----------
 
 Setting Up Trajectory Planning
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
+   import numpy as np
    from ManipulaPy.path_planning import TrajectoryPlanning
    from ManipulaPy.urdf_processor import URDFToSerialManipulator
-   
+
    # Load robot model
    processor = URDFToSerialManipulator("robot.urdf")
    robot = processor.serial_manipulator
@@ -77,10 +78,10 @@ Simple Joint Trajectory
    np.testing.assert_allclose(trajectory['positions'][-1], theta_end, rtol=1e-3)
 
 TrajectoryPlanning Class
------------------------
+------------------------
 
 Class Constructor
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -104,18 +105,20 @@ Class Constructor
 - ``potential_field``: Potential field for obstacle avoidance
 
 Core Methods
------------
+------------
 
 joint_trajectory()
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~
 
 Generates smooth joint-space trajectories with CUDA acceleration:
 
 .. code-block:: python
 
+   import numpy as np
+
    def joint_trajectory_example():
        """Demonstrate joint trajectory generation options."""
-       
+
        # Setup
        theta_start = np.zeros(6)
        theta_end = np.array([0.8, -0.5, 0.3, -0.2, 0.6, -0.4])
@@ -164,15 +167,18 @@ Generates smooth joint-space trajectories with CUDA acceleration:
    cubic_traj, quintic_traj = joint_trajectory_example()
 
 cartesian_trajectory()
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Generates Cartesian-space trajectories for end-effector motion:
 
 .. code-block:: python
 
+   import numpy as np
+   import matplotlib.pyplot as plt
+
    def cartesian_trajectory_example():
        """Demonstrate Cartesian trajectory generation."""
-       
+
        # Define start and end poses
        X_start = np.eye(4)
        X_start[:3, 3] = [0.3, 0.2, 0.5]  # Start position
@@ -259,14 +265,17 @@ Generates Cartesian-space trajectories for end-effector motion:
    cartesian_traj = cartesian_trajectory_example()
 
 Dynamics Integration
--------------------
+--------------------
 
 inverse_dynamics_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Computes required joint torques along a trajectory:
 
 .. code-block:: python
+
+   import numpy as np
+   import matplotlib.pyplot as plt
 
    def dynamics_analysis_example():
        """Analyze dynamics along a trajectory."""
@@ -328,11 +337,14 @@ Computes required joint torques along a trajectory:
    trajectory_torques = dynamics_analysis_example()
 
 forward_dynamics_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Simulates robot motion given applied torques:
 
 .. code-block:: python
+
+   import numpy as np
+   import matplotlib.pyplot as plt
 
    def forward_dynamics_simulation():
        """Simulate robot motion using forward dynamics."""
@@ -451,14 +463,16 @@ Simulates robot motion given applied torques:
    simulation_result = forward_dynamics_simulation()
 
 Trajectory Visualization
------------------------
+------------------------
 
 plot_trajectory()
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 Static plotting of trajectory data:
 
 .. code-block:: python
+
+   import numpy as np
 
    def trajectory_visualization_example():
        """Comprehensive trajectory visualization."""
@@ -485,11 +499,13 @@ Static plotting of trajectory data:
    sample_trajectory = trajectory_visualization_example()
 
 plot_cartesian_trajectory()
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Visualization for Cartesian trajectories:
 
 .. code-block:: python
+
+   import numpy as np
 
    def cartesian_visualization_example():
        """Visualize Cartesian trajectory."""
@@ -518,14 +534,16 @@ Visualization for Cartesian trajectories:
    cartesian_viz = cartesian_visualization_example()
 
 Advanced Features
-----------------
+-----------------
 
 Collision Avoidance
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 The trajectory planner includes collision detection and avoidance:
 
 .. code-block:: python
+
+   import numpy as np
 
    def collision_avoidance_example():
        """Demonstrate collision avoidance in trajectory planning."""
@@ -563,11 +581,14 @@ The trajectory planner includes collision detection and avoidance:
    safe_trajectory = collision_avoidance_example()
 
 Multi-Point Trajectories
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Creating trajectories through multiple waypoints:
 
 .. code-block:: python
+
+   import numpy as np
+   import matplotlib.pyplot as plt
 
    def multi_waypoint_trajectory():
        """Generate trajectory through multiple waypoints."""
@@ -684,18 +705,20 @@ Creating trajectories through multiple waypoints:
    multi_traj, waypoints = multi_waypoint_trajectory()
 
 Performance Optimization
------------------------
+------------------------
 
 CUDA Acceleration
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 The trajectory planner uses CUDA for high-performance computations:
 
 .. code-block:: python
 
+   import numpy as np
+
    def performance_comparison():
        """Compare CPU vs CUDA performance for trajectory generation."""
-       
+
        import time
        
        # Large trajectory for performance testing
@@ -749,11 +772,13 @@ The trajectory planner uses CUDA for high-performance computations:
    perf_traj, traj_time, dyn_time = performance_comparison()
 
 Batch Processing
-~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
 
 Processing multiple trajectories efficiently:
 
 .. code-block:: python
+
+   import numpy as np
 
    def batch_trajectory_processing():
        """Process multiple trajectories in batch for efficiency."""
@@ -815,14 +840,17 @@ Processing multiple trajectories efficiently:
    batch_trajs, batch_torques = batch_trajectory_processing()
 
 Real-Time Applications
----------------------
+----------------------
 
 Trajectory Execution
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 Real-time trajectory following for robot control:
 
 .. code-block:: python
+
+   import numpy as np
+   import matplotlib.pyplot as plt
 
    def real_time_trajectory_execution():
        """Simulate real-time trajectory execution."""
@@ -1016,14 +1044,17 @@ Real-time trajectory following for robot control:
    execution_results = real_time_trajectory_execution()
 
 Practical Applications
----------------------
+----------------------
 
 Pick and Place Operation
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Complete pick-and-place trajectory planning:
 
 .. code-block:: python
+
+   import numpy as np
+   import matplotlib.pyplot as plt
 
    def pick_and_place_trajectory():
        """Generate trajectory for pick-and-place operation."""
@@ -1218,10 +1249,10 @@ Complete pick-and-place trajectory planning:
    pick_place_traj, pick_place_torques = pick_and_place_trajectory()
 
 Best Practices
--------------
+--------------
 
 Trajectory Design Guidelines
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1295,9 +1326,11 @@ Trajectory Design Guidelines
    design_guidelines = trajectory_design_guidelines()
 
 Error Handling and Debugging
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def trajectory_debugging_tools():
        """Tools for debugging trajectory planning issues."""

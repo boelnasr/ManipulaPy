@@ -9,23 +9,23 @@ build-backend = "setuptools.build_meta"
 # ------------------------------------------------------------------
 [project]
 name = "ManipulaPy"
-version = "1.3.1"
+version = "1.3.2"
 authors = [
     { name = "Mohamed Aboelnasr", email = "aboelnasr1997@gmail.com" },
 ]
 description = "A comprehensive Python package for robotic manipulator analysis and control"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -46,60 +46,72 @@ keywords = [
 ]
 
 # ------------------------------------------------------------------
-# Install all dependencies by default - let individual imports handle missing ones gracefully
+# Core dependencies — numerical/plotting only. Heavy and platform-specific
+# deps (pybullet, torch, opencv, ultralytics, cupy, trimesh) live in
+# optional groups so `pip install ManipulaPy` succeeds on minimal images
+# and platforms without prebuilt wheels (e.g., Apple Silicon — closes #25).
+#
 dependencies = [
-    # Core numerical computing (required)
-    # NumPy 2.0+ now supported via native URDF parser
-    "numpy>=1.19.2,<3.0",
-    "scipy>=1.5.2",
-    "matplotlib>=3.3",
-
-    # Core robotics (required)
-    "numba>=0.55",
-    "pybullet>=3.0.6",
-    # Note: urchin is now optional - native URDF parser is default
-    "trimesh>=3.9.14",
-
-    # Machine learning (install but handle gracefully if fails)
-    "torch>=1.8.0",
-    "scikit-learn>=1.0",
-
-    # Vision and perception (install but handle gracefully if fails)
-    "opencv-python>=4.5",
-    "ultralytics>=8.0",
+    "numpy>=2.0,<3.0",
+    "scipy>=1.13",
+    "matplotlib>=3.9",
+    "numba>=0.60",
     "pillow>=8.0.0",
-
-    # GPU acceleration (install but handle gracefully if fails)
-    # Note: This will attempt CUDA 11.x first, fallback handled in code
-    "cupy-cuda11x>=10.0.0; sys_platform != 'darwin'",  # No CUDA on macOS typically
 ]
 
 [project.optional-dependencies]
-# Minimal installation for constrained environments
+# Pin-only minimal install (kept for backwards compatibility — same set
+# as default ``dependencies`` plus pybullet for users coming from the
+# pre-1.3.2 install instructions).
 minimal = [
-    "numpy>=1.19.2,<3.0",
-    "scipy>=1.5.2",
-    "matplotlib>=3.3",
-    "numba>=0.55",
-    "pybullet>=3.0.6",
+    "numpy>=2.0,<3.0",
+    "scipy>=1.13",
+    "matplotlib>=3.9",
+    "numba>=0.60",
+    "pybullet>=3.2.5,<4.0",
 ]
 
-# Legacy URDF parser (urchin) - NOT compatible with NumPy 2.0+
-# Use this only if you need backward compatibility with existing code
-urdf-legacy = [
-    "urchin>=0.0.27",
-    "numpy>=1.19.2,<2.0",  # urchin is not compatible with NumPy 2.0+
+# Feature groups (1.3.2 — heavy deps moved here).
+# ultralytics floor pinned at 8.4.0: newer releases are compatible with
+# the NumPy 2.x runtime range used by ManipulaPy.
+simulation = ["pybullet>=3.2.5,<4.0"]
+urdf = ["trimesh>=3.9.14"]
+vision = [
+    "opencv-python>=4.5",
+    "ultralytics>=8.4.0",
+    "torch>=1.8.0",
+]
+ml = ["torch>=1.8.0", "scikit-learn>=1.0"]
+# Default GPU extra targets CUDA 12.x — that's what Ubuntu 22.04 ships
+# with current NVIDIA apt repos (driver 525+), what the [cuda] section
+# of our docs assumes, and what the v1.3.2 patch was validated against
+# on driver 580. Pinned to the 13.x series because CuPy 14.x raised its
+# floor to numpy 2.2+ and broke transitive resolver chains with
+# ultralytics. Use [gpu-cuda11] for legacy CUDA 11.x systems.
+cuda = ["cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'"]
+
+# Convenience: install everything (no self-references — the resolver
+# handles direct deps more reliably than ``ManipulaPy[simulation,...]``).
+all = [
+    "pybullet>=3.2.5,<4.0",
+    "trimesh>=3.9.14",
+    "opencv-python>=4.5",
+    "ultralytics>=8.4.0",
+    "torch>=1.8.0",
+    "scikit-learn>=1.0",
+    "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
 ]
 
-# Alternative GPU options for different CUDA versions
-gpu-cuda12 = ["cupy-cuda12x>=12.0.0"]
+# Alternative GPU options for legacy CUDA versions and AMD/PyCUDA paths.
+gpu-cuda11 = ["cupy-cuda11x>=13.0,<14.0; sys_platform != 'darwin'"]
+gpu-cuda12 = ["cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'"]
 gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
 gpu-pycuda = ["pycuda>=2021.1"]
 
 # Vision for headless environments (CI-friendly)
 vision-headless = [
     "opencv-python-headless>=4.5",
-    "ultralytics>=8.0",
+    "ultralytics>=8.4.0",
     "pillow>=8.0.0",
 ]
 
@@ -122,10 +134,11 @@ dev = [
 
 # Documentation dependencies
 docs = [
-    "sphinx>=4.0.0",
-    "sphinx-rtd-theme>=1.0.0",
-    "myst-parser>=0.15.0",
-    "sphinx-autodoc-typehints>=1.12.0",
+    "sphinx>=8.0.0,<9.0.0",
+    "pydata-sphinx-theme>=0.18.0,<0.19.0",
+    "sphinx-rtd-theme>=3.0.0,<4.0.0",
+    "myst-parser>=4.0.0,<5.0.0",
+    "sphinx-autodoc-typehints>=3.0.0,<4.0.0",
     "nbsphinx>=0.8.0",
     "jupyter>=1.0.0",
 ]
@@ -239,7 +252,7 @@ markers = [
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
     "vision: marks tests requiring vision dependencies (OpenCV, YOLO)",
-    "simulation: marks tests requiring simulation dependencies (PyBullet, URCHIN)",
+    "simulation: marks tests requiring simulation dependencies (PyBullet)",
     "ml: marks tests requiring machine learning dependencies",
     "network: marks tests requiring network access",
     "benchmark: marks tests as benchmarks",
@@ -404,7 +417,7 @@ output = "coverage.json"
 
 [tool.black]
 line-length = 88
-target-version = ["py38", "py39", "py310", "py311"]
+target-version = ["py39", "py310", "py311", "py312"]
 include = "\\.pyi?$"
 extend-exclude = '''
 /(
@@ -449,7 +462,6 @@ known_third_party = [
     "cupy",
     "ultralytics",
     "sklearn",
-    "urchin",
     "trimesh",
     "PIL",
     "pytest",
@@ -468,7 +480,7 @@ skip_glob = [
 sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -489,7 +501,6 @@ show_error_context = true
 [[tool.mypy.overrides]]
 module = [
     "pybullet.*",
-    "urchin.*",
     "ultralytics.*",
     "cupy.*",
     "numba.*",
@@ -505,7 +516,7 @@ module = [
 ignore_missing_imports = true
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py39"
 line-length = 88
 select = [
     "E",  # pycodestyle errors
@@ -571,7 +582,7 @@ wrap-descriptions = 88
 legacy_tox_ini = """
 [tox]
 isolated_build = true
-envlist = py38,py39,py310,py311,coverage,docs,lint
+envlist = py39,py310,py311,py312,coverage,docs,lint
 
 [testenv]
 extras = 

@@ -6,6 +6,9 @@ These tests exercise the NumPy fallback paths and ensure GPU-only
 entry points raise clearly when CUDA is unavailable.
 """
 
+import subprocess
+import sys
+
 import numpy as np
 import pytest
 
@@ -21,7 +24,8 @@ from ManipulaPy.cuda_kernels import (
 )
 
 
-def test_trajectory_cpu_fallback_linear_matches_expected():
+def test_trajectory_cpu_fallback_linear_matches_expected() -> None:
+    """Verify the CPU fallback produces linear interpolation with constant velocity and zero acceleration."""
     thetastart = np.array([0.0, 0.0], dtype=np.float32)
     thetaend = np.array([1.0, -1.0], dtype=np.float32)
     Tf, N, method = 1.0, 5, 1  # linear
@@ -40,7 +44,8 @@ def test_trajectory_cpu_fallback_linear_matches_expected():
     assert np.allclose(acc, expected_acc)
 
 
-def test_trajectory_cpu_fallback_quintic_endpoints_exact():
+def test_trajectory_cpu_fallback_quintic_endpoints_exact() -> None:
+    """Verify the quintic CPU fallback hits exact endpoints with zero boundary velocity and acceleration."""
     thetastart = np.array([0.5], dtype=np.float32)
     thetaend = np.array([1.5], dtype=np.float32)
     Tf, N, method = 2.0, 11, 5  # quintic
@@ -56,7 +61,8 @@ def test_trajectory_cpu_fallback_quintic_endpoints_exact():
     assert np.isclose(acc[-1, 0], 0.0, atol=1e-6)
 
 
-def test_optimized_trajectory_generation_uses_cpu_when_no_cuda(monkeypatch):
+def test_optimized_trajectory_generation_uses_cpu_when_no_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify optimized_trajectory_generation matches the CPU fallback when CUDA is unavailable."""
     # Force CUDA unavailable
     monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     result_pos, result_vel, result_acc = optimized_trajectory_generation(
@@ -79,7 +85,45 @@ def test_optimized_trajectory_generation_uses_cpu_when_no_cuda(monkeypatch):
     assert np.allclose(result_acc, cpu_acc)
 
 
-def test_gpu_only_entrypoints_raise_when_no_cuda():
+def test_import_never_crashes_on_broken_cuda_driver() -> None:
+    """Importing cuda_kernels must not abort the interpreter on a bad driver.
+
+    A mismatched NVIDIA driver can SIGSEGV inside numba's C call during CUDA
+    detection. Detection runs in a sacrificial subprocess so the import always
+    completes and degrades to CPU. We verify the import succeeds in a child
+    process: a segfault would surface here as a non-zero (negative) return code
+    rather than crashing the test runner.
+    """
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import ManipulaPy.cuda_kernels as ck; "
+            "assert isinstance(ck.CUDA_AVAILABLE, bool); print('ok')",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert proc.returncode == 0, (
+        f"import crashed (rc={proc.returncode}): {proc.stderr[-2000:]}"
+    )
+    assert "ok" in proc.stdout
+
+
+@pytest.mark.skipif(
+    cuda_kernels.CUDA_AVAILABLE,
+    reason=(
+        "cuda_kernels.py picks GPU vs mock function bodies at import time. "
+        "Monkeypatching CUDA_AVAILABLE=False after a real-CUDA import flips "
+        "the boolean but not the dispatched callables, so these tests can "
+        "only exercise the no-CUDA branch when the module was imported "
+        "without a working GPU."
+    ),
+)
+def test_gpu_only_entrypoints_raise_when_no_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify GPU-only entrypoints raise RuntimeError when CUDA is unavailable."""
+    monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     assert check_cuda_availability() is False
 
     positions = np.zeros((2, 3), dtype=np.float32)
@@ -102,6 +146,12 @@ def test_gpu_only_entrypoints_raise_when_no_cuda():
         )
 
 
-def test_kernel_selection_fallbacks_when_no_cuda():
+@pytest.mark.skipif(
+    cuda_kernels.CUDA_AVAILABLE,
+    reason="See test_gpu_only_entrypoints_raise_when_no_cuda — same import-time dispatch limitation.",
+)
+def test_kernel_selection_fallbacks_when_no_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify kernel selection helpers report no available kernel when CUDA is unavailable."""
+    monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     assert auto_select_optimal_kernel(100, 6) == "none"
     assert get_optimal_kernel_config(100, 6) is None

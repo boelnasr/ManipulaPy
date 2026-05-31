@@ -17,7 +17,8 @@ Expected Output:
     - Inverse and forward dynamics verification
     - Comprehensive matplotlib visualizations saved to files
 
-Author: ManipulaPy Development Team
+Copyright (c) 2025 Mohamed Aboelnasr
+Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import numpy as np
@@ -45,7 +46,7 @@ class DynamicsBasicDemo:
     Comprehensive demonstration of basic dynamics operations for robotic manipulators.
     """
     
-    def __init__(self, output_dir=None):
+    def __init__(self, output_dir=None) -> None:
         """Initialize the demo with robot model loading."""
         self.robot = None
         self.dynamics = None
@@ -58,13 +59,16 @@ class DynamicsBasicDemo:
         else:
             self.output_dir = Path(output_dir)
         
-    def run_demo(self):
+    def run_demo(self) -> bool:
         """Run the complete dynamics demonstration."""
         print("=" * 70)
         print("   ManipulaPy: Basic Dynamics Demo")
         print("=" * 70)
         print()
-        
+
+        # Seed for reproducible random configurations / motion profiles.
+        np.random.seed(0)
+
         # Create output directory in the same folder as the script
         script_dir = Path(__file__).parent
         output_path = script_dir / "dynamics_demo_output"
@@ -104,7 +108,7 @@ class DynamicsBasicDemo:
         
         return True
     
-    def load_robot_model(self):
+    def load_robot_model(self) -> bool:
         """Load and initialize robot model with dynamics."""
         print("🤖 Loading Robot Model with Dynamics")
         print("-" * 40)
@@ -149,7 +153,7 @@ class DynamicsBasicDemo:
             traceback.print_exc()
             return False
     
-    def demonstrate_mass_matrix_analysis(self):
+    def demonstrate_mass_matrix_analysis(self) -> None:
         """Demonstrate mass matrix computation and analysis."""
         print(f"\n⚙️ Mass Matrix Analysis")
         print("-" * 40)
@@ -223,7 +227,7 @@ class DynamicsBasicDemo:
         condition_numbers = [result['condition_number'] for result in self.mass_matrix_results.values()]
         print(f"   Condition number range: [{np.min(condition_numbers):.1f}, {np.max(condition_numbers):.1f}]")
     
-    def demonstrate_coriolis_forces(self):
+    def demonstrate_coriolis_forces(self) -> None:
         """Demonstrate Coriolis and centrifugal forces computation."""
         print(f"\n🌪️ Coriolis and Centrifugal Forces Analysis")
         print("-" * 50)
@@ -279,7 +283,7 @@ class DynamicsBasicDemo:
         print("   • They represent coupling between joint motions")
         print("   • Important for high-speed motion control")
     
-    def demonstrate_gravity_forces(self):
+    def demonstrate_gravity_forces(self) -> None:
         """Demonstrate gravity forces computation."""
         print(f"\n🌍 Gravity Forces Analysis")
         print("-" * 30)
@@ -334,7 +338,7 @@ class DynamicsBasicDemo:
         print("   • Independent of joint velocities and accelerations")
         print("   • Critical for static equilibrium and compensation")
     
-    def demonstrate_inverse_dynamics(self):
+    def demonstrate_inverse_dynamics(self) -> None:
         """Demonstrate inverse dynamics computation."""
         print(f"\n🔄 Inverse Dynamics Analysis")
         print("-" * 35)
@@ -387,25 +391,18 @@ class DynamicsBasicDemo:
             )
             computation_time = time.time() - start_time
             
-            # Analyze torque components
+            # Decompose the torque into its three physical contributions, all
+            # evaluated at the SAME state (joint_angles, joint_velocities) used by
+            # inverse_dynamics. The Newton-Euler inverse_dynamics reconstructs
+            # exactly as τ = M(q)q̈ + C(q,q̇) + G(q), so the verification error
+            # below should be at machine-precision level.
             M = self.mass_matrix_results[config_name]['mass_matrix']
             inertial_torques = M @ joint_accelerations
-            
-            if motion_name in ["Slow motion", "Medium motion", "Fast motion"]:
-                config_key = config_name
-                if config_key in self.coriolis_results:
-                    vel_key = "Medium velocity" if motion_name == "Medium motion" else "Low velocity"
-                    if vel_key in self.coriolis_results[config_key]:
-                        coriolis_torques = self.coriolis_results[config_key][vel_key]['coriolis_forces']
-                    else:
-                        coriolis_torques = np.zeros(self.n_joints)
-                else:
-                    coriolis_torques = np.zeros(self.n_joints)
-            else:
-                coriolis_torques = np.zeros(self.n_joints)
-            
-            gravity_torques = self.gravity_results["Earth gravity (down)"][config_name]['gravity_forces']
-            
+            coriolis_torques = self.dynamics.velocity_quadratic_forces(
+                joint_angles, joint_velocities
+            )
+            gravity_torques = self.dynamics.gravity_forces(joint_angles, gravity_vector)
+
             # Verify inverse dynamics equation: τ = M(q)q̈ + C(q,q̇) + G(q)
             computed_torques = inertial_torques + coriolis_torques + gravity_torques
             verification_error = np.linalg.norm(required_torques - computed_torques)
@@ -431,8 +428,17 @@ class DynamicsBasicDemo:
                 'computation_time': computation_time,
                 'verification_error': verification_error
             }
-    
-    def demonstrate_forward_dynamics(self):
+
+        # The Newton-Euler inverse_dynamics must equal the sum of its parts.
+        max_id_error = max(
+            r['verification_error'] for r in self.inverse_dynamics_results.values()
+        )
+        print(f"\n📈 Inverse Dynamics Decomposition Check:")
+        print(f"   τ = M(q)q̈ + C(q,q̇) + G(q)")
+        print(f"   Max reconstruction error: {max_id_error:.2e}")
+        print(f"   Decomposition check: {'✅ PASSED' if max_id_error < 1e-9 else '❌ FAILED'}")
+
+    def demonstrate_forward_dynamics(self) -> None:
         """Demonstrate forward dynamics computation."""
         print(f"\n⏩ Forward Dynamics Analysis")
         print("-" * 35)
@@ -499,7 +505,7 @@ class DynamicsBasicDemo:
         print(f"   Average computation time: {avg_time*1000:.2f} ms")
         print(f"   Consistency check: {'✅ PASSED' if avg_error < 1e-10 else '❌ FAILED'}")
     
-    def demonstrate_configuration_space_analysis(self):
+    def demonstrate_configuration_space_analysis(self) -> None:
         """Demonstrate dynamics properties across configuration space."""
         print(f"\n🗺️ Configuration Space Dynamics Analysis")
         print("-" * 45)
@@ -575,7 +581,7 @@ class DynamicsBasicDemo:
             'n_high_condition': n_high_condition
         }
     
-    def create_visualizations(self):
+    def create_visualizations(self) -> None:
         """Create comprehensive visualization plots and save to files."""
         print(f"\n📊 Creating Comprehensive Dynamics Visualizations (saving to files)")
         print("-" * 70)
@@ -675,7 +681,7 @@ class DynamicsBasicDemo:
             import traceback
             traceback.print_exc()
     
-    def _create_individual_plots(self, plot_dir):
+    def _create_individual_plots(self, plot_dir) -> None:
         """Create individual detailed plots for each analysis."""
         print("📊 Creating individual detailed plots...")
         
@@ -750,7 +756,7 @@ class DynamicsBasicDemo:
         # 5. Save data summary to text file
         self._save_data_summary(plot_dir)
     
-    def _save_data_summary(self, plot_dir):
+    def _save_data_summary(self, plot_dir) -> None:
         """Save numerical results summary to text file."""
         summary_path = plot_dir / "dynamics_analysis_summary.txt"
         
@@ -801,7 +807,7 @@ class DynamicsBasicDemo:
         
         print(f"   ✅ Data summary: {summary_path}")
     
-    def _plot_mass_matrix_properties(self, ax):
+    def _plot_mass_matrix_properties(self, ax) -> None:
         """Plot mass matrix properties comparison."""
         configs = list(self.mass_matrix_results.keys())
         condition_numbers = [self.mass_matrix_results[config]['condition_number'] for config in configs]
@@ -828,7 +834,7 @@ class DynamicsBasicDemo:
         ax.legend()
         ax.grid(True, alpha=0.3)
     
-    def _plot_mass_matrix_heatmap(self, ax):
+    def _plot_mass_matrix_heatmap(self, ax) -> None:
         """Plot mass matrix heatmap."""
         # Use the first configuration
         config = list(self.mass_matrix_results.keys())[0]
@@ -847,7 +853,7 @@ class DynamicsBasicDemo:
         ax.set_yticks(range(M.shape[0]))
         ax.grid(True, alpha=0.3)
     
-    def _plot_eigenvalue_analysis(self, ax):
+    def _plot_eigenvalue_analysis(self, ax) -> None:
         """Plot eigenvalue analysis."""
         configs = list(self.mass_matrix_results.keys())
         
@@ -868,7 +874,7 @@ class DynamicsBasicDemo:
         else:
             print(f"   ⚠️ Warning: Negative eigenvalues detected, using linear scale")
     
-    def _plot_coriolis_analysis(self, ax):
+    def _plot_coriolis_analysis(self, ax) -> None:
         """Plot Coriolis force magnitude analysis."""
         if not hasattr(self, 'coriolis_results'):
             ax.text(0.5, 0.5, 'No Coriolis\nresults available', ha='center', va='center', transform=ax.transAxes)
@@ -893,7 +899,7 @@ class DynamicsBasicDemo:
         ax.legend()
         ax.grid(True, alpha=0.3)
     
-    def _plot_gravity_comparison(self, ax):
+    def _plot_gravity_comparison(self, ax) -> None:
         """Plot gravity forces comparison."""
         gravity_scenarios = list(self.gravity_results.keys())
         configs = list(self.gravity_results[gravity_scenarios[0]].keys())
@@ -914,7 +920,7 @@ class DynamicsBasicDemo:
             ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
                    f'{value:.2f}', ha='center', va='bottom', fontsize=8)
     
-    def _plot_torque_components(self, ax):
+    def _plot_torque_components(self, ax) -> None:
         """Plot torque component analysis."""
         motions = list(self.inverse_dynamics_results.keys())
         
@@ -937,7 +943,7 @@ class DynamicsBasicDemo:
         ax.legend()
         ax.grid(True, alpha=0.3)
     
-    def _plot_dynamics_verification(self, ax):
+    def _plot_dynamics_verification(self, ax) -> None:
         """Plot forward/inverse dynamics verification."""
         motions = list(self.forward_dynamics_results.keys())
         errors = [self.forward_dynamics_results[motion]['acceleration_error'] for motion in motions]
@@ -961,7 +967,7 @@ class DynamicsBasicDemo:
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{value:.1e}', ha='center', va='bottom', fontsize=8)
     
-    def _plot_configuration_space(self, ax):
+    def _plot_configuration_space(self, ax) -> None:
         """Plot configuration space analysis."""
         condition_numbers = self.config_space_results['condition_numbers']
         gravity_magnitudes = self.config_space_results['gravity_magnitudes']
@@ -979,7 +985,7 @@ class DynamicsBasicDemo:
         else:
             print(f"   ⚠️ Warning: Zero or negative condition numbers detected, using linear scale")
     
-    def _plot_performance_metrics(self, ax):
+    def _plot_performance_metrics(self, ax) -> None:
         """Plot performance metrics summary."""
         # Collect timing data
         mass_times = [r['computation_time']*1000 for r in self.mass_matrix_results.values()]
@@ -1003,7 +1009,7 @@ class DynamicsBasicDemo:
             ax.text(bar.get_x() + bar.get_width()/2., height + 0.01,
                    f'{value:.2f}', ha='center', va='bottom', fontsize=8)
     
-    def _plot_acceleration_analysis(self, ax):
+    def _plot_acceleration_analysis(self, ax) -> None:
         """Plot acceleration analysis."""
         motions = list(self.forward_dynamics_results.keys())
         magnitudes = [self.forward_dynamics_results[motion]['acceleration_magnitude'] for motion in motions]
@@ -1023,7 +1029,7 @@ class DynamicsBasicDemo:
         ax.legend()
         ax.grid(True, alpha=0.3)
     
-    def _plot_condition_number_distribution(self, ax):
+    def _plot_condition_number_distribution(self, ax) -> None:
         """Plot condition number distribution."""
         condition_numbers = self.config_space_results['condition_numbers']
         
@@ -1038,7 +1044,7 @@ class DynamicsBasicDemo:
         ax.axvline(mean_cond, color='red', linestyle='--', label=f'Mean: {mean_cond:.1f}')
         ax.legend()
     
-    def _plot_gravity_vs_configuration(self, ax):
+    def _plot_gravity_vs_configuration(self, ax) -> None:
         """Plot gravity magnitude vs configuration."""
         gravity_magnitudes = self.config_space_results['gravity_magnitudes']
         
@@ -1053,7 +1059,7 @@ class DynamicsBasicDemo:
         ax.axhline(mean_gravity, color='red', linestyle='--', label=f'Mean: {mean_gravity:.2f}')
         ax.legend()
     
-    def _plot_mass_matrix_diagonal(self, ax):
+    def _plot_mass_matrix_diagonal(self, ax) -> None:
         """Plot mass matrix diagonal elements."""
         configs = list(self.mass_matrix_results.keys())
         
@@ -1068,7 +1074,7 @@ class DynamicsBasicDemo:
         ax.legend()
         ax.grid(True, alpha=0.3)
     
-    def _plot_torque_magnitude_comparison(self, ax):
+    def _plot_torque_magnitude_comparison(self, ax) -> None:
         """Plot torque magnitude comparison."""
         motions = list(self.inverse_dynamics_results.keys())
         magnitudes = [self.inverse_dynamics_results[motion]['total_magnitude'] for motion in motions]
@@ -1088,7 +1094,7 @@ class DynamicsBasicDemo:
         ax.legend()
         ax.grid(True, alpha=0.3)
     
-    def _plot_dynamic_range_analysis(self, ax):
+    def _plot_dynamic_range_analysis(self, ax) -> None:
         """Plot dynamic range analysis."""
         configs = list(self.mass_matrix_results.keys())
         eigenvalue_ranges = []
@@ -1126,7 +1132,7 @@ class DynamicsBasicDemo:
                 ax.text(bar.get_x() + bar.get_width()/2., bar.get_height()/2,
                        'inf', ha='center', va='center', fontsize=8)
     
-    def _plot_computational_performance(self, ax):
+    def _plot_computational_performance(self, ax) -> None:
         """Plot computational performance summary."""
         # Calculate frequencies
         mass_freq = 1 / np.mean([r['computation_time'] for r in self.mass_matrix_results.values()])
@@ -1151,7 +1157,7 @@ class DynamicsBasicDemo:
                    f'{value:.0f}', ha='center', va='bottom', fontsize=8)
     
     # Helper methods
-    def _generate_extended_pose(self):
+    def _generate_extended_pose(self) -> np.ndarray:
         """Generate an extended arm pose."""
         # Move joints towards their positive limits (extended configuration)
         extended = np.zeros(self.n_joints)
@@ -1162,7 +1168,7 @@ class DynamicsBasicDemo:
                 extended[i] = 0.3 * self.joint_limits[i, 1]
         return extended
     
-    def _generate_folded_pose(self):
+    def _generate_folded_pose(self) -> np.ndarray:
         """Generate a folded arm pose."""
         # Move joints towards their negative limits (folded configuration)
         folded = np.zeros(self.n_joints)
@@ -1174,7 +1180,7 @@ class DynamicsBasicDemo:
         return folded
 
 
-def main():
+def main() -> None:
     """Main function to run the dynamics basic demo."""
     try:
         # Create and run demo

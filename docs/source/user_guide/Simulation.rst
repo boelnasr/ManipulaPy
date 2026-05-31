@@ -13,6 +13,7 @@ computations through CuPy integration.
 .. contents:: Table of Contents
    :depth: 3
    :local:
+   :backlinks: none
 
 Installation and Setup
 ----------------------
@@ -26,7 +27,7 @@ Before using the Simulation module, ensure you have the following dependencies:
 
 .. code-block:: bash
 
-   pip install ManipulaPy[simulation] pybullet>=3.2.5 matplotlib>=3.5 numpy>=1.21
+   pip install ManipulaPy[simulation] pybullet>=3.2.5 matplotlib>=3.9 "numpy>=2.0,<3.0"
 
 **GPU Acceleration (Optional but Recommended)**
 
@@ -38,9 +39,8 @@ Before using the Simulation module, ensure you have the following dependencies:
 
 **URDF Processing**
 
-.. code-block:: bash
-
-   pip install urchin>=0.0.27
+The native URDF parser is included with ManipulaPy. Install
+``ManipulaPy[urdf]`` only when you need optional ``trimesh`` mesh loading.
 
 Verification
 ~~~~~~~~~~~~
@@ -128,7 +128,8 @@ Simulation Class
 ~~~~~~~~~~~~~~~~
 
 .. autoclass:: ManipulaPy.sim.Simulation
-   :members:
+   :no-members:
+   :no-index:
    :undoc-members:
    :show-inheritance:
    :special-members: __init__
@@ -136,7 +137,8 @@ Simulation Class
 Constructor Parameters
 ^^^^^^^^^^^^^^^^^^^^^^
 
-.. py:method:: __init__(urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0, physics_client=None)
+.. py:method:: __init__(urdf_file_path, joint_limits, torque_limits=None, time_step=0.01, real_time_factor=1.0, physics_client=None, enable_self_collision=False, disable_pairs=None)
+   :no-index:
 
    Initialize the simulation environment.
 
@@ -146,6 +148,8 @@ Constructor Parameters
    :param float time_step: Physics simulation time step in seconds (default: 0.01)
    :param float real_time_factor: Playback speed multiplier (1.0 = real-time, 0.5 = half-speed)
    :param int physics_client: Existing PyBullet client ID, or None to create new GUI client
+   :param bool enable_self_collision: When True, passes PyBullet's ``URDF_USE_SELF_COLLISION`` flag to ``loadURDF``, enabling self-contact detection (default: False)
+   :param list disable_pairs: Optional list of ``(link_name_a, link_name_b)`` tuples whose collision response is disabled via ``setCollisionFilterPair`` after loading (default: None)
 
    :raises FileNotFoundError: If URDF file doesn't exist
    :raises ValueError: If joint_limits and URDF DOF don't match
@@ -156,6 +160,7 @@ Core Simulation Methods
 **Trajectory Execution**
 
 .. py:method:: run_trajectory(joint_trajectory) -> np.ndarray
+   :no-index:
 
    Execute a sequence of joint configurations with physics simulation and visualization.
 
@@ -177,27 +182,21 @@ Core Simulation Methods
       
       final_pos = sim.run_trajectory(trajectory)
 
-**Controller Integration**
+**Open-Loop Position Tracking**
 
-.. py:method:: run_controller(controller, desired_positions, desired_velocities, desired_accelerations, g, Ftip, Kp, Ki, Kd) -> np.ndarray
+.. py:method:: run_controller(desired_positions) -> np.ndarray
+   :no-index:
 
-   Execute closed-loop control with real-time feedback and visualization.
+   Execute open-loop position tracking with real-time visualization. For closed-loop torque control, drive PyBullet's ``p.TORQUE_CONTROL`` mode directly. See ``CHANGELOG.md`` for the v1.3.2 migration notes.
 
-   :param ManipulatorController controller: Controller instance from ManipulaPy.control
-   :param np.ndarray desired_positions: Desired joint positions (N_steps × DOF)
-   :param np.ndarray desired_velocities: Desired joint velocities (N_steps × DOF)
-   :param np.ndarray desired_accelerations: Desired joint accelerations (N_steps × DOF)
-   :param list g: Gravity vector [gx, gy, gz] in m/s²
-   :param list Ftip: External force/torque at end-effector [fx, fy, fz, τx, τy, τz]
-   :param list Kp: Proportional gains for each joint
-   :param list Ki: Integral gains for each joint
-   :param list Kd: Derivative gains for each joint
+   :param array_like desired_positions: Sequence of joint configurations to visit in open-loop position control, shape (N, n_joints)
    :return: Final end-effector position
    :rtype: np.ndarray
 
 **Manual Control and Interaction**
 
 .. py:method:: manual_control()
+   :no-index:
 
    Enter interactive manual control mode with GUI sliders.
 
@@ -213,6 +212,7 @@ Initialization and Setup Methods
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:method:: initialize_robot()
+   :no-index:
 
    Process URDF file and create robot dynamics model.
 
@@ -223,6 +223,7 @@ Initialization and Setup Methods
    - Identifies non-fixed joints for control
 
 .. py:method:: initialize_planner_and_controller()
+   :no-index:
 
    Initialize trajectory planning and control modules.
 
@@ -235,6 +236,7 @@ State Management and Monitoring
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:method:: get_joint_positions() -> np.ndarray
+   :no-index:
 
    Get current joint positions from simulation.
 
@@ -242,12 +244,14 @@ State Management and Monitoring
    :rtype: np.ndarray
 
 .. py:method:: set_joint_positions(joint_positions)
+   :no-index:
 
    Set target joint positions for position control.
 
    :param array_like joint_positions: Target angles in radians
 
 .. py:method:: check_collisions()
+   :no-index:
 
    Check for self-collisions and log contact points.
 
@@ -258,6 +262,7 @@ Data Logging and Analysis
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. py:method:: save_joint_states(filename="joint_states.csv")
+   :no-index:
 
    Save current joint states to CSV file.
 
@@ -266,6 +271,7 @@ Data Logging and Analysis
    Creates CSV with columns: Position, Velocity for each joint.
 
 .. py:method:: plot_trajectory_in_scene(joint_trajectory, end_effector_trajectory)
+   :no-index:
 
    Create 3D visualization of end-effector trajectory.
 
@@ -275,17 +281,15 @@ Data Logging and Analysis
 Advanced Examples
 -----------------
 
-Closed-Loop Control Simulation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Open-Loop Position Tracking Simulation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Demonstrate advanced controller integration with GPU acceleration:
+Demonstrate trajectory generation followed by open-loop position tracking:
 
 .. code-block:: python
 
    from ManipulaPy.sim import Simulation
-   from ManipulaPy.control import ManipulatorController
    from ManipulaPy.path_planning import TrajectoryPlanning
-   import cupy as cp
    import numpy as np
 
    # Setup simulation
@@ -307,22 +311,8 @@ Demonstrate advanced controller integration with GPU acceleration:
        method=5 # Quintic time scaling
    )
 
-   # Controller parameters
-   controller = ManipulatorController(sim.dynamics)
-   Kp = np.array([50, 40, 30, 20, 15, 10])  # Position gains
-   Ki = np.array([0.1, 0.1, 0.1, 0.05, 0.05, 0.05])  # Integral gains  
-   Kd = np.array([5, 4, 3, 2, 1.5, 1])     # Derivative gains
-
-   # Execute closed-loop control
-   final_pos = sim.run_controller(
-       controller=controller,
-       desired_positions=traj_data["positions"],
-       desired_velocities=traj_data["velocities"], 
-       desired_accelerations=traj_data["accelerations"],
-       g=[0, 0, -9.81],
-       Ftip=[0, 0, 0, 0, 0, 0],
-       Kp=Kp, Ki=Ki, Kd=Kd
-   )
+   # Execute open-loop position tracking
+   final_pos = sim.run_controller(traj_data["positions"])
 
 Multi-Phase Simulation Workflow
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -600,9 +590,9 @@ Configure multiple simulation instances for parallel processing:
        client = p.connect(p.DIRECT)
        
        sim = Simulation(urdf_file_path=urdf_path,
-                       joint_limits=joint_limits, 
+                       joint_limits=joint_limits,
                        physics_client=client)
-       sim.initialize_robot()
+       sim.initialize_robot()  # redundant when physics_client= is passed; see note below
        
        while True:
            try:
@@ -649,6 +639,16 @@ Configure multiple simulation instances for parallel processing:
            worker.join()
        
        return results
+
+.. note::
+
+   In the worker pattern above (calling only ``run_trajectory`` or
+   ``run_controller``), ``sim.initialize_robot()`` is redundant — the
+   constructor already loads the robot when ``physics_client=`` is
+   passed. Workers that subsequently call
+   ``initialize_planner_and_controller()`` still need ``initialize_robot()``
+   first, because the planner/controller setup reads ``self.robot`` and
+   ``self.dynamics``.
 
 Troubleshooting Guide
 -------------------------

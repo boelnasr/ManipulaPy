@@ -17,7 +17,7 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
-from typing import List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 from numpy.typing import NDArray
@@ -103,7 +103,7 @@ def extrapolate_from_current(
     theta_current: Union[NDArray[np.float64], List[float]],
     T_current: NDArray[np.float64],
     T_desired: NDArray[np.float64],
-    jacobian_func,
+    jacobian_func: Callable[[NDArray[np.float64]], NDArray[np.float64]],
     joint_limits: List[Tuple[Optional[float], Optional[float]]],
     alpha: float = 0.5,
 ) -> NDArray[np.float64]:
@@ -239,7 +239,7 @@ class IKInitialGuessCache:
         >>> theta0 = cache.get_nearest(T_new, k=3)
     """
 
-    def __init__(self, max_size: int = 100):
+    def __init__(self, max_size: int = 100) -> None:
         """
         Initialize cache.
 
@@ -388,7 +388,7 @@ def _clip_to_limits(
 
 
 def adaptive_multi_start_ik(
-    ik_solver_func,
+    ik_solver_func: Callable[..., Tuple[NDArray[np.float64], bool, int]],
     T_desired: NDArray[np.float64],
     max_attempts: int = 10,
     eomg: float = 2e-3,
@@ -425,10 +425,10 @@ def adaptive_multi_start_ik(
         - Computational cost: ~3-5x single-start, but 3-5x higher success
 
     Strategy Sequence:
-        1. Workspace heuristic (conservative params) - 20-40% success
-        2. Midpoint (moderate params) - +10-20% success
-        3-5. Random exploration (varying params) - +10-20% success
-        6-10. Aggressive random (if needed) - +5-10% success
+        - Workspace heuristic (conservative params): 20-40% success
+        - Midpoint (moderate params): +10-20% success
+        - Random exploration, attempts 3-5 (varying params): +10-20% success
+        - Aggressive random, attempts 6-10 (if needed): +5-10% success
 
     Example:
         >>> from ManipulaPy.ik_helpers import adaptive_multi_start_ik

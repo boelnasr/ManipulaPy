@@ -1,30 +1,33 @@
-# Kinematics User Guide
+Kinematics User Guide
+=====================
 
 This chapter walks you through **everyday kinematics workflows** in ManipulaPy:
 from building a *SerialManipulator* object, to computing forward & inverse
 kinematics, Jacobians, workspace envelopes, and velocity mappings.  It assumes
-you already ran the \:doc:`../installation` guide and have a working Python
-interpreter.
+you already ran the :doc:`installation guide <../Installation Guide>` and have
+a working Python interpreter.
 
-.. \_ug-kinematics-prereq:
+.. _ug-kinematics-prereq:
 
-## Prerequisites
+Prerequisites
+-------------
 
 * Python ≥ 3.8 with `numpy` & `matplotlib`
 * ManipulaPy ≥ |release|
 * A basic grasp of screw theory / the Product‑of‑Exponentials (PoE) model.
 
-If you need a refresher, see `Modern Robotics, Ch 3`\_ (free online PDF) or our
-\:doc:`../theory/screw_theory` page.
+If you need a refresher, see `Modern Robotics, Ch 3`_ (free online PDF) or the
+conceptual overview in :doc:`../user_guide/Kinematics`.
 
-.. \_Modern Robotics, Ch 3: [http://hades.mech.northwestern.edu/index.php/Modern\_Robotics](http://hades.mech.northwestern.edu/index.php/Modern_Robotics)
+.. _Modern Robotics, Ch 3: http://hades.mech.northwestern.edu/index.php/Modern_Robotics
 
-## What is robot kinematics?
+What is robot kinematics?
+-------------------------
 
 *Robot kinematics* studies the geometry of a manipulator **without** worrying
 about forces or torques.  The central problems are:
 
-* **Forward kinematics (FK):** joint angles → pose of the tool frame \:math:`T \in
+* **Forward kinematics (FK):** joint angles → pose of the tool frame :math:`T \in
   \mathrm{SE}(3)`.
 * **Inverse kinematics (IK):** desired pose → one or more joint angle
   solutions.
@@ -32,13 +35,12 @@ about forces or torques.  The central problems are:
   end‑effector.
 
 ManipulaPy models every rigid motion as an element of
-\:math:`\mathrm{SE}(3) \cong \mathbb{R}^3 \times \mathrm{SO}(3)` using
+:math:`\mathrm{SE}(3) \cong \mathbb{R}^3 \times \mathrm{SO}(3)` using
 *homogeneous transforms* and encodes joint axes as **screws**
-\:math:`S_i \in \mathfrak{se}(3)`.
+:math:`S_i \in \mathfrak{se}(3)`.
 
 Forward kinematics via PoE
-
-```
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 With screws arranged column‑wise in :math:`S_{list} \in \mathbb{R}^{6\times n}`
 and a *home configuration* matrix :math:`M`, the FK map is
@@ -200,12 +202,11 @@ Symptom           Fix
 ================  ===========================================
 IK fails to       * Check if the target pose is outside joint
 converge            limits or workspace.
-                  * Provide a better initial guess; use the
-                    *smart_initial_guess* helper below.
+                  * Provide a better initial guess; use the *smart_initial_guess* helper below.
 Numerical         * Call IK with ``damping`` > 1e‑4 or switch to
 instability         ``lm_inverse_kinematics``.
-Joint limit       * Run :pyfunc:`ManipulaPy.kinematics.utils.enforce_joint_limits`.
-violation
+Joint limit       * Clamp joint angles into ``robot.joint_limits`` before
+violation           passing them to the IK solver.
 ================  ===========================================
 
 .. code-block:: python
@@ -217,5 +218,3 @@ violation
        except AttributeError:
            # fallback: mid‑range of each joint
            return np.mean(robot.joint_limits, axis=1)
-
---------------------------------------------------------------

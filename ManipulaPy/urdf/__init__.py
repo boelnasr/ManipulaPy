@@ -4,8 +4,8 @@
 ManipulaPy Native URDF Parser
 
 A modern, optimized URDF parser built specifically for ManipulaPy.
-Combines best practices from yourdfpy, urchin, and urdfpy while being
-tailored for robotics kinematics and dynamics workflows.
+Tailored for robotics kinematics and dynamics workflows without a legacy
+external URDF parser dependency.
 
 Features:
     - Zero external URDF dependencies (only numpy required for core)
@@ -95,4 +95,4 @@ __all__ = [
     "save_calibration",
 ]
 
-__version__ = "1.3.0"
+__version__ = "1.3.2"

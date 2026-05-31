@@ -61,19 +61,22 @@ except ImportError:
 
 class BenchmarkTimer:
     """Context manager for timing operations"""
-    def __init__(self, name: str, warmup: bool = False):
+    def __init__(self, name: str, warmup: bool = False) -> None:
+        """Initialize timer state for a named benchmark section."""
         self.name = name
         self.warmup = warmup
         self.start_time = None
         self.end_time = None
         
-    def __enter__(self):
+    def __enter__(self) -> "BenchmarkTimer":
+        """Start timing and return the active timer."""
         if not self.warmup:
             print(f"🚀 Running {self.name}...")
         self.start_time = time.perf_counter()
         return self
         
-    def __exit__(self, *args):
+    def __exit__(self, *args) -> None:
+        """Stop timing and print the elapsed duration."""
         self.end_time = time.perf_counter()
         self.elapsed = self.end_time - self.start_time
         if not self.warmup:
@@ -82,7 +85,8 @@ class BenchmarkTimer:
 class MockTrajectoryPlanner:
     """Mock trajectory planner that avoids the boolean array issue"""
     
-    def __init__(self, robot, dynamics, joint_limits, torque_limits):
+    def __init__(self, robot, dynamics, joint_limits, torque_limits) -> None:
+        """Store robot interfaces and normalized joint/torque limits."""
         self.serial_manipulator = robot
         self.dynamics = dynamics
         self.joint_limits = np.array(joint_limits)
@@ -92,7 +96,7 @@ class MockTrajectoryPlanner:
         else:
             self.torque_limits = np.array(torque_limits)
     
-    def joint_trajectory(self, thetastart, thetaend, Tf, N, method):
+    def joint_trajectory(self, thetastart, thetaend, Tf, N, method) -> dict:
         """Generate joint trajectory using simple polynomial interpolation"""
         thetastart = np.array(thetastart, dtype=np.float32)
         thetaend = np.array(thetaend, dtype=np.float32)
@@ -139,7 +143,7 @@ class MockTrajectoryPlanner:
             "accelerations": traj_acc
         }
     
-    def cartesian_trajectory(self, Xstart, Xend, Tf, N, method):
+    def cartesian_trajectory(self, Xstart, Xend, Tf, N, method) -> dict:
         """Generate Cartesian trajectory"""
         # Extract positions
         pstart = Xstart[:3, 3]
@@ -183,7 +187,7 @@ class MockTrajectoryPlanner:
             "orientations": orientations
         }
     
-    def inverse_dynamics_trajectory(self, positions, velocities, accelerations, g=None, Ftip=None):
+    def inverse_dynamics_trajectory(self, positions, velocities, accelerations, g=None, Ftip=None) -> np.ndarray:
         """Mock inverse dynamics calculation"""
         if g is None:
             g = np.array([0, 0, -9.81])
@@ -212,7 +216,8 @@ class MockTrajectoryPlanner:
 class ManipulaPyBenchmark:
     """Comprehensive benchmark suite for ManipulaPy"""
     
-    def __init__(self, iterations: int = 1000, use_cuda: bool = True):
+    def __init__(self, iterations: int = 1000, use_cuda: bool = True) -> None:
+        """Initialize benchmark settings and reusable robot fixtures."""
         self.iterations = iterations
         self.use_cuda = use_cuda and CUDA_AVAILABLE
         self.results = {}
@@ -241,7 +246,7 @@ class ManipulaPyBenchmark:
                 
         return info
         
-    def _setup_test_robot(self):
+    def _setup_test_robot(self) -> None:
         """Set up test robot for benchmarking"""
         try:
             from ManipulaPy.urdf_processor import URDFToSerialManipulator
@@ -263,50 +268,61 @@ class ManipulaPyBenchmark:
             print(f"⚠️ Failed to load real robot, using mock: {e}")
             self._setup_mock_robot()
             
-    def _setup_mock_robot(self):
+    def _setup_mock_robot(self) -> None:
         """Set up mock robot for testing"""
         self.num_joints = 6
         
         # Create mock dynamics
         class MockDynamics:
-            def __init__(self, n_joints):
+            def __init__(self, n_joints) -> None:
+                """Initialize randomized dynamics fixtures with the requested DOF."""
                 self.Glist = [np.eye(6) for _ in range(n_joints)]
                 self.S_list = np.random.randn(6, n_joints)
                 self.M_list = np.eye(4)
                 
-            def mass_matrix(self, thetalist):
+            def mass_matrix(self, thetalist) -> np.ndarray:
+                """Return a small randomized mass matrix."""
                 n = len(thetalist)
                 return np.eye(n) + 0.1 * np.random.randn(n, n)
                 
-            def velocity_quadratic_forces(self, thetalist, dthetalist):
+            def velocity_quadratic_forces(self, thetalist, dthetalist) -> np.ndarray:
+                """Return randomized velocity-coupling forces."""
                 return 0.01 * np.random.randn(len(thetalist))
                 
-            def gravity_forces(self, thetalist, g):
+            def gravity_forces(self, thetalist, g) -> np.ndarray:
+                """Return randomized gravity compensation forces."""
                 return 0.1 * np.random.randn(len(thetalist))
                 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
+            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+                """Return randomized torque values."""
                 return np.random.randn(len(thetalist))
                 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+                """Return randomized joint accelerations."""
                 return np.random.randn(len(thetalist))
                 
-            def jacobian(self, thetalist):
+            def jacobian(self, thetalist) -> np.ndarray:
+                """Return a randomized spatial Jacobian."""
                 return np.random.randn(6, len(thetalist))
         
         # Create mock robot
         class MockRobot:
-            def __init__(self, n_joints):
+            def __init__(self, n_joints) -> None:
+                """Initialize symmetric joint limits for a mock arm."""
                 self.joint_limits = [(-np.pi, np.pi)] * n_joints
                 
-            def forward_kinematics(self, thetalist, frame="space"):
+            def forward_kinematics(self, thetalist, frame="space") -> np.ndarray:
+                """Return a randomized end-effector transform."""
                 T = np.eye(4)
                 T[:3, 3] = np.random.randn(3)
                 return T
                 
-            def jacobian(self, thetalist, frame="space"):
+            def jacobian(self, thetalist, frame="space") -> np.ndarray:
+                """Return a randomized spatial Jacobian."""
                 return np.random.randn(6, len(thetalist))
                 
-            def iterative_inverse_kinematics(self, T_desired, thetalist0, **kwargs):
+            def iterative_inverse_kinematics(self, T_desired, thetalist0, **kwargs) -> tuple:
+                """Return a randomized IK solution tuple."""
                 return np.random.randn(len(thetalist0)), True, 10
         
         self.dynamics = MockDynamics(self.num_joints)
@@ -872,7 +888,7 @@ class ManipulaPyBenchmark:
             
         return df
         
-    def plot_results(self, df: pd.DataFrame, save_path: Optional[str] = None):
+    def plot_results(self, df: pd.DataFrame, save_path: Optional[str] = None) -> None:
         """Create visualization plots of benchmark results"""
         if len(df) == 0:
             print("⚠️ No data to plot")
@@ -984,7 +1000,7 @@ class ManipulaPyBenchmark:
         finally:
             plt.close()
 
-def main():
+def main() -> None:
     """Main benchmark execution function"""
     parser = argparse.ArgumentParser(description="ManipulaPy Comprehensive Benchmark Suite")
     parser.add_argument("--module", type=str, choices=[

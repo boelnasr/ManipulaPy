@@ -16,15 +16,16 @@ Quick Navigation
 .. contents::
    :local:
    :depth: 2
+   :backlinks: none
 
-------------
+-----------------------------
 URDFToSerialManipulator Class
-------------
+-----------------------------
 
 .. currentmodule:: ManipulaPy.urdf_processor
 
 .. autoclass:: URDFToSerialManipulator
-   :members:
+   :no-members:
    :show-inheritance:
 
    Converts URDF files to SerialManipulator and ManipulatorDynamics objects with PyBullet integration.
@@ -40,7 +41,7 @@ URDFToSerialManipulator Class
 
       **Process:**
 
-        1. Load URDF using urchin library
+        1. Load URDF using ManipulaPy's native parser
         2. Extract kinematic and dynamic parameters
         3. Optionally retrieve joint limits from PyBullet
         4. Create SerialManipulator and ManipulatorDynamics objects
@@ -48,7 +49,7 @@ URDFToSerialManipulator Class
       **Attributes Created:**
 
         - **urdf_name** (*str*) -- Path to URDF file
-        - **robot** (*urchin.URDF*) -- Loaded URDF object
+        - **robot** (*ManipulaPy.urdf.URDF*) -- Loaded URDF object
         - **robot_data** (*dict*) -- Extracted robot parameters
         - **serial_manipulator** (*SerialManipulator*) -- Kinematics object
         - **dynamics** (*ManipulatorDynamics*) -- Dynamics object
@@ -124,7 +125,7 @@ URDFToSerialManipulator Class
 
    .. automethod:: visualize_robot
 
-      **Purpose:** Display static robot model using matplotlib visualization from urchin library.
+      **Purpose:** Display static robot model using ManipulaPy visualization helpers.
 
       **Usage:** Interactive 3D visualization with rotation and zoom capabilities.
 
@@ -166,7 +167,6 @@ URDFToSerialManipulator Class
    .. rubric:: Static Utility Methods
 
    .. automethod:: transform_to_xyz
-      :staticmethod:
 
       **Parameters:**
 
@@ -179,21 +179,19 @@ URDFToSerialManipulator Class
       **Purpose:** Extract position from homogeneous transformation matrix.
 
    .. automethod:: get_link
-      :staticmethod:
 
       **Parameters:**
 
-        - **robot** (*urchin.URDF*) -- Loaded URDF object
+        - **robot** (*ManipulaPy.urdf.URDF*) -- Loaded URDF object
         - **link_name** (*str*) -- Name of link to find
 
       **Returns:**
 
-        - **link** (*urchin.Link* or *None*) -- Link object if found, None otherwise
+        - **link** (*Link* or *None*) -- Link object if found, None otherwise
 
       **Purpose:** Find specific link by name in URDF structure.
 
    .. automethod:: w_p_to_slist
-      :staticmethod:
 
       **Parameters:**
 
@@ -209,9 +207,9 @@ URDFToSerialManipulator Class
 
       **Purpose:** Convert joint parameters to screw axis representation.
 
--------------
+--------------
 Usage Examples
--------------
+--------------
 
 **Basic URDF Loading**::
 
@@ -321,7 +319,7 @@ Usage Examples
 
 **Custom URDF Processing**::
 
-   # Access raw urchin URDF object
+   # Access raw ManipulaPy URDF object
    urdf_obj = processor.robot
    
    # Inspect URDF structure
@@ -354,7 +352,7 @@ Usage Examples
 Key Features
 -------------
 
-- **Automatic parameter extraction** from URDF files using urchin library
+- **Automatic parameter extraction** from URDF files using the native parser
 
 - **PyBullet integration** for accurate joint limit retrieval
 
@@ -374,8 +372,6 @@ Key Features
 -----------------
 Dependencies
 -----------------
-
-- **urchin** -- URDF loading and visualization
 
 - **PyBullet** -- Joint limit extraction and simulation
 

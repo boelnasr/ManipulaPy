@@ -34,6 +34,8 @@ from .utils import adjoint_transform as ad
 
 
 class ManipulatorDynamics(SerialManipulator):
+    """Serial manipulator model with mass, Coriolis, gravity, and dynamics APIs."""
+
     def __init__(
         self,
         M_list: NDArray[np.float64],
@@ -43,9 +45,25 @@ class ManipulatorDynamics(SerialManipulator):
         S_list: NDArray[np.float64],
         B_list: NDArray[np.float64],
         Glist: Union[List[NDArray[np.float64]], NDArray[np.float64]],
+        Mlist_per_link: Optional[List[NDArray[np.float64]]] = None,  # New
     ) -> None:
+        """
+        Initialize manipulator dynamics data and finite-difference caches.
+
+        Args:
+            M_list: Home transforms for the manipulator.
+            omega_list: Joint angular velocity axes.
+            r_list: Space-frame screw-axis position vectors.
+            b_list: Body-frame screw-axis position vectors.
+            S_list: Space-frame screw axes.
+            B_list: Body-frame screw axes.
+            Glist: Spatial inertia matrices per link.
+            Mlist_per_link: Optional CoM transforms per link.
+        """
         super().__init__(M_list, omega_list, r_list, b_list, S_list, B_list)
         self.Glist = Glist
+        self.Mlist_per_link = Mlist_per_link  # NEW
+
         self._mass_matrix_cache: Dict[Tuple[float, ...], NDArray[np.float64]] = {}
         self._mass_matrix_derivative_cache: Dict[
             Tuple[Any, ...], NDArray[np.float64]
@@ -54,38 +72,91 @@ class ManipulatorDynamics(SerialManipulator):
     def mass_matrix(
         self, thetalist: Union[NDArray[np.float64], List[float]]
     ) -> NDArray[np.float64]:
+        """Compute mass matrix using per-link body Jacobians.
+
+        M(θ) = Σ_k J_k^T G_k J_k
+
+        Where J_k is the body Jacobian of link k's CoM (6×n), and G_k is link
+        k's spatial inertia in body frame. For joints i > k, J_k[:, i] = 0
+        (link k doesn't depend on those joints).
+
+        Reference: Modern Robotics §8.3 / Murray, Li, Sastry §4.3.
+
+        If Mlist_per_link is None (legacy path), falls back to the previous
+        EE-Jacobian approximation with a deprecation warning.
+        """
+        from ManipulaPy.utils import adjoint_transform as _ad
+
         thetalist_key = tuple(thetalist)
         if thetalist_key in self._mass_matrix_cache:
             return self._mass_matrix_cache[thetalist_key]
 
         n = len(thetalist)
+
+        if self.Mlist_per_link is None:
+            # Legacy fallback (still wrong, but preserves old behavior for
+            # callers constructing ManipulatorDynamics manually without per-link M)
+            import warnings
+
+            warnings.warn(
+                "mass_matrix called without Mlist_per_link — using legacy "
+                "approximation (incorrect for non-trivial robots). Construct "
+                "ManipulatorDynamics via URDFToSerialManipulator to get accurate "
+                "mass matrix.",
+                stacklevel=2,
+            )
+            return self._mass_matrix_legacy(thetalist)
+
         M = np.zeros((n, n), dtype=np.float64)
 
-        # Precompute the "space" transforms for each link
+        # Spatial Jacobian columns J_s[:, i] = Ad(prefix_i) @ S_i, built once
+        # via the canonical incremental formula in kinematics.jacobian. Body
+        # twist of link k is then J_b_k[:, i] = Ad(T_k_com^-1) @ J_s[:, i].
+        J_s = self.jacobian(thetalist, frame="space")  # (6, n)
+
+        for k in range(n):
+            # T_k_com(θ): base → link k CoM at the current configuration.
+            # Joints k+1..n don't move link k, so truncating thetalist to
+            # k+1 entries gives the correct link pose; the inv(M_list)
+            # @ Mlist_per_link[k] offset shifts from link frame to CoM frame.
+            T_k_zero = self.Mlist_per_link[k]
+            T_k = self.forward_kinematics(thetalist[: k + 1], frame="space")
+            T_k_at_zero = self.forward_kinematics(np.zeros(k + 1), frame="space")
+            T_link_to_com = np.linalg.inv(T_k_at_zero) @ T_k_zero
+            T_k_com = T_k @ T_link_to_com
+
+            # Convert spatial → body for link k. Columns i > k stay zero
+            # because joint i is downstream of link k and doesn't move it.
+            Ad_inv_T_k_com = _ad(np.linalg.inv(T_k_com))
+            J_k = np.zeros((6, n), dtype=np.float64)
+            J_k[:, : k + 1] = Ad_inv_T_k_com @ J_s[:, : k + 1]
+
+            M += J_k.T @ self.Glist[k] @ J_k
+
+        # Symmetrize against floating-point drift
+        M = 0.5 * (M + M.T)
+        self._mass_matrix_cache[thetalist_key] = M
+        return M
+
+    def _mass_matrix_legacy(
+        self, thetalist: Union[NDArray[np.float64], List[float]]
+    ) -> NDArray[np.float64]:
+        """Legacy mass matrix (incorrect, kept for backward compat). DO NOT USE."""
+        thetalist_key = tuple(thetalist)
+        n = len(thetalist)
+        M = np.zeros((n, n), dtype=np.float64)
         AdT = np.zeros((6, 6, n + 1))
         AdT[:, :, 0] = np.eye(6)
         for j in range(n):
             T = self.forward_kinematics(thetalist[: j + 1], frame="space")
             AdT[:, :, j + 1] = ad(T)
-
-        # Full space Jacobian at the end-effector
-        J_full = self.jacobian(thetalist, frame="space")  # shape (6, n)
-
-        # Implement the correct formula: M(θ) = Σᵢ JᵢᵀI_i Jᵢ
-        # where Jᵢ is the spatial Jacobian up to link i, and I_i is link i's spatial inertia in base frame
+        J_full = self.jacobian(thetalist, frame="space")
         for i in range(n):
             for j in range(n):
-                # Transform the i-th link's inertia into the base frame
                 Ii_base = AdT[:, :, i + 1].T @ self.Glist[i] @ AdT[:, :, i + 1]
-
-                # Get the spatial Jacobian columns for joints i and j
-                Ji = J_full[:, i]  # i-th column of Jacobian
-                Jj = J_full[:, j]  # j-th column of Jacobian
-
-                # Accumulate M[i,j] = Jᵢᵀ I_i Jⱼ for each link
+                Ji = J_full[:, i]
+                Jj = J_full[:, j]
                 M[i, j] += Ji.T @ Ii_base @ Jj
-
-        # Ensure exact symmetry (guard against tiny floating-point drift)
         M = 0.5 * (M + M.T)
         self._mass_matrix_cache[thetalist_key] = M
         return M
@@ -133,6 +204,16 @@ class ManipulatorDynamics(SerialManipulator):
         thetalist: Union[NDArray[np.float64], List[float]],
         dthetalist: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
+        """
+        Compute Coriolis and centripetal generalized forces.
+
+        Args:
+            thetalist: Joint angles.
+            dthetalist: Joint velocities.
+
+        Returns:
+            Joint-space velocity quadratic force vector.
+        """
         n = len(thetalist)
         dtheta = np.asarray(dthetalist, dtype=np.float64)
         if np.allclose(dtheta, 0.0):
@@ -153,11 +234,74 @@ class ManipulatorDynamics(SerialManipulator):
     def gravity_forces(
         self,
         thetalist: Union[NDArray[np.float64], List[float]],
-        g: Union[NDArray[np.float64], List[float]] = [0, 0, -9.81],
+        g: Optional[Union[NDArray[np.float64], List[float]]] = None,
     ) -> NDArray[np.float64]:
+        """
+        Compute joint torques needed to compensate gravity.
+
+        Args:
+            thetalist: Joint angles.
+            g: Gravity vector. Defaults to ``[0, 0, -9.81]``.
+
+        Returns:
+            Joint-space gravity compensation torques.
+        """
+        if g is None:
+            g = [0.0, 0.0, -9.81]
+        g = np.asarray(g, dtype=np.float64)
+        n = len(thetalist)
+
+        if self.Mlist_per_link is None:
+            # Legacy fallback for callers that build ManipulatorDynamics
+            # manually without per-link CoM data. Mirrors mass_matrix.
+            import warnings
+
+            warnings.warn(
+                "gravity_forces called without Mlist_per_link — using legacy "
+                "approximation (incorrect for non-trivial robots). Construct "
+                "ManipulatorDynamics via URDFToSerialManipulator to get accurate "
+                "gravity compensation.",
+                stacklevel=2,
+            )
+            return self._gravity_forces_legacy(thetalist, g)
+
+        # g(θ)_i = Σ_k (J_k^T F_k)_i, where J_k is the body Jacobian of link k's
+        # CoM and F_k = [0; m_k R_k^T (-g)] is the gravity-balancing wrench in
+        # that CoM frame (Modern Robotics §8.3 / base accelerated by -g). The
+        # per-link CoM Jacobian construction matches mass_matrix exactly.
+        grav = np.zeros(n, dtype=np.float64)
+        J_s = self.jacobian(thetalist, frame="space")  # (6, n)
+
+        for k in range(n):
+            T_k_zero = self.Mlist_per_link[k]
+            T_k = self.forward_kinematics(thetalist[: k + 1], frame="space")
+            T_k_at_zero = self.forward_kinematics(np.zeros(k + 1), frame="space")
+            T_link_to_com = np.linalg.inv(T_k_at_zero) @ T_k_zero
+            T_k_com = T_k @ T_link_to_com
+
+            # Columns i > k stay zero: joint i is downstream of link k.
+            J_k = np.zeros((6, n), dtype=np.float64)
+            J_k[:, : k + 1] = ad(np.linalg.inv(T_k_com)) @ J_s[:, : k + 1]
+
+            # Pure force m_k * R_k^T (-g) in the CoM body frame; no moment,
+            # since the force acts through the CoM origin. [moment; force]
+            # ordering pairs with the [omega; v] twist of J_k.
+            m_k = self.Glist[k][3, 3]
+            F = np.zeros(6, dtype=np.float64)
+            F[3:6] = m_k * (T_k_com[:3, :3].T @ (-g))
+            grav += J_k.T @ F
+
+        return grav
+
+    def _gravity_forces_legacy(
+        self,
+        thetalist: Union[NDArray[np.float64], List[float]],
+        g: Union[NDArray[np.float64], List[float]],
+    ) -> NDArray[np.float64]:
+        """Legacy gravity approximation (incorrect, kept for backward compat)."""
         n = len(thetalist)
         grav = np.zeros(n)
-        G = np.array(g)
+        G = np.asarray(g)
         for i in range(n):
             AdT = ad(self.forward_kinematics(thetalist[: i + 1], "space"))
             grav[i] = np.dot(AdT.T[:3, :3], G[:3]).dot(
@@ -173,6 +317,19 @@ class ManipulatorDynamics(SerialManipulator):
         g: Union[NDArray[np.float64], List[float]],
         Ftip: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
+        """
+        Compute joint torques for the requested motion and end-effector wrench.
+
+        Args:
+            thetalist: Joint angles.
+            dthetalist: Joint velocities.
+            ddthetalist: Joint accelerations.
+            g: Gravity vector.
+            Ftip: End-effector wrench.
+
+        Returns:
+            Required joint torques.
+        """
         n = len(thetalist)
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
@@ -189,6 +346,19 @@ class ManipulatorDynamics(SerialManipulator):
         g: Union[NDArray[np.float64], List[float]],
         Ftip: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
+        """
+        Solve joint accelerations from applied torques and external loads.
+
+        Args:
+            thetalist: Joint angles.
+            dthetalist: Joint velocities.
+            taulist: Applied joint torques.
+            g: Gravity vector.
+            Ftip: End-effector wrench.
+
+        Returns:
+            Joint accelerations.
+        """
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)

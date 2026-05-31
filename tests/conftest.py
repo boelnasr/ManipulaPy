@@ -14,9 +14,13 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 """
 
 import os
+import shutil
+import subprocess
 import sys
 import types
 import warnings
+from pathlib import Path
+from typing import Any, Iterator
 from unittest.mock import MagicMock, Mock
 
 # Set up matplotlib for headless testing
@@ -35,11 +39,68 @@ warnings.filterwarnings("ignore", category=PendingDeprecationWarning)
 # Add the package to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# Force CPU-only execution
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-os.environ["NUMBA_DISABLE_CUDA"] = "1"
-os.environ["MANIPULAPY_FORCE_CPU"] = "1"
+
+def _env_truthy(value) -> bool:
+    """Return True for common truthy environment values."""
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _cuda_hidden_by_user() -> bool:
+    """Detect explicit user-level CUDA hiding without treating unset as hidden."""
+    value = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if value is None:
+        return False
+    return value.strip().lower() in {"", "-1", "none", "no"}
+
+
+def _nvidia_device_visible() -> bool:
+    """Detect whether an NVIDIA GPU is visible to this test process."""
+    if _cuda_hidden_by_user():
+        return False
+
+    if Path("/dev/nvidiactl").exists() or any(Path("/dev").glob("nvidia[0-9]*")):
+        return True
+
+    nvidia_smi = shutil.which("nvidia-smi")
+    if not nvidia_smi:
+        return False
+
+    try:
+        result = subprocess.run(
+            [nvidia_smi, "-L"],
+            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=2,
+        )
+    except Exception:
+        return False
+
+    return result.returncode == 0 and "GPU" in result.stdout
+
+
+_USER_FORCED_CPU = (
+    _env_truthy(os.environ.get("MANIPULAPY_FORCE_CPU"))
+    or _env_truthy(os.environ.get("NUMBA_DISABLE_CUDA"))
+    or _cuda_hidden_by_user()
+)
+NVIDIA_VISIBLE = _nvidia_device_visible()
+FORCE_CPU_ONLY = _USER_FORCED_CPU or not NVIDIA_VISIBLE
+
+if FORCE_CPU_ONLY:
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    os.environ["NUMBA_DISABLE_CUDA"] = "1"
+    os.environ["MANIPULAPY_FORCE_CPU"] = "1"
+
 os.environ["TORCH_USE_CUDA_DSA"] = "0"
+# Pin YOLO to CPU for the test process regardless of GPU presence.
+# When CUDA is visible, ultralytics auto-selects a CUDA device for the
+# torch backend, and the first conv-forward warmup SIGABRTs inside torch
+# whenever another library (numba, cupy) already owns a CUDA context in
+# the same process. Tests don't need GPU-accelerated YOLO — they
+# exercise the perception pipeline shape, not detection speed.
+os.environ.setdefault("MANIPULAPY_YOLO_DEVICE", "cpu")
 # Files/dirs pytest should skip during collection
 collect_ignore = [
     "setup.py",
@@ -47,7 +108,6 @@ collect_ignore = [
     "build",
     "dist",
     "test_error_computation.py",
-    "test_cuda_kernels.py",  # GPU-only tests
 ]
 
 # IK convergence tests in parent directory (not in tests/)
@@ -62,32 +122,40 @@ collect_ignore_glob = []
 class MockModule:
     """Enhanced mock module that handles iteration and common operations properly."""
 
-    def __init__(self, name=None):
+    def __init__(self, name=None) -> None:
+        """Initialize the mock module with an optional dotted name."""
         self._name = name or "MockModule"
 
-    def __getattr__(self, name):
+    def __getattr__(self, name) -> "MockModule":
+        """Return a nested mock for any attribute access."""
         return MockModule(f"{self._name}.{name}")
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args, **kwargs) -> "MockModule":
+        """Return a mock representing the call result."""
         return MockModule(f"{self._name}()")
 
     def __iter__(self):
+        """Iterate as an empty sequence."""
         return iter([])
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
+        """Mock modules are always truthy."""
         return True
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Mock modules report zero length."""
         return 0
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "MockModule":
+        """Return a nested mock for any item access."""
         return MockModule(f"{self._name}[{key}]")
 
 
 class CuPyArrayMock:
     """Enhanced CuPy array mock with proper numpy compatibility and type safety."""
 
-    def __init__(self, data, dtype=None):
+    def __init__(self, data, dtype=None) -> None:
+        """Initialize the mock array, inferring a float32 dtype when unset."""
         if dtype is None:
             dtype = (
                 np.float32
@@ -96,57 +164,65 @@ class CuPyArrayMock:
             )
         self._data = np.asarray(data, dtype=dtype)
 
-    def get(self):
+    def get(self) -> np.ndarray:
         """CuPy's method to convert GPU array to CPU (numpy) array."""
         return self._data
 
-    def copy_to_host(self):
+    def copy_to_host(self) -> np.ndarray:
         """Alternative CuPy method for GPU->CPU transfer."""
         return self._data.copy()
 
-    def copy_to_device(self, src):
+    def copy_to_device(self, src) -> None:
         """Mock GPU memory copy."""
         self._data[:] = np.asarray(src, dtype=self._data.dtype)
 
     def __getattr__(self, name):
+        """Delegate attribute access to the backing numpy array."""
         return getattr(self._data, name)
 
-    def __array__(self):
+    def __array__(self) -> np.ndarray:
+        """Expose the backing numpy array for array protocol consumers."""
         return self._data
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Return a debug representation of the mock array."""
         return f"CuPyArrayMock({self._data})"
 
     # Math operations with proper type handling
-    def __add__(self, other):
+    def __add__(self, other) -> "CuPyArrayMock":
+        """Element-wise addition returning a new mock array."""
         if hasattr(other, "_data"):
             result = self._data + other._data
         else:
             result = self._data + np.asarray(other, dtype=self._data.dtype)
         return CuPyArrayMock(result, dtype=self._data.dtype)
 
-    def __sub__(self, other):
+    def __sub__(self, other) -> "CuPyArrayMock":
+        """Element-wise subtraction returning a new mock array."""
         if hasattr(other, "_data"):
             result = self._data - other._data
         else:
             result = self._data - np.asarray(other, dtype=self._data.dtype)
         return CuPyArrayMock(result, dtype=self._data.dtype)
 
-    def __mul__(self, other):
+    def __mul__(self, other) -> "CuPyArrayMock":
+        """Element-wise multiplication returning a new mock array."""
         if hasattr(other, "_data"):
             result = self._data * other._data
         else:
             result = self._data * np.asarray(other, dtype=self._data.dtype)
         return CuPyArrayMock(result, dtype=self._data.dtype)
 
-    def __matmul__(self, other):
+    def __matmul__(self, other) -> "CuPyArrayMock":
+        """Matrix multiplication returning a new mock array."""
         if hasattr(other, "_data"):
             result = self._data @ other._data
         else:
             result = self._data @ np.asarray(other, dtype=self._data.dtype)
         return CuPyArrayMock(result, dtype=self._data.dtype)
 
-    def __iadd__(self, other):
+    def __iadd__(self, other) -> "CuPyArrayMock":
+        """In-place addition updating the backing array."""
         if hasattr(other, "_data"):
             self._data += other._data.astype(self._data.dtype)
         else:
@@ -156,23 +232,29 @@ class CuPyArrayMock:
     # Array properties
     @property
     def shape(self):
+        """Shape of the backing numpy array."""
         return self._data.shape
 
     @property
     def dtype(self):
+        """Dtype of the backing numpy array."""
         return self._data.dtype
 
     @property
-    def size(self):
+    def size(self) -> int:
+        """Number of elements in the backing numpy array."""
         return self._data.size
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Length of the backing numpy array."""
         return len(self._data)
 
-    def __getitem__(self, key):
+    def __getitem__(self, key) -> "CuPyArrayMock":
+        """Index into the backing array, returning a new mock array."""
         return CuPyArrayMock(self._data[key], dtype=self._data.dtype)
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key, value) -> None:
+        """Assign into the backing array, unwrapping mock array values."""
         if hasattr(value, "_data"):
             self._data[key] = value._data.astype(self._data.dtype)
         else:
@@ -182,14 +264,16 @@ class CuPyArrayMock:
 class CuPyMock:
     """Comprehensive CuPy mock that properly handles all CuPy operations."""
 
-    def asarray(self, arr, dtype=None):
+    def asarray(self, arr, dtype=None) -> CuPyArrayMock:
+        """Mock cupy.asarray returning a CuPyArrayMock."""
         if isinstance(arr, CuPyArrayMock):
             if dtype is not None and arr.dtype != dtype:
                 return CuPyArrayMock(arr._data, dtype=dtype)
             return arr
         return CuPyArrayMock(arr, dtype=dtype)
 
-    def asnumpy(self, arr):
+    def asnumpy(self, arr) -> np.ndarray:
+        """Mock cupy.asnumpy converting any array-like to numpy."""
         if hasattr(arr, "get"):
             return arr.get()
         elif hasattr(arr, "_data"):
@@ -197,24 +281,30 @@ class CuPyMock:
         else:
             return np.asarray(arr)
 
-    def zeros(self, *args, **kwargs):
+    def zeros(self, *args, **kwargs) -> CuPyArrayMock:
+        """Mock cupy.zeros returning a CuPyArrayMock."""
         return CuPyArrayMock(np.zeros(*args, **kwargs))
 
-    def ones(self, *args, **kwargs):
+    def ones(self, *args, **kwargs) -> CuPyArrayMock:
+        """Mock cupy.ones returning a CuPyArrayMock."""
         return CuPyArrayMock(np.ones(*args, **kwargs))
 
-    def zeros_like(self, arr):
+    def zeros_like(self, arr) -> CuPyArrayMock:
+        """Mock cupy.zeros_like returning a CuPyArrayMock."""
         if hasattr(arr, "_data"):
             return CuPyArrayMock(np.zeros_like(arr._data))
         return CuPyArrayMock(np.zeros_like(arr))
 
-    def eye(self, n, **kwargs):
+    def eye(self, n, **kwargs) -> CuPyArrayMock:
+        """Mock cupy.eye returning a CuPyArrayMock identity matrix."""
         return CuPyArrayMock(np.eye(n, **kwargs))
 
-    def array(self, arr, **kwargs):
+    def array(self, arr, **kwargs) -> CuPyArrayMock:
+        """Mock cupy.array returning a CuPyArrayMock."""
         return CuPyArrayMock(np.array(arr, **kwargs))
 
-    def concatenate(self, arrays, **kwargs):
+    def concatenate(self, arrays, **kwargs) -> CuPyArrayMock:
+        """Mock cupy.concatenate returning a CuPyArrayMock."""
         numpy_arrays = []
         for arr in arrays:
             if hasattr(arr, "_data"):
@@ -223,7 +313,8 @@ class CuPyMock:
                 numpy_arrays.append(np.asarray(arr))
         return CuPyArrayMock(np.concatenate(numpy_arrays, **kwargs))
 
-    def clip(self, arr, a_min, a_max):
+    def clip(self, arr, a_min, a_max) -> CuPyArrayMock:
+        """Mock cupy.clip returning a CuPyArrayMock."""
         if hasattr(arr, "_data"):
             data = arr._data
         else:
@@ -239,17 +330,24 @@ class CuPyMock:
     # Linear algebra
     @property
     def linalg(self):
+        """Mock cupy.linalg namespace backed by numpy.linalg."""
+
         class LinAlg:
-            def solve(self, a, b):
+            """Mock of the cupy.linalg submodule."""
+
+            def solve(self, a, b) -> CuPyArrayMock:
+                """Mock linalg.solve returning a CuPyArrayMock."""
                 a_data = a._data if hasattr(a, "_data") else np.asarray(a)
                 b_data = b._data if hasattr(b, "_data") else np.asarray(b)
                 return CuPyArrayMock(np.linalg.solve(a_data, b_data))
 
-            def inv(self, a):
+            def inv(self, a) -> CuPyArrayMock:
+                """Mock linalg.inv returning a CuPyArrayMock."""
                 a_data = a._data if hasattr(a, "_data") else np.asarray(a)
                 return CuPyArrayMock(np.linalg.inv(a_data))
 
             def norm(self, a, **kwargs):
+                """Mock linalg.norm returning a scalar or CuPyArrayMock."""
                 a_data = a._data if hasattr(a, "_data") else np.asarray(a)
                 result = np.linalg.norm(a_data, **kwargs)
                 if np.isscalar(result):
@@ -259,10 +357,12 @@ class CuPyMock:
         return LinAlg()
 
     def __getattr__(self, name):
+        """Dispatch unknown attributes to numpy functions or nested mocks."""
         numpy_func = getattr(np, name, None)
         if numpy_func is not None:
 
             def wrapped_func(*args, **kwargs):
+                """Unwrap mock-array args, call numpy, and re-wrap the result."""
                 new_args = []
                 for arg in args:
                     if hasattr(arg, "_data"):
@@ -287,11 +387,11 @@ class CuPyMock:
 # ============================================================================
 
 
-def test_module_availability(module_name):
+def test_module_availability(module_name) -> bool:
     """Test if a module is available and can be imported."""
     try:
-        __import__(module_name)
-        return True
+        module = __import__(module_name, fromlist=["*"])
+        return isinstance(module, types.ModuleType)
     except ImportError:
         return False
     except Exception as e:
@@ -299,7 +399,7 @@ def test_module_availability(module_name):
         return False
 
 
-def create_smart_mock(module_name):
+def create_smart_mock(module_name) -> Any:
     """Create appropriate mocks for unavailable modules."""
 
     if module_name == "cupy":
@@ -307,13 +407,52 @@ def create_smart_mock(module_name):
 
     elif module_name == "torch":
         torch_mock = MockModule("torch")
-        torch_mock.tensor = lambda *args, **kwargs: Mock()
-        torch_mock.zeros = lambda *args, **kwargs: Mock()
-        torch_mock.ones = lambda *args, **kwargs: Mock()
-        torch_mock.eye = lambda *args, **kwargs: Mock()
+
+        # torch.Tensor must be a class so that issubclass(x, torch.Tensor)
+        # works the way production code expects. The previous Mock() based
+        # placeholders made isinstance/issubclass either return True for
+        # everything (false positives) or raise TypeError (false skips).
+        class _MockTensor:
+            """Minimal torch.Tensor stand-in backed by a numpy array."""
+
+            def __init__(self, data=None, *args, **kwargs) -> None:
+                """Initialize the mock tensor from optional array-like data."""
+                self._data = np.asarray(data) if data is not None else np.array([])
+                self.shape = self._data.shape
+                self.dtype = self._data.dtype
+                self.device = "cpu"
+                self.requires_grad = False
+
+            def numpy(self) -> np.ndarray:
+                """Return the backing numpy array."""
+                return self._data
+
+            def cpu(self) -> "_MockTensor":
+                """Return self; mock tensors are always on CPU."""
+                return self
+
+            def detach(self) -> "_MockTensor":
+                """Return self; mock tensors carry no autograd state."""
+                return self
+
+            def __array__(self) -> np.ndarray:
+                """Expose the backing numpy array for the array protocol."""
+                return self._data
+
+            def __repr__(self) -> str:
+                """Return a debug representation of the mock tensor."""
+                return f"MockTensor({self._data!r})"
+
+        torch_mock.Tensor = _MockTensor
+        torch_mock.tensor = lambda *args, **kwargs: _MockTensor(*args, **kwargs)
+        torch_mock.zeros = lambda *args, **kwargs: _MockTensor(
+            np.zeros(*args, **kwargs)
+        )
+        torch_mock.ones = lambda *args, **kwargs: _MockTensor(np.ones(*args, **kwargs))
+        torch_mock.eye = lambda n, *args, **kwargs: _MockTensor(np.eye(n))
         torch_mock.cuda = MockModule("torch.cuda")
         torch_mock.cuda.is_available = lambda: False
-        torch_mock.device = lambda x: Mock()
+        torch_mock.device = lambda x: x
         torch_mock.float32 = np.float32
         torch_mock.float64 = np.float64
         return torch_mock
@@ -357,12 +496,16 @@ def create_smart_mock(module_name):
         sklearn_mock.cluster = MockModule("sklearn.cluster")
 
         class MockDBSCAN:
-            def __init__(self, eps=0.5, min_samples=5):
+            """Mock of sklearn.cluster.DBSCAN producing deterministic labels."""
+
+            def __init__(self, eps=0.5, min_samples=5) -> None:
+                """Store DBSCAN hyperparameters and clear fitted labels."""
                 self.eps = eps
                 self.min_samples = min_samples
                 self.labels_ = None
 
-            def fit(self, X):
+            def fit(self, X) -> "MockDBSCAN":
+                """Assign synthetic cluster labels and return self."""
                 if len(X) == 0:
                     self.labels_ = np.array([])
                 else:
@@ -384,12 +527,20 @@ def create_smart_mock(module_name):
         ultralytics_mock = MockModule("ultralytics")
 
         class MockYOLO:
-            def __init__(self, model_path):
+            """Mock of the ultralytics YOLO detector returning fixed boxes."""
+
+            def __init__(self, model_path) -> None:
+                """Store the model path for the mock detector."""
                 self.model_path = model_path
 
-            def __call__(self, image, conf=0.3):
+            def __call__(self, image, conf=0.3) -> list:
+                """Return a list with a single mock detection result."""
+
                 class MockBoxes:
-                    def __init__(self):
+                    """Mock detection boxes with two synthetic objects."""
+
+                    def __init__(self) -> None:
+                        """Build two synthetic bounding boxes scaled to the image."""
                         # Generate some reasonable bounding boxes
                         h, w = (
                             image.shape[:2] if hasattr(image, "shape") else (480, 640)
@@ -403,15 +554,20 @@ def create_smart_mock(module_name):
                             )
                         ]
 
-                    def __len__(self):
+                    def __len__(self) -> int:
+                        """Number of mock detection boxes."""
                         return len(self.xyxy[0])
 
                     def __iter__(self):
+                        """Yield each box wrapped as a mock detection."""
                         for box in self.xyxy[0]:
                             yield Mock(xyxy=[box])
 
                 class MockResults:
-                    def __init__(self):
+                    """Mock YOLO result wrapping a set of detection boxes."""
+
+                    def __init__(self) -> None:
+                        """Attach the mock detection boxes to this result."""
                         self.boxes = MockBoxes()
 
                 return [MockResults()]
@@ -423,18 +579,25 @@ def create_smart_mock(module_name):
         numba_mock = MockModule("numba")
 
         def jit(*args, **kwargs):
+            """Mock numba.jit that returns the function unchanged."""
+
             def decorator(func):
+                """Return the wrapped function untouched."""
                 return func
 
             return decorator if args else jit
 
         def njit(*args, **kwargs):
+            """Mock numba.njit that returns the function unchanged."""
+
             def decorator(func):
+                """Return the wrapped function untouched."""
                 return func
 
             return decorator if args else njit
 
-        def prange(*args, **kwargs):
+        def prange(*args, **kwargs) -> range:
+            """Mock numba.prange delegating to the builtin range."""
             return range(*args, **kwargs)
 
         numba_mock.jit = jit
@@ -459,7 +622,8 @@ def create_smart_mock(module_name):
         pb_mock.getNumJoints = lambda robot_id: 6
         pb_mock.stepSimulation = lambda: None
 
-        def getCameraImage(width, height, **kwargs):
+        def getCameraImage(width, height, **kwargs) -> tuple:
+            """Mock pybullet.getCameraImage returning random RGBA/depth/seg."""
             rgba = np.random.randint(0, 255, (height, width, 4), dtype=np.uint8)
             depth = np.random.uniform(0.1, 5.0, (height, width))
             segmentation = np.zeros((height, width), dtype=np.int32)
@@ -482,32 +646,6 @@ def create_smart_mock(module_name):
 
         return pb_mock
 
-    elif module_name in ["urchin", "urchin.urdf"]:
-        urchin_mock = MockModule("urchin")
-
-        class MockURDF:
-            def __init__(self):
-                self.links = []
-                self.joints = []
-                self.actuated_joints = []
-
-            @staticmethod
-            def load(urdf_path):
-                return MockURDF()
-
-            def show(self):
-                pass
-
-            def animate(self, *args, **kwargs):
-                pass
-
-            def link_fk(self, cfg=None):
-                return {}
-
-        urchin_mock.urdf = MockModule("urchin.urdf")
-        urchin_mock.urdf.URDF = MockURDF
-        return urchin_mock
-
     else:
         return MockModule(module_name)
 
@@ -516,14 +654,23 @@ def create_smart_mock(module_name):
 # Intelligent Mocking Setup
 # ============================================================================
 
-# GPU-only modules that should always be mocked
+# GPU-only modules are mocked only in CPU-only test runs. On NVIDIA hosts the
+# real CuPy/Numba CUDA paths are allowed to load and decide availability.
+GPU_ONLY_MOCKS = (
+    [
+        "cupy",
+        "numba.cuda",
+        "numba.cuda.random",
+    ]
+    if FORCE_CPU_ONLY
+    else []
+)
+
 ALWAYS_MOCK = [
-    "cupy",
+    *GPU_ONLY_MOCKS,
     "pycuda",
     "pycuda.driver",
     "pycuda.autoinit",
-    "numba.cuda",
-    "numba.cuda.random",
     "torchvision",
     "torchvision.ops",
     "torchvision.transforms",
@@ -533,8 +680,6 @@ ALWAYS_MOCK = [
 # Simulation/complex modules that are problematic in CI
 MOCK_IN_CI = [
     "pybullet",
-    "urchin",
-    "urchin.urdf",
 ]
 
 # CPU libraries that should be tested when available
@@ -570,8 +715,33 @@ for module_name in TEST_WHEN_AVAILABLE:
 # Dependency Availability Checks for Test Markers
 # ============================================================================
 
-CUDA_AVAILABLE = False  # Always false due to mocking
-CUPY_AVAILABLE = False  # Always false due to mocking
+
+def _numba_cuda_available() -> bool:
+    """Return True only when Numba can see a usable CUDA runtime."""
+    if FORCE_CPU_ONLY:
+        return False
+    try:
+        from numba import cuda
+
+        return bool(cuda.is_available())
+    except Exception:
+        return False
+
+
+def _cupy_runtime_available() -> bool:
+    """Return True only when CuPy can see at least one CUDA device."""
+    if FORCE_CPU_ONLY:
+        return False
+    try:
+        import cupy as cp
+
+        return cp.cuda.runtime.getDeviceCount() > 0
+    except Exception:
+        return False
+
+
+CUDA_AVAILABLE = _numba_cuda_available()
+CUPY_AVAILABLE = _cupy_runtime_available()
 OPENCV_AVAILABLE = test_module_availability("cv2")
 PYBULLET_AVAILABLE = test_module_availability("pybullet") and not in_ci
 YOLO_AVAILABLE = test_module_availability("ultralytics")
@@ -579,7 +749,9 @@ SKLEARN_AVAILABLE = test_module_availability("sklearn")
 TORCH_AVAILABLE = test_module_availability("torch")
 
 # Environment flags from CI
-SKIP_CUDA_TESTS = True  # Always skip due to mocking
+SKIP_CUDA_TESTS = (
+    os.environ.get("SKIP_CUDA_TESTS", "false").lower() == "true" or not CUDA_AVAILABLE
+)
 SKIP_VISION_TESTS = os.environ.get("SKIP_VISION_TESTS", "false").lower() == "true"
 SKIP_SIMULATION_TESTS = (
     os.environ.get("SKIP_SIMULATION_TESTS", "false").lower() == "true" or in_ci
@@ -590,12 +762,12 @@ SKIP_SIMULATION_TESTS = (
 # ============================================================================
 
 
-def pytest_addoption(parser):
+def pytest_addoption(parser) -> None:
     """Add custom command line options."""
     parser.addoption(
         "--skip-cuda",
         action="store_true",
-        default=True,  # Always skip CUDA
+        default=SKIP_CUDA_TESTS,
         help="Skip tests that require CUDA/GPU",
     )
     parser.addoption(
@@ -615,7 +787,7 @@ def pytest_addoption(parser):
     )
 
 
-def pytest_configure(config):
+def pytest_configure(config) -> None:
     """Configure pytest markers and environment."""
     # Register custom markers
     config.addinivalue_line("markers", "cuda: mark test as requiring CUDA")
@@ -640,10 +812,10 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "singularity: mark test as singularity-related")
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config, items) -> None:
     """Modify test collection based on available dependencies and options."""
     # Skip markers
-    skip_cuda = pytest.mark.skip(reason="CUDA not available (always skipped in tests)")
+    skip_cuda = pytest.mark.skip(reason="CUDA not available or skipped")
     skip_vision = pytest.mark.skip(
         reason="Vision dependencies not available or skipped"
     )
@@ -653,8 +825,10 @@ def pytest_collection_modifyitems(config, items):
     skip_slow = pytest.mark.skip(reason="Slow tests skipped (use --run-slow to run)")
 
     for item in items:
-        # Skip CUDA tests (always)
-        if "cuda" in item.keywords or "gpu" in item.keywords:
+        # Skip CUDA tests only when CUDA is unavailable or explicitly skipped.
+        if ("cuda" in item.keywords or "gpu" in item.keywords) and (
+            not CUDA_AVAILABLE or config.getoption("--skip-cuda")
+        ):
             item.add_marker(skip_cuda)
 
         # Skip vision tests if not available
@@ -680,13 +854,13 @@ def pytest_collection_modifyitems(config, items):
 
 
 @pytest.fixture
-def tolerance():
+def tolerance() -> float:
     """Default numerical tolerance for tests."""
     return 1e-6
 
 
 @pytest.fixture
-def simple_robot_config():
+def simple_robot_config() -> dict:
     """Create a simple robot configuration for testing."""
     num_joints = 6
 
@@ -730,13 +904,13 @@ def simple_robot_config():
 
 
 @pytest.fixture
-def sample_joint_angles():
+def sample_joint_angles() -> np.ndarray:
     """Sample joint angles for testing."""
     return np.array([0.1, 0.2, -0.3, 0.1, 0.2, 0.1], dtype=np.float32)
 
 
 @pytest.fixture
-def planar_2link_robot():
+def planar_2link_robot() -> dict:
     """Create a simple 2-link planar robot for IK convergence testing."""
     # Simple 2-link planar robot configuration
     M_list = np.array(
@@ -763,7 +937,7 @@ def planar_2link_robot():
 
 
 @pytest.fixture
-def ik_test_angles():
+def ik_test_angles() -> list:
     """Standard test angles for IK convergence testing."""
     return [
         [0.0, 0.0],
@@ -778,7 +952,7 @@ def ik_test_angles():
 
 
 @pytest.fixture
-def ik_default_params():
+def ik_default_params() -> dict:
     """
     Optimal IK parameters for 2-DOF planar robots.
 
@@ -804,7 +978,7 @@ def ik_default_params():
 
 
 @pytest.fixture(autouse=True)
-def setup_test_environment():
+def setup_test_environment() -> Iterator[None]:
     """Set up the test environment for each test."""
     # Set random seed for reproducibility
     np.random.seed(42)
@@ -824,7 +998,7 @@ def setup_test_environment():
 # ============================================================================
 
 
-def assert_array_almost_equal(actual, expected, tolerance=1e-6, msg=""):
+def assert_array_almost_equal(actual, expected, tolerance=1e-6, msg="") -> None:
     """Assert that two arrays are almost equal within tolerance."""
     actual = np.asarray(actual)
     expected = np.asarray(expected)
@@ -842,11 +1016,11 @@ def assert_array_almost_equal(actual, expected, tolerance=1e-6, msg=""):
     )
 
 
-def requires_dependency(dependency_name):
+def requires_dependency(dependency_name) -> Any:
     """Decorator to skip tests if dependency is not available."""
     availability_map = {
-        "cuda": False,  # Always false
-        "cupy": False,  # Always false
+        "cuda": CUDA_AVAILABLE and not SKIP_CUDA_TESTS,
+        "cupy": CUPY_AVAILABLE and not SKIP_CUDA_TESTS,
         "opencv": OPENCV_AVAILABLE and not SKIP_VISION_TESTS,
         "pybullet": PYBULLET_AVAILABLE and not SKIP_SIMULATION_TESTS,
         "yolo": YOLO_AVAILABLE and not SKIP_VISION_TESTS,
@@ -861,7 +1035,7 @@ def requires_dependency(dependency_name):
     )
 
 
-def run_ik_convergence_test(robot, target_angles, initial_guess, params=None):
+def run_ik_convergence_test(robot, target_angles, initial_guess, params=None) -> dict:
     """
     Helper function to run IK convergence tests with standard parameters.
 
@@ -906,7 +1080,7 @@ def run_ik_convergence_test(robot, target_angles, initial_guess, params=None):
     }
 
 
-def print_convergence_summary(results_list):
+def print_convergence_summary(results_list) -> float:
     """
     Print a formatted summary of convergence test results.
 
@@ -936,7 +1110,7 @@ def print_convergence_summary(results_list):
 # ============================================================================
 
 
-def pytest_sessionstart(session):
+def pytest_sessionstart(session) -> None:
     """Report test session start with environment info."""
     print("\n" + "=" * 60)
     print("ManipulaPy Test Suite")
@@ -946,8 +1120,8 @@ def pytest_sessionstart(session):
 
     # Dependency status
     deps = [
-        ("CUDA/Numba", False),  # Always false due to mocking
-        ("CuPy", False),  # Always false due to mocking
+        ("CUDA/Numba", CUDA_AVAILABLE and not SKIP_CUDA_TESTS),
+        ("CuPy", CUPY_AVAILABLE and not SKIP_CUDA_TESTS),
         ("OpenCV", OPENCV_AVAILABLE and not SKIP_VISION_TESTS),
         ("PyBullet", PYBULLET_AVAILABLE and not SKIP_SIMULATION_TESTS),
         ("YOLO", YOLO_AVAILABLE and not SKIP_VISION_TESTS),
@@ -993,8 +1167,8 @@ Simulation Tests:
   - test_sim.py                    : PyBullet simulation tests
   - test_urdf_processor.py         : URDF file processing
 
-GPU/CUDA Tests (always skipped in test environment):
-  - test_cuda_kernels.py           : GPU kernel tests (skipped)
+GPU/CUDA Tests:
+  - test_cuda_kernels.py           : CUDA kernels and CPU fallback tests
   - test_cuda_kernels_cpu.py       : CPU fallback for CUDA kernels
 
 Smoke Tests:
@@ -1012,7 +1186,7 @@ Total Test Count:
   - All tests: 150+ tests across all modules
 
 Test Markers:
-  @pytest.mark.cuda           : Requires CUDA/GPU (always skipped)
+  @pytest.mark.cuda           : Requires CUDA/GPU
   @pytest.mark.gpu            : Alias for cuda marker
   @pytest.mark.vision         : Requires OpenCV/vision dependencies
   @pytest.mark.simulation     : Requires PyBullet

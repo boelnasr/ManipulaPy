@@ -18,6 +18,7 @@ Welcome to ManipulaPy! This guide will get you up and running with modern roboti
 .. contents:: **What you'll learn**
    :local:
    :depth: 2
+   :backlinks: none
 
 Installation
 ------------
@@ -29,6 +30,15 @@ The fastest way to get started:
 .. code-block:: bash
 
    pip install manipulapy
+
+.. note::
+   As of v1.3.2, the default install is intentionally lightweight — it
+   pulls only the core numerical/plotting stack (NumPy, SciPy, matplotlib,
+   numba, pillow). Heavier or platform-specific dependencies such as
+   ``pybullet``, ``opencv-python``, ``torch``, ``scikit-learn``, and ``trimesh``
+   now live in optional extras (see below) so that the base
+   install succeeds on minimal images and platforms without prebuilt wheels
+   (e.g., Apple Silicon).
 
 🚀 **Recommended Install (with GPU acceleration)**
 
@@ -52,17 +62,23 @@ If you want to contribute or modify the library:
 
 .. code-block:: bash
 
-   git clone https://github.com/yourusername/ManipulaPy.git
+   git clone https://github.com/boelnasr/ManipulaPy.git
    cd ManipulaPy
    pip install -e .[dev]
 
 .. note::
    **System Requirements:**
-   
-   - Python 3.8 or higher
-   - NumPy, SciPy (automatically installed)
-   - Optional: CUDA for GPU acceleration
-   - Optional: PyBullet for simulation
+
+   - Python 3.9 or higher
+   - Core (auto-installed): NumPy, SciPy, matplotlib, numba, pillow
+   - Optional extras (install on demand):
+
+     - ``[simulation]`` — PyBullet physics simulation
+     - ``[urdf]`` — trimesh-based URDF mesh loading
+     - ``[vision]`` — OpenCV, Ultralytics/YOLO, PyTorch
+     - ``[ml]`` — PyTorch + scikit-learn for learning-based components
+     - ``[cuda]`` — CuPy (CUDA 11.x) for GPU acceleration
+     - ``[all]`` — everything above
 
 Verify Your Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -180,7 +196,13 @@ Your First Simulation
 
 🎬 **PyBullet Physics Simulation**
 
-Note that simulations require a CUDA installation, and a GPU.
+.. note::
+   Simulation runs on CPU via PyBullet — no GPU or CUDA is required.
+   You do, however, need the ``[simulation]`` extra:
+
+   .. code-block:: bash
+
+      pip install "ManipulaPy[simulation]"
 
 Bring your robot to life with realistic physics:
 
@@ -213,7 +235,9 @@ Your First Control System
 
 🎛️ **Intelligent Robot Control**
 
-Note that robot control requires a CUDA installation, and a GPU.
+.. note::
+   The control module is pure NumPy/SciPy — it ships with the default
+   install and does **not** require CUDA, a GPU, or any extras.
 
 Control your robot with advanced algorithms:
 
@@ -256,6 +280,15 @@ Your First Vision System
 ------------------------
 
 👁️ **Computer Vision & Perception**
+
+.. note::
+   The vision and perception modules pull in OpenCV, Ultralytics/YOLO,
+   and PyTorch, which are *not* part of the default install. Install the
+   ``[vision]`` extra first:
+
+   .. code-block:: bash
+
+      pip install "ManipulaPy[vision]"
 
 Add eyes to your robot:
 
@@ -407,79 +440,16 @@ Common Issues & Solutions
 📞 **Need Help?**
 
 - 📖 Check the :doc:`../api/index` for detailed function documentation
-- 🐛 Report bugs on `GitHub Issues <https://github.com/yourusername/ManipulaPy/issues>`_
+- 🐛 Report bugs on `GitHub Issues <https://github.com/boelnasr/ManipulaPy/issues>`_
 - 💬 Join our community discussions
 - 📧 Contact the maintainers for support
 
-.. raw:: html
+.. tip::
+   Curious what changed in this release? See the
+   `v1.3.2 changelog <https://github.com/boelnasr/ManipulaPy/blob/main/CHANGELOG.md>`_
+   for highlights — the lightweight default install, the new ``[simulation]``,
+   ``[urdf]``, ``[vision]``, and ``[ml]`` extras, plus control/sim/URDF bug fixes.
 
-   <style>
-   .getting-started-hero {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 2rem;
-      border-radius: 10px;
-      margin: 2rem 0;
-      text-align: center;
-   }
-   .getting-started-hero h2 {
-      margin-top: 0;
-      font-size: 2rem;
-   }
-   .next-steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin: 2rem 0;
-   }
-   .step-category {
-      border: 1px solid #e1e4e8;
-      border-radius: 8px;
-      padding: 1rem;
-      background: #f8f9fa;
-   }
-   .step-category h4 {
-      margin-top: 0;
-      color: #0366d6;
-   }
-   .step-category ul {
-      margin: 0;
-      padding-left: 1rem;
-   }
-   .step-category li {
-      margin: 0.5rem 0;
-   }
-   .pro-tips {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
-   }
-   .tip {
-      color: white;
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-   }
-
-   .tip:nth-child(1) {
-      background: #2563eb; /* Strong blue */
-   }
-
-   .tip:nth-child(2) {
-      background: #dc2626; /* Strong red */
-   }
-
-   .tip:nth-child(3) {
-      background: #059669; /* Strong green */
-   }
-
-   .tip:nth-child(4) {
-      background: #7c3aed; /* Strong purple */
-   }
-   .tip-icon {
-      font-size: 1.5rem;
-      display: block;
-      margin-bottom: 0.5rem;
-   }
-   </style>
+.. Styles for .getting-started-hero, .next-steps, .step-category, .pro-tips,
+   and .tip live in docs/source/_static/custom.css so they adapt to Furo's
+   light/dark theme via CSS variables.

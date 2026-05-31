@@ -29,7 +29,7 @@ FIXTURES_DIR = Path(__file__).parent / "urdf_fixtures"
 class TestURDFLoading:
     """Test URDF loading and basic parsing."""
 
-    def test_load_simple_arm(self):
+    def test_load_simple_arm(self) -> None:
         """Test loading a simple 2-DOF arm."""
         from ManipulaPy.urdf import URDF
 
@@ -40,7 +40,7 @@ class TestURDFLoading:
         assert len(robot.joints) == 2  # joint1, joint2
         assert robot.num_dofs == 2
 
-    def test_link_properties(self):
+    def test_link_properties(self) -> None:
         """Test link properties are parsed correctly."""
         from ManipulaPy.urdf import URDF
 
@@ -54,7 +54,7 @@ class TestURDFLoading:
         assert len(base.visuals) > 0
         assert len(base.collisions) > 0
 
-    def test_joint_properties(self):
+    def test_joint_properties(self) -> None:
         """Test joint properties are parsed correctly."""
         from ManipulaPy.urdf import URDF, JointType
 
@@ -69,7 +69,7 @@ class TestURDFLoading:
         assert joint1.limit is not None
         assert joint1.limit.lower < joint1.limit.upper
 
-    def test_joint_limits(self):
+    def test_joint_limits(self) -> None:
         """Test joint limits extraction."""
         from ManipulaPy.urdf import URDF
 
@@ -84,7 +84,7 @@ class TestURDFLoading:
 class TestJointTypes:
     """Test different joint type handling."""
 
-    def test_revolute_joint(self):
+    def test_revolute_joint(self) -> None:
         """Test revolute joint motion."""
         from ManipulaPy.urdf import URDF
 
@@ -101,7 +101,7 @@ class TestJointTypes:
         # Test the full transform (rotation + translation)
         assert not np.allclose(fk0["link2"], fk1["link2"])
 
-    def test_continuous_joint(self):
+    def test_continuous_joint(self) -> None:
         """Test continuous joint (no limits)."""
         from ManipulaPy.urdf import URDF, JointType
 
@@ -115,7 +115,7 @@ class TestJointTypes:
         cfg = np.array([10 * np.pi, -10 * np.pi])
         fk = robot.link_fk(cfg)  # Should not raise
 
-    def test_prismatic_joint(self):
+    def test_prismatic_joint(self) -> None:
         """Test prismatic joint motion."""
         from ManipulaPy.urdf import URDF, JointType
 
@@ -138,7 +138,7 @@ class TestJointTypes:
             fk1["x_slide"][:3, 3] - fk0["x_slide"][:3, 3], [0.05, 0, 0], atol=1e-10
         )
 
-    def test_fixed_joints_ignored(self):
+    def test_fixed_joints_ignored(self) -> None:
         """Test that fixed joints don't add DOFs."""
         from ManipulaPy.urdf import URDF
 
@@ -150,7 +150,7 @@ class TestJointTypes:
 class TestMimicJoints:
     """Test mimic joint handling."""
 
-    def test_mimic_joint_parsing(self):
+    def test_mimic_joint_parsing(self) -> None:
         """Test mimic joint properties are parsed."""
         from ManipulaPy.urdf import URDF
 
@@ -162,7 +162,7 @@ class TestMimicJoints:
         assert right_finger.mimic.multiplier == -1.0
         assert right_finger.mimic.offset == 0.0
 
-    def test_mimic_joint_fk(self):
+    def test_mimic_joint_fk(self) -> None:
         """Test mimic joints follow master joint."""
         from ManipulaPy.urdf import URDF
 
@@ -187,7 +187,7 @@ class TestMimicJoints:
 class TestTransmissions:
     """Test transmission parsing."""
 
-    def test_transmission_parsing(self):
+    def test_transmission_parsing(self) -> None:
         """Test transmission elements are parsed."""
         from ManipulaPy.urdf import URDF
 
@@ -206,7 +206,7 @@ class TestTransmissions:
 class TestGeometry:
     """Test geometry parsing."""
 
-    def test_primitive_geometry(self):
+    def test_primitive_geometry(self) -> None:
         """Test all primitive geometry types."""
         from ManipulaPy.urdf import URDF, Box, Cylinder, Sphere
 
@@ -229,7 +229,7 @@ class TestGeometry:
 class TestValidation:
     """Test URDF validation."""
 
-    def test_cycle_detection(self):
+    def test_cycle_detection(self) -> None:
         """Test cyclic URDF is detected at load time."""
         import pytest
 
@@ -239,7 +239,7 @@ class TestValidation:
         with pytest.raises(ValueError, match="cyclic|root"):
             URDF.load(FIXTURES_DIR / "cyclic.urdf")
 
-    def test_multi_root_handling(self):
+    def test_multi_root_handling(self) -> None:
         """Test multiple roots are handled (all roots included in FK)."""
         from ManipulaPy.urdf import URDF
 
@@ -253,7 +253,7 @@ class TestValidation:
         for root in robot.root_links:
             np.testing.assert_allclose(fk[root.name], np.eye(4), atol=1e-10)
 
-    def test_valid_urdf_passes(self):
+    def test_valid_urdf_passes(self) -> None:
         """Test valid URDF passes validation."""
         from ManipulaPy.urdf import URDF, validate_urdf
 
@@ -266,7 +266,7 @@ class TestValidation:
 class TestForwardKinematics:
     """Test forward kinematics computation."""
 
-    def test_fk_at_zero_config(self):
+    def test_fk_at_zero_config(self) -> None:
         """Test FK at zero configuration."""
         from ManipulaPy.urdf import URDF
 
@@ -283,7 +283,7 @@ class TestForwardKinematics:
             np.testing.assert_allclose(R @ R.T, np.eye(3), atol=1e-10)
             np.testing.assert_allclose(np.linalg.det(R), 1.0, atol=1e-10)
 
-    def test_fk_consistency(self):
+    def test_fk_consistency(self) -> None:
         """Test FK is consistent with joint chain."""
         from ManipulaPy.urdf import URDF
 
@@ -295,7 +295,7 @@ class TestForwardKinematics:
         # Child link should be reachable from parent through joint
         # This is a sanity check that FK follows kinematic chain
 
-    def test_batch_fk(self):
+    def test_batch_fk(self) -> None:
         """Test batch forward kinematics."""
         from ManipulaPy.urdf import URDF
 
@@ -320,7 +320,7 @@ class TestForwardKinematics:
 class TestScrewAxes:
     """Test screw axis extraction."""
 
-    def test_extract_screw_axes(self):
+    def test_extract_screw_axes(self) -> None:
         """Test screw axis extraction for manipulator conversion."""
         from ManipulaPy.urdf import URDF
 
@@ -339,7 +339,7 @@ class TestScrewAxes:
         assert screws["B_list"].shape == (6, robot.num_dofs)
         assert len(screws["G_list"]) == robot.num_dofs
 
-    def test_m_matrix_valid(self):
+    def test_m_matrix_valid(self) -> None:
         """Test M matrix is valid SE(3)."""
         from ManipulaPy.urdf import URDF
 
@@ -354,7 +354,7 @@ class TestScrewAxes:
         np.testing.assert_allclose(np.linalg.det(R), 1.0, atol=1e-10)
         np.testing.assert_allclose(M[3, :], [0, 0, 0, 1], atol=1e-10)
 
-    def test_tip_selection_for_m(self):
+    def test_tip_selection_for_m(self) -> None:
         """Test custom tip selection when extracting screw axes."""
         from ManipulaPy.urdf import URDF
 
@@ -371,7 +371,7 @@ class TestScrewAxes:
 class TestScene:
     """Test multi-robot scene support."""
 
-    def test_scene_creation(self):
+    def test_scene_creation(self) -> None:
         """Test creating a scene with multiple robots."""
         from ManipulaPy.urdf import URDF, Scene
 
@@ -386,7 +386,7 @@ class TestScene:
         assert "arm1" in scene.robot_names
         assert "arm2" in scene.robot_names
 
-    def test_world_frame_fk(self):
+    def test_world_frame_fk(self) -> None:
         """Test world-frame FK in scene."""
         from ManipulaPy.urdf import URDF, Scene
 
@@ -406,7 +406,7 @@ class TestScene:
 class TestModifiers:
     """Test URDF modification functionality."""
 
-    def test_modifier_creates_copy(self):
+    def test_modifier_creates_copy(self) -> None:
         """Test modifier creates deep copy of URDF."""
         from ManipulaPy.urdf import URDF, URDFModifier
 
@@ -422,7 +422,7 @@ class TestModifiers:
         # Modified should be changed
         assert modifier.urdf._links["link1"].inertial.mass == 100.0
 
-    def test_set_joint_limits(self):
+    def test_set_joint_limits(self) -> None:
         """Test modifying joint limits."""
         from ManipulaPy.urdf import URDF, URDFModifier
 
@@ -435,7 +435,7 @@ class TestModifiers:
         assert modified._joints["joint1"].limit.lower == -1.0
         assert modified._joints["joint1"].limit.upper == 1.0
 
-    def test_add_payload(self):
+    def test_add_payload(self) -> None:
         """Test adding payload to link."""
         from ManipulaPy.urdf import URDF, URDFModifier
 
@@ -448,7 +448,7 @@ class TestModifiers:
         modified = modifier.urdf
         assert modified._links["link2"].inertial.mass == original_mass + 2.0
 
-    def test_scale_masses(self):
+    def test_scale_masses(self) -> None:
         """Test scaling all masses."""
         from ManipulaPy.urdf import URDF, URDFModifier
 
@@ -468,7 +468,7 @@ class TestModifiers:
             actual = modified._links[name].inertial.mass
             np.testing.assert_allclose(actual, expected, rtol=1e-10)
 
-    def test_export_to_urdf_string(self):
+    def test_export_to_urdf_string(self) -> None:
         """Test exporting modified URDF to string."""
         from ManipulaPy.urdf import URDF, URDFModifier
 
@@ -488,7 +488,7 @@ class TestModifiers:
 class TestBranchedRobot:
     """Test branched (multi-end-effector) robot handling."""
 
-    def test_branched_robot_loading(self):
+    def test_branched_robot_loading(self) -> None:
         """Test loading branched robot."""
         from ManipulaPy.urdf import URDF
 
@@ -498,7 +498,7 @@ class TestBranchedRobot:
         end_links = robot.end_links
         assert len(end_links) >= 3  # left_hand, right_hand, head
 
-    def test_multiple_end_effectors(self):
+    def test_multiple_end_effectors(self) -> None:
         """Test robot has multiple end effectors detected."""
         from ManipulaPy.urdf import URDF
 

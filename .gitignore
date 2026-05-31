@@ -137,6 +137,10 @@ PLAN.md
 NOTES.md
 SCRATCH.md
 STATUS.md
+URDF_FIXES.md
+VERSIONING.md
+INDEX.md
+tasks/
 
 # =============================================================================
 # ML model weights (large binaries, downloaded on demand)
@@ -177,3 +181,34 @@ benchmark_run.log
 
 ik_new_branch/
 ik_test_branch_2/
+CLAUDE.md
+.codebuddy
+
+# Local-only GIF recorder scripts — keep on disk for re-runs, but don't
+# ship them in the public repo. The generated GIFs in
+# docs/source/_static/gifs/ are tracked; the recorders are the user's
+# personal tooling.
+scripts/record_readme_gifs.py
+scripts/record_robot_gifs.py
+
+# Local tooling / editor workspaces
+.gstack/
+.obsidian/
+
+# Sphinx build log captured by `make ... | tee build.log`
+docs/build.log
+
+# Debug plots emitted when running the control examples
+*_results.png
+*_comparison.png
+
+# Timestamped example run outputs (perception/simulation demos regenerate these
+# every run, e.g. 20260530_135344_fk_forward_kinematics_workspace.png)
+Examples/**/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_*.png
+
+# Per-run example output directories created by the demos
+Examples/**/*_demo_outputs/
+
+# Generated per-run example reports/logs
+Examples/**/*_analysis_report.txt
+Examples/**/*_demo_report.txt

@@ -4,14 +4,14 @@
 Intermediate Trajectory Planning Demo - ManipulaPy
 
 This demo showcases advanced trajectory planning capabilities including:
-- GPU-accelerated trajectory generation
+- Joint-space trajectory generation (cubic & quintic time scaling) with
+  automatic GPU/CPU dispatch (CPU fallback when CUDA is unavailable)
 - Batch trajectory processing
-- Collision-aware path planning
-- Multi-segment trajectory generation
+- Multi-segment trajectory generation through waypoints
 - Cartesian space trajectory planning
-- Optimal trajectory timing
-- Trajectory smoothing and filtering
-- Performance benchmarking and optimization
+- Trajectory timing / smoothness trade-off analysis
+- CPU vs GPU performance benchmarking
+- Collision-aware planning via the potential-field path planner
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -24,7 +24,9 @@ import logging
 from pathlib import Path
 import matplotlib
 import os
-matplotlib.use('TkAgg')
+# Respect MPLBACKEND if set (e.g. "Agg" for headless); default to a non-interactive
+# backend so the demo never requires a display.
+matplotlib.use(os.environ.get("MPLBACKEND", "Agg"))
 
 # ManipulaPy imports
 try:
@@ -58,7 +60,7 @@ class IntermediateTrajectoryDemo:
     Demonstrates advanced trajectory planning techniques for robotic manipulators.
     """
     
-    def __init__(self, use_simple_robot=False):
+    def __init__(self, use_simple_robot=False) -> None:
         """
         Initialize the trajectory planning demo.
         
@@ -72,14 +74,14 @@ class IntermediateTrajectoryDemo:
         self.setup_robot()
         self.setup_trajectory_planner()
         
-    def setup_robot(self):
+    def setup_robot(self) -> None:
         """Set up the robot model (either XArm or simple)."""
         if self.use_simple_robot:
             self.setup_simple_robot()
         else:
             self.setup_xarm_robot()
             
-    def setup_xarm_robot(self):
+    def setup_xarm_robot(self) -> None:
         """Load the built-in XArm robot from ManipulaPy data."""
         logger.info("Setting up XArm robot from built-in data...")
         
@@ -117,7 +119,7 @@ class IntermediateTrajectoryDemo:
             self.use_simple_robot = True
             self.setup_simple_robot()
             
-    def setup_simple_robot(self):
+    def setup_simple_robot(self) -> None:
         """Create a simple 3-DOF planar robot for demonstration (fallback)."""
         logger.info("Setting up simple 3-DOF planar robot as fallback...")
         
@@ -202,7 +204,7 @@ class IntermediateTrajectoryDemo:
         
         logger.info("✅ Simple robot setup complete")
         
-    def setup_trajectory_planner(self):
+    def setup_trajectory_planner(self) -> None:
         """Initialize the optimized trajectory planner."""
         logger.info("Setting up optimized trajectory planner...")
         
@@ -230,7 +232,7 @@ class IntermediateTrajectoryDemo:
             logger.error(f"Failed to initialize trajectory planner: {e}")
             raise
     
-    def get_safe_waypoints(self, num_waypoints=5):
+    def get_safe_waypoints(self, num_waypoints=5) -> np.ndarray:
         """Generate safe waypoints within joint limits."""
         num_joints = len(self.joint_limits)
         waypoints = []
@@ -254,7 +256,7 @@ class IntermediateTrajectoryDemo:
         
         return np.array(waypoints)
     
-    def demonstrate_basic_trajectory_generation(self):
+    def demonstrate_basic_trajectory_generation(self) -> None:
         """Demonstrate basic joint space trajectory generation."""
         logger.info("\n🎯 Demonstrating Basic Trajectory Generation...")
         
@@ -310,7 +312,7 @@ class IntermediateTrajectoryDemo:
         
         logger.info("✅ Basic trajectory generation demonstration complete")
         
-    def plot_trajectory_comparison(self, results, T_final):
+    def plot_trajectory_comparison(self, results, T_final) -> None:
         """Plot comparison of different trajectory generation methods."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('Trajectory Generation Comparison', fontsize=16, fontweight='bold')
@@ -391,7 +393,7 @@ class IntermediateTrajectoryDemo:
         logger.info(f"📊 Trajectory comparison plot saved as '{save_path}'")
         plt.close()
         
-    def analyze_trajectory_properties(self, results, T_final):
+    def analyze_trajectory_properties(self, results, T_final) -> None:
         """Analyze trajectory properties like smoothness and continuity."""
         logger.info("\n📊 Trajectory Analysis:")
         
@@ -427,7 +429,7 @@ class IntermediateTrajectoryDemo:
             logger.info(f"    RMS jerk: {rms_jerk:.4f} rad/s³")
             logger.info(f"    Computation time: {data['computation_time']:.4f}s")
     
-    def demonstrate_multi_segment_trajectories(self):
+    def demonstrate_multi_segment_trajectories(self) -> None:
         """Demonstrate multi-segment trajectory generation through waypoints."""
         logger.info("\n🎯 Demonstrating Multi-Segment Trajectories...")
         
@@ -477,7 +479,7 @@ class IntermediateTrajectoryDemo:
         # Analyze continuity at waypoints
         self.analyze_trajectory_continuity(segments, waypoints)
         
-    def combine_trajectory_segments(self, segments):
+    def combine_trajectory_segments(self, segments) -> dict:
         """Combine multiple trajectory segments into a single trajectory."""
         all_positions = []
         all_velocities = []
@@ -501,7 +503,7 @@ class IntermediateTrajectoryDemo:
             'accelerations': np.vstack(all_accelerations)
         }
     
-    def plot_multi_segment_trajectory(self, trajectory, waypoints, segment_time):
+    def plot_multi_segment_trajectory(self, trajectory, waypoints, segment_time) -> None:
         """Plot multi-segment trajectory with waypoint markers."""
         positions = trajectory['positions']
         velocities = trajectory['velocities']
@@ -558,7 +560,7 @@ class IntermediateTrajectoryDemo:
         logger.info(f"📊 Multi-segment trajectory plot saved as '{save_path}'")
         plt.close()
     
-    def analyze_trajectory_continuity(self, segments, waypoints):
+    def analyze_trajectory_continuity(self, segments, waypoints) -> None:
         """Analyze continuity at waypoints."""
         logger.info("\n📊 Trajectory Continuity Analysis:")
         
@@ -594,7 +596,7 @@ class IntermediateTrajectoryDemo:
             else:
                 logger.warning(f"    ⚠️ Velocity discontinuity detected")
     
-    def demonstrate_batch_trajectory_generation(self):
+    def demonstrate_batch_trajectory_generation(self) -> None:
         """Demonstrate batch processing of multiple trajectories."""
         logger.info("\n🎯 Demonstrating Batch Trajectory Generation...")
         
@@ -678,7 +680,7 @@ class IntermediateTrajectoryDemo:
         logger.info(f"  CPU calls: {stats['cpu_calls']}")
         logger.info(f"  GPU usage: {stats['gpu_usage_percent']:.1f}%")
         
-    def plot_batch_trajectories(self, batch_results, start_batch, end_batch, T_final):
+    def plot_batch_trajectories(self, batch_results, start_batch, end_batch, T_final) -> None:
         """Plot multiple trajectories from batch processing."""
         positions = batch_results['positions']
         batch_size, N, num_joints = positions.shape
@@ -764,7 +766,7 @@ class IntermediateTrajectoryDemo:
         logger.info(f"📊 Batch trajectory plot saved as '{save_path}'")
         plt.close()
     
-    def demonstrate_cartesian_trajectory_planning(self):
+    def demonstrate_cartesian_trajectory_planning(self) -> None:
         """Demonstrate Cartesian space trajectory planning."""
         logger.info("\n🎯 Demonstrating Cartesian Trajectory Planning...")
         
@@ -827,7 +829,7 @@ class IntermediateTrajectoryDemo:
         
         logger.info("✅ Cartesian trajectory planning demonstration complete")
     
-    def compare_cartesian_paths(self, cartesian_traj, joint_traj, theta_start, T_final):
+    def compare_cartesian_paths(self, cartesian_traj, joint_traj, theta_start, T_final) -> None:
         """Compare Cartesian and joint space trajectories in end-effector space."""
         # Compute end-effector positions for joint trajectory
         joint_positions = joint_traj['positions']
@@ -932,7 +934,7 @@ class IntermediateTrajectoryDemo:
         logger.info(f"  Mean error: {mean_error:.6f} m")
         logger.info(f"  RMS error: {np.sqrt(np.mean(path_error**2)):.6f} m")
     
-    def demonstrate_trajectory_optimization(self):
+    def demonstrate_trajectory_optimization(self) -> None:
         """Demonstrate trajectory optimization for minimum time and smooth motion."""
         logger.info("\n🎯 Demonstrating Trajectory Optimization...")
         
@@ -1006,7 +1008,7 @@ class IntermediateTrajectoryDemo:
         
         logger.info("✅ Trajectory optimization demonstration complete")
     
-    def analyze_trajectory_optimization(self, results):
+    def analyze_trajectory_optimization(self, results) -> None:
         """Analyze trajectory optimization results."""
         logger.info("\n📊 Trajectory Optimization Analysis:")
         
@@ -1038,7 +1040,7 @@ class IntermediateTrajectoryDemo:
             logger.info(f"    Smoothness: {result['smoothness']:.4f}")
             logger.info(f"    Computation time: {result['computation_time']:.4f}s")
     
-    def plot_trajectory_optimization(self, results):
+    def plot_trajectory_optimization(self, results) -> None:
         """Plot trajectory optimization results."""
         times = list(results.keys())
         
@@ -1127,7 +1129,7 @@ class IntermediateTrajectoryDemo:
         logger.info(f"📊 Trajectory optimization plot saved as '{save_path}'")
         plt.close()
     
-    def demonstrate_performance_benchmarking(self):
+    def demonstrate_performance_benchmarking(self) -> None:
         """Demonstrate performance benchmarking of trajectory planning algorithms."""
         logger.info("\n🎯 Demonstrating Performance Benchmarking...")
         
@@ -1155,7 +1157,7 @@ class IntermediateTrajectoryDemo:
         for case_name, result in benchmark_results.items():
             logger.info(f"  {case_name}:")
             logger.info(f"    Problem size: {result['N']} × {result['joints']}")
-            logger.info(f"    Total time: {result['total_time']:.4f}s")
+            logger.info(f"    Mean time: {result['mean_time']:.4f}s")
             logger.info(f"    Used GPU: {result['used_gpu']}")
             logger.info(f"    Trajectory shape: {result['trajectory_shape']}")
             
@@ -1177,11 +1179,10 @@ class IntermediateTrajectoryDemo:
         
         logger.info("✅ Performance benchmarking demonstration complete")
     
-    def plot_performance_benchmark(self, results):
+    def plot_performance_benchmark(self, results) -> None:
         """Plot performance benchmark results."""
         case_names = list(results.keys())
-        total_times = [results[name]['total_time'] for name in case_names]
-        problem_sizes = [results[name]['N'] * results[name]['joints'] for name in case_names]
+        total_times = [results[name]['mean_time'] for name in case_names]
         gpu_usage = [results[name]['used_gpu'] for name in case_names]
         
         fig, axes = plt.subplots(1, 2, figsize=(15, 6))
@@ -1226,7 +1227,7 @@ class IntermediateTrajectoryDemo:
         logger.info(f"📊 Performance benchmark plot saved as '{save_path}'")
         plt.close()
     
-    def benchmark_batch_processing(self):
+    def benchmark_batch_processing(self) -> None:
         """Benchmark batch processing capabilities."""
         batch_sizes = [1, 5, 10, 20]
         num_joints = len(self.joint_limits)
@@ -1291,7 +1292,7 @@ class IntermediateTrajectoryDemo:
         # Plot batch processing results
         self.plot_batch_benchmark(batch_results)
     
-    def plot_batch_benchmark(self, results):
+    def plot_batch_benchmark(self, results) -> None:
         """Plot batch processing benchmark results."""
         batch_sizes = list(results.keys())
         times = [results[bs]['time'] for bs in batch_sizes]
@@ -1330,206 +1331,129 @@ class IntermediateTrajectoryDemo:
         logger.info(f"📊 Batch benchmark plot saved as '{save_path}'")
         plt.close()
     
-    def demonstrate_trajectory_smoothing(self):
-        """Demonstrate trajectory smoothing and filtering techniques."""
-        logger.info("\n🎯 Demonstrating Trajectory Smoothing...")
-        
+    def demonstrate_collision_aware_planning(self) -> None:
+        """Demonstrate collision-aware planning via the potential-field planner.
+
+        Uses ``planner.plan_trajectory`` (ManipulaPy's potential-field path
+        planner backed by ``PotentialField`` + ``CollisionChecker``) to route a
+        joint-space path around obstacles, then compares it against the naive
+        straight-line interpolation between the same endpoints.
+        """
+        logger.info("\n🎯 Demonstrating Collision-Aware Planning...")
+
+        if self.planner.collision_checker is None or self.planner.potential_field is None:
+            logger.warning(
+                "⚠️ Collision checker / potential field unavailable for this robot; "
+                "skipping collision-aware planning."
+            )
+            return
+
         num_joints = len(self.joint_limits)
-        
-        # Generate a trajectory with some noise
+
+        # Start at home, target a modest configuration well inside the limits.
         theta_start = np.zeros(num_joints)
-        theta_end = self.get_safe_waypoints(2)[1]
-        
-        # Generate base trajectory
-        T_final = 3.0
-        N = 200  # Higher resolution for smoothing demo
-        
-        trajectory = self.planner.joint_trajectory(
-            thetastart=theta_start,
-            thetaend=theta_end,
-            Tf=T_final,
-            N=N,
-            method=5
+        theta_end = np.array([
+            (self.joint_limits[j, 0] + self.joint_limits[j, 1]) / 2
+            + (self.joint_limits[j, 1] - self.joint_limits[j, 0]) * 0.12
+            for j in range(num_joints)
+        ])
+
+        # Retune the planner's potential field for a gentle, well-behaved demo.
+        # The default repulsive gain is large enough to produce explosive
+        # corrections when an obstacle sits on the path, so use a smaller gain
+        # and a tighter influence radius for representative deflections.
+        from ManipulaPy.potential_field import PotentialField
+        self.planner.potential_field = PotentialField(
+            attractive_gain=1.0, repulsive_gain=2.0, influence_distance=0.25
         )
-        
-        # Add noise to simulate measurement errors
-        np.random.seed(42)
-        noise_level = 0.01  # 1% noise
-        noisy_positions = trajectory['positions'] + noise_level * np.random.randn(*trajectory['positions'].shape)
-        
-        # Apply different smoothing techniques
-        smoothed_results = self.apply_smoothing_techniques(noisy_positions, T_final)
-        
-        # Plot smoothing comparison
-        self.plot_smoothing_comparison(trajectory['positions'], noisy_positions, smoothed_results, T_final)
-        
-        # Analyze smoothing effectiveness
-        self.analyze_smoothing_effectiveness(trajectory['positions'], noisy_positions, smoothed_results)
-        
-        logger.info("✅ Trajectory smoothing demonstration complete")
-    
-    def apply_smoothing_techniques(self, noisy_positions, T_final):
-        """Apply various smoothing techniques to trajectory data."""
-        from scipy import signal
-        from scipy.ndimage import gaussian_filter1d
-        
-        smoothed_results = {}
-        
-        # 1. Moving average filter
-        window_size = 5
-        smoothed_results['Moving Average'] = np.array([
-            np.convolve(noisy_positions[:, j], np.ones(window_size)/window_size, mode='same')
-            for j in range(noisy_positions.shape[1])
-        ]).T
-        
-        # 2. Gaussian filter
-        sigma = 2.0
-        smoothed_results['Gaussian'] = np.array([
-            gaussian_filter1d(noisy_positions[:, j], sigma=sigma)
-            for j in range(noisy_positions.shape[1])
-        ]).T
-        
-        # 3. Butterworth low-pass filter
-        fs = noisy_positions.shape[0] / T_final  # Sampling frequency
-        cutoff = fs / 10  # Cutoff frequency
-        b, a = signal.butter(4, cutoff, btype='low', fs=fs)
-        smoothed_results['Butterworth'] = np.array([
-            signal.filtfilt(b, a, noisy_positions[:, j])
-            for j in range(noisy_positions.shape[1])
-        ]).T
-        
-        # 4. Savitzky-Golay filter
-        window_length = min(21, noisy_positions.shape[0] // 2 * 2 + 1)  # Ensure odd number
-        polyorder = 3
-        smoothed_results['Savgol'] = np.array([
-            signal.savgol_filter(noisy_positions[:, j], window_length, polyorder)
-            for j in range(noisy_positions.shape[1])
-        ]).T
-        
-        return smoothed_results
-    
-    def plot_smoothing_comparison(self, original, noisy, smoothed_results, T_final):
-        """Plot comparison of different smoothing techniques."""
-        N = original.shape[0]
-        time_history = np.linspace(0, T_final, N)
-        
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
-        fig.suptitle('Trajectory Smoothing Comparison', fontsize=16, fontweight='bold')
-        
-        # Joint 1 comparison
-        ax = axes[0, 0]
-        ax.plot(time_history, original[:, 0], 'k-', linewidth=3, label='Original', alpha=0.8)
-        ax.plot(time_history, noisy[:, 0], 'r:', linewidth=1, label='Noisy', alpha=0.6)
-        
-        colors = ['blue', 'green', 'orange', 'purple']
-        for i, (method, smoothed) in enumerate(smoothed_results.items()):
-            ax.plot(time_history, smoothed[:, 0], color=colors[i], 
-                   linewidth=2, label=method, alpha=0.8)
-        
-        ax.set_title('Joint 1 Position - Smoothing Comparison', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Position (rad)')
-        ax.legend()
+
+        # Place a joint-space obstacle just off the midpoint of the direct path so
+        # the potential field has to deflect around it (PotentialField treats
+        # obstacle points in the same space as the configuration vector).
+        midpoint = 0.5 * (theta_start + theta_end)
+        obstacle_points = [(midpoint + 0.1).tolist()]
+
+        logger.info(f"  Start configuration: {theta_start}")
+        logger.info(f"  Target configuration: {theta_end}")
+        logger.info(f"  Obstacle near midpoint: {obstacle_points[0]}")
+
+        start_time = time.time()
+        planned_path = np.array(
+            self.planner.plan_trajectory(
+                theta_start.tolist(), theta_end.tolist(), obstacle_points
+            )
+        )
+        plan_time = time.time() - start_time
+
+        # Baseline: naive straight-line interpolation (no obstacle awareness).
+        straight_line = np.linspace(theta_start, theta_end, len(planned_path))
+
+        logger.info(f"✅ Collision-aware path planned in {plan_time:.4f}s "
+                    f"({len(planned_path)} waypoints)")
+
+        # Report how far the planner deflected from the straight line and whether
+        # the endpoints remain collision-free.
+        deflection = np.linalg.norm(planned_path - straight_line, axis=1)
+        end_collision = self.planner.collision_checker.check_collision(planned_path[-1])
+
+        logger.info("\n📊 Collision-Aware Planning Analysis:")
+        logger.info(f"  Max deflection from straight line: {deflection.max():.4f} rad")
+        logger.info(f"  Mean deflection from straight line: {deflection.mean():.4f} rad")
+        logger.info(f"  Final waypoint in collision: {end_collision}")
+
+        self.plot_collision_aware_planning(
+            planned_path, straight_line, obstacle_points
+        )
+
+        logger.info("✅ Collision-aware planning demonstration complete")
+
+    def plot_collision_aware_planning(
+        self, planned_path, straight_line, obstacle_points
+    ) -> None:
+        """Plot the potential-field path against the straight-line baseline."""
+        num_waypoints, num_joints = planned_path.shape
+        waypoint_idx = np.arange(num_waypoints)
+        obstacle = np.array(obstacle_points[0])
+
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+        fig.suptitle('Collision-Aware vs Straight-Line Planning',
+                     fontsize=16, fontweight='bold')
+
+        # Per-joint trajectories for the first three joints.
+        ax = axes[0]
+        colors = ['tab:blue', 'tab:green', 'tab:orange']
+        for j in range(min(3, num_joints)):
+            ax.plot(waypoint_idx, planned_path[:, j], color=colors[j],
+                    linewidth=2, marker='o', label=f'Planned J{j+1}')
+            ax.plot(waypoint_idx, straight_line[:, j], color=colors[j],
+                    linewidth=1.5, linestyle='--', alpha=0.6,
+                    label=f'Straight J{j+1}')
+            ax.scatter([num_waypoints // 2], [obstacle[j]], color=colors[j],
+                       marker='x', s=120, zorder=5)
+
+        ax.set_title('Joint Paths (solid=planned, dashed=straight)',
+                     fontweight='bold')
+        ax.set_xlabel('Waypoint Index')
+        ax.set_ylabel('Joint Position (rad)')
+        ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3)
-        
-        # Zoomed view of a section
-        ax = axes[0, 1]
-        zoom_start, zoom_end = N//3, 2*N//3
-        zoom_time = time_history[zoom_start:zoom_end]
-        
-        ax.plot(zoom_time, original[zoom_start:zoom_end, 0], 'k-', 
-               linewidth=3, label='Original', alpha=0.8)
-        ax.plot(zoom_time, noisy[zoom_start:zoom_end, 0], 'r:', 
-               linewidth=1, label='Noisy', alpha=0.6)
-        
-        for i, (method, smoothed) in enumerate(smoothed_results.items()):
-            ax.plot(zoom_time, smoothed[zoom_start:zoom_end, 0], color=colors[i], 
-                   linewidth=2, label=method, alpha=0.8)
-        
-        ax.set_title('Zoomed View - Middle Section', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Position (rad)')
-        ax.legend()
+
+        # Per-waypoint deflection from the straight-line baseline.
+        ax = axes[1]
+        deflection = np.linalg.norm(planned_path - straight_line, axis=1)
+        ax.bar(waypoint_idx, deflection, color='purple', alpha=0.8)
+        ax.set_title('Deflection From Straight Line', fontweight='bold')
+        ax.set_xlabel('Waypoint Index')
+        ax.set_ylabel('||planned - straight|| (rad)')
         ax.grid(True, alpha=0.3)
-        
-        # Error comparison
-        ax = axes[1, 0]
-        for i, (method, smoothed) in enumerate(smoothed_results.items()):
-            error = np.linalg.norm(smoothed - original, axis=1)
-            ax.plot(time_history, error, color=colors[i], 
-                   linewidth=2, label=f'{method}', alpha=0.8)
-        
-        # Noisy error for reference
-        noisy_error = np.linalg.norm(noisy - original, axis=1)
-        ax.plot(time_history, noisy_error, 'r:', linewidth=1, label='Noisy', alpha=0.6)
-        
-        ax.set_title('Reconstruction Error vs Time', fontweight='bold')
-        ax.set_xlabel('Time (s)')
-        ax.set_ylabel('L2 Error')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        ax.set_yscale('log')
-        
-        # RMS error comparison
-        ax = axes[1, 1]
-        methods = list(smoothed_results.keys()) + ['Noisy']
-        rms_errors = []
-        
-        for method, smoothed in smoothed_results.items():
-            rms_error = np.sqrt(np.mean((smoothed - original)**2))
-            rms_errors.append(rms_error)
-        
-        # Add noisy RMS error
-        noisy_rms = np.sqrt(np.mean((noisy - original)**2))
-        rms_errors.append(noisy_rms)
-        
-        bars = ax.bar(methods, rms_errors, color=colors + ['red'], alpha=0.8)
-        ax.set_title('RMS Error Comparison', fontweight='bold')
-        ax.set_ylabel('RMS Error')
-        ax.grid(True, alpha=0.3)
-        
-        # Add error values on bars
-        for bar, error in zip(bars, rms_errors):
-            height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + height*0.01,
-                   f'{error:.4f}', ha='center', va='bottom')
-        
+
         plt.tight_layout()
-        save_path = os.path.join(self.script_dir, 'trajectory_smoothing.png')
+        save_path = os.path.join(self.script_dir, 'collision_aware_planning.png')
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        logger.info(f"📊 Trajectory smoothing plot saved as '{save_path}'")
+        logger.info(f"📊 Collision-aware planning plot saved as '{save_path}'")
         plt.close()
-    
-    def analyze_smoothing_effectiveness(self, original, noisy, smoothed_results):
-        """Analyze the effectiveness of different smoothing techniques."""
-        logger.info("\n📊 Smoothing Effectiveness Analysis:")
-        
-        # Calculate metrics for noisy data
-        noisy_rms = np.sqrt(np.mean((noisy - original)**2))
-        noisy_max = np.max(np.abs(noisy - original))
-        
-        logger.info(f"  Noisy data:")
-        logger.info(f"    RMS error: {noisy_rms:.6f}")
-        logger.info(f"    Max error: {noisy_max:.6f}")
-        
-        # Calculate metrics for each smoothing method
-        for method, smoothed in smoothed_results.items():
-            rms_error = np.sqrt(np.mean((smoothed - original)**2))
-            max_error = np.max(np.abs(smoothed - original))
-            improvement = (noisy_rms - rms_error) / noisy_rms * 100
-            
-            # Calculate smoothness (second derivative)
-            dt = 1.0 / (smoothed.shape[0] - 1)
-            second_deriv = np.diff(smoothed, n=2, axis=0) / (dt**2)
-            smoothness = np.mean(np.var(second_deriv, axis=0))
-            
-            logger.info(f"  {method}:")
-            logger.info(f"    RMS error: {rms_error:.6f}")
-            logger.info(f"    Max error: {max_error:.6f}")
-            logger.info(f"    Improvement: {improvement:.1f}%")
-            logger.info(f"    Smoothness metric: {smoothness:.6f}")
-    
-    def run_complete_demonstration(self):
+
+    def run_complete_demonstration(self) -> None:
         """Run the complete intermediate trajectory planning demonstration."""
         logger.info("🚀 Starting Intermediate Trajectory Planning Demonstration")
         logger.info("=" * 70)
@@ -1552,10 +1476,10 @@ class IntermediateTrajectoryDemo:
             
             # 6. Performance benchmarking
             self.demonstrate_performance_benchmarking()
-            
-            # 7. Trajectory smoothing
-            self.demonstrate_trajectory_smoothing()
-            
+
+            # 7. Collision-aware planning
+            self.demonstrate_collision_aware_planning()
+
             # Final summary
             self.print_demonstration_summary()
             
@@ -1566,7 +1490,7 @@ class IntermediateTrajectoryDemo:
         logger.info("🎉 Intermediate Trajectory Planning Demonstration Complete!")
         logger.info("=" * 70)
     
-    def print_demonstration_summary(self):
+    def print_demonstration_summary(self) -> None:
         """Print a summary of the demonstration results."""
         logger.info("\n📋 Demonstration Summary:")
         logger.info("  ✅ Basic trajectory generation (cubic & quintic)")
@@ -1575,7 +1499,7 @@ class IntermediateTrajectoryDemo:
         logger.info("  ✅ Cartesian space trajectory planning")
         logger.info("  ✅ Trajectory optimization analysis")
         logger.info("  ✅ Performance benchmarking")
-        logger.info("  ✅ Trajectory smoothing and filtering")
+        logger.info("  ✅ Collision-aware planning")
         
         # Get final planner statistics
         final_stats = self.planner.get_performance_stats()
@@ -1595,7 +1519,7 @@ class IntermediateTrajectoryDemo:
             'trajectory_optimization.png',
             'performance_benchmark.png',
             'batch_benchmark.png',
-            'trajectory_smoothing.png'
+            'collision_aware_planning.png'
         ]
         
         for filename in generated_files:
@@ -1606,7 +1530,7 @@ class IntermediateTrajectoryDemo:
                 logger.info(f"  ❌ {filename} (not generated)")
 
 
-def main():
+def main() -> int:
     """Main function to run the intermediate trajectory planning demonstration."""
     print("🔧 Intermediate Trajectory Planning Demo - ManipulaPy")
     print("=" * 60)

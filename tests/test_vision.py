@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 class TestVisionModule(unittest.TestCase):
     """Test the Vision module with both real and mocked dependencies."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.test_image_rgb = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
         self.test_image_depth = np.random.uniform(0.1, 5.0, (480, 640)).astype(
@@ -37,7 +37,7 @@ class TestVisionModule(unittest.TestCase):
     @patch("pybullet.readUserDebugParameter")
     def test_vision_initialization_basic(
         self, mock_read_param, mock_add_param, mock_connect
-    ):
+    ) -> None:
         """Test basic Vision initialization."""
         try:
             from ManipulaPy.vision import Vision
@@ -65,7 +65,7 @@ class TestVisionModule(unittest.TestCase):
     @patch("pybullet.readUserDebugParameter")
     def test_vision_camera_configuration(
         self, mock_read_param, mock_add_param, mock_connect
-    ):
+    ) -> None:
         """Test camera configuration setup."""
         try:
             from ManipulaPy.vision import Vision
@@ -105,13 +105,14 @@ class TestVisionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Vision module not available: {e}")
 
-    def test_vision_extrinsic_matrix_computation(self):
+    def test_vision_extrinsic_matrix_computation(self) -> None:
         """Test extrinsic matrix computation."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -140,7 +141,7 @@ class TestVisionModule(unittest.TestCase):
 
     @patch("pybullet.connect")
     @patch("pybullet.getCameraImage")
-    def test_vision_capture_image(self, mock_get_camera, mock_connect):
+    def test_vision_capture_image(self, mock_get_camera, mock_connect) -> None:
         """Test image capture functionality."""
         try:
             from ManipulaPy.vision import Vision
@@ -150,10 +151,11 @@ class TestVisionModule(unittest.TestCase):
             mock_depth = np.random.uniform(0.0, 1.0, (480, 640)).astype(np.float32)
             mock_get_camera.return_value = (None, None, mock_rgba, mock_depth, None)
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
-            ), patch("pybullet.computeViewMatrix"), patch(
-                "pybullet.computeProjectionMatrixFOV"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
+                patch("pybullet.computeViewMatrix"),
+                patch("pybullet.computeProjectionMatrixFOV"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -176,13 +178,14 @@ class TestVisionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Vision module not available: {e}")
 
-    def test_vision_obstacle_detection_no_yolo(self):
+    def test_vision_obstacle_detection_no_yolo(self) -> None:
         """Test obstacle detection when YOLO is not available."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -216,7 +219,7 @@ class TestVisionModule(unittest.TestCase):
 class TestVisionObstacleDetection(unittest.TestCase):
     """Specific tests for vision obstacle detection with proper mocking."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.test_image_rgb = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
         self.test_image_depth = np.random.uniform(0.1, 5.0, (480, 640)).astype(
@@ -227,28 +230,34 @@ class TestVisionObstacleDetection(unittest.TestCase):
         self.test_image_depth[200:280, 300:380] = 1.0  # Close obstacle
         self.test_image_depth[350:400, 150:250] = 0.8  # Closer obstacle
 
-    def test_obstacle_detection_with_mock_yolo(self):
+    def test_obstacle_detection_with_mock_yolo(self) -> None:
         """Test obstacle detection with properly mocked YOLO."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Create properly working mock YOLO
                 class FixedMockYOLO:
-                    def __init__(self, model_path):
+                    def __init__(self, model_path) -> None:
+                        """Store the mock model path."""
                         self.model_path = model_path
 
-                    def __call__(self, image, conf=0.3):
+                    def __call__(self, image, conf=0.3) -> list:
+                        """Return mock YOLO detection results with one bounding box."""
+
                         class FixedMockBox:
-                            def __init__(self):
+                            def __init__(self) -> None:
+                                """Store a single mock bounding box in xyxy format."""
                                 # Fix: xyxy should contain coordinates directly, not nested arrays
                                 self.xyxy = np.array([[160, 120, 480, 360]])
 
                         class FixedMockResults:
-                            def __init__(self):
+                            def __init__(self) -> None:
+                                """Store an iterable list of mock detection boxes."""
                                 self.boxes = [
                                     FixedMockBox()
                                 ]  # Make it a list to be iterable
@@ -307,15 +316,16 @@ class TestVisionObstacleDetection(unittest.TestCase):
         "cv2" not in sys.modules or not hasattr(sys.modules.get("cv2", None), "_name"),
         "Real OpenCV not available",
     )
-    def test_vision_with_real_opencv(self):
+    def test_vision_with_real_opencv(self) -> None:
         """Test vision functionality with real OpenCV."""
         try:
             import cv2
 
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Create stereo configuration for real OpenCV testing
@@ -374,13 +384,14 @@ class TestVisionObstacleDetection(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Real OpenCV not available: {e}")
 
-    def test_vision_error_handling(self):
+    def test_vision_error_handling(self) -> None:
         """Test error handling in vision module."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -407,7 +418,7 @@ class TestVisionObstacleDetection(unittest.TestCase):
 class TestPerceptionModule(unittest.TestCase):
     """Test the Perception module functionality."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         # Create mock vision instance
         self.mock_vision = Mock()
@@ -420,7 +431,7 @@ class TestPerceptionModule(unittest.TestCase):
             np.arange(10),  # Labels 0-9
         )
 
-    def test_perception_initialization(self):
+    def test_perception_initialization(self) -> None:
         """Test Perception module initialization."""
         try:
             from ManipulaPy.perception import Perception
@@ -438,7 +449,7 @@ class TestPerceptionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_initialization_without_vision(self):
+    def test_perception_initialization_without_vision(self) -> None:
         """Test that Perception requires vision instance."""
         try:
             from ManipulaPy.perception import Perception
@@ -451,7 +462,7 @@ class TestPerceptionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_detect_and_cluster_obstacles(self):
+    def test_perception_detect_and_cluster_obstacles(self) -> None:
         """Test obstacle detection and clustering pipeline."""
         try:
             from ManipulaPy.perception import Perception
@@ -478,7 +489,7 @@ class TestPerceptionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_with_empty_detection(self):
+    def test_perception_with_empty_detection(self) -> None:
         """Test perception behavior when no obstacles detected."""
         try:
             from ManipulaPy.perception import Perception
@@ -508,7 +519,7 @@ class TestPerceptionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_with_invalid_depth(self):
+    def test_perception_with_invalid_depth(self) -> None:
         """Test perception with invalid depth data."""
         try:
             from ManipulaPy.perception import Perception
@@ -539,7 +550,7 @@ class TestPerceptionModule(unittest.TestCase):
         or not hasattr(sys.modules.get("sklearn", None), "_name"),
         "Real sklearn not available",
     )
-    def test_perception_with_real_sklearn(self):
+    def test_perception_with_real_sklearn(self) -> None:
         """Test perception clustering with real scikit-learn."""
         try:
             from sklearn.cluster import DBSCAN
@@ -597,7 +608,7 @@ class TestPerceptionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Real sklearn not available: {e}")
 
-    def test_perception_stereo_methods(self):
+    def test_perception_stereo_methods(self) -> None:
         """Test stereo-related perception methods."""
         try:
             from ManipulaPy.perception import Perception
@@ -640,7 +651,7 @@ class TestPerceptionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_stereo_without_config(self):
+    def test_perception_stereo_without_config(self) -> None:
         """Test stereo operations fail gracefully without stereo config."""
         try:
             from ManipulaPy.perception import Perception
@@ -662,7 +673,7 @@ class TestPerceptionModule(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_resource_cleanup(self):
+    def test_perception_resource_cleanup(self) -> None:
         """Test that perception properly cleans up resources."""
         try:
             from ManipulaPy.perception import Perception
@@ -695,7 +706,7 @@ class TestVisionPerceptionIntegration(unittest.TestCase):
     @patch("pybullet.readUserDebugParameter")
     def test_vision_perception_integration(
         self, mock_read_param, mock_add_param, mock_disconnect, mock_connect
-    ):
+    ) -> None:
         """Test Vision and Perception integration."""
         try:
             from ManipulaPy.perception import Perception
@@ -743,7 +754,7 @@ class TestVisionPerceptionIntegration(unittest.TestCase):
     @patch("pybullet.readUserDebugParameter")
     def test_end_to_end_obstacle_detection(
         self, mock_read_param, mock_add_param, mock_disconnect, mock_connect
-    ):
+    ) -> None:
         """Test end-to-end obstacle detection pipeline."""
         try:
             from ManipulaPy.perception import Perception
@@ -767,7 +778,24 @@ class TestVisionPerceptionIntegration(unittest.TestCase):
 
             # Override capture_image to return our test data
             original_capture = vision.capture_image
+            original_detect = vision.detect_obstacles
             vision.capture_image = lambda **kwargs: (test_rgb, test_depth)
+            vision.detect_obstacles = Mock(
+                return_value=(
+                    np.array(
+                        [
+                            [0.0, 0.0, 1.0],
+                            [0.01, 0.0, 1.0],
+                            [0.0, 0.01, 1.0],
+                            [1.0, 1.0, 0.8],
+                            [1.01, 1.0, 0.8],
+                            [1.0, 1.01, 0.8],
+                        ],
+                        dtype=np.float32,
+                    ),
+                    np.zeros(6, dtype=np.int32),
+                )
+            )
 
             # Create perception
             perception = Perception(vision_instance=vision)
@@ -785,6 +813,7 @@ class TestVisionPerceptionIntegration(unittest.TestCase):
 
             # Restore original method
             vision.capture_image = original_capture
+            vision.detect_obstacles = original_detect
 
             print("✅ End-to-end obstacle detection pipeline working")
 
@@ -811,7 +840,7 @@ class TestVisionPyBulletIntegration(unittest.TestCase):
         mock_add_param,
         mock_disconnect,
         mock_connect,
-    ):
+    ) -> None:
         """Test PyBullet debug camera functionality."""
         try:
             from ManipulaPy.vision import Vision
@@ -821,7 +850,8 @@ class TestVisionPyBulletIntegration(unittest.TestCase):
             mock_add_param.return_value = 1
 
             # Create a mock that returns different values for different parameters
-            def mock_read_param_side_effect(param_id):
+            def mock_read_param_side_effect(param_id) -> float:
+                """Return safe non-zero debug parameter values keyed by param id."""
                 # Return safe non-zero values for width/height and other parameters
                 param_values = {
                     1: 0.0,  # target_x
@@ -886,13 +916,14 @@ class TestVisionPyBulletIntegration(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Vision module not available: {e}")
 
-    def test_vision_basic_functionality_without_pybullet_debug(self):
+    def test_vision_basic_functionality_without_pybullet_debug(self) -> None:
         """Test basic Vision functionality without PyBullet debug features."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Test Vision initialization without debug features
@@ -921,7 +952,7 @@ class TestVisionPyBulletIntegration(unittest.TestCase):
 class TestVisionStereoFunctionality(unittest.TestCase):
     """Test stereo vision functionality in detail."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up stereo test configurations."""
         self.left_config = {
             "name": "left_camera",
@@ -937,13 +968,14 @@ class TestVisionStereoFunctionality(unittest.TestCase):
         self.right_config["name"] = "right_camera"
         self.right_config["translation"] = [0.1, 0, 0.5]  # 10cm baseline
 
-    def test_stereo_configuration_validation(self):
+    def test_stereo_configuration_validation(self) -> None:
         """Test stereo configuration validation."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Test valid stereo config
@@ -980,15 +1012,16 @@ class TestVisionStereoFunctionality(unittest.TestCase):
         "cv2" not in sys.modules or not hasattr(sys.modules.get("cv2", None), "_name"),
         "Real OpenCV not available",
     )
-    def test_stereo_rectification_with_opencv(self):
+    def test_stereo_rectification_with_opencv(self) -> None:
         """Test stereo rectification with real OpenCV."""
         try:
             import cv2
 
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(
@@ -1043,13 +1076,14 @@ class TestVisionStereoFunctionality(unittest.TestCase):
 class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
     """Test Vision module error handling and edge cases."""
 
-    def test_vision_without_dependencies(self):
+    def test_vision_without_dependencies(self) -> None:
         """Test Vision gracefully handles missing dependencies."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Test without YOLO (should still initialize)
@@ -1078,13 +1112,14 @@ class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Vision module not available: {e}")
 
-    def test_vision_invalid_inputs(self):
+    def test_vision_invalid_inputs(self) -> None:
         """Test Vision handles invalid inputs properly."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
@@ -1116,13 +1151,14 @@ class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Vision module not available: {e}")
 
-    def test_vision_stereo_without_config(self):
+    def test_vision_stereo_without_config(self) -> None:
         """Test stereo methods fail appropriately without config."""
         try:
             from ManipulaPy.vision import Vision
 
-            with patch("pybullet.addUserDebugParameter"), patch(
-                "pybullet.readUserDebugParameter"
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
             ):
 
                 # Create vision without stereo config
@@ -1148,7 +1184,7 @@ class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
 class TestPerceptionErrorHandlingAndEdgeCases(unittest.TestCase):
     """Test Perception module error handling and edge cases."""
 
-    def test_perception_with_failing_vision(self):
+    def test_perception_with_failing_vision(self) -> None:
         """Test Perception handles Vision failures gracefully."""
         try:
             from ManipulaPy.perception import Perception
@@ -1180,7 +1216,7 @@ class TestPerceptionErrorHandlingAndEdgeCases(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Perception module not available: {e}")
 
-    def test_perception_clustering_edge_cases(self):
+    def test_perception_clustering_edge_cases(self) -> None:
         """Test Perception clustering with edge cases."""
         try:
             from ManipulaPy.perception import Perception
@@ -1224,15 +1260,16 @@ class TestPerceptionErrorHandlingAndEdgeCases(unittest.TestCase):
 class TestModuleImportAndDependencies(unittest.TestCase):
     """Test module imports and dependency handling."""
 
-    def test_vision_import_with_missing_ultralytics(self):
+    def test_vision_import_with_missing_ultralytics(self) -> None:
         """Test Vision import when ultralytics is missing."""
         # This test simulates missing ultralytics
         with patch.dict("sys.modules", {"ultralytics": None}):
             try:
                 from ManipulaPy.vision import Vision
 
-                with patch("pybullet.addUserDebugParameter"), patch(
-                    "pybullet.readUserDebugParameter"
+                with (
+                    patch("pybullet.addUserDebugParameter"),
+                    patch("pybullet.readUserDebugParameter"),
                 ):
 
                     # Should still be able to create Vision instance
@@ -1250,7 +1287,7 @@ class TestModuleImportAndDependencies(unittest.TestCase):
                 # If the whole module fails to import, that's also acceptable
                 print("⚠️ Vision module requires ultralytics - expected behavior")
 
-    def test_perception_import_with_missing_sklearn(self):
+    def test_perception_import_with_missing_sklearn(self) -> None:
         """Test Perception import when sklearn is missing."""
         # This test simulates missing sklearn
         with patch.dict("sys.modules", {"sklearn": None, "sklearn.cluster": None}):

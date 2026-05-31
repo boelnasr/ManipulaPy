@@ -1,114 +1,206 @@
-# Installation Guide
+.. _installation-guide:
 
-This page shows the **fastest way** to get ManipulaPy on your machine and explains the
-optional *extras* published on PyPI — they mirror the names you see in
-`pyproject.toml` (`gpu‑cuda11` & co.).
+==================
+Installation Guide
+==================
 
-.. note::
-All commands assume you are inside a fresh virtual environment (`python -m venv`
-or Conda).  ManipulaPy supports **Python 3.8 – 3.12** on Linux, macOS (CPU‑only),
-and Windows/WSL2.
+ManipulaPy 1.3.2 ships with a **lightweight default install** and a set
+of **optional extras** that pull in heavy or platform-specific
+dependencies on demand. Most workflows only need one or two extras.
 
-## System requirements
+System Requirements
+===================
 
-\===================  =============================================================
-Component            Minimum / recommended
-\===================  =============================================================
-CPU                  x86‑64 or Apple Silicon (runs in Rosetta)
-RAM                  4 GB min / 8 GB recommended
-GPU (optional)       *NVIDIA* CUDA 11.8 / 12.4 or *AMD* ROCm 5.7
-\===================  =============================================================
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
 
-## Quick install (CPU‑only)
+   * - Component
+     - Requirement
+   * - Python
+     - 3.9 -- 3.12 (3.12 added in v1.3.2)
+   * - OS
+     - Linux, macOS, Windows
+   * - GPU (optional)
+     - NVIDIA CUDA 11.x (driver >= 470) or 12.x (driver >= 535)
+   * - PyBullet (optional)
+     - Required only for simulation; CPU-only, no GPU needed
 
-If you do **not** need GPU acceleration right away:
+Default install
+===============
 
 .. code-block:: bash
 
-pip install manipulapy
+   pip install ManipulaPy
 
-This brings in *all* core features — kinematics, dynamics, perception, trajectory
-planning, PyBullet sim, OpenCV, Torch, scikit‑learn, etc.  Nothing else to add.
+This pulls in only **NumPy 2.x, SciPy, Matplotlib, Numba, and Pillow**.
+Kinematics, dynamics, control, native URDF parsing, and CPU trajectory
+generation work out of the box.
 
-## GPU extras
+.. versionchanged:: 1.3.2
+   The default install is now lightweight. Previous versions installed
+   PyBullet, OpenCV, scikit-learn, and trimesh by default;
+   these are now opt-in via extras.
 
-ManipulaPy ships several "extras" so you can choose the CUDA flavour that matches your
-driver:
+Optional extras
+===============
 
-\==========================  When to use                                      Command
-\==========================  ------------------------------------------------  ----------------------------------------
-CUDA 11.x (470+ drivers)    Most LTS distro packages                         `pip install manipulapy[gpu-cuda11]`
-CUDA 12.x (535+ drivers)    Latest NVIDIA toolkits / Ubuntu 24.04            `pip install manipulapy[gpu-cuda12]`
-AMD ROCm 5.6+               Recent Radeon/MI cards                           `pip install manipulapy[gpu-rocm]`
-Legacy PyCUDA               Prefer `pycuda` API over CuPy                 `pip install manipulapy[gpu-pycuda]`
-Meta‑extra (defaults CUDA11) Installs CuPy 11 build                          `pip install manipulapy[gpu]`
-\==========================  ------------------------------------------------  ----------------------------------------
+.. list-table::
+   :header-rows: 1
+   :widths: 22 53 25
 
-After the install you can verify CUDA access:
+   * - Extra
+     - What it adds
+     - Install
+   * - ``[simulation]``
+     - PyBullet physics simulation
+     - ``pip install "ManipulaPy[simulation]"``
+   * - ``[urdf]``
+     - ``trimesh`` mesh loading for the native URDF backend
+     - ``pip install "ManipulaPy[urdf]"``
+   * - ``[vision]``
+     - OpenCV, Ultralytics (YOLO), and PyTorch
+     - ``pip install "ManipulaPy[vision]"``
+   * - ``[vision-headless]``
+     - ``opencv-python-headless`` + Ultralytics for CI/servers
+     - ``pip install "ManipulaPy[vision-headless]"``
+   * - ``[ml]``
+     - PyTorch + scikit-learn (DBSCAN clustering for perception)
+     - ``pip install "ManipulaPy[ml]"``
+   * - ``[cuda]``
+     - CuPy 12.x for GPU-accelerated kernels (default, driver >= 525)
+     - ``pip install "ManipulaPy[cuda]"``
+   * - ``[gpu-cuda11]``
+     - CuPy 11.x for legacy CUDA 11.x toolchains (driver 470 - 524)
+     - ``pip install "ManipulaPy[gpu-cuda11]"``
+   * - ``[gpu-cuda12]``
+     - Explicit CUDA 12.x alias for ``[cuda]``
+     - ``pip install "ManipulaPy[gpu-cuda12]"``
+   * - ``[gpu-rocm]``
+     - CuPy ROCm 4.3 build for AMD GPUs
+     - ``pip install "ManipulaPy[gpu-rocm]"``
+   * - ``[gpu-pycuda]``
+     - PyCUDA backend (alternative to CuPy)
+     - ``pip install "ManipulaPy[gpu-pycuda]"``
+   * - ``[all]``
+     - Every runtime extra above (CPU + simulation + vision + ml + cuda)
+     - ``pip install "ManipulaPy[all]"``
+   * - ``[minimal]``
+     - Backwards-compatible pre-1.3.2 set (core + PyBullet)
+     - ``pip install "ManipulaPy[minimal]"``
+   * - ``[dev]``
+     - Test, lint, and type-check tooling
+     - ``pip install "ManipulaPy[dev]"``
+   * - ``[docs]``
+     - Sphinx + theme for building the documentation
+     - ``pip install "ManipulaPy[docs]"``
+   * - ``[ci]``
+     - CI-only test deps (headless OpenCV, pytest plugins)
+     - ``pip install "ManipulaPy[ci]"``
+
+Combine extras with a comma:
+
+.. code-block:: bash
+
+   pip install "ManipulaPy[simulation,vision,cuda]"
+
+GPU extras detail
+=================
+
+The default ``[cuda]`` extra installs ``cupy-cuda12x`` — the version
+that ships with Ubuntu 22.04's NVIDIA apt repos and is what v1.3.2
+was validated against on driver 580. For older CUDA 11.x toolchains
+(driver 470 – 524), use the ``[gpu-cuda11]`` extra:
+
+.. code-block:: bash
+
+   # CUDA 12.x (driver >= 525) -- the default `[cuda]` extra
+   pip install "ManipulaPy[cuda]"
+
+   # Legacy CUDA 11.x (driver 470 - 524)
+   pip install "ManipulaPy[gpu-cuda11]"
+
+   # AMD ROCm 4.3
+   pip install "ManipulaPy[gpu-rocm]"
+
+.. note::
+
+   On macOS the CuPy wheels are skipped automatically
+   (``sys_platform != 'darwin'``); install ManipulaPy without the GPU
+   extras on Apple Silicon.
+
+If GPU acceleration is unavailable, ManipulaPy automatically falls
+back to NumPy/Numba CPU paths -- no code changes needed.
+
+Apple Silicon (M1 / M2 / M3)
+============================
+
+The default ``pip install ManipulaPy`` installs cleanly on macOS ARM --
+all CPU features (kinematics, IK, dynamics, trajectory planning, native
+URDF parsing, perception clustering) work natively.
+
+PyPI does not ship a ``pybullet`` wheel for Apple Silicon, so a plain
+``pip install "ManipulaPy[simulation]"`` triggers a from-source Clang
+build that fails on some macOS ARM toolchains. If you need the
+``[simulation]`` extra, install PyBullet from conda-forge first (it
+provides prebuilt ARM64 wheels):
+
+.. code-block:: bash
+
+   conda create -n manipulapy python=3.11
+   conda activate manipulapy
+   conda install -c conda-forge pybullet
+   pip install ManipulaPy            # pybullet already satisfied -- no compile
+
+Alternatively, run ManipulaPy inside a Linux container on Apple Silicon;
+installation succeeds there, including the simulation extra.
+
+.. note::
+
+   CUDA / GPU acceleration is not available on macOS by design -- the
+   ``[cuda]`` extra is skipped automatically (``sys_platform != 'darwin'``)
+   and ManipulaPy falls back to the NumPy / Numba CPU paths.
+
+Development install
+===================
+
+.. code-block:: bash
+
+   git clone https://github.com/boelnasr/ManipulaPy.git
+   cd ManipulaPy
+   pip install -e ".[dev]"
+
+For documentation work, add ``[docs]``; for the full feature set while
+developing, combine extras as needed (for example
+``pip install -e ".[dev,all]"``).
+
+Upgrading
+=========
+
+.. code-block:: bash
+
+   pip install --upgrade ManipulaPy
+   pip install --upgrade "ManipulaPy[cuda]"   # if you already use the cuda extra
+
+When upgrading from 1.3.1 or earlier, run
+``ManipulaPy.check_dependencies()`` after install to see which extras
+you may now need to request explicitly -- several previously bundled
+dependencies (PyBullet, OpenCV, scikit-learn, trimesh) are now
+opt-in.
+
+Verifying the install
+=====================
 
 .. code-block:: python
 
-import cupy as cp
-print("CUDA available:", cp.cuda.is\_available())
-print("Device count:", cp.cuda.runtime.getDeviceCount())
+   import ManipulaPy
+   ManipulaPy.check_dependencies()
 
-## Development & docs
+This prints a per-feature availability table and the exact
+``pip install`` command for any missing extra.
 
-* **Editable dev install** (tests, Black, MyPy, coverage):
+See also
+========
 
-  .. code-block:: bash
-
-  git clone [https://github.com/boelnasr/ManipulaPy.git](https://github.com/boelnasr/ManipulaPy.git)
-  cd ManipulaPy
-  pip install -e .\[dev]
-
-* **Build the documentation locally**:
-
-  .. code-block:: bash
-
-  pip install manipulapy\[docs]
-  sphinx-build -b html docs docs/\_build/html
-
-## Conda & Docker
-
-ManipulaPy is mirrored on **conda‑forge** and as ready‑made Docker images:
-
-.. code-block:: bash
-
-# Conda CPU build
-
-conda install -c conda-forge manipulapy
-
-# Docker (CPU)
-
-docker pull manipulapy/manipulapy\:cpu-latest
-
-# Docker (GPU, CUDA 12)
-
-docker pull manipulapy/manipulapy\:cuda12-latest
-docker run --gpus all -it manipulapy/manipulapy\:cuda12-latest
-
-## Troubleshooting
-
-* `ImportError: No module named 'cupy'` – install the matching extra (see table).
-
-* `CUDA out of memory` – lower batch sizes or hide the GPU:
-
-  .. code-block:: bash
-
-  CUDA\_VISIBLE\_DEVICES="" python your\_script.py  # forces CPU fallback
-
-* **Windows build errors** – ensure *Microsoft C++ Build Tools* are installed.
-
-## Update / Upgrade
-
-.. code-block:: bash
-
-pip install --upgrade manipulapy   # upgrades the core
-pip install --upgrade "manipulapy\[gpu-cuda12]"  # upgrade with extras
-
-## Next steps
-
-* \:doc:`quickstart` – run your first pick‑and‑place
-* \:doc:`user_guide/kinematics` – learn the API in depth
-* \:doc:`examples/basic_manipulation` – full end‑to‑end notebook
+- :doc:`getting_started/index` -- quick-start tutorial.
+- :doc:`api/index` -- full API reference.

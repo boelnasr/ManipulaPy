@@ -11,11 +11,15 @@ Copyright (c) 2025 Mohamed Aboelnasr
 
 from collections import OrderedDict
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 import numpy as np
 
 from .types import Joint, JointType, Link, Material, Transmission
+
+if TYPE_CHECKING:
+    from ..dynamics import ManipulatorDynamics
+    from ..kinematics import SerialManipulator
 
 
 class URDF:
@@ -41,7 +45,7 @@ class URDF:
         materials: Optional[Dict[str, Material]] = None,
         transmissions: Optional[List[Transmission]] = None,
         filename_handler: Optional[Callable[[str], str]] = None,
-    ):
+    ) -> None:
         """
         Initialize URDF.
 
@@ -112,28 +116,23 @@ class URDF:
             filename: Path to URDF or XACRO file
             load_meshes: Load mesh geometry data
             mesh_dir: Base directory for mesh file resolution
-            backend: Parser backend - "builtin" (default), "urchin", or "pybullet"
+            backend: Parser backend - "builtin" (default) or "pybullet"
 
         Returns:
             URDF object
 
         Note:
             - "builtin": Native ManipulaPy parser (NumPy 2.0 compatible)
-            - "urchin": Legacy urchin parser (requires urchin package)
             - "pybullet": PyBullet-based parser (requires pybullet package)
         """
         if backend == "builtin":
             return cls._load_builtin(
                 filename, load_meshes=load_meshes, mesh_dir=mesh_dir
             )
-        elif backend == "urchin":
-            return cls._load_urchin(filename)
         elif backend == "pybullet":
             return cls._load_pybullet(filename)
         else:
-            raise ValueError(
-                f"Unknown backend: {backend}. Use 'builtin', 'urchin', or 'pybullet'"
-            )
+            raise ValueError(f"Unknown backend: {backend}. Use 'builtin' or 'pybullet'")
 
     @classmethod
     def _load_builtin(
@@ -149,215 +148,6 @@ class URDF:
         return URDFParser.parse_file(
             filename, load_meshes=load_meshes, mesh_dir=mesh_path
         )
-
-    @classmethod
-    def _load_urchin(cls, filename: Union[str, Path]) -> "URDF":
-        """
-        Load URDF using urchin parser (legacy fallback).
-
-        Requires: pip install urchin
-        Note: urchin is not compatible with NumPy 2.0+
-        """
-        try:
-            import urchin
-        except ImportError:
-            raise ImportError(
-                "urchin package not installed. Install with: pip install urchin\n"
-                "Note: urchin is not compatible with NumPy 2.0+. "
-                "Consider using backend='builtin' instead."
-            )
-
-        import warnings
-
-        warnings.warn(
-            "Using urchin backend which is not compatible with NumPy 2.0+. "
-            "Consider using backend='builtin' for better compatibility.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-        # Load with urchin
-        urchin_robot = urchin.URDF.load(str(filename))
-
-        # Convert to our URDF format
-        return cls._convert_from_urchin(urchin_robot)
-
-    @classmethod
-    def _convert_from_urchin(cls, urchin_robot) -> "URDF":
-        """Convert urchin URDF to native URDF."""
-        from .types import (
-            Box,
-            Collision,
-            Cylinder,
-            Inertial,
-            Joint,
-            JointDynamics,
-            JointLimit,
-            JointMimic,
-            JointType,
-            Link,
-            Material,
-            Mesh,
-            Origin,
-            Sphere,
-            Visual,
-        )
-
-        # Convert links
-        links = []
-        for ulink in urchin_robot.links:
-            # Convert inertial
-            inertial = None
-            if ulink.inertial is not None:
-                origin = Origin(
-                    xyz=(
-                        np.array(ulink.inertial.origin.xyz)
-                        if ulink.inertial.origin
-                        else np.zeros(3)
-                    ),
-                    rpy=(
-                        np.array(ulink.inertial.origin.rpy)
-                        if ulink.inertial.origin
-                        else np.zeros(3)
-                    ),
-                )
-                inertial = Inertial(
-                    mass=ulink.inertial.mass,
-                    inertia=(
-                        ulink.inertial.inertia
-                        if hasattr(ulink.inertial, "inertia")
-                        else np.eye(3)
-                    ),
-                    origin=origin,
-                )
-
-            # Convert visuals
-            visuals = []
-            for uvis in ulink.visuals or []:
-                vis_origin = Origin(
-                    xyz=np.array(uvis.origin.xyz) if uvis.origin else np.zeros(3),
-                    rpy=np.array(uvis.origin.rpy) if uvis.origin else np.zeros(3),
-                )
-                geometry = (
-                    cls._convert_urchin_geometry(uvis.geometry)
-                    if uvis.geometry
-                    else None
-                )
-                visuals.append(Visual(origin=vis_origin, geometry=geometry))
-
-            # Convert collisions
-            collisions = []
-            for ucol in ulink.collisions or []:
-                col_origin = Origin(
-                    xyz=np.array(ucol.origin.xyz) if ucol.origin else np.zeros(3),
-                    rpy=np.array(ucol.origin.rpy) if ucol.origin else np.zeros(3),
-                )
-                geometry = (
-                    cls._convert_urchin_geometry(ucol.geometry)
-                    if ucol.geometry
-                    else None
-                )
-                collisions.append(Collision(origin=col_origin, geometry=geometry))
-
-            links.append(
-                Link(
-                    name=ulink.name,
-                    inertial=inertial,
-                    visuals=visuals,
-                    collisions=collisions,
-                )
-            )
-
-        # Convert joints
-        joints = []
-        for ujoint in urchin_robot.joints:
-            # Map joint type
-            jtype_map = {
-                "revolute": JointType.REVOLUTE,
-                "continuous": JointType.CONTINUOUS,
-                "prismatic": JointType.PRISMATIC,
-                "fixed": JointType.FIXED,
-                "floating": JointType.FLOATING,
-                "planar": JointType.PLANAR,
-            }
-            joint_type = jtype_map.get(ujoint.joint_type, JointType.FIXED)
-
-            origin = Origin(
-                xyz=np.array(ujoint.origin.xyz) if ujoint.origin else np.zeros(3),
-                rpy=np.array(ujoint.origin.rpy) if ujoint.origin else np.zeros(3),
-            )
-
-            axis = (
-                np.array(ujoint.axis)
-                if ujoint.axis is not None
-                else np.array([0, 0, 1])
-            )
-
-            # Convert limit
-            limit = None
-            if ujoint.limit is not None:
-                limit = JointLimit(
-                    lower=ujoint.limit.lower if hasattr(ujoint.limit, "lower") else 0.0,
-                    upper=ujoint.limit.upper if hasattr(ujoint.limit, "upper") else 0.0,
-                    velocity=getattr(ujoint.limit, "velocity", None),
-                    effort=getattr(ujoint.limit, "effort", None),
-                )
-
-            # Convert dynamics
-            dynamics = None
-            if ujoint.dynamics is not None:
-                dynamics = JointDynamics(
-                    damping=getattr(ujoint.dynamics, "damping", 0.0),
-                    friction=getattr(ujoint.dynamics, "friction", 0.0),
-                )
-
-            # Convert mimic
-            mimic = None
-            if ujoint.mimic is not None:
-                mimic = JointMimic(
-                    joint=ujoint.mimic.joint,
-                    multiplier=getattr(ujoint.mimic, "multiplier", 1.0),
-                    offset=getattr(ujoint.mimic, "offset", 0.0),
-                )
-
-            joints.append(
-                Joint(
-                    name=ujoint.name,
-                    joint_type=joint_type,
-                    parent=ujoint.parent,
-                    child=ujoint.child,
-                    origin=origin,
-                    axis=axis,
-                    limit=limit,
-                    dynamics=dynamics,
-                    mimic=mimic,
-                )
-            )
-
-        return cls(
-            name=urchin_robot.name or "robot",
-            links=links,
-            joints=joints,
-        )
-
-    @classmethod
-    def _convert_urchin_geometry(cls, ugeom):
-        """Convert urchin geometry to native geometry."""
-        from .types import Box, Cylinder, Mesh, Sphere
-
-        geom_type = type(ugeom).__name__.lower()
-
-        if geom_type == "box":
-            return Box(size=np.array(ugeom.size))
-        elif geom_type == "cylinder":
-            return Cylinder(radius=ugeom.radius, length=ugeom.length)
-        elif geom_type == "sphere":
-            return Sphere(radius=ugeom.radius)
-        elif geom_type == "mesh":
-            scale = np.array(ugeom.scale) if ugeom.scale is not None else np.ones(3)
-            return Mesh(filename=ugeom.filename, scale=scale)
-
-        return None
 
     @classmethod
     def _load_pybullet(cls, filename: Union[str, Path]) -> "URDF":
@@ -501,7 +291,7 @@ class URDF:
         )
 
     @classmethod
-    def from_xml_string(cls, xml_string: str, **kwargs) -> "URDF":
+    def from_xml_string(cls, xml_string: str, **kwargs: object) -> "URDF":
         """Load URDF from XML string."""
         from .parser import URDFParser
 
@@ -616,7 +406,7 @@ class URDF:
         )
 
     @cfg.setter
-    def cfg(self, value: Union[np.ndarray, List[float], Dict[str, float]]):
+    def cfg(self, value: Union[np.ndarray, List[float], Dict[str, float]]) -> None:
         """Set current configuration."""
         self.update_cfg(value)
 
@@ -899,6 +689,7 @@ class URDF:
         omega_list = np.zeros((3, n), dtype=np.float64)
         r_list = np.zeros((3, n), dtype=np.float64)
         G_list = []
+        Mlist_per_link = []  # New: per-link CoM transform in zero config
 
         for i, joint in enumerate(actuated):
             if joint.joint_type in (JointType.PLANAR, JointType.FLOATING):
@@ -933,7 +724,16 @@ class URDF:
             r_list[:, i] = p
 
             # Spatial inertia
+            # Per-link CoM transform in Zero config (for mass matrix)
             child_link = self._links[joint.child]
+            child_link_T = fk[joint.child]  # link frame in zero config
+            if child_link.inertial and child_link.inertial.origin is not None:
+                # CoM offset within link frame
+                com_local = child_link.inertial.origin.matrix
+                Mlist_per_link.append(child_link_T @ com_local)
+            else:
+                Mlist_per_link.append(child_link_T.copy())
+
             if child_link.inertial:
                 G_list.append(child_link.inertial.spatial_inertia)
             else:
@@ -952,6 +752,7 @@ class URDF:
             "omega_list": omega_list,
             "r_list": r_list,
             "joint_limits": self.joint_limits,
+            "Mlist_per_link": Mlist_per_link,
         }
 
     def to_serial_manipulator(
@@ -1082,6 +883,7 @@ class URDF:
         return copy.deepcopy(self)
 
     def __repr__(self) -> str:
+        """Return a compact debug representation."""
         return (
             f"URDF(name='{self.name}', "
             f"links={len(self._links)}, "
@@ -1090,6 +892,7 @@ class URDF:
         )
 
     def __str__(self) -> str:
+        """Return a human-readable URDF summary."""
         lines = [
             f"URDF: {self.name}",
             f"  Links: {len(self._links)}",

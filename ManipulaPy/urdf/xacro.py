@@ -9,12 +9,21 @@ Copyright (c) 2025 Mohamed Aboelnasr
 """
 
 import logging
+import re
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# Xacro arg names must be plain Python-identifier-shaped tokens. Values must
+# not contain shell metacharacters or look like CLI flags (so a malicious
+# arg can't smuggle a flag past xacro). Negative numbers (``-1.5``) are
+# allowed because the flag check requires an alphabetic char after the dash.
+_XACRO_ARG_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_FORBIDDEN_VALUE_CHARS = set(";|&`$<>\n\r\x00")
+_LOOKS_LIKE_FLAG_RE = re.compile(r"^-[^0-9.]")
+_MAX_VALUE_LEN = 4096
 
 
 class XacroProcessor:
@@ -72,12 +81,54 @@ class XacroProcessor:
         filename: Path,
         args: Optional[Dict[str, str]] = None,
     ) -> str:
-        """Process using system xacro command."""
+        """Process a xacro file via the system ``xacro`` command.
+
+        Builds an ``xacro <filename> key:=value ...`` command line, validating
+        every argument name and value to prevent shell injection before passing
+        them to :func:`subprocess.run`.
+
+        Args:
+            filename: Path to the ``.xacro`` file to process.
+            args: Optional mapping of xacro argument names to values. Names must
+                match ``[A-Za-z_][A-Za-z0-9_]*``; values must not contain shell
+                metacharacters, look like CLI flags, or exceed the maximum
+                allowed length.
+
+        Returns:
+            str: The expanded URDF XML emitted on the command's standard output.
+
+        Raises:
+            ValueError: If an argument name is invalid, or a value contains a
+                forbidden shell metacharacter, resembles a CLI flag, or exceeds
+                the maximum value length.
+        """
         cmd = ["xacro", str(filename)]
 
         if args:
             for key, value in args.items():
-                cmd.append(f"{key}:={value}")
+                key_str = str(key)
+                if not _XACRO_ARG_NAME_RE.match(key_str):
+                    raise ValueError(
+                        f"Invalid xacro arg name {key!r}: must match "
+                        "[A-Za-z_][A-Za-z0-9_]*"
+                    )
+                value_str = str(value)
+                if any(c in value_str for c in _FORBIDDEN_VALUE_CHARS):
+                    raise ValueError(
+                        f"Invalid xacro arg value for {key!r}: contains "
+                        "shell metacharacter"
+                    )
+                if _LOOKS_LIKE_FLAG_RE.match(value_str):
+                    raise ValueError(
+                        f"Invalid xacro arg value for {key!r}: value looks "
+                        f"like a CLI flag ({value_str!r})"
+                    )
+                if len(value_str) > _MAX_VALUE_LEN:
+                    raise ValueError(
+                        f"Invalid xacro arg value for {key!r}: exceeds "
+                        f"{_MAX_VALUE_LEN} chars"
+                    )
+                cmd.append(f"{key_str}:={value_str}")
 
         result = subprocess.run(
             cmd,
@@ -94,8 +145,34 @@ class XacroProcessor:
         filename: Path,
         args: Optional[Dict[str, str]] = None,
     ) -> str:
-        """Process using xacro Python package."""
+        """Process a xacro file via the ``xacro`` Python package.
+
+        Validates argument names, then expands the file in-process using
+        :func:`xacro.process_file` and serializes the result to pretty-printed
+        XML.
+
+        Args:
+            filename: Path to the ``.xacro`` file to process.
+            args: Optional mapping of xacro argument names to values, passed as
+                xacro ``mappings``. Names must match
+                ``[A-Za-z_][A-Za-z0-9_]*``.
+
+        Returns:
+            str: The expanded URDF as pretty-printed XML (two-space indentation).
+
+        Raises:
+            ImportError: If the ``xacro`` Python package is not installed.
+            ValueError: If an argument name does not match the allowed pattern.
+        """
         import xacro
+
+        if args:
+            for key in args:
+                if not _XACRO_ARG_NAME_RE.match(str(key)):
+                    raise ValueError(
+                        f"Invalid xacro arg name {key!r}: must match "
+                        "[A-Za-z_][A-Za-z0-9_]*"
+                    )
 
         # Build argument list
         xacro_args = [str(filename)]
@@ -109,17 +186,29 @@ class XacroProcessor:
 
     @classmethod
     def _process_basic(cls, filename: Path) -> str:
-        """
-        Basic xacro processing without macro expansion.
+        """Basic xacro processing without macro expansion.
+
+        A fallback used when neither the system ``xacro`` command nor the
+        ``xacro`` Python package is available. It strips the ``xacro``
+        namespace, inlines ``<include>`` directives, and removes unhandled
+        xacro elements via regular expressions.
 
         Handles:
-        - xacro:include directives
-        - Removes xacro namespace declarations
+            - ``xacro:include`` directives (inlined into the document)
+            - Removal of xacro namespace declarations
 
         Does NOT handle:
-        - Macro definitions and calls
-        - Property substitutions
-        - Conditionals
+            - Macro definitions and calls
+            - Property substitutions
+            - Conditionals
+
+        Args:
+            filename: Path to the ``.xacro`` file to process.
+
+        Returns:
+            str: The processed URDF XML with the xacro namespace removed and
+            includes inlined. Macros, properties, and ``<arg>`` elements are
+            stripped rather than expanded.
         """
         import re
         import xml.etree.ElementTree as ET
@@ -136,7 +225,22 @@ class XacroProcessor:
         # Handle includes
         include_pattern = re.compile(r'<include\s+filename="([^"]+)"\s*/>')
 
-        def replace_include(match):
+        def replace_include(match: re.Match) -> str:
+            """Inline the contents of an ``<include>`` directive.
+
+            Resolves the included file path (relative paths are resolved
+            against the parent file's directory), reads its contents, and
+            strips the XML declaration and wrapping ``<robot>`` tags so the
+            fragment can be embedded.
+
+            Args:
+                match: Regex match for ``<include filename="..."/>``; group 1
+                    holds the include filename.
+
+            Returns:
+                str: The cleaned XML contents of the included file, or an empty
+                string if the file does not exist.
+            """
             include_file = match.group(1)
 
             # Resolve relative path
@@ -166,6 +270,14 @@ class XacroProcessor:
 
     @classmethod
     def is_xacro_file(cls, filename: Path) -> bool:
-        """Check if file is a xacro file."""
+        """Check whether a file is a xacro file.
+
+        Args:
+            filename: Path (or path-like) to inspect.
+
+        Returns:
+            bool: ``True`` if the file has a ``.xacro`` suffix or contains
+            ``.xacro`` in its name (case-insensitive), otherwise ``False``.
+        """
         filename = Path(filename)
         return filename.suffix.lower() == ".xacro" or ".xacro" in filename.name.lower()

@@ -108,7 +108,7 @@ Ensure required packages are installed:
 
 .. code-block:: bash
 
-   pip install ManipulaPy[core] scipy urchin
+   pip install ManipulaPy[core] scipy
 
 Usage Examples
 --------------
@@ -218,4 +218,3 @@ References
 - Latombe, J.-C., *Robot Motion Planning*, Kluwer, 1991.  
 - Khatib, O., "Real-time obstacle avoidance for manipulators and mobile robots,"
   *IEEE IJRR*, 1986.  
-- urchin.urdf — URDF parser for Python (used for mesh loading and convex hulls).

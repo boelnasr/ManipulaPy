@@ -7,6 +7,7 @@ The ManipulaPy Control Module provides comprehensive control algorithms for robo
 .. contents:: Table of Contents
    :depth: 3
    :local:
+   :backlinks: none
 
 Overview
 ========
@@ -172,6 +173,17 @@ PID Control
 **Description**: Classic Proportional-Integral-Derivative control for joint space regulation.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.pid_control
+   :no-index:
+
+.. note::
+
+   Both ``pid_control`` and ``computed_torque_control`` accept an optional ``i_clamp``
+   keyword argument (default: ``None``, behavior identical to v1.3.1) that caps the
+   integral error term to prevent windup during sustained tracking error. When
+   provided, it must be a **positive scalar** — every joint's integral term is
+   independently clamped to ``[-i_clamp, +i_clamp]``. Passing an array raises
+   ``ValueError`` ("i_clamp must be a scalar"), as do negative, zero, ``nan``, or
+   otherwise non-finite values.
 
 **Example**:
 
@@ -197,6 +209,7 @@ PD Control
 **Description**: Proportional-Derivative control without integral term.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.pd_control
+   :no-index:
 
 **Example**:
 
@@ -219,6 +232,7 @@ Computed Torque Control
 **Description**: Model-based control that linearizes the nonlinear robot dynamics.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.computed_torque_control
+   :no-index:
 
 **Example**:
 
@@ -248,6 +262,7 @@ Feedforward Control
 **Description**: Open-loop control based on desired trajectory dynamics.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.feedforward_control
+   :no-index:
 
 **Example**:
 
@@ -270,6 +285,7 @@ PD + Feedforward Control
 **Description**: Combines feedback PD control with feedforward compensation.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.pd_feedforward_control
+   :no-index:
 
 **Example**:
 
@@ -292,6 +308,7 @@ Robust Control
 **Description**: Control with disturbance rejection capabilities.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.robust_control
+   :no-index:
 
 **Example**:
 
@@ -316,6 +333,7 @@ Adaptive Control
 **Description**: Control with online parameter adaptation.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.adaptive_control
+   :no-index:
 
 **Example**:
 
@@ -341,6 +359,7 @@ Joint and Torque Limit Enforcement
 -----------------------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.enforce_limits
+   :no-index:
 
 **Example**:
 
@@ -378,10 +397,13 @@ Kalman Filter State Estimation
 -------------------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.kalman_filter_predict
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.kalman_filter_update
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.kalman_filter_control
+   :no-index:
 
 **Example**:
 
@@ -411,6 +433,13 @@ Ziegler-Nichols Tuning
 ----------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.ziegler_nichols_tuning
+   :no-index:
+
+.. note::
+
+   Since v1.3.2, passing ``Tu=0`` to the PI or PID branches raises ``ValueError``
+   with a descriptive message instead of silently producing ``inf`` gains. The
+   P-only branch ignores ``Tu``, so ``Tu=0`` remains valid there.
 
 **Example**:
 
@@ -437,8 +466,10 @@ Automatic Ultimate Gain Finding
 -------------------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.find_ultimate_gain_and_period
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.tune_controller
+   :no-index:
 
 **Example**:
 
@@ -464,6 +495,7 @@ Steady-State Response Analysis
 ------------------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.plot_steady_state_response
+   :no-index:
 
 **Example**:
 
@@ -487,12 +519,27 @@ Performance Metrics
 Calculate control performance metrics:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_rise_time
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_percent_overshoot
+   :no-index:
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_settling_time
+   :no-index:
+
+.. note::
+
+   **v1.3.2 semantics:** ``calculate_settling_time`` returns the *first* time the
+   response enters and stays within the tolerance band around the setpoint — using
+   ``abs(set_point) * tolerance`` as the half-width so the band is correct for
+   negative setpoints. The previous implementation used the signed
+   ``set_point * tolerance`` threshold (wrong sign for negative targets) and returned
+   the index of the last in-band sample rather than the first settled time
+   (off-by-one for oscillatory responses). Callers upgrading from v1.3.1 may see
+   different numeric return values for negative setpoints or oscillatory traces.
 
 .. automethod:: ManipulaPy.control.ManipulatorController.calculate_steady_state_error
+   :no-index:
 
 **Example**:
 
@@ -516,11 +563,13 @@ Joint Space Control
 -------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.joint_space_control
+   :no-index:
 
 Cartesian Space Control
 -----------------------
 
 .. automethod:: ManipulaPy.control.ManipulatorController.cartesian_space_control
+   :no-index:
 
 Examples
 ========
@@ -711,7 +760,8 @@ API Reference
 =============
 
 .. autoclass:: ManipulaPy.control.ManipulatorController
-   :members:
+   :no-members:
+   :no-index:
    :undoc-members:
    :show-inheritance:
 

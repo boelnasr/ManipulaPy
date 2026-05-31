@@ -1,26 +1,30 @@
 ManipulaPy Simulation Demo - Detailed Report
 ==================================================
 
-Generated: 2025-07-13 15:46:21
+Generated: 2026-05-30 14:33:04
 
 Robot Configuration:
-  URDF Path: /home/abo/Desktop/ManipulaPy/Examples/intermediate_examples/simple_arm.urdf
-  Number of Joints: 2
-  Joint Limits: [(-3.141592653589793, 3.141592653589793), (-3.141592653589793, 3.141592653589793)]
+  URDF Path: /home/abo/Desktop/ManipulaPy/ManipulaPy/ManipulaPy_data/xarm/xarm6_robot.urdf
+  Number of Joints: 6
+  Joint Limits: [(-6.28318530718, 6.28318530718), (-2.059, 2.0944), (-3.927, 0.19198), (-6.28318530718, 6.28318530718), (-1.69297, 3.14159265359), (-6.28318530718, 6.28318530718)]
 
 System Information:
-  CUDA Available: True
-  Plots Generated: 5
+  CUDA Available: False
+  Plots Generated: 8
   Plots Saved To: /home/abo/Desktop/ManipulaPy/Examples/intermediate_examples
 
 Generated Plots:
-  - 20250713_154618_ik_inverse_kinematics_analysis.png
-  - 20250713_154620_traj_trajectory_planning_comparison.png
-  - 20250713_154620_traj_perf_trajectory_planning_performance.png
-  - 20250713_154621_perf_performance_benchmarking.png
-  - 20250713_154621_control_tune_controller_tuning.png
-  - 20250713_154621_summary_summary_report.png
+  - 20260530_143300_fk_forward_kinematics_workspace.png
+  - 20260530_143300_ik_inverse_kinematics_analysis.png
+  - 20260530_143301_traj_trajectory_planning_comparison.png
+  - 20260530_143302_traj_perf_trajectory_planning_performance.png
+  - 20260530_143302_singular_singularity_analysis.png
+  - 20260530_143303_perf_performance_benchmarking.png
+  - 20260530_143303_control_tune_controller_tuning.png
+  - 20260530_143304_sim_pybullet_tracking.png
+  - 20260530_143304_summary_summary_report.png
 
 Performance Results:
-  benchmarking: {'Small': {'total_time': 0.0027761459350585938, 'N': 50, 'joints': 2, 'stats': {'gpu_calls': 0, 'cpu...
-  planner_stats: {'gpu_calls': 0, 'cpu_calls': 1, 'total_gpu_time': 0.0, 'total_cpu_time': 0.013815641403198242, 'mem...
+  benchmarking: {'Small': {'mean_time': np.float64(0.016183773676554363), 'std_time': np.float64(0.00179350937069145...
+  planner_stats: {'gpu_calls': 0, 'cpu_calls': 3, 'total_gpu_time': 0.0, 'total_cpu_time': 0.09433627128601074, 'memo...
+  pybullet_simulation: {'waypoints': 60, 'max_tracking_error': 0.044706642627716064, 'controlled_joints': 6}...

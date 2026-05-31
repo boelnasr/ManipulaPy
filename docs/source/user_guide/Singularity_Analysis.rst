@@ -13,6 +13,7 @@ and workspace optimization.
 .. contents:: Table of Contents
    :depth: 2
    :local:
+   :backlinks: none
 
 Theoretical Background
 ----------------------
@@ -185,7 +186,8 @@ Singularity Class
 ~~~~~~~~~~~~~~~~~~
 
 .. autoclass:: ManipulaPy.singularity.Singularity
-   :members:
+   :no-members:
+   :no-index:
    :undoc-members:
    :show-inheritance:
    :special-members: __init__
@@ -194,6 +196,7 @@ Core Analysis Methods
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. py:method:: __init__(serial_manipulator)
+   :no-index:
 
    Initialize singularity analysis for a given robot.
 
@@ -201,6 +204,7 @@ Core Analysis Methods
    :raises TypeError: If serial_manipulator is not a valid SerialManipulator instance
 
 .. py:method:: singularity_analysis(thetalist) -> bool
+   :no-index:
 
    Detect exact singularities using Jacobian determinant.
 
@@ -212,6 +216,8 @@ Core Analysis Methods
    use :py:meth:`condition_number` or :py:meth:`near_singularity_detection`.
 
    .. code-block:: python
+
+       import numpy as np
 
        # Example: Check multiple configurations
        test_configs = [
@@ -225,6 +231,7 @@ Core Analysis Methods
            print(f"Config {i+1} singular: {singular}")
 
 .. py:method:: condition_number(thetalist) -> float
+   :no-index:
 
    Calculate Jacobian condition number for singularity proximity assessment.
 
@@ -239,6 +246,7 @@ Core Analysis Methods
    - κ → ∞: At singularity
 
 .. py:method:: near_singularity_detection(thetalist, threshold=100) -> bool
+   :no-index:
 
    Detect proximity to singularities using condition number threshold.
 
@@ -257,6 +265,7 @@ Visualization Methods
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. py:method:: manipulability_ellipsoid(thetalist, ax=None)
+   :no-index:
 
    Visualize manipulability ellipsoids for linear and angular velocities.
 
@@ -276,6 +285,7 @@ Visualization Methods
    - **Orientation**: Principal motion directions
 
 .. py:method:: plot_workspace_monte_carlo(joint_limits, num_samples=10000)
+   :no-index:
 
    Generate workspace boundary using Monte Carlo sampling with optional GPU acceleration.
 
@@ -367,6 +377,9 @@ Analyze singularities along planned trajectories:
 
 .. code-block:: python
 
+    import numpy as np
+    import matplotlib.pyplot as plt
+
     def analyze_trajectory_singularities(analyzer, trajectory, time_steps=None):
         """Analyze singularities along a trajectory."""
         
@@ -447,6 +460,7 @@ Implement real-time singularity monitoring for robot control:
 
     import time
     import threading
+    import numpy as np
     from collections import deque
 
     class SingularityMonitor:
@@ -551,6 +565,8 @@ Cache Jacobian computations for repeated configurations:
 
 .. code-block:: python
 
+    import numpy as np
+
     class CachedSingularityAnalyzer:
         """Singularity analyzer with Jacobian caching."""
         
@@ -591,6 +607,8 @@ Cache Jacobian computations for repeated configurations:
 Process multiple configurations efficiently:
 
 .. code-block:: python
+
+    import numpy as np
 
     def batch_singularity_analysis(analyzer, configurations, batch_size=100):
         """Efficiently analyze multiple configurations."""
@@ -635,6 +653,8 @@ Common Issues and Solutions
 Problem: Condition numbers become infinite or NaN
 
 .. code-block:: python
+
+    import numpy as np
 
     def robust_condition_number(analyzer, thetalist, max_condition=1e12):
         """Robust condition number computation with error handling."""
@@ -697,6 +717,7 @@ Unit Testing Framework
 
 .. code-block:: python
 
+    import numpy as np
     import unittest
 
     class TestSingularityAnalysis(unittest.TestCase):

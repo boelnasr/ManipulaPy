@@ -19,7 +19,7 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
                <img src="https://img.shields.io/pypi/v/manipulapy?style=for-the-badge&logo=pypi&logoColor=white&label=PyPI&color=blue" alt="PyPI Version">
             </a>
             <a href="https://www.python.org/downloads/">
-               <img src="https://img.shields.io/badge/python-3.8%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python Versions">
+               <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python Versions">
             </a>
             <a href="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa">
                <img src="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg?style=for-the-badge" alt="JOSS Paper">
@@ -62,6 +62,7 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
 .. contents:: **Quick links**
    :local:
    :depth: 1
+   :backlinks: none
 
 Getting Started
 ---------------
@@ -336,6 +337,19 @@ Documentation Map
 
 .. toctree::
    :maxdepth: 2
+   :caption: 🚀 Getting Started
+
+   Installation Guide
+   getting_started/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: 📘 Tutorials
+
+   tutorials/index
+
+.. toctree::
+   :maxdepth: 2
    :caption: 🛠️ API Reference
 
    api/index   
@@ -345,17 +359,6 @@ Documentation Map
    :caption: 📚 User Guides
 
    user_guide/index
-   user_guide/Kinematics
-   user_guide/Dynamics
-   user_guide/Control
-   user_guide/Trajectory_Planning
-   user_guide/Simulation
-   user_guide/URDF_Processor
-   user_guide/Singularity_Analysis 
-   user_guide/Perception
-   user_guide/Potential_Field
-   user_guide/Collision_Checker
-   user_guide/CUDA_Kernels
 
 Popular Learning Paths
 ----------------------
@@ -407,14 +410,16 @@ What's New
 .. raw:: html
 
    <div class="whats-new">
-      <h4>🎉 Latest in v1.3.1</h4>
+      <h4>🎉 Latest in v1.3.2</h4>
       <ul>
-         <li><strong>New:</strong> CUDA-accelerated trajectory planning</li>
-         <li><strong>New:</strong> Computer vision and perception modules</li>
-         <li><strong>New:</strong> Neural network inverse kinematics</li>
-         <li><strong>Improved:</strong> 3x faster dynamics computation with caching</li>
-         <li><strong>Added:</strong> PyBullet simulation integration</li>
-         <li><strong>Enhanced:</strong> Documentation with interactive examples</li>
+         <li><strong>New:</strong> Modular optional extras — <code>[simulation]</code>, <code>[urdf]</code>, <code>[vision]</code>, <code>[ml]</code>, <code>[cuda]</code>, <code>[all]</code> — default install is now lightweight</li>
+         <li><strong>New:</strong> Native NumPy 2.0-compatible URDF parser (<code>ManipulaPy.urdf.URDF</code>) with <code>PackageResolver</code> for <code>package://</code> and <code>file://</code> URIs</li>
+         <li><strong>New:</strong> PEP 561 <code>py.typed</code> marker — mypy/pyright now see ManipulaPy as a typed package</li>
+         <li><strong>New:</strong> Python 3.12 added to the supported matrix</li>
+         <li><strong>Fixed:</strong> CUDA trajectory kernels — corrected quintic acceleration, removed shared-memory and forward-dynamics races, added <code>method=1</code> (linear) support, guarded N≤1 against div-zero</li>
+         <li><strong>Fixed:</strong> Repulsive-potential-gradient sign in <code>fused_potential_gradient_kernel</code> — previous versions produced an attracting field</li>
+         <li><strong>Fixed:</strong> Simulation methods now raise clear <code>ImportError</code> with <code>pip install ManipulaPy[simulation]</code> hint when PyBullet is missing</li>
+         <li><strong>Fixed:</strong> <code>Vision.detect_obstacles</code> default <code>depth_threshold</code> raised from 0.0 → 5.0 m (the old default filtered every detection)</li>
       </ul>
    </div>
 
@@ -423,22 +428,31 @@ Installation Options
 
 .. code-block:: bash
 
-   # Basic installation
+   # Lightweight default install — kinematics, dynamics, control, native URDF parser
    pip install manipulapy
 
-   # With CUDA acceleration (recommended)
-   pip install manipulapy[cuda]
+   # Add PyBullet-based simulation
+   pip install "manipulapy[simulation]"
 
-   # With computer vision support
-   pip install manipulapy[vision]
+   # Add trimesh-based mesh loading
+   pip install "manipulapy[urdf]"
 
-   # Full installation (all features)
-   pip install manipulapy[all]
+   # Add OpenCV / ultralytics / torch for vision and perception
+   pip install "manipulapy[vision]"
+
+   # Add scikit-learn for ML clustering
+   pip install "manipulapy[ml]"
+
+   # Add CUDA acceleration (CUDA 12.x)
+   pip install "manipulapy[cuda]"
+
+   # Everything (sim + urdf + vision + ml + cuda)
+   pip install "manipulapy[all]"
 
    # Development installation
    git clone https://github.com/boelnasr/ManipulaPy.git
    cd ManipulaPy
-   pip install -e .[dev]
+   pip install -e ".[dev]"
 
 Performance Showcase
 ~~~~~~~~~~~~~~~~~~~~
@@ -475,12 +489,12 @@ If you use ManipulaPy in your research, please cite:
 
 .. code-block:: bibtex
 
-   @software{manipulapy2024,
+   @software{manipulapy2026,
      title={ManipulaPy: A Modern Python Library for Robot Manipulation},
-     author={Mohamed Aboelnar},
-     year={2024},
+     author={Mohamed Aboelnasr},
+     year={2026},
      url={https://github.com/boelnasr/ManipulaPy},
-     version={1.3.1}
+     version={1.3.2}
    }
 
 License

@@ -16,13 +16,22 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
+import os
 import numpy as np
-import matplotlib.pyplot as plt
-import time
 import logging
 from pathlib import Path
 import matplotlib
-matplotlib.use('TkAgg')
+
+# Respect the MPLBACKEND environment variable (e.g. "Agg" for headless runs);
+# only fall back to an interactive backend when none was requested.
+if not os.environ.get("MPLBACKEND"):
+    matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+# Save every figure next to this script so the repo root stays clean.
+OUTPUT_DIR = Path(__file__).resolve().parent / "control_basic_demo_outputs"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
 # ManipulaPy imports
 try:
     from ManipulaPy.kinematics import SerialManipulator
@@ -54,7 +63,7 @@ class BasicControlDemo:
     Demonstrates basic control algorithms for robotic manipulators using the built-in XArm robot.
     """
     
-    def __init__(self, use_simple_robot=False):
+    def __init__(self, use_simple_robot=False) -> None:
         """
         Initialize the control demo.
         
@@ -66,14 +75,14 @@ class BasicControlDemo:
         self.setup_robot()
         self.setup_controller()
         
-    def setup_robot(self):
+    def setup_robot(self) -> None:
         """Set up the robot model (either XArm or simple)."""
         if self.use_simple_robot:
             self.setup_simple_robot()
         else:
             self.setup_xarm_robot()
             
-    def setup_xarm_robot(self):
+    def setup_xarm_robot(self) -> None:
         """Load the built-in XArm robot from ManipulaPy data."""
         logger.info("Setting up XArm robot from built-in data...")
         
@@ -117,7 +126,7 @@ class BasicControlDemo:
             self.use_simple_robot = True
             self.setup_simple_robot()
             
-    def setup_simple_robot(self):
+    def setup_simple_robot(self) -> None:
         """Create a simple 3-DOF planar robot for demonstration (fallback)."""
         logger.info("Setting up simple 3-DOF planar robot as fallback...")
         
@@ -202,7 +211,7 @@ class BasicControlDemo:
         
         logger.info("✅ Simple robot setup complete")
     
-    def get_safe_joint_targets(self):
+    def get_safe_joint_targets(self) -> list:
         """Get safe joint target positions within limits for the current robot."""
         num_joints = len(self.joint_limits)
         
@@ -234,7 +243,7 @@ class BasicControlDemo:
         
         return targets
     
-    def get_trajectory_amplitudes(self):
+    def get_trajectory_amplitudes(self) -> list:
         """Get safe trajectory amplitudes for the current robot."""
         num_joints = len(self.joint_limits)
         
@@ -256,51 +265,111 @@ class BasicControlDemo:
         
         return amplitudes
         
-    def setup_urdf_robot(self):
+    def setup_urdf_robot(self) -> None:
         """Legacy method - now redirects to XArm setup."""
         logger.info("Redirecting to built-in XArm robot...")
         self.setup_xarm_robot()
         
-    def setup_controller(self):
+    def setup_controller(self) -> None:
         """Initialize the manipulator controller."""
         self.controller = ManipulatorController(self.dynamics)
         logger.info("✅ Controller initialized")
-        
-    def demonstrate_pid_control(self):
+
+    def pid_gains(self, omega_n: float = 8.0, zeta: float = 1.0,
+                  ki_ratio: float = 0.1) -> tuple:
+        """Compute inertia-scaled PID gains for a stable step response.
+
+        The joints of a real arm have very different effective inertias
+        (the wrist is far lighter than the shoulder). Using one fixed gain
+        for every joint makes the light joints stiff and unstable under
+        explicit integration. We size each joint's gains from the diagonal
+        of the mass matrix M(0) so that every joint behaves like the same
+        second-order system: Kp = m·ωₙ², Kd = 2·ζ·m·ωₙ.
+
+        Args:
+            omega_n: Target natural frequency (rad/s).
+            zeta: Target damping ratio (1.0 = critically damped).
+            ki_ratio: Integral gain as a fraction of Kp.
+
+        Returns:
+            (Kp, Ki, Kd) arrays, one entry per joint.
+        """
+        num_joints = len(self.joint_limits)
+        inertia = np.diag(self.dynamics.mass_matrix(np.zeros(num_joints)))
+        inertia = np.clip(inertia, 1e-3, None)  # avoid zero-inertia division
+        Kp = inertia * omega_n**2
+        Kd = 2.0 * zeta * inertia * omega_n
+        Ki = ki_ratio * Kp
+        return Kp, Ki, Kd
+
+    def integrate_dynamics(self, q: np.ndarray, dq: np.ndarray,
+                           tau: np.ndarray, g: np.ndarray, Ftip: np.ndarray,
+                           dt: float, n_substeps: int = 8) -> tuple:
+        """Advance the plant one control period using the library dynamics.
+
+        The wrist joints have very small inertia, so a single explicit Euler
+        step at the control rate would be numerically stiff. We sub-step the
+        forward dynamics (semi-implicit Euler) to keep the simulation stable
+        while still holding the torque constant over the control period.
+
+        Args:
+            q, dq: current joint positions / velocities.
+            tau: commanded joint torques (held constant over the period).
+            g: gravity vector; Ftip: end-effector wrench.
+            dt: control period; n_substeps: integration sub-steps per period.
+
+        Returns:
+            (q_next, dq_next) after one control period.
+        """
+        h = dt / n_substeps
+        q = q.copy()
+        dq = dq.copy()
+        for _ in range(n_substeps):
+            ddq = self.dynamics.forward_dynamics(q, dq, tau, g, Ftip)
+            dq = dq + ddq * h
+            q = q + dq * h
+        return q, dq
+
+    def demonstrate_pid_control(self) -> None:
         """Demonstrate PID control with step response analysis."""
         logger.info("\n🎯 Demonstrating PID Control...")
         
-        # Control parameters
+        # Inertia-scaled gains keep every joint stable and similarly damped.
         num_joints = len(self.joint_limits)
-        Kp = np.array([100.0] * num_joints)
-        Ki = np.array([10.0] * num_joints)
-        Kd = np.array([20.0] * num_joints)
-        
+        Kp, Ki, Kd = self.pid_gains(omega_n=8.0, zeta=1.0, ki_ratio=0.1)
+
         # Simulation parameters
         dt = 0.01  # 10 ms time step
-        T_final = 5.0  # 5 second simulation
+        T_final = 1.5  # short horizon keeps the CPU run fast
         time_steps = int(T_final / dt)
         
         # Target positions (step inputs) - use safe targets for current robot
         target_positions = self.get_safe_joint_targets()
         target_velocities = np.zeros(num_joints)
         
+        # Gravity acts on the arm during the simulated step response.
+        gravity = np.array([0, 0, -9.81])
+        Ftip = np.zeros(6)
+
         # Initial conditions
         current_positions = np.zeros(num_joints)
         current_velocities = np.zeros(num_joints)
-        
+
+        # Reset the controller's integral accumulator before the run.
+        self.controller.eint = None
+
         # Data storage
         time_history = []
         position_history = []
         velocity_history = []
         torque_history = []
         error_history = []
-        
+
         logger.info(f"Running PID simulation for {T_final}s with {time_steps} steps...")
-        
+
         for step in range(time_steps):
             current_time = step * dt
-            
+
             # PID control
             control_torques = self.controller.pid_control(
                 thetalistd=target_positions,
@@ -312,28 +381,25 @@ class BasicControlDemo:
                 Ki=Ki,
                 Kd=Kd
             )
-            
+
             # Convert to numpy if using GPU
             if GPU_AVAILABLE and hasattr(control_torques, 'get'):
                 control_torques = control_torques.get()
-            
+
             # Apply torque limits
             control_torques = np.clip(
-                control_torques, 
-                self.torque_limits[:, 0], 
+                control_torques,
+                self.torque_limits[:, 0],
                 self.torque_limits[:, 1]
             )
-            
-            # Simple integration (Euler method)
-            # In a real system, you would use forward dynamics
-            # For demo purposes, we'll use a simplified model
-            mass_matrix = np.diag([1.0] * num_joints)  # Simplified
-            accelerations = np.linalg.solve(mass_matrix, control_torques)
-            
-            # Update states
-            current_velocities += accelerations * dt
-            current_positions += current_velocities * dt
-            
+
+            # Integrate the true rigid-body dynamics (mass matrix, Coriolis
+            # and gravity terms) via the library's forward_dynamics.
+            current_positions, current_velocities = self.integrate_dynamics(
+                current_positions, current_velocities, control_torques,
+                gravity, Ftip, dt
+            )
+
             # Apply joint limits
             current_positions = np.clip(
                 current_positions,
@@ -366,7 +432,7 @@ class BasicControlDemo:
         
         logger.info("✅ PID control demonstration complete")
         
-    def plot_pid_results(self, time_hist, pos_hist, vel_hist, torque_hist, error_hist, targets):
+    def plot_pid_results(self, time_hist, pos_hist, vel_hist, torque_hist, error_hist, targets) -> None:
         """Plot PID control results."""
         num_joints = pos_hist.shape[1]
         
@@ -415,55 +481,74 @@ class BasicControlDemo:
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig('pid_control_results.png', dpi=150, bbox_inches='tight')
-        logger.info("📊 PID control plot saved as 'pid_control_results.png'")
+        out_path = OUTPUT_DIR / "pid_control_results.png"
+        plt.savefig(out_path, dpi=150, bbox_inches='tight')
+        logger.info(f"📊 PID control plot saved to '{out_path}'")
         plt.close()  # Close figure to prevent display issues
         
-    def analyze_step_response(self, time_hist, pos_hist, targets):
+    def analyze_step_response(self, time_hist, pos_hist, targets) -> None:
         """Analyze step response characteristics."""
         logger.info("\n📊 Step Response Analysis:")
         
         for joint in range(pos_hist.shape[1]):
             target = targets[joint]
             response = pos_hist[:, joint]
-            
-            # Rise time (10% to 90% of final value)
+            initial = response[0]
             final_value = response[-1]
-            rise_start_idx = np.where(response >= 0.1 * target)[0]
-            rise_end_idx = np.where(response >= 0.9 * target)[0]
-            
+
+            # All step metrics are referenced to the commanded step magnitude
+            # (target - initial), not the raw target value. This keeps them well
+            # defined for small, negative, or limit-clipped targets, where the
+            # old "divide by target" formulation produced nan/garbage percentages.
+            step = target - initial
+            magnitude = abs(step)
+
+            if magnitude < 1e-6:
+                # No commanded motion (target ~ start): step metrics are undefined.
+                logger.info(f"  Joint {joint+1}: target ≈ start "
+                            f"({target:.3f} rad); step metrics N/A")
+                continue
+
+            sign = np.sign(step)
+            progress = (response - initial) * sign  # 0 at start -> magnitude at target
+
+            # Rise time (10% -> 90% of the step), direction-aware
+            rise_start_idx = np.where(progress >= 0.1 * magnitude)[0]
+            rise_end_idx = np.where(progress >= 0.9 * magnitude)[0]
             if len(rise_start_idx) > 0 and len(rise_end_idx) > 0:
                 rise_time = time_hist[rise_end_idx[0]] - time_hist[rise_start_idx[0]]
             else:
                 rise_time = float('inf')
-            
-            # Settling time (within 2% of target)
-            settling_indices = np.where(np.abs(response - target) <= 0.02 * target)[0]
-            if len(settling_indices) > 0:
-                settling_time = time_hist[settling_indices[0]]
-            else:
-                settling_time = float('inf')
-            
-            # Overshoot
-            max_response = np.max(response)
-            overshoot = max(0, (max_response - target) / target * 100)
-            
+
+            # Settling time (within 2% of the step magnitude around the target)
+            settling_indices = np.where(np.abs(response - target) <= 0.02 * magnitude)[0]
+            settling_time = (time_hist[settling_indices[0]]
+                             if len(settling_indices) > 0 else float('inf'))
+
+            # Overshoot beyond the target, as a percentage of the step magnitude
+            overshoot = max(0.0, (np.max(progress) - magnitude) / magnitude * 100.0)
+
             # Steady-state error
             steady_state_error = abs(final_value - target)
-            
+
+            # inf means the joint never reached 90% / never settled within the
+            # band (e.g. large steady-state error) — report it as n/a, not "infs".
+            rise_str = f"{rise_time:.3f}s" if np.isfinite(rise_time) else "n/a (never reached 90%)"
+            settle_str = f"{settling_time:.3f}s" if np.isfinite(settling_time) else "n/a (never settled)"
+
             logger.info(f"  Joint {joint+1}:")
-            logger.info(f"    Rise time: {rise_time:.3f}s")
-            logger.info(f"    Settling time: {settling_time:.3f}s")
+            logger.info(f"    Rise time: {rise_str}")
+            logger.info(f"    Settling time: {settle_str}")
             logger.info(f"    Overshoot: {overshoot:.1f}%")
             logger.info(f"    Steady-state error: {steady_state_error:.4f} rad")
             
 
-    def demonstrate_computed_torque_control(self):
+    def demonstrate_computed_torque_control(self) -> None:
         """Demonstrate computed torque control for trajectory tracking."""
         logger.info("\n🎯 Demonstrating Computed Torque Control...")
         
         # Generate a simple trajectory
-        T_final = 5.0
+        T_final = 1.5
         dt = 0.01
         time_steps = int(T_final / dt)
         num_joints = len(self.joint_limits)
@@ -498,18 +583,21 @@ class BasicControlDemo:
         gravity = np.array([0, 0, -9.81])
         Ftip = np.zeros(6)  # No external forces
         
-        # Initial conditions
-        current_positions = np.zeros(num_joints)
-        current_velocities = np.zeros(num_joints)
-        
+        # Initial conditions (start at the trajectory's first sample)
+        current_positions = desired_positions[0].copy()
+        current_velocities = desired_velocities[0].copy()
+
+        # Reset the controller's integral accumulator before the run.
+        self.controller.eint = None
+
         # Data storage
         actual_positions = []
         actual_velocities = []
         control_torques = []
         tracking_errors = []
-        
+
         logger.info(f"Running computed torque simulation...")
-        
+
         for step in range(time_steps):
             # Computed torque control
             torques = self.controller.computed_torque_control(
@@ -524,21 +612,19 @@ class BasicControlDemo:
                 Ki=Ki,
                 Kd=Kd
             )
-            
+
             # Convert from GPU if necessary
             if GPU_AVAILABLE and hasattr(torques, 'get'):
                 torques = torques.get()
-            
+
             # Apply torque limits
             torques = np.clip(torques, self.torque_limits[:, 0], self.torque_limits[:, 1])
-            
-            # Simplified dynamics integration
-            mass_matrix = np.diag([1.0] * num_joints)
-            accelerations = np.linalg.solve(mass_matrix, torques)
-            
-            # Update states
-            current_velocities += accelerations * dt
-            current_positions += current_velocities * dt
+
+            # Integrate the true rigid-body dynamics. Because computed-torque
+            # control linearizes the plant, tracking should be near-perfect.
+            current_positions, current_velocities = self.integrate_dynamics(
+                current_positions, current_velocities, torques, gravity, Ftip, dt
+            )
             
             # Store data
             actual_positions.append(current_positions.copy())
@@ -568,7 +654,7 @@ class BasicControlDemo:
 
 
 
-    def plot_computed_torque_results(self, time_hist, desired_pos, actual_pos, torques, errors):
+    def plot_computed_torque_results(self, time_hist, desired_pos, actual_pos, torques, errors) -> None:
         """Plot computed torque control results."""
         num_joints = actual_pos.shape[1]
         
@@ -627,11 +713,12 @@ class BasicControlDemo:
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig('computed_torque_results.png', dpi=150, bbox_inches='tight')
-        logger.info("📊 Computed torque control plot saved as 'computed_torque_results.png'")
+        out_path = OUTPUT_DIR / "computed_torque_results.png"
+        plt.savefig(out_path, dpi=150, bbox_inches='tight')
+        logger.info(f"📊 Computed torque control plot saved to '{out_path}'")
         plt.close()  # Close figure to prevent display issues
         
-    def demonstrate_controller_tuning(self):
+    def demonstrate_controller_tuning(self) -> None:
         """Demonstrate automatic controller tuning using Ziegler-Nichols method."""
         logger.info("\n🎯 Demonstrating Controller Tuning (Ziegler-Nichols)...")
         
@@ -669,7 +756,7 @@ class BasicControlDemo:
         try:
             ultimate_gain, ultimate_period, gain_history, error_history = \
                 self.controller.find_ultimate_gain_and_period(
-                    initial_angles, target_angles, dt=0.01, max_steps=500
+                    initial_angles, target_angles, dt=0.01, max_steps=100
                 )
             
             logger.info(f"  Found ultimate gain: {ultimate_gain:.2f}")
@@ -684,7 +771,7 @@ class BasicControlDemo:
             
         logger.info("✅ Controller tuning demonstration complete")
         
-    def plot_tuning_results(self, gain_history, error_history):
+    def plot_tuning_results(self, gain_history, error_history) -> None:
         """Plot controller tuning results."""
         fig, axes = plt.subplots(2, 1, figsize=(12, 8))
         fig.suptitle('Controller Tuning Results', fontsize=16, fontweight='bold')
@@ -713,11 +800,12 @@ class BasicControlDemo:
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig('controller_tuning_results.png', dpi=150, bbox_inches='tight')
-        logger.info("📊 Controller tuning plot saved as 'controller_tuning_results.png'")
+        out_path = OUTPUT_DIR / "controller_tuning_results.png"
+        plt.savefig(out_path, dpi=150, bbox_inches='tight')
+        logger.info(f"📊 Controller tuning plot saved to '{out_path}'")
         plt.close()  # Close figure to prevent display issues
         
-    def demonstrate_cartesian_control(self):
+    def demonstrate_cartesian_control(self) -> None:
         """Demonstrate Cartesian space control."""
         logger.info("\n🎯 Demonstrating Cartesian Space Control...")
         
@@ -778,7 +866,7 @@ class BasicControlDemo:
             
         logger.info("✅ Cartesian space control demonstration complete")
         
-    def plot_cartesian_control_results(self, current_pos, desired_pos, error, torques):
+    def plot_cartesian_control_results(self, current_pos, desired_pos, error, torques) -> None:
         """Plot Cartesian control results."""
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         fig.suptitle('Cartesian Space Control Results', fontsize=16, fontweight='bold')
@@ -834,11 +922,12 @@ class BasicControlDemo:
                    f'{torque:.2f}', ha='center', va='bottom' if height >= 0 else 'top')
         
         plt.tight_layout()
-        plt.savefig('cartesian_control_results.png', dpi=150, bbox_inches='tight')
-        logger.info("📊 Cartesian control plot saved as 'cartesian_control_results.png'")
+        out_path = OUTPUT_DIR / "cartesian_control_results.png"
+        plt.savefig(out_path, dpi=150, bbox_inches='tight')
+        logger.info(f"📊 Cartesian control plot saved to '{out_path}'")
         plt.close()  # Close figure to prevent display issues
         
-    def demonstrate_feedforward_control(self):
+    def demonstrate_feedforward_control(self) -> None:
         """Demonstrate PD control with feedforward compensation."""
         logger.info("\n🎯 Demonstrating PD + Feedforward Control...")
         
@@ -925,7 +1014,7 @@ class BasicControlDemo:
             
         logger.info("✅ PD + Feedforward control demonstration complete")
         
-    def plot_feedforward_results(self, pd_torques, ff_torques, combined_torques):
+    def plot_feedforward_results(self, pd_torques, ff_torques, combined_torques) -> None:
         """Plot feedforward control analysis."""
         num_joints = len(pd_torques)
         
@@ -969,76 +1058,60 @@ class BasicControlDemo:
         ax.set_ylim(0, 100)
         
         plt.tight_layout()
-        plt.savefig('feedforward_control_results.png', dpi=150, bbox_inches='tight')
-        logger.info("📊 Feedforward control plot saved as 'feedforward_control_results.png'")
+        out_path = OUTPUT_DIR / "feedforward_control_results.png"
+        plt.savefig(out_path, dpi=150, bbox_inches='tight')
+        logger.info(f"📊 Feedforward control plot saved to '{out_path}'")
         plt.close()  # Close figure to prevent display issues
 
 
 
-    def demonstrate_control_comparison(self):
+    def demonstrate_control_comparison(self) -> None:
         """Compare different control strategies on the same task."""
         logger.info("\n🎯 Demonstrating Control Strategy Comparison...")
         
-        # Define a challenging trajectory
-        T_final = 3.0
+        # A common step-response task lets us compare strategies fairly.
+        T_final = 1.2
         dt = 0.01
         time_steps = int(T_final / dt)
         num_joints = len(self.joint_limits)
-        
-        time_history = np.linspace(0, T_final, time_steps)
-        
-        # Multi-frequency trajectory with safe amplitudes
-        amplitude = self.get_trajectory_amplitudes() * 0.8  # Conservative amplitudes
-        freq1 = np.array([0.3, 0.4, 0.5, 0.3, 0.4, 0.3, 0.5][:num_joints])
-        freq2 = np.array([0.8, 0.6, 0.7, 0.9, 0.6, 0.8, 0.7][:num_joints])
-        
-        # Ensure frequency arrays match number of joints
-        if len(freq1) < num_joints:
-            base_freq1 = [0.3, 0.4, 0.5, 0.3, 0.4, 0.3, 0.5]
-            freq1 = np.array([base_freq1[i % len(base_freq1)] for i in range(num_joints)])
-        if len(freq2) < num_joints:
-            base_freq2 = [0.8, 0.6, 0.7, 0.9, 0.6, 0.8, 0.7]
-            freq2 = np.array([base_freq2[i % len(base_freq2)] for i in range(num_joints)])
 
-        desired_positions = np.zeros((time_steps, num_joints))
-        # FIX: Use amplitude[i] instead of amplitude
-        for i in range(num_joints):
-            desired_positions[:, i] = amplitude[i] * (
-                np.sin(2*np.pi*freq1[i]*time_history) + 
-                0.3*np.sin(2*np.pi*freq2[i]*time_history)
-            )
-        
-        # Control strategies adapted for current robot
-        if not self.use_simple_robot:  # XArm robot - more conservative gains
-            strategies = {
-                'PID': {'Kp': 50, 'Ki': 10, 'Kd': 15},
-                'High_Gain_PD': {'Kp': 80, 'Ki': 0, 'Kd': 20},
-                'Aggressive_PID': {'Kp': 100, 'Ki': 25, 'Kd': 30}
-            }
-        else:  # Simple robot - can handle higher gains
-            strategies = {
-                'PID': {'Kp': 100, 'Ki': 20, 'Kd': 25},
-                'High_Gain_PD': {'Kp': 200, 'Ki': 0, 'Kd': 40},
-                'Aggressive_PID': {'Kp': 300, 'Ki': 50, 'Kd': 60}
-            }
-        
+        time_history = np.linspace(0, T_final, time_steps)
+        gravity = np.array([0, 0, -9.81])
+        Ftip = np.zeros(6)
+
+        # Constant target (step input) within the joint limits.
+        target_positions = self.get_safe_joint_targets()
+        desired_positions = np.tile(target_positions, (time_steps, 1))
+
+        # Each strategy is described by its target second-order tuning
+        # (natural frequency, damping, integral ratio); pid_gains() turns that
+        # into inertia-scaled per-joint gains. Pure PD (ki_ratio = 0) cannot
+        # reject gravity and leaves a steady-state offset, while the PID
+        # variants drive that offset to zero — the teaching point.
+        strategies = {
+            'PID':            {'omega_n': 6.0,  'zeta': 1.0,  'ki_ratio': 0.15},
+            'High_Gain_PD':   {'omega_n': 10.0, 'zeta': 0.7,  'ki_ratio': 0.0},
+            'Aggressive_PID': {'omega_n': 10.0, 'zeta': 0.8,  'ki_ratio': 0.30},
+        }
+
         results = {}
-        
-        for strategy_name, gains in strategies.items():
+
+        for strategy_name, tuning in strategies.items():
             logger.info(f"  Testing {strategy_name} strategy...")
-            
+            Kp, Ki, Kd = self.pid_gains(**tuning)
+
             # Reset initial conditions
             current_positions = np.zeros(num_joints)
             current_velocities = np.zeros(num_joints)
-            
+
             # Reset controller state
             self.controller.eint = None
-            
+
             positions_hist = []
             errors_hist = []
             torques_hist = []
-            
-            for step in range(min(500, time_steps)):  # Limit for demo
+
+            for step in range(time_steps):
                 if strategy_name in ['PID', 'Aggressive_PID']:
                     torques = self.controller.pid_control(
                         thetalistd=desired_positions[step],
@@ -1046,31 +1119,36 @@ class BasicControlDemo:
                         thetalist=current_positions,
                         dthetalist=current_velocities,
                         dt=dt,
-                        Kp=np.array([gains['Kp']] * num_joints),
-                        Ki=np.array([gains['Ki']] * num_joints),
-                        Kd=np.array([gains['Kd']] * num_joints)
+                        Kp=Kp,
+                        Ki=Ki,
+                        Kd=Kd
                     )
-                else:  # PD control
+                else:  # PD control (no integral term)
                     torques = self.controller.pd_control(
                         desired_position=desired_positions[step],
                         desired_velocity=np.zeros(num_joints),
                         current_position=current_positions,
                         current_velocity=current_velocities,
-                        Kp=np.array([gains['Kp']] * num_joints),
-                        Kd=np.array([gains['Kd']] * num_joints)
+                        Kp=Kp,
+                        Kd=Kd
                     )
                 
                 # Convert from GPU if necessary
                 if GPU_AVAILABLE and hasattr(torques, 'get'):
                     torques = torques.get()
                 
-                # Apply limits and simple integration
+                # Apply limits and integrate the true rigid-body dynamics.
                 torques = np.clip(torques, self.torque_limits[:, 0], self.torque_limits[:, 1])
-                accelerations = torques  # Simplified
-                
-                current_velocities += accelerations * dt * 0.1  # Damped
-                current_positions += current_velocities * dt
-                
+                current_positions, current_velocities = self.integrate_dynamics(
+                    current_positions, current_velocities, torques,
+                    gravity, Ftip, dt
+                )
+                current_positions = np.clip(
+                    current_positions,
+                    self.joint_limits[:, 0],
+                    self.joint_limits[:, 1]
+                )
+
                 # Store results
                 positions_hist.append(current_positions.copy())
                 errors_hist.append(desired_positions[step] - current_positions)
@@ -1099,7 +1177,7 @@ class BasicControlDemo:
         logger.info("✅ Control strategy comparison complete")
 
 
-    def plot_control_comparison(self, results, desired_positions):
+    def plot_control_comparison(self, results, desired_positions) -> None:
         """Plot control strategy comparison."""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('Control Strategy Comparison', fontsize=16, fontweight='bold')
@@ -1170,11 +1248,12 @@ class BasicControlDemo:
         ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig('control_strategy_comparison.png', dpi=150, bbox_inches='tight')
-        logger.info("📊 Control comparison plot saved as 'control_strategy_comparison.png'")
+        out_path = OUTPUT_DIR / "control_strategy_comparison.png"
+        plt.savefig(out_path, dpi=150, bbox_inches='tight')
+        logger.info(f"📊 Control comparison plot saved to '{out_path}'")
         plt.close()  # Close figure to prevent display issues
         
-    def run_all_demonstrations(self):
+    def run_all_demonstrations(self) -> None:
         """Run all control demonstrations."""
         logger.info("🚀 Starting Basic Control Demonstrations")
         logger.info("=" * 60)
@@ -1207,7 +1286,7 @@ class BasicControlDemo:
             import traceback
             traceback.print_exc()
 
-def main():
+def main() -> int:
     """Main function to run the basic control demo."""
     print("🤖 ManipulaPy Basic Control Demo - XArm Edition")
     print("=" * 60)

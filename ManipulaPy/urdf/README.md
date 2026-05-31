@@ -56,14 +56,12 @@ robot = URDF.load("robot.urdf", load_meshes=True, mesh_dir="/path/to/meshes")
 
 ### Backend Selection
 
-The parser supports multiple backends for compatibility:
+The native parser is the default. PyBullet remains available as an optional
+backend for simulation interoperability:
 
 ```python
 # Native builtin parser (default, NumPy 2.0 compatible)
 robot = URDF.load("robot.urdf", backend="builtin")
-
-# Legacy urchin backend (if installed)
-robot = URDF.load("robot.urdf", backend="urchin")
 
 # PyBullet backend
 robot = URDF.load("robot.urdf", backend="pybullet")
@@ -404,19 +402,16 @@ robot.show(config=np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]))
 | `to_urdf_string()` | Export to XML string |
 | `save(filename)` | Save to file |
 
-## Migration from urchin
+## Native Parser
 
-If migrating from the old urchin-based approach:
-
-1. **Import change**: `from urchin import URDF` -> `from ManipulaPy.urdf import URDF`
-2. **API is largely compatible** - `link_fk()`, `joint_limits`, etc. work similarly
-3. **Backend fallback**: Use `backend="urchin"` if you need exact urchin behavior
-4. **NumPy 2.0**: The native parser works with NumPy 2.0+; urchin does not
+ManipulaPy ships its own URDF parser. Use `backend="builtin"` for NumPy 2.x
+support and `backend="pybullet"` only when you explicitly need PyBullet's URDF
+loader behavior.
 
 ## Dependencies
 
 **Required:**
-- `numpy` (1.19.2+, including 2.0+)
+- `numpy` (2.0+)
 
 **Optional:**
 - `trimesh` - Mesh loading and visualization

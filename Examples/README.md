@@ -44,7 +44,7 @@ pip install ultralytics opencv-python
 pip install scikit-learn matplotlib seaborn
 
 # For simulation examples
-pip install pybullet urchin
+pip install pybullet
 ```
 
 ## 📚 Example Categories
@@ -60,7 +60,7 @@ Perfect for newcomers to robotics and ManipulaPy. These examples demonstrate cor
   - Inverse kinematics with multiple solutions
   - Jacobian analysis
   - End-effector pose visualization
-- **Output**: `complete_robot_analysis.png`, `workspace_visualization.png`
+- **Output**: `kinematics_basic_demo.png`
 
 #### `dynamics_basic_demo.py`
 - **Purpose**: Fundamental dynamics computations
@@ -125,7 +125,7 @@ More sophisticated examples combining multiple modules and real-world scenarios.
   - Performance metrics comparison
   - Real-time monitoring capabilities
   - Adaptive parameter tuning
-- **Output**: `control_comparison.png`, `performance_benchmark.png`
+- **Output**: `control_comparison.png`, `control_metrics.png`
 
 #### `perception_intermediate_demo.py`
 - **Purpose**: Computer vision and perception integration
@@ -157,7 +157,7 @@ Production-ready examples showcasing optimization, scaling, and real-world integ
   - Memory management optimization
   - Performance profiling and analysis
   - Batch processing capabilities
-- **Output**: `gpu_performance_analysis.png`, `memory_efficiency_analysis.png`
+- **Output**: `gpu_acceleration_scaling.png`
 
 #### `batch_processing_advanced_demo.py`
 - **Purpose**: Large-scale batch trajectory processing
@@ -166,7 +166,7 @@ Production-ready examples showcasing optimization, scaling, and real-world integ
   - Statistical analysis
   - Scaling behavior evaluation
   - Resource utilization monitoring
-- **Output**: `batch_scaling_analysis.png`, `batch_statistics_analysis_100.png`
+- **Output**: `batch_scaling_analysis.png`, `batch_processing_analysis_report.txt`
 
 #### `collision_avoidance_advanced_demo.py`
 - **Purpose**: Advanced collision avoidance strategies
@@ -175,7 +175,7 @@ Production-ready examples showcasing optimization, scaling, and real-world integ
   - Real-time obstacle detection
   - Dynamic environment adaptation
   - Safety-critical applications
-- **Output**: `potential_field_visualization.png`, `environment_3d.png`
+- **Output**: `potential_field_visualization.png`, `trajectory_comparison.png`, `performance_statistics.png`, `collision_avoidance_analysis_report.txt`
 
 #### `optimal_control_advanced_demo.py`
 - **Purpose**: Optimal control and trajectory optimization
@@ -184,7 +184,7 @@ Production-ready examples showcasing optimization, scaling, and real-world integ
   - Constrained trajectory planning
   - Multi-objective optimization
   - Performance comparison analysis
-- **Output**: `trajectory_comparison_scenario_0.png`
+- **Output**: `optimal_control_tracking.png`, `optimal_control_error_metrics.png`
 
 #### `stereo_vision_advanced_demo.py`
 - **Purpose**: Advanced stereo vision processing
@@ -193,6 +193,7 @@ Production-ready examples showcasing optimization, scaling, and real-world integ
   - 3D reconstruction
   - Real-time depth estimation
   - Point cloud processing
+- **Output**: `stereo_vision_pipeline.png`
 
 #### `real_robot_integration_advanced_demo.py`
 - **Purpose**: Real robot hardware integration
@@ -201,7 +202,7 @@ Production-ready examples showcasing optimization, scaling, and real-world integ
   - Real-time control implementation
   - Safety monitoring systems
   - Production deployment strategies
-- **Output**: `real_time_simulation.png`
+- **Output**: `real_robot_integration_tracking.png`
 
 ## 📊 Output Files and Analysis
 

@@ -27,9 +27,9 @@ This guide helps diagnose and resolve common issues when using the native URDF p
 import numpy as np
 print(np.__version__)
 
-# The native parser supports NumPy 1.19.2+ and NumPy 2.0+
+# The native parser supports NumPy 2.0+
 # If using NumPy 2.0+, ensure scipy is also updated:
-# pip install 'scipy>=1.14'
+# pip install 'scipy>=1.13'
 ```
 
 ### Missing Optional Dependencies
@@ -395,7 +395,7 @@ def get_robot(urdf_path):
 ```python
 # The native URDF parser supports NumPy 2.0
 # Make sure scipy is also updated:
-# pip install 'scipy>=1.14'
+# pip install 'scipy>=1.13'
 
 # Check versions
 import numpy as np
@@ -434,11 +434,6 @@ from ManipulaPy.urdf import URDF
 # - Fast batch FK
 robot = URDF.load("robot.urdf", backend="builtin")
 
-# Legacy: urchin backend
-# - For compatibility with existing code
-# - Does NOT support NumPy 2.0
-robot = URDF.load("robot.urdf", backend="urchin")
-
 # PyBullet backend
 # - Uses PyBullet's URDF parser
 # - Good for simulation integration
@@ -454,12 +449,6 @@ robot = URDF.load("robot.urdf", backend="pybullet")
 # Check available backends
 def check_backends():
     backends = {"builtin": True}
-
-    try:
-        import urchin
-        backends["urchin"] = True
-    except ImportError:
-        backends["urchin"] = False
 
     try:
         import pybullet

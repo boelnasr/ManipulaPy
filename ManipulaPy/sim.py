@@ -30,33 +30,115 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 import logging
+import os
 import time
+from typing import Any, List, Optional, Sequence, Tuple
 
-import cupy as cp  # Import cupy for CUDA acceleration
 import matplotlib.pyplot as plt
 import numpy as np
-import pybullet as p
-import pybullet_data
+
+try:
+    import cupy as cp  # Optional: CUDA acceleration
+
+    _CUPY_AVAILABLE = True
+except ImportError:
+
+    class _NumpyProxy:
+        """Small subset of CuPy's array interface backed by NumPy."""
+
+        # Internal fallback shim: enough of cupy's surface for sim.py's own
+        # call sites (cp.array, cp.asnumpy). Not a drop-in cupy replacement —
+        # cp.cuda.*, cp.ndarray identity (isinstance), and asnumpy keyword
+        # arguments are unsupported. Do NOT import this as ManipulaPy.sim.cp
+        # from external code; depend on cupy directly if you need GPU semantics.
+        def __getattr__(self, name: str) -> Any:
+            """Delegate attribute access to the NumPy module."""
+            return getattr(np, name)
+
+        def asnumpy(self, x: Any) -> np.ndarray:
+            """Convert fallback arrays to NumPy arrays.
+
+            Args:
+                x: Any array-like object to coerce into a NumPy array.
+
+            Returns:
+                np.ndarray: ``x`` as a NumPy array (no copy when already one).
+            """
+            return np.asarray(x)
+
+    cp = _NumpyProxy()
+    _CUPY_AVAILABLE = False
+
+try:
+    import pybullet as p  # Required for Simulation; sim cannot run without it
+    import pybullet_data
+
+    _PYBULLET_AVAILABLE = True
+except ImportError:
+    p = None
+    pybullet_data = None
+    _PYBULLET_AVAILABLE = False
+
+
+def _check_pybullet_available() -> None:
+    """Raise a clear ImportError if pybullet is unavailable.
+
+    __init__ already does this, but every public method that touches p.*
+    needs the same check at runtime — users can bypass __init__ via
+    ``Simulation.__new__`` (tests do), or hot-swap the pybullet module after
+    construction. Without this, those paths surface confusing
+    ``AttributeError: 'NoneType' object has no attribute ...`` instead.
+    """
+    if not _PYBULLET_AVAILABLE or p is None:
+        raise ImportError(
+            "pybullet is required for this Simulation operation. "
+            "Install with: pip install 'ManipulaPy[simulation]'"
+        )
+
 
 from ManipulaPy.control import ManipulatorController
 from ManipulaPy.path_planning import TrajectoryPlanning as tp
 
 
 class Simulation:
+    """PyBullet-backed simulation and visualization helper for manipulators."""
+
     def __init__(
         self,
-        urdf_file_path,
-        joint_limits,
-        torque_limits=None,
-        time_step=0.01,
-        real_time_factor=1.0,
-        physics_client=None,
-    ):
+        urdf_file_path: str,
+        joint_limits: Sequence[Tuple[float, float]],
+        torque_limits: Optional[Sequence[Any]] = None,
+        time_step: float = 0.01,
+        real_time_factor: float = 1.0,
+        physics_client: Optional[int] = None,
+        enable_self_collision: bool = False,
+        disable_pairs: Optional[Sequence[Tuple[str, str]]] = None,
+    ) -> None:
+        """
+        Initialize the simulation and set up the PyBullet world.
+
+        Args:
+            urdf_file_path: Path to the robot's URDF file.
+            joint_limits: Per-joint (lower, upper) position limits.
+            torque_limits: Optional per-joint torque limits.
+            time_step: Simulation time step in seconds.
+            real_time_factor: Real-time playback factor.
+            physics_client: Existing PyBullet client id to reuse, if any.
+            enable_self_collision: Whether to enable self-collision checking.
+            disable_pairs: Link name pairs to exclude from self-collision.
+        """
+        if not _PYBULLET_AVAILABLE:
+            raise ImportError(
+                "Simulation requires pybullet. Install with: "
+                "pip install 'ManipulaPy[simulation]'"
+            )
         self.urdf_file_path = urdf_file_path
         self.joint_limits = joint_limits
         self.torque_limits = torque_limits
         self.time_step = time_step
         self.real_time_factor = real_time_factor
+        self.enable_self_collision = enable_self_collision
+        self._disable_pairs = disable_pairs or []
         self.logger = self.setup_logger()
         self.physics_client = physics_client
         self.joint_params = []
@@ -68,74 +150,132 @@ class Simulation:
 
         self.setup_simulation()
 
-    def setup_logger(self):
+    def setup_logger(self) -> logging.Logger:
         """
         Sets up the logger for the simulation.
         """
         logger = logging.getLogger("SimulationLogger")
         logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
+        if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+            ch = logging.StreamHandler()
+            ch.setLevel(logging.DEBUG)
+            ch.setFormatter(
+                logging.Formatter(
+                    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                )
+            )
+            logger.addHandler(ch)
+            # Own our output; don't also bubble to the root handler (double logging)
+            logger.propagate = False
         return logger
 
-    def connect_simulation(self):
+    def _connect_client(self) -> int:
+        """Connect to PyBullet, preferring GUI but falling back to DIRECT.
+
+        Honors ``MANIPULAPY_PYBULLET_CONNECT`` (``GUI`` or ``DIRECT``) so headless
+        environments (CI, servers) can force a windowless client. Otherwise it
+        tries GUI and transparently falls back to DIRECT when no display is
+        available, instead of leaving an invalid client that later surfaces as
+        out-of-range joint-index errors.
+
+        Returns:
+            int: The connected PyBullet physics client id.
+        """
+        mode = os.getenv("MANIPULAPY_PYBULLET_CONNECT", "").strip().upper()
+        if mode == "DIRECT":
+            return p.connect(p.DIRECT)
+        if mode == "GUI":
+            return p.connect(p.GUI)
+        try:
+            client = p.connect(p.GUI)
+            if client < 0:
+                raise RuntimeError("GUI connection returned an invalid client id")
+            return client
+        except Exception:
+            self.logger.warning(
+                "PyBullet GUI unavailable; falling back to DIRECT (headless) mode."
+            )
+            return p.connect(p.DIRECT)
+
+    def connect_simulation(self) -> None:
         """
         Connects to the PyBullet simulation.
         """
+        _check_pybullet_available()
         self.logger.info("Connecting to PyBullet simulation...")
         if self.physics_client is None:
-            self.physics_client = p.connect(p.GUI)
+            self.physics_client = self._connect_client()
         p.resetSimulation()  # Clear the simulation environment
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)
         p.setTimeStep(self.time_step)
 
-    def disconnect_simulation(self):
+    def disconnect_simulation(self) -> None:
         """
         Disconnects from the PyBullet simulation.
         """
+        _check_pybullet_available()
         self.logger.info("Disconnecting from PyBullet simulation...")
         if self.physics_client is not None:
             p.disconnect()
             self.physics_client = None
             self.logger.info("Disconnected successfully.")
 
-    def setup_simulation(self):
+    def setup_simulation(self) -> None:
         """
         Sets up the simulation environment.
         """
+        _check_pybullet_available()
         if self.physics_client is None:
-            self.physics_client = p.connect(p.GUI)
-            p.resetSimulation()
-            p.setAdditionalSearchPath(pybullet_data.getDataPath())
-            p.setGravity(0, 0, -9.81)
-            p.setTimeStep(self.time_step)
+            self.physics_client = self._connect_client()
+        p.resetSimulation()
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        p.setGravity(0, 0, -9.81)
+        p.setTimeStep(self.time_step)
 
-            # Load the ground plane
-            self.plane_id = p.loadURDF("plane.urdf")
+        # Load the ground plane
+        self.plane_id = p.loadURDF("plane.urdf")
 
-            # Load the robot
-            self.robot_id = p.loadURDF(self.urdf_file_path, useFixedBase=True)
+        # Load the robot, enabling self-collision detection if requested
+        load_flags = p.URDF_USE_SELF_COLLISION if self.enable_self_collision else 0
+        self.robot_id = p.loadURDF(
+            self.urdf_file_path, useFixedBase=True, flags=load_flags
+        )
 
-            # Identify non-fixed joints
-            self.non_fixed_joints = [
-                i
+        # Identify non-fixed joints
+        self.non_fixed_joints = [
+            i
+            for i in range(p.getNumJoints(self.robot_id))
+            if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
+        ]
+        self.home_position = np.zeros(len(self.non_fixed_joints))
+
+        # Apply per-pair collision filter exclusions when self-collision is on
+        if self.enable_self_collision and self._disable_pairs:
+            # Build link-name -> pybullet link index map; joint info[12] is child link name
+            link_name_to_idx = {
+                p.getJointInfo(self.robot_id, i)[12].decode(): i
                 for i in range(p.getNumJoints(self.robot_id))
-                if p.getJointInfo(self.robot_id, i)[2] != p.JOINT_FIXED
-            ]
-            self.home_position = np.zeros(len(self.non_fixed_joints))
-        else:
-            print("Simulation already initialized.")
+            }
+            for name_a, name_b in self._disable_pairs:
+                idx_a = link_name_to_idx.get(name_a)
+                idx_b = link_name_to_idx.get(name_b)
+                if idx_a is not None and idx_b is not None:
+                    p.setCollisionFilterPair(
+                        self.robot_id, self.robot_id, idx_a, idx_b, 0
+                    )
+                else:
+                    self.logger.warning(
+                        "disable_pairs: could not resolve link names %r / %r to indices",
+                        name_a,
+                        name_b,
+                    )
 
-    def initialize_robot(self):
+    def initialize_robot(self) -> None:
         """
         Initializes the robot using the URDF processor.
         """
+        _check_pybullet_available()
         # Only skip URDF processing if self.robot is already set.
         if hasattr(self, "robot") and self.robot is not None:
             self.logger.warning("Robot already initialized. Skipping URDF processing.")
@@ -143,8 +283,14 @@ class Simulation:
             # Even if self.robot_id is already set from setup_simulation(),
             # we need to process the URDF to set self.robot and self.dynamics.
             if not (hasattr(self, "robot_id") and self.robot_id is not None):
+                load_flags = (
+                    p.URDF_USE_SELF_COLLISION if self.enable_self_collision else 0
+                )
                 self.robot_id = p.loadURDF(
-                    self.urdf_file_path, [0, 0, 0.1], useFixedBase=True
+                    self.urdf_file_path,
+                    [0, 0, 0.1],
+                    useFixedBase=True,
+                    flags=load_flags,
                 )
             # Process the URDF to generate the robot model and dynamics.
             from ManipulaPy.urdf_processor import URDFToSerialManipulator
@@ -160,7 +306,7 @@ class Simulation:
             ]
             self.home_position = np.zeros(len(self.non_fixed_joints))
 
-    def set_robot_models(self, robot, dynamics):
+    def set_robot_models(self, robot: Any, dynamics: Any) -> None:
         """
         Set pre-existing robot models to avoid reprocessing.
 
@@ -172,7 +318,7 @@ class Simulation:
         self.dynamics = dynamics
         self.logger.info("Pre-existing robot models set successfully.")
 
-    def initialize_planner_and_controller(self):
+    def initialize_planner_and_controller(self) -> None:
         """
         Initializes the trajectory planner and the manipulator controller.
         """
@@ -185,10 +331,11 @@ class Simulation:
         )
         self.controller = ManipulatorController(self.dynamics)
 
-    def add_joint_parameters(self):
+    def add_joint_parameters(self) -> None:
         """
         Adds GUI sliders for each joint.
         """
+        _check_pybullet_available()
         if not self.joint_params:
             for i, joint_index in enumerate(self.non_fixed_joints):
                 param_id = p.addUserDebugParameter(
@@ -199,37 +346,74 @@ class Simulation:
                 )
                 self.joint_params.append(param_id)
 
-    def add_reset_button(self):
+    def add_reset_button(self) -> None:
         """
         Adds a reset button to the simulation.
         """
+        _check_pybullet_available()
         if self.reset_button is None:
             try:
                 self.reset_button = p.addUserDebugParameter("Reset", 1, 0, 1)
             except Exception as e:
                 self.logger.error(f"Failed to add reset button: {e}")
 
-    def set_joint_positions(self, joint_positions):
+    def set_joint_positions(
+        self, joint_positions: Sequence[float], forces: Optional[Sequence[float]] = None
+    ) -> None:
         """
         Sets the joint positions of the robot.
+
+        Drives the non-fixed joints toward ``joint_positions`` using PyBullet's
+        ``POSITION_CONTROL`` mode.
+
+        Args:
+            joint_positions: Target angles for the non-fixed joints, in radians,
+                one entry per non-fixed joint.
+            forces: Optional per-joint maximum motor force. When ``None``, forces
+                are derived from ``self.torque_limits`` (collapsing each
+                (min, max) pair to its largest absolute magnitude) or default to
+                ``1000.0`` for every joint when no torque limits are configured.
         """
+        _check_pybullet_available()
+        n = len(self.non_fixed_joints)
+        if forces is None:
+            if getattr(self, "torque_limits", None) is not None:
+                # PyBullet wants one scalar per joint, but torque_limits is
+                # commonly a list of (min, max) pairs. Collapse each pair to
+                # the maximum absolute magnitude so the motor can both push
+                # and pull within the configured limits.
+                torque_limits = np.asarray(self.torque_limits, dtype=float)
+                if torque_limits.ndim == 2 and torque_limits.shape[1] == 2:
+                    forces = np.max(np.abs(torque_limits), axis=1).tolist()
+                else:
+                    forces = torque_limits.tolist()
+            else:
+                forces = [1000.0] * n
         p.setJointMotorControlArray(
             self.robot_id,
             self.non_fixed_joints,
             p.POSITION_CONTROL,
             targetPositions=joint_positions,
+            forces=forces,
         )
 
-    def get_joint_positions(self):
+    def get_joint_positions(self) -> np.ndarray:
         """
         Gets the current joint positions of the robot.
         """
+        _check_pybullet_available()
         joint_positions = [
             p.getJointState(self.robot_id, i)[0] for i in self.non_fixed_joints
         ]
         return np.array(joint_positions)
 
-    def _capsule_line(self, a, b, radius=0.006, rgba=(1, 0.5, 0, 1)):
+    def _capsule_line(
+        self,
+        a: Sequence[float],
+        b: Sequence[float],
+        radius: float = 0.006,
+        rgba: Sequence[float] = (1, 0.5, 0, 1),
+    ) -> int:
         """
         Create a thin capsule between point a and b; returns body-id.
         This creates REAL GEOMETRY that appears in getCameraImage() screenshots.
@@ -272,7 +456,12 @@ class Simulation:
                 axis_norm = np.linalg.norm(axis)
                 if axis_norm > 1e-6:
                     axis = axis / axis_norm
-                    orn = p.getQuaternionFromAxisAngle(axis, angle)
+                    # Inline axis-angle to quaternion to avoid relying on
+                    # p.getQuaternionFromAxisAngle, which is missing from
+                    # several pybullet builds (cross-version portability).
+                    half = angle / 2.0
+                    s = np.sin(half)
+                    orn = (axis[0] * s, axis[1] * s, axis[2] * s, np.cos(half))
                 else:
                     orn = p.getQuaternionFromEuler([0, 0, 0])
             else:
@@ -303,7 +492,12 @@ class Simulation:
             self.logger.error(f"Failed to create capsule line: {e}")
             return -1
 
-    def plot_trajectory(self, ee_positions, line_width=3, color=[1, 0, 0]):
+    def plot_trajectory(
+        self,
+        ee_positions: Sequence[Sequence[float]],
+        line_width: int = 3,
+        color: Optional[List[float]] = None,
+    ) -> List[int]:
         """
         Plots the end-effector trajectory in PyBullet using REAL GEOMETRY.
 
@@ -318,12 +512,16 @@ class Simulation:
         Returns:
             list: Body IDs of created trajectory geometry (for cleanup)
         """
+        _check_pybullet_available()
         # Clear any existing trajectory bodies
         self.clear_trajectory_visualization()
 
         if len(ee_positions) < 2:
             self.logger.warning("Not enough positions to plot trajectory")
             return []
+
+        if color is None:
+            color = [1, 0, 0]
 
         # Convert color to RGBA
         if len(color) == 3:
@@ -381,7 +579,9 @@ class Simulation:
 
         return trajectory_bodies
 
-    def _add_trajectory_markers(self, ee_positions, color):
+    def _add_trajectory_markers(
+        self, ee_positions: Sequence[Sequence[float]], color: Sequence[float]
+    ) -> List[int]:
         """
         Add START/END markers using real geometry.
 
@@ -470,10 +670,11 @@ class Simulation:
 
         return marker_bodies
 
-    def clear_trajectory_visualization(self):
+    def clear_trajectory_visualization(self) -> None:
         """
         Clear all trajectory visualization bodies from the simulation.
         """
+        _check_pybullet_available()
         if hasattr(self, "trajectory_body_ids"):
             removed_count = 0
             for body_id in self.trajectory_body_ids:
@@ -492,10 +693,25 @@ class Simulation:
 
             self.trajectory_body_ids = []
 
-    def run_trajectory(self, joint_trajectory):
+    def run_trajectory(
+        self, joint_trajectory: Sequence[Sequence[float]]
+    ) -> Tuple[float, float, float]:
         """
         Runs a joint trajectory in the simulation.
+
+        Iterates over each waypoint, commands position control, steps the
+        simulation, records the end-effector position, and finally renders the
+        traced end-effector path in the scene.
+
+        Args:
+            joint_trajectory: Sequence of joint-angle configurations (one per
+                simulation step), each a sequence of joint angles in radians.
+
+        Returns:
+            tuple[float, float, float]: The (x, y, z) world position of the
+            end-effector at the final waypoint.
         """
+        _check_pybullet_available()
         self.logger.info("Running trajectory...")
         ee_positions = []
 
@@ -515,46 +731,57 @@ class Simulation:
         return ee_positions[-1]  # Return the last end-effector position
 
     def run_controller(
-        self,
-        controller,
-        desired_positions,
-        desired_velocities,
-        desired_accelerations,
-        g,
-        Ftip,
-        Kp,
-        Ki,
-        Kd,
-    ):
+        self, desired_positions: Sequence[Sequence[float]]
+    ) -> Tuple[float, float, float]:
         """
-        Runs the controller with the specified parameters.
+        Drive the robot through ``desired_positions`` in open-loop position
+        control, one configuration per simulation step.
+
+        For real closed-loop torque control, drive PyBullet's
+        ``p.TORQUE_CONTROL`` mode directly in your own loop. The previous
+        signature accepted a controller object plus PID gains; those were
+        removed in v1.3.2 because the loop body never produced honest
+        closed-loop behavior. See CHANGELOG.
+
+        Args:
+            desired_positions: Waypoints to track, shape ``(N, DOF)`` where DOF
+                must equal the number of non-fixed joints; joint angles in
+                radians.
+
+        Returns:
+            tuple[float, float, float]: The (x, y, z) world position of the
+            end-effector at the final waypoint.
+
+        Raises:
+            ValueError: If ``desired_positions`` is empty, is not 2-D, or its
+                joint count does not match the number of non-fixed joints.
         """
+        _check_pybullet_available()
         self.logger.info("Running controller...")
-        current_positions = self.get_joint_positions()
-        current_velocities = np.zeros_like(current_positions)
         ee_positions = []
 
-        for i in range(len(desired_positions)):
-            control_signal = controller.computed_torque_control(
-                thetalistd=cp.array(desired_positions[i]),
-                dthetalistd=cp.array(desired_velocities[i]),
-                ddthetalistd=cp.array(desired_accelerations[i]),
-                thetalist=cp.array(current_positions),
-                dthetalist=cp.array(current_velocities),
-                g=cp.array(g),
-                dt=self.time_step,
-                Kp=cp.array(Kp),
-                Ki=cp.array(Ki),
-                Kd=cp.array(Kd),
+        positions_arr = np.asarray(list(desired_positions), dtype=float)
+        if positions_arr.size == 0:
+            raise ValueError("desired_positions is empty; nothing to track")
+        if positions_arr.ndim != 2:
+            raise ValueError(
+                "desired_positions must have shape (N waypoints x DOF); "
+                f"actual shape is {positions_arr.shape}"
+            )
+        expected_dof = len(self.non_fixed_joints)
+        actual_dof = positions_arr.shape[1]
+        if actual_dof != expected_dof:
+            raise ValueError(
+                "desired_positions joint count mismatch: "
+                f"expected {expected_dof}, got {actual_dof}"
             )
 
-            self.set_joint_positions(
-                cp.asnumpy(current_positions)
-                + cp.asnumpy(control_signal) * self.time_step
-            )
-            current_positions = self.get_joint_positions()
-            current_velocities = cp.asnumpy(control_signal) / self.time_step
-
+        for pos in positions_arr:
+            # Open-loop position tracking. Closed-loop torque control via
+            # this method was always broken (treated torque as position delta).
+            # For real closed-loop control, use p.TORQUE_CONTROL mode directly
+            # in your own loop. See v1.3.2 CHANGELOG.
+            self.set_joint_positions(pos)
             p.stepSimulation()
 
             # Get end-effector position
@@ -568,16 +795,32 @@ class Simulation:
         self.logger.info("Controller run completed.")
         return ee_positions[-1]  # Return the last end-effector position
 
-    def get_joint_parameters(self):
+    def get_joint_parameters(self) -> List[float]:
         """
         Gets the current values of the GUI sliders.
         """
+        _check_pybullet_available()
         return [p.readUserDebugParameter(param_id) for param_id in self.joint_params]
 
-    def simulate_robot_motion(self, desired_angles_trajectory):
+    def simulate_robot_motion(
+        self, desired_angles_trajectory: Sequence[Sequence[float]]
+    ) -> Tuple[float, float, float]:
         """
         Simulates the robot's motion using a given trajectory of desired joint angles.
+
+        Commands each configuration via position control, steps the simulation,
+        collects the end-effector positions, and plots the traced path.
+
+        Args:
+            desired_angles_trajectory: Sequence of desired joint-angle
+                configurations (one per simulation step), each a sequence of
+                joint angles in radians.
+
+        Returns:
+            tuple[float, float, float]: The (x, y, z) world position of the
+            end-effector at the final configuration.
         """
+        _check_pybullet_available()
         self.logger.info("Simulating robot motion...")
         ee_positions = []
 
@@ -596,13 +839,16 @@ class Simulation:
         self.logger.info("Robot motion simulation completed.")
         return ee_positions[-1]  # Return the last end-effector position
 
-    def simulate_robot_with_desired_angles(self, desired_angles):
+    def simulate_robot_with_desired_angles(
+        self, desired_angles: Sequence[float]
+    ) -> None:
         """
         Simulates the robot using PyBullet with desired joint angles.
 
         Args:
             desired_angles (np.ndarray): Desired joint angles.
         """
+        _check_pybullet_available()
         self.logger.info("Simulating robot with desired joint angles...")
 
         p.setJointMotorControlArray(
@@ -620,10 +866,14 @@ class Simulation:
                 p.stepSimulation()
                 time.sleep(time_step / self.real_time_factor)
         except KeyboardInterrupt:
-            print("Simulation stopped by user.")
+            self.logger.info("Simulation stopped by user.")
             self.logger.info("Robot simulation with desired angles completed.")
+            self.close_simulation()
+        except Exception:
+            self.close_simulation()
+            raise
 
-    def close_simulation(self):
+    def close_simulation(self) -> None:
         """
         Closes the simulation.
         """
@@ -635,34 +885,46 @@ class Simulation:
         self.disconnect_simulation()
         self.logger.info("Simulation closed.")
 
-    def check_collisions(self):
+    def check_collisions(self) -> List[Tuple[int, int, Tuple[float, float, float]]]:
         """
-        Checks for collisions in the simulation and logs them.
+        Checks for self-collisions in the simulation and returns contacts.
+
+        Returns:
+            list of (linkA, linkB, position) tuples for each contact point.
+            Empty list if no collisions or simulation not started.
         """
+        _check_pybullet_available()
         if self.robot_id is None:
             self.logger.warning(
                 "Cannot check for collisions before simulation is started."
             )
-            return
-        for i in self.non_fixed_joints:
-            contact_points = p.getContactPoints(self.robot_id, self.robot_id, i)
-            if contact_points:
-                self.logger.warning(f"Collision detected at joint {i}.")
-                for point in contact_points:
-                    self.logger.warning(f"Contact point: {point}")
+            return []
+        contacts = []
+        # PyBullet's per-joint linkIndexA filter excludes base-link contacts
+        # (base index is -1, never a non-fixed joint). Query without filter to
+        # catch base<->link pairs (the most common self-collision on folded arms).
+        for pt in p.getContactPoints(self.robot_id, self.robot_id) or []:
+            link_a, link_b, position = pt[3], pt[4], pt[5]
+            contacts.append((link_a, link_b, position))
+            self.logger.warning(
+                "Self-collision: link %s <-> link %s at %s", link_a, link_b, position
+            )
+        return contacts
 
-    def step_simulation(self):
+    def step_simulation(self) -> None:
         """
         Steps the simulation forward by one time step.
         """
+        _check_pybullet_available()
         self.logger.info("Setting up the simulation environment...")
         self.connect_simulation()
         self.add_additional_parameters()
 
-    def add_additional_parameters(self):
+    def add_additional_parameters(self) -> None:
         """
         Adds additional GUI parameters for controlling physics properties like gravity and time step.
         """
+        _check_pybullet_available()
         if not hasattr(self, "gravity_param"):
             self.gravity_param = p.addUserDebugParameter("Gravity", -20, 20, -9.81)
         if not hasattr(self, "time_step_param"):
@@ -670,20 +932,22 @@ class Simulation:
                 "Time Step", 0.001, 0.1, self.time_step
             )
 
-    def update_simulation_parameters(self):
+    def update_simulation_parameters(self) -> None:
         """
         Updates simulation parameters from GUI controls.
         """
+        _check_pybullet_available()
         gravity = p.readUserDebugParameter(self.gravity_param)
         time_step = p.readUserDebugParameter(self.time_step_param)
         p.setGravity(0, 0, gravity)
         p.setTimeStep(time_step)
         self.time_step = time_step
 
-    def manual_control(self):
+    def manual_control(self) -> None:
         """
         Allows manual control of the robot through the PyBullet UI sliders.
         """
+        _check_pybullet_available()
         self.logger.info("Starting manual control...")
         if not self.joint_params:
             self.add_joint_parameters()  # Ensure sliders are created
@@ -698,7 +962,9 @@ class Simulation:
                 joint_positions = self.get_joint_parameters()
                 if len(joint_positions) != len(self.non_fixed_joints):
                     raise ValueError(
-                        f"Number of joint positions ({len(joint_positions)}) does not match number of non-fixed joints ({len(self.non_fixed_joints)})."
+                        "Number of joint positions "
+                        f"({len(joint_positions)}) does not match number of "
+                        f"non-fixed joints ({len(self.non_fixed_joints)})."
                     )
                 self.set_joint_positions(joint_positions)
                 self.check_collisions()  # Check for collisions in each step
@@ -716,16 +982,20 @@ class Simulation:
                     self.set_joint_positions(self.home_position)
                     break  # Exit manual control to restart trajectory loop
         except KeyboardInterrupt:
-            print("Manual control stopped by user.")
             self.logger.info("Manual control stopped.")
+            self.close_simulation()
+        except Exception:
+            self.close_simulation()
+            raise
 
-    def save_joint_states(self, filename="joint_states.csv"):
+    def save_joint_states(self, filename: str = "joint_states.csv") -> None:
         """
         Saves the joint states to a CSV file.
 
         Args:
             filename (str): The filename for the CSV file.
         """
+        _check_pybullet_available()
         joint_states = [
             p.getJointState(self.robot_id, i) for i in self.non_fixed_joints
         ]
@@ -738,10 +1008,25 @@ class Simulation:
         )
         self.logger.info(f"Joint states saved to {filename}.")
 
-    def plot_trajectory_in_scene(self, joint_trajectory, end_effector_trajectory):
+    def plot_trajectory_in_scene(
+        self,
+        joint_trajectory: Sequence[Sequence[float]],
+        end_effector_trajectory: Sequence[Sequence[float]],
+    ) -> None:
         """
         Plots the trajectory in the simulation scene.
+
+        Renders the end-effector path as a 3-D Matplotlib line plot, then replays
+        the joint trajectory in the PyBullet simulation.
+
+        Args:
+            joint_trajectory: Sequence of joint-angle configurations (one per
+                simulation step) to replay, each a sequence of joint angles in
+                radians.
+            end_effector_trajectory: Sequence of end-effector positions to plot,
+                each an (x, y, z) world-frame coordinate.
         """
+        _check_pybullet_available()
         self.logger.info("Plotting trajectory in simulation scene...")
         ee_positions = np.array(end_effector_trajectory)
 
@@ -762,9 +1047,17 @@ class Simulation:
         self.run_trajectory(joint_trajectory)
         self.logger.info("Trajectory plotted and simulation completed.")
 
-    def run(self, joint_trajectory):
+    def run(self, joint_trajectory: Sequence[Sequence[float]]) -> None:
         """
         Main loop for running the simulation.
+
+        Runs the given trajectory once, then waits for the GUI reset button and
+        switches between trajectory, wait-for-reset, and manual control modes.
+
+        Args:
+            joint_trajectory: Sequence of joint-angle configurations (one per
+                simulation step) to execute, each a sequence of joint angles in
+                radians.
         """
         try:
             reset_pressed = False
@@ -796,8 +1089,11 @@ class Simulation:
         except KeyboardInterrupt:
             self.logger.info("Simulation stopped by user.")
             self.close_simulation()
+        except Exception:
+            self.close_simulation()
+            raise
 
-    def __del__(self):
+    def __del__(self) -> None:
         """
         Destructor to clean up trajectory visualization when simulation is destroyed.
         """
@@ -805,4 +1101,12 @@ class Simulation:
             if hasattr(self, "trajectory_body_ids"):
                 self.clear_trajectory_visualization()
         except Exception:
-            pass  # Ignore errors during cleanup
+            logger = getattr(self, "logger", None)
+            if logger is not None:
+                try:
+                    logger.debug(
+                        "Failed to clear trajectory visualization during cleanup.",
+                        exc_info=True,
+                    )
+                except Exception:
+                    pass

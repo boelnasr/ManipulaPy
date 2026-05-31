@@ -6,12 +6,16 @@ Trimesh-based URDF Visualization
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
+import logging
 from typing import TYPE_CHECKING, Dict, Optional, Union
 
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
     from ..core import URDF
+    from ..types import Geometry
 
 try:
     import trimesh
@@ -22,7 +26,9 @@ except ImportError:
     TRIMESH_AVAILABLE = False
 
 
-def _geometry_to_trimesh(geometry, color=None):
+def _geometry_to_trimesh(
+    geometry: Optional["Geometry"], color: Optional[np.ndarray] = None
+) -> Optional[object]:
     """Convert URDF geometry to trimesh object."""
     from ..types import Box, Cylinder, Mesh, Sphere
 
@@ -47,8 +53,11 @@ def _geometry_to_trimesh(geometry, color=None):
                 # Apply scale
                 if not np.allclose(geometry.scale, 1.0):
                     mesh.apply_scale(geometry.scale)
-            except Exception:
-                # Create placeholder if mesh loading fails
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load mesh {geometry.filename!r} for "
+                    f"visualization: {e!r}. Using placeholder box."
+                )
                 mesh = trimesh.creation.box(extents=[0.01, 0.01, 0.01])
 
     if mesh is not None and color is not None:
@@ -57,7 +66,11 @@ def _geometry_to_trimesh(geometry, color=None):
     return mesh
 
 
-def _build_scene(urdf: "URDF", cfg=None, use_collision: bool = False):
+def _build_scene(
+    urdf: "URDF",
+    cfg: Optional[Union[np.ndarray, Dict[str, float]]] = None,
+    use_collision: bool = False,
+) -> object:
     """Build trimesh scene from URDF."""
     if not TRIMESH_AVAILABLE:
         raise ImportError("trimesh is required for visualization")
@@ -147,7 +160,7 @@ def animate_trimesh(
     # Build initial scene
     scene = _build_scene(urdf, cfgs[0], use_collision)
 
-    def callback(scene):
+    def callback(scene: object) -> None:
         """Animation callback."""
         # Get current frame from time
         import time

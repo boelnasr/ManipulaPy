@@ -61,52 +61,63 @@ class SolverStats:
     results: List[SolveResult] = field(default_factory=list)
 
     @property
-    def n(self):
+    def n(self) -> int:
+        """Return the number of solver attempts."""
         return len(self.results)
 
     @property
-    def successes(self):
+    def successes(self) -> list:
+        """Return only successful solver attempts."""
         return [r for r in self.results if r.success]
 
     @property
-    def success_rate(self):
+    def success_rate(self) -> float:
+        """Return successful solves as a percentage."""
         return len(self.successes) / self.n * 100 if self.n else 0.0
 
     @property
-    def times(self):
+    def times(self) -> list:
+        """Return all solve times in seconds."""
         return [r.time_s for r in self.results]
 
     @property
-    def success_times(self):
+    def success_times(self) -> list:
+        """Return solve times for successful attempts."""
         return [r.time_s for r in self.successes]
 
     @property
-    def mean_time(self):
+    def mean_time(self) -> float:
+        """Return the mean solve time in seconds."""
         t = self.times
         return np.mean(t) if t else 0.0
 
     @property
-    def median_time(self):
+    def median_time(self) -> float:
+        """Return the median solve time in seconds."""
         t = self.times
         return np.median(t) if t else 0.0
 
     @property
-    def p95_time(self):
+    def p95_time(self) -> float:
+        """Return the 95th percentile solve time in seconds."""
         t = self.times
         return np.percentile(t, 95) if t else 0.0
 
     @property
-    def mean_pos_err(self):
+    def mean_pos_err(self) -> float:
+        """Return the mean successful position error."""
         errs = [r.pos_error for r in self.successes]
         return np.mean(errs) if errs else float("nan")
 
     @property
-    def mean_rot_err(self):
+    def mean_rot_err(self) -> float:
+        """Return the mean successful orientation error."""
         errs = [r.rot_error for r in self.successes]
         return np.mean(errs) if errs else float("nan")
 
     @property
-    def mean_iters(self):
+    def mean_iters(self) -> float:
+        """Return the mean reported iteration count."""
         iters = [r.iterations for r in self.results if r.iterations >= 0]
         return np.mean(iters) if iters else float("nan")
 
@@ -115,7 +126,7 @@ class SolverStats:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _load_branch_module(branch_path: Path, module_name: str):
+def _load_branch_module(branch_path: Path, module_name: str) -> Any:
     """Import a module from a specific branch directory."""
     pkg_path = branch_path / "ManipulaPy"
     if not pkg_path.exists():
@@ -135,7 +146,7 @@ def _load_branch_module(branch_path: Path, module_name: str):
         sys.path.remove(branch_str)
 
 
-def _load_robot_from_branch(branch_path: Path):
+def _load_robot_from_branch(branch_path: Path) -> tuple:
     """Load a SerialManipulator from a branch using the xArm URDF."""
     branch_str = str(branch_path)
     sys.path.insert(0, branch_str)
@@ -159,6 +170,7 @@ def _load_robot_from_branch(branch_path: Path):
 
 
 def _has_method(robot, method_name: str) -> bool:
+    """Return whether a robot exposes a callable solver method."""
     return hasattr(robot, method_name) and callable(getattr(robot, method_name))
 
 
@@ -183,7 +195,7 @@ def _compute_errors(
     return pos_err, rot_err
 
 
-def _generate_targets(robot, num_targets: int, rng: np.random.RandomState):
+def _generate_targets(robot, num_targets: int, rng: np.random.RandomState) -> list:
     """Generate reachable IK targets by sampling random joint angles and computing FK."""
     targets = []
     n_joints = robot.S_list.shape[1] if robot.S_list.ndim == 2 else len(robot.S_list)
@@ -213,7 +225,7 @@ def _generate_targets(robot, num_targets: int, rng: np.random.RandomState):
 # Solver wrappers — uniform interface returning SolveResult
 # ---------------------------------------------------------------------------
 
-def _bench_iterative(robot, T_target, theta_ref, n_joints):
+def _bench_iterative(robot, T_target, theta_ref, n_joints) -> SolveResult:
     """Benchmark iterative_inverse_kinematics."""
     theta0 = np.zeros(n_joints)
     t0 = time.perf_counter()
@@ -229,7 +241,7 @@ def _bench_iterative(robot, T_target, theta_ref, n_joints):
     return SolveResult(success, theta, elapsed, iters, pos_err, rot_err)
 
 
-def _bench_smart(robot, T_target, theta_ref, n_joints):
+def _bench_smart(robot, T_target, theta_ref, n_joints) -> SolveResult:
     """Benchmark smart_inverse_kinematics."""
     t0 = time.perf_counter()
     try:
@@ -245,7 +257,7 @@ def _bench_smart(robot, T_target, theta_ref, n_joints):
     return SolveResult(success, theta, elapsed, iters, pos_err, rot_err)
 
 
-def _bench_robust(robot, T_target, theta_ref, n_joints):
+def _bench_robust(robot, T_target, theta_ref, n_joints) -> SolveResult:
     """Benchmark robust_inverse_kinematics."""
     t0 = time.perf_counter()
     try:
@@ -262,7 +274,7 @@ def _bench_robust(robot, T_target, theta_ref, n_joints):
     return SolveResult(success, theta, elapsed, iters, pos_err, rot_err)
 
 
-def _bench_trac_ik(robot, T_target, theta_ref, n_joints):
+def _bench_trac_ik(robot, T_target, theta_ref, n_joints) -> SolveResult:
     """Benchmark trac_ik."""
     t0 = time.perf_counter()
     try:
@@ -328,7 +340,7 @@ def run_branch(
 # Report
 # ---------------------------------------------------------------------------
 
-def print_report(all_branch_stats: Dict[str, List[SolverStats]], num_targets: int):
+def print_report(all_branch_stats: Dict[str, List[SolverStats]], num_targets: int) -> None:
     """Print a formatted comparison report."""
     print("\n")
     print("=" * 100)
@@ -413,7 +425,7 @@ def print_report(all_branch_stats: Dict[str, List[SolverStats]], num_targets: in
 
 def save_results_json(
     all_branch_stats: Dict[str, List[SolverStats]], filepath: Path
-):
+) -> None:
     """Save raw results to JSON for later analysis."""
     data = {}
     for branch_name, stats_list in all_branch_stats.items():
@@ -440,7 +452,8 @@ def save_results_json(
 # Main
 # ---------------------------------------------------------------------------
 
-def main():
+def main() -> None:
+    """Run the branch-to-branch IK benchmark from the command line."""
     parser = argparse.ArgumentParser(description="IK Branch Benchmark")
     parser.add_argument("--num-targets", type=int, default=50,
                         help="Number of random reachable targets (default: 50)")

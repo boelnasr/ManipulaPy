@@ -6,6 +6,7 @@ This guide covers the **SerialManipulator** class in ManipulaPy, which provides 
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 What is Robot Kinematics?
 -------------------------
@@ -263,6 +264,8 @@ Basic Forward Kinematics
 
 .. code-block:: python
 
+   import numpy as np
+
    # Define joint angles
    theta = np.array([0.5, -0.3])  # radians
    
@@ -281,8 +284,10 @@ Space vs Body Frames
 
 .. code-block:: python
 
+   import numpy as np
+
    theta = np.array([0.2, 0.3])
-   
+
    # Both methods give the same result
    T_space = robot.forward_kinematics(theta, frame="space")
    T_body = robot.forward_kinematics(theta, frame="body")
@@ -295,6 +300,8 @@ End-Effector Pose as Vector
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    # Get pose as [x, y, z, roll, pitch, yaw]
    pose_vector = robot.end_effector_pose(theta)
@@ -309,6 +316,8 @@ Multiple Configurations
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def test_multiple_configurations():
        """Test FK for multiple joint configurations."""
@@ -337,6 +346,8 @@ Basic Inverse Kinematics
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    # Define target pose
    T_target = np.eye(4)
@@ -397,6 +408,7 @@ Key IK tuning parameters:
 
 .. code-block:: python
 
+   import numpy as np
    from ManipulaPy.ik_helpers import IKInitialGuessCache
 
    cache = IKInitialGuessCache(max_size=200)
@@ -418,6 +430,8 @@ Multiple IK Solutions
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def find_multiple_solutions(robot, target_pos, n_attempts=5):
        """Find multiple IK solutions for the same target."""
@@ -465,8 +479,10 @@ Computing the Jacobian
 
 .. code-block:: python
 
+   import numpy as np
+
    theta = np.array([0.3, -0.2])
-   
+
    # Compute Jacobian in space frame
    J_space = robot.jacobian(theta, frame="space")
    
@@ -480,6 +496,8 @@ Jacobian Analysis
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def analyze_jacobian(robot, theta):
        """Analyze Jacobian properties at a configuration."""
@@ -523,6 +541,8 @@ End-Effector Velocity
 
 .. code-block:: python
 
+   import numpy as np
+
    # Current configuration and joint velocities
    theta = np.array([0.2, 0.3])
    theta_dot = np.array([0.1, -0.2])  # rad/s
@@ -544,6 +564,8 @@ Joint Velocities from Desired Motion
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    # Desired end-effector motion
    V_desired = np.array([0.1, 0.0, 0.0, 0.0, 0.0, 0.2])  # Move +X, rotate +Z
@@ -594,6 +616,8 @@ Complete Workflow Example
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def complete_kinematics_example():
        """Complete example showing all kinematic functions."""
@@ -680,6 +704,8 @@ Troubleshooting IK Convergence
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def troubleshoot_ik(robot, T_target):
        """Helper function to troubleshoot IK issues."""

@@ -15,6 +15,8 @@ import logging
 import os
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +44,7 @@ class PackageResolver:
         package_map: Optional[Dict[str, Union[str, Path]]] = None,
         search_paths: Optional[List[Union[str, Path]]] = None,
         use_ros: bool = True,
-    ):
+    ) -> None:
         """
         Initialize PackageResolver.
 
@@ -72,21 +74,22 @@ class PackageResolver:
 
     def _init_from_environment(self) -> None:
         """Initialize from environment variables."""
-        # ROS package paths
-        ros_package_path = os.environ.get("ROS_PACKAGE_PATH", "")
-        if ros_package_path:
-            for path_str in ros_package_path.split(os.pathsep):
-                path = Path(path_str)
-                if path.exists():
-                    self._search_paths.append(path)
+        # ROS package paths — only when ROS discovery is enabled, otherwise
+        # use_ros=False would still leak host ROS packages via search paths.
+        if self._use_ros:
+            ros_package_path = os.environ.get("ROS_PACKAGE_PATH", "")
+            if ros_package_path:
+                for path_str in ros_package_path.split(os.pathsep):
+                    path = Path(path_str)
+                    if path.exists():
+                        self._search_paths.append(path)
 
-        # Ament prefix path (ROS 2)
-        ament_prefix_path = os.environ.get("AMENT_PREFIX_PATH", "")
-        if ament_prefix_path:
-            for prefix in ament_prefix_path.split(os.pathsep):
-                share_path = Path(prefix) / "share"
-                if share_path.exists():
-                    self._search_paths.append(share_path)
+            ament_prefix_path = os.environ.get("AMENT_PREFIX_PATH", "")
+            if ament_prefix_path:
+                for prefix in ament_prefix_path.split(os.pathsep):
+                    share_path = Path(prefix) / "share"
+                    if share_path.exists():
+                        self._search_paths.append(share_path)
 
         # Custom ManipulaPy package path
         manipulapy_package_path = os.environ.get("MANIPULAPY_PACKAGE_PATH", "")
@@ -174,9 +177,9 @@ class PackageResolver:
         if uri.startswith("package://"):
             return self._resolve_package_uri(uri)
 
-        # Handle file:// URIs
+        # Handle file:// URIs (use url2pathname so file:///C:/... works on Windows)
         if uri.startswith("file://"):
-            return uri[7:]
+            return url2pathname(urlparse(uri).path)
 
         # Handle absolute paths
         if Path(uri).is_absolute():
@@ -185,65 +188,127 @@ class PackageResolver:
         # Handle relative paths
         return self._resolve_relative_path(uri)
 
-    def _resolve_package_uri(self, uri: str) -> str:
+    def _resolve_package_uri(self, uri: str) -> Optional[str]:
+        """Resolve package://pkg/path with ambiguity detection.
+
+        Strategy 1 (explicit ``add_package`` mapping) short-circuits — the
+        documented escape hatch must always win. Strategies 2-5 (search paths,
+        ROS lookup, base path, ancestor heuristic) collect candidates whose
+        canonical (symlink-resolved) paths are deduped before the ambiguity
+        check, so symlinked or case-insensitive workspaces don't trigger false
+        ambiguity.
         """
-        Resolve package:// URI.
+        if not uri.startswith("package://"):
+            return uri
+        rest = uri[len("package://") :]
+        if not rest:
+            logger.warning(f"Malformed package URI {uri!r}: missing package name")
+            return uri
+        parts = rest.split("/", 1)
+        if len(parts) < 2 or not parts[0] or not parts[1]:
+            logger.warning(
+                f"Malformed package URI {uri!r}: expected 'package://<name>/<path>'"
+            )
+            return uri
+        package_name, relative_path = parts[0], parts[1]
 
-        Args:
-            uri: URI starting with package://
-
-        Returns:
-            Resolved absolute path
-        """
-        # Parse URI: package://package_name/relative/path
-        path_part = uri[10:]  # Remove "package://"
-        parts = path_part.split("/", 1)
-
-        if len(parts) < 2:
-            logger.warning(f"Invalid package URI: {uri}")
+        rel_parts = Path(relative_path).parts
+        if ".." in rel_parts or Path(relative_path).is_absolute():
+            logger.warning(
+                f"Refusing to resolve {uri!r}: relative path contains traversal "
+                "or is absolute"
+            )
             return uri
 
-        package_name, relative_path = parts
-
-        # Try explicit package map first
+        # Strategy 1: explicit package map (highest precedence — short-circuits
+        # ambiguity detection so add_package() remains a working escape hatch).
+        # If the caller pinned this package and the file is missing under the
+        # pinned root, do NOT fall through to other strategies: silently
+        # returning a different package would defeat the explicit override.
         if package_name in self._package_map:
-            resolved = self._package_map[package_name] / relative_path
-            if resolved.exists():
-                return str(resolved)
+            cand = Path(self._package_map[package_name]) / relative_path
+            if cand.exists():
+                return str(cand)
+            logger.warning(
+                "Explicit package mapping for %r did not contain %r under %r; "
+                "refusing to fall back to auto-discovery to honor the override.",
+                package_name,
+                relative_path,
+                str(self._package_map[package_name]),
+            )
+            return uri
 
-        # Try search paths
+        candidates: List[Path] = []
+
+        # Strategy 2: search paths — try both the package-rooted and the flat
+        # forms (regression: prior code only tried search_path/pkg/relative).
         for search_path in self._search_paths:
-            # Try package_name as direct subdirectory
-            candidate = search_path / package_name / relative_path
-            if candidate.exists():
-                self._package_map[package_name] = search_path / package_name
-                return str(candidate)
+            c1 = Path(search_path) / package_name / relative_path
+            if c1.exists():
+                candidates.append(c1)
+            c2 = Path(search_path) / relative_path
+            if c2.exists():
+                candidates.append(c2)
 
-            # Try without package name (for flat structures)
-            candidate = search_path / relative_path
-            if candidate.exists():
-                return str(candidate)
-
-        # Try ROS package discovery
+        # Strategy 3: ROS package discovery (only when use_ros is enabled).
         if self._use_ros:
-            ros_path = self._find_ros_package(package_name)
-            if ros_path:
-                self._package_map[package_name] = ros_path
-                resolved = ros_path / relative_path
-                if resolved.exists():
-                    return str(resolved)
+            ros_pkg_root = self._find_ros_package(package_name)
+            if ros_pkg_root is not None:
+                c = ros_pkg_root / relative_path
+                if c.exists():
+                    candidates.append(c)
+            ros_paths = os.environ.get("ROS_PACKAGE_PATH", "").split(os.pathsep)
+            for ros_path in ros_paths:
+                if not ros_path:
+                    continue
+                c = Path(ros_path) / package_name / relative_path
+                if c.exists():
+                    candidates.append(c)
 
-        # Try base path as fallback
+        # Strategy 4: base path fallback
         if self.base_path:
-            candidate = self.base_path / relative_path
-            if candidate.exists():
-                return str(candidate)
+            c = Path(self.base_path) / relative_path
+            if c.exists():
+                candidates.append(c)
 
-            candidate = self.base_path / package_name / relative_path
-            if candidate.exists():
-                return str(candidate)
+            # Strategy 5: ancestor heuristic
+            for ancestor in [
+                self.base_path,
+                self.base_path.parent,
+                self.base_path.parent.parent,
+            ]:
+                cand_a = ancestor / package_name / relative_path
+                if cand_a.exists():
+                    candidates.append(cand_a)
+                cand_b = ancestor / relative_path
+                if cand_b.exists():
+                    candidates.append(cand_b)
 
-        logger.warning(f"Could not resolve package URI: {uri}")
+        # Dedup by canonical (symlink/case-resolved) path before ambiguity check.
+        seen_canonical = set()
+        unique_paths: List[str] = []
+        for cand in candidates:
+            try:
+                canonical = cand.resolve(strict=True)
+            except (OSError, RuntimeError):
+                canonical = cand.absolute()
+            key = str(canonical)
+            if key in seen_canonical:
+                continue
+            seen_canonical.add(key)
+            unique_paths.append(str(cand))
+
+        if not unique_paths:
+            logger.warning(f"Package URI {uri!r} could not be resolved (no candidates)")
+            return uri
+        if len(unique_paths) == 1:
+            return unique_paths[0]
+
+        logger.warning(
+            f"Multiple package paths matched for {uri!r}: {sorted(unique_paths)}. "
+            "Refusing to auto-resolve to avoid the wrong choice. Add explicit "
+            "package mapping with resolver.add_package(name, path)."
+        )
         return uri
 
     def _resolve_relative_path(self, path: str) -> str:
@@ -371,5 +436,12 @@ class PackageResolver:
                 # If it looks like a package directory, add it
                 if (parent / "package.xml").exists():
                     resolver.add_package(parent.name, parent)
-
+                # Scan more ancestor levels for deeply nested URDFs
+        for depth in range(1, 4):
+            if depth < len(urdf_path.parents):
+                parent = urdf_path.parents[depth]
+                if parent.exists():
+                    resolver.add_search_path(parent)
+                    if (parent / "package.xml").exists():
+                        resolver.add_package(parent.name, parent)
         return resolver

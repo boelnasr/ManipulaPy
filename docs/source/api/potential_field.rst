@@ -17,6 +17,7 @@ Quick Navigation
 .. contents::
    :local:
    :depth: 2
+   :backlinks: none
 
 ---
 
@@ -26,7 +27,7 @@ PotentialField Class
 .. currentmodule:: ManipulaPy.potential_field
 
 .. autoclass:: PotentialField
-   :members:
+   :no-members:
    :show-inheritance:
 
    Main class for artificial potential field computations including attractive and repulsive potential calculations with configurable gain parameters.
@@ -47,7 +48,7 @@ Potential Field Computations
 ============================
 
 Attractive Potential
--------------------
+--------------------
 
 .. automethod:: PotentialField.compute_attractive_potential
 
@@ -70,7 +71,7 @@ Attractive Potential
    Where ξ is the attractive_gain parameter.
 
 Repulsive Potential
-------------------
+-------------------
 
 .. automethod:: PotentialField.compute_repulsive_potential
 
@@ -98,7 +99,7 @@ Repulsive Potential
    - Scaling factor of 10 applied to final result
 
 Gradient Computation
--------------------
+--------------------
 
 .. automethod:: PotentialField.compute_gradient
 
@@ -138,7 +139,7 @@ CollisionChecker Class
 ======================
 
 .. autoclass:: CollisionChecker
-   :members:
+   :no-members:
    :show-inheritance:
 
    URDF-based collision detection system using convex hull approximations for robotic manipulator self-collision and environment collision checking.
@@ -153,7 +154,7 @@ CollisionChecker Class
 
    **Initialization Process:**
    
-   1. Loads URDF using urchin.urdf.URDF.load()
+   1. Loads URDF using ManipulaPy's native URDF parser
    2. Extracts visual geometry from robot links
    3. Generates convex hulls for collision approximation
    4. Stores hull dictionary indexed by link names
@@ -164,7 +165,7 @@ Collision Detection Methods
 ===========================
 
 Hull Generation
---------------
+---------------
 
 .. automethod:: CollisionChecker._create_convex_hulls
 
@@ -183,7 +184,7 @@ Hull Generation
    5. Associates hulls with link names
 
 Geometric Transformation
------------------------
+------------------------
 
 .. automethod:: CollisionChecker._transform_convex_hull
 
@@ -209,7 +210,7 @@ Geometric Transformation
    - P represents point coordinates
 
 Collision Detection
-------------------
+-------------------
 
 .. automethod:: CollisionChecker.check_collision
 
@@ -241,7 +242,7 @@ Data Structures and Internal Representation
 ===========================================
 
 Convex Hull Storage
-------------------
+-------------------
 
 Internal convex_hulls dictionary structure:
 
@@ -254,7 +255,7 @@ Internal convex_hulls dictionary structure:
    }
 
 ConvexHull Properties
---------------------
+---------------------
 
 Each ConvexHull object contains:
 
@@ -267,9 +268,9 @@ Each ConvexHull object contains:
 - **equations**: Hyperplane equations for faces
 
 Forward Kinematics Integration
------------------------------
+------------------------------
 
-Integration with urchin URDF processing:
+Integration with ManipulaPy URDF processing:
 
 - **Input**: Joint configuration (thetalist)
 
@@ -283,7 +284,7 @@ Computational Complexity Analysis
 =================================
 
 Potential Field Methods
-----------------------
+-----------------------
 
 .. list-table::
    :header-rows: 1
@@ -303,7 +304,7 @@ Potential Field Methods
      - k obstacles × gradient calculation
 
 Collision Detection Methods
---------------------------
+---------------------------
 
 .. list-table::
    :header-rows: 1
@@ -332,7 +333,7 @@ Where:
 ---
 
 Numerical Implementation Details
-===============================
+================================
 
 Potential Field Scaling
 -----------------------
@@ -346,7 +347,7 @@ Applied scaling factors in implementation:
 - **Distance threshold**: influence_distance parameter cutoff
 
 Distance Computations
---------------------
+---------------------
 
 All distance calculations use numpy.linalg.norm():
 
@@ -357,7 +358,7 @@ All distance calculations use numpy.linalg.norm():
 - **Precision**: Double precision floating point
 
 Matrix Operations
-----------------
+-----------------
 
 Convex hull transformations use optimized NumPy operations:
 
@@ -368,7 +369,7 @@ Convex hull transformations use optimized NumPy operations:
 - **Memory layout**: Contiguous arrays for efficient computation
 
 Intersection Detection
----------------------
+----------------------
 
 Hull intersection testing relies on scipy.spatial.ConvexHull:
 
@@ -413,10 +414,10 @@ Potential Field Singularities
 ---
 
 Memory Management
-================
+=================
 
 Convex Hull Storage
-------------------
+-------------------
 
 Memory allocation for collision checking:
 
@@ -450,6 +451,5 @@ See Also
 External Dependencies
 =====================
 
-* `urchin <https://github.com/fishbotics/urchin>`_ -- URDF processing library
 * `scipy.spatial <https://docs.scipy.org/doc/scipy/reference/spatial.html>`_ -- Convex hull computations
 * `NumPy <https://numpy.org/doc/stable/>`_ -- Numerical array operations

@@ -5,7 +5,7 @@ Dynamics API Reference
 =========================
 
 This page documents **``ManipulaPy.dynamics``**, the module that
-adds full rigid-body dynamics to :pyclass:`~ManipulaPy.kinematics.SerialManipulator`.
+adds full rigid-body dynamics to :py:class:`~ManipulaPy.kinematics.SerialManipulator`.
 
 .. tip::
    Looking for a conceptual tour?  See :doc:`../user_guide/Dynamics`.
@@ -17,6 +17,7 @@ Quick Navigation
 .. contents::
    :local:
    :depth: 2
+   :backlinks: none
 
 .. ---------------------------------------------------------------------------
 .. ManipulatorDynamics
@@ -28,10 +29,10 @@ ManipulatorDynamics Class
 .. currentmodule:: ManipulaPy.dynamics
 
 .. autoclass:: ManipulatorDynamics
-   :members:
+   :no-members:
    :show-inheritance:
 
-   **Inheritance:**  derives from :pyclass:`~ManipulaPy.kinematics.SerialManipulator`
+   **Inheritance:**  derives from :py:class:`~ManipulaPy.kinematics.SerialManipulator`
    and therefore exposes *all* forward-kinematics & Jacobian helpers.
 
    .. rubric:: Constructor
@@ -113,9 +114,9 @@ Full Equations
      \mathbf{F}_{\text{ext}}
    \Bigr)
 
--------------
+--------------
 Usage Examples
--------------
+--------------
 
 **Basic set-up**
 

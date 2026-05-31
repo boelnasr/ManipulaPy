@@ -4,20 +4,40 @@
 URDF Data Types
 
 Dataclass definitions for URDF elements, optimized for ManipulaPy.
-Combines the best design patterns from yourdfpy, urchin, and urdfpy.
+Designed for ManipulaPy's native URDF parser.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-def _array_eq(a: np.ndarray, b: np.ndarray, tol: float = 1e-10) -> bool:
-    """Compare numpy arrays with tolerance."""
+def _array_eq(
+    a: Optional[np.ndarray], b: Optional[np.ndarray], tol: float = 1e-10
+) -> bool:
+    """
+    Compare two numpy arrays for equality within a tolerance.
+
+    Two ``None`` values are considered equal; a ``None`` paired with an
+    array is not. Arrays with differing shapes are never equal.
+
+    Args:
+        a: First array, or ``None``.
+        b: Second array, or ``None``.
+        tol: Absolute tolerance passed to ``np.allclose`` (default 1e-10).
+
+    Returns:
+        bool: ``True`` if the arrays are element-wise close within ``tol``
+        (or both are ``None``), ``False`` otherwise.
+    """
     if a is None and b is None:
         return True
     if a is None or b is None:
@@ -39,7 +59,19 @@ class JointType(Enum):
 
     @classmethod
     def from_string(cls, s: str) -> "JointType":
-        """Create JointType from string."""
+        """
+        Create a JointType from its URDF string name.
+
+        Args:
+            s: URDF joint type string (e.g. ``"revolute"``, ``"fixed"``);
+                matching is case-insensitive.
+
+        Returns:
+            JointType: The enum member corresponding to ``s``.
+
+        Raises:
+            ValueError: If ``s`` does not name a known joint type.
+        """
         try:
             return cls(s.lower())
         except ValueError:
@@ -60,7 +92,8 @@ class Origin:
 
     _matrix_cache: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Coerce xyz and rpy into float64 numpy arrays."""
         self.xyz = np.asarray(self.xyz, dtype=np.float64)
         self.rpy = np.asarray(self.rpy, dtype=np.float64)
 
@@ -101,7 +134,21 @@ class Origin:
 
     @classmethod
     def from_matrix(cls, T: np.ndarray) -> "Origin":
-        """Create Origin from 4x4 transformation matrix."""
+        """
+        Create an Origin from a 4x4 homogeneous transformation matrix.
+
+        The translation is read from the last column and the rotation is
+        decomposed into roll-pitch-yaw Euler angles using the ZYX
+        convention, with gimbal-lock handling when the pitch is near
+        +/- 90 degrees.
+
+        Args:
+            T: (4, 4) ndarray homogeneous transformation matrix.
+
+        Returns:
+            Origin: An Origin whose ``xyz`` is the translation and whose
+            ``rpy`` is the extracted (roll, pitch, yaw) in radians.
+        """
         xyz = T[:3, 3].copy()
 
         # Extract Euler angles (ZYX convention)
@@ -123,12 +170,14 @@ class Origin:
         """Create identity transform."""
         return cls()
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare two origins by xyz and rpy within tolerance."""
         if not isinstance(other, Origin):
             return NotImplemented
         return _array_eq(self.xyz, other.xyz) and _array_eq(self.rpy, other.rpy)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """Hash the origin by its xyz and rpy components."""
         return hash((tuple(self.xyz), tuple(self.rpy)))
 
 
@@ -146,7 +195,8 @@ class Inertial:
         default_factory=lambda: np.zeros((3, 3), dtype=np.float64)
     )
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Coerce the inertia tensor into a float64 numpy array."""
         self.inertia = np.asarray(self.inertia, dtype=np.float64)
 
     @property
@@ -204,8 +254,25 @@ class Inertial:
         return G
 
     @classmethod
-    def from_spatial_inertia(cls, G: np.ndarray, origin: Origin = None) -> "Inertial":
-        """Create Inertial from 6x6 spatial inertia matrix."""
+    def from_spatial_inertia(
+        cls, G: np.ndarray, origin: Optional[Origin] = None
+    ) -> "Inertial":
+        """
+        Create an Inertial from a 6x6 spatial inertia matrix.
+
+        The rotational inertia tensor is taken from the top-left 3x3 block
+        and the mass from the ``G[3, 3]`` entry of the translational block.
+
+        Args:
+            G: (6, 6) ndarray spatial inertia matrix in the
+                ``[[I, 0], [0, m*I_3]]`` block layout.
+            origin: Optional Origin giving the center-of-mass pose; defaults
+                to the identity Origin when ``None``.
+
+        Returns:
+            Inertial: Inertial properties with the extracted mass, inertia
+            tensor, and origin.
+        """
         inertia = G[0:3, 0:3].copy()
         mass = G[3, 3]
         return cls(mass=mass, origin=origin or Origin(), inertia=inertia)
@@ -249,15 +316,18 @@ class Box:
 
     size: np.ndarray = field(default_factory=lambda: np.ones(3, dtype=np.float64))
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Coerce the box size into a float64 numpy array."""
         self.size = np.asarray(self.size, dtype=np.float64)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare two boxes by size within tolerance."""
         if not isinstance(other, Box):
             return NotImplemented
         return _array_eq(self.size, other.size)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """Hash the box by its size."""
         return hash(tuple(self.size))
 
 
@@ -291,28 +361,42 @@ class Mesh:
     _vertices: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
     _faces: Optional[np.ndarray] = field(default=None, repr=False, compare=False)
     _trimesh: Optional[object] = field(default=None, repr=False, compare=False)
+    _load_attempted: bool = field(default=False, repr=False, compare=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Coerce scale to a float64 array, broadcasting a scalar to 3 axes."""
         self.scale = np.asarray(self.scale, dtype=np.float64)
         if self.scale.size == 1:
             self.scale = np.full(3, self.scale.item(), dtype=np.float64)
 
     @property
     def vertices(self) -> Optional[np.ndarray]:
-        """Mesh vertices (lazy-loaded)."""
-        if self._vertices is None and self.filename:
+        """Mesh vertices (lazy-loaded; load is attempted at most once)."""
+        if self._vertices is None and self.filename and not self._load_attempted:
             self._load_mesh()
         return self._vertices
 
     @property
     def faces(self) -> Optional[np.ndarray]:
-        """Mesh faces (lazy-loaded)."""
-        if self._faces is None and self.filename:
+        """Mesh faces (lazy-loaded; load is attempted at most once)."""
+        if self._faces is None and self.filename and not self._load_attempted:
             self._load_mesh()
         return self._faces
 
     def _load_mesh(self) -> None:
-        """Load mesh from file using trimesh."""
+        """Attempt to load mesh vertices and faces from the filename via trimesh."""
+        # Filename and exception text are interpolated with !r so newlines or
+        # control characters in user-supplied URDFs cannot forge log lines.
+        self._load_attempted = True
+        if self.filename.startswith("package://"):
+            logger.warning(
+                f"Mesh has unresolved package URI: {self.filename!r}. "
+                "Configure PackageResolver.add_package(name, path) before loading meshes."
+            )
+            return
+        if not Path(self.filename).is_file():
+            logger.warning(f"Mesh file not found: {self.filename!r}")
+            return
         try:
             import trimesh
 
@@ -321,16 +405,21 @@ class Mesh:
             self._faces = np.asarray(mesh.faces, dtype=np.int64)
             self._trimesh = mesh
         except ImportError:
-            pass  # trimesh not available
-        except Exception:
-            pass  # Failed to load mesh
+            logger.warning(
+                f"trimesh not installed — cannot load mesh {self.filename!r}. "
+                "Install with: pip install trimesh"
+            )
+        except Exception as e:
+            logger.warning(f"Failed to load mesh {self.filename!r}: {e!r}")
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare two meshes by filename and scale within tolerance."""
         if not isinstance(other, Mesh):
             return NotImplemented
         return self.filename == other.filename and _array_eq(self.scale, other.scale)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """Hash the mesh by its filename and scale."""
         return hash((self.filename, tuple(self.scale)))
 
 
@@ -346,11 +435,13 @@ class Material:
     color: Optional[np.ndarray] = None  # RGBA
     texture: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Coerce a non-None color into a float64 numpy array."""
         if self.color is not None:
             self.color = np.asarray(self.color, dtype=np.float64)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare two materials by name, color, and texture."""
         if not isinstance(other, Material):
             return NotImplemented
         return (
@@ -359,7 +450,8 @@ class Material:
             and self.texture == other.texture
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """Hash the material by its name, color, and texture."""
         color_tuple = tuple(self.color) if self.color is not None else None
         return hash((self.name, color_tuple, self.texture))
 
@@ -470,10 +562,12 @@ class Transmission:
     joints: List[TransmissionJoint] = field(default_factory=list)
     actuators: List[Actuator] = field(default_factory=list)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """Hash the transmission by its name."""
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare two transmissions by name."""
         if not isinstance(other, Transmission):
             return NotImplemented
         return self.name == other.name
@@ -495,10 +589,12 @@ class Link:
     visuals: List[Visual] = field(default_factory=list)
     collisions: List[Collision] = field(default_factory=list)
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """Hash the link by its name."""
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare two links by name."""
         if not isinstance(other, Link):
             return NotImplemented
         return self.name == other.name
@@ -524,7 +620,8 @@ class Joint:
     safety: Optional[SafetyController] = None
     calibration: Optional[JointCalibration] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Coerce the joint axis to a float64 array and normalize it."""
         self.axis = np.asarray(self.axis, dtype=np.float64)
         # Normalize axis
         norm = np.linalg.norm(self.axis)
@@ -541,7 +638,12 @@ class Joint:
         """Check if joint mimics another."""
         return self.mimic is not None
 
-    def get_child_pose(self, q=None) -> np.ndarray:
+    def get_child_pose(
+        self,
+        q: Optional[
+            Union[float, np.ndarray, List[float], Tuple[float, ...]]
+        ] = None,
+    ) -> np.ndarray:
         """
         Compute child link pose relative to parent for given configuration.
 
@@ -681,7 +783,17 @@ class Joint:
 
     @staticmethod
     def _axis_angle_rotation(axis: np.ndarray, angle: float) -> np.ndarray:
-        """Rodrigues' rotation formula."""
+        """
+        Build a 3x3 rotation matrix via Rodrigues' rotation formula.
+
+        Args:
+            axis: (3,) ndarray rotation axis; normalized internally so it
+                need not be unit length.
+            angle: Rotation angle about ``axis``, in radians.
+
+        Returns:
+            (3, 3) ndarray rotation matrix.
+        """
         axis = axis / np.linalg.norm(axis)
         K = np.array(
             [[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]], [-axis[1], axis[0], 0]],
@@ -695,7 +807,16 @@ class Joint:
         """
         Batch Rodrigues' rotation formula.
 
-        Optimized for computing many rotations about same axis.
+        Computes many rotation matrices about a single shared axis in a
+        vectorized fashion.
+
+        Args:
+            axis: (3,) ndarray rotation axis; normalized internally so it
+                need not be unit length.
+            angles: (n,) ndarray of rotation angles about ``axis``, radians.
+
+        Returns:
+            (n, 3, 3) ndarray stack of rotation matrices, one per angle.
         """
         axis = axis / np.linalg.norm(axis)
         n = len(angles)
@@ -721,10 +842,12 @@ class Joint:
 
         return R
 
-    def __hash__(self):
+    def __hash__(self) -> int:
+        """Hash the joint by its name."""
         return hash(self.name)
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
+        """Compare two joints by name."""
         if not isinstance(other, Joint):
             return NotImplemented
         return self.name == other.name

@@ -30,6 +30,8 @@ import logging
 import os
 import tempfile
 import time
+from pathlib import Path
+from typing import Iterator
 from unittest.mock import MagicMock, Mock, call, patch
 
 import numpy as np
@@ -55,10 +57,11 @@ class MockPyBullet:
     GEOM_CAPSULE = 7
     GEOM_SPHERE = 2
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the mock and reset its internal state."""
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all internal counters and state"""
         self._body_counter = 1000
         self._shape_counter = 100
@@ -66,32 +69,41 @@ class MockPyBullet:
         self._joint_states = {}
         self._physics_client = None
 
-    def connect(self, mode):
+    def connect(self, mode) -> int:
+        """Pretend to connect and return a fake physics-client id."""
         self._physics_client = 1
         return 1
 
-    def disconnect(self):
+    def disconnect(self) -> None:
+        """Clear the fake physics-client id to mimic PyBullet disconnect."""
         self._physics_client = None
 
-    def resetSimulation(self):
+    def resetSimulation(self) -> None:
+        """No-op stand-in for PyBullet's resetSimulation."""
         pass
 
-    def setAdditionalSearchPath(self, path):
+    def setAdditionalSearchPath(self, path) -> None:
+        """No-op stand-in for PyBullet's setAdditionalSearchPath."""
         pass
 
-    def setGravity(self, x, y, z):
+    def setGravity(self, x, y, z) -> None:
+        """No-op stand-in for PyBullet's setGravity."""
         pass
 
-    def setTimeStep(self, dt):
+    def setTimeStep(self, dt) -> None:
+        """No-op stand-in for PyBullet's setTimeStep."""
         pass
 
-    def loadURDF(self, path, *args, **kwargs):
+    def loadURDF(self, path, *args, **kwargs) -> int:
+        """Return a fake URDF body id."""
         return 1
 
-    def getNumJoints(self, robot_id):
+    def getNumJoints(self, robot_id) -> int:
+        """Return a fixed joint count for the mocked robot."""
         return 6
 
-    def getJointInfo(self, robot_id, joint_idx):
+    def getJointInfo(self, robot_id, joint_idx) -> tuple:
+        """Return a synthetic joint-info tuple for the given joint index."""
         joint_types = [self.JOINT_REVOLUTE] * 6
         return (
             joint_idx,
@@ -108,44 +120,56 @@ class MockPyBullet:
             0,
         )
 
-    def getJointState(self, robot_id, joint_idx):
+    def getJointState(self, robot_id, joint_idx) -> tuple:
+        """Return a synthetic (position, velocity) pair for the joint."""
         return (joint_idx * 0.1, joint_idx * 0.05)
 
-    def setJointMotorControlArray(self, *args, **kwargs):
+    def setJointMotorControlArray(self, *args, **kwargs) -> None:
+        """No-op stand-in for PyBullet's setJointMotorControlArray."""
         pass
 
-    def createCollisionShape(self, *args, **kwargs):
+    def createCollisionShape(self, *args, **kwargs) -> int:
+        """Return an incrementing fake collision-shape id."""
         self._shape_counter += 1
         return self._shape_counter
 
-    def createVisualShape(self, *args, **kwargs):
+    def createVisualShape(self, *args, **kwargs) -> int:
+        """Return an incrementing fake visual-shape id."""
         self._shape_counter += 1
         return self._shape_counter
 
-    def createMultiBody(self, *args, **kwargs):
+    def createMultiBody(self, *args, **kwargs) -> int:
+        """Return an incrementing fake multi-body id."""
         self._body_counter += 1
         return self._body_counter
 
-    def removeBody(self, body_id):
+    def removeBody(self, body_id) -> None:
+        """No-op stand-in for PyBullet's removeBody."""
         pass
 
-    def getQuaternionFromEuler(self, euler):
+    def getQuaternionFromEuler(self, euler) -> list:
+        """Return a fixed identity quaternion."""
         return [0, 0, 0, 1]
 
-    def getQuaternionFromAxisAngle(self, axis, angle):
+    def getQuaternionFromAxisAngle(self, axis, angle) -> list:
+        """Return a fixed identity quaternion."""
         return [0, 0, 0, 1]
 
-    def addUserDebugParameter(self, name, low, high, init):
+    def addUserDebugParameter(self, name, low, high, init) -> int:
+        """Return an incrementing fake debug-parameter id."""
         self._param_counter += 1
         return self._param_counter
 
-    def readUserDebugParameter(self, param_id):
+    def readUserDebugParameter(self, param_id) -> float:
+        """Return a fixed debug-parameter value."""
         return 0.5
 
-    def stepSimulation(self):
+    def stepSimulation(self) -> None:
+        """No-op stand-in for PyBullet's stepSimulation."""
         pass
 
-    def getLinkState(self, robot_id, link_idx):
+    def getLinkState(self, robot_id, link_idx) -> tuple:
+        """Return a synthetic link-state tuple with a fake world position."""
         return (
             None,
             None,
@@ -155,7 +179,8 @@ class MockPyBullet:
             None,
         )
 
-    def getContactPoints(self, *args, **kwargs):
+    def getContactPoints(self, *args, **kwargs) -> list:
+        """Return an empty contact-point list by default."""
         return []
 
 
@@ -164,7 +189,7 @@ mock_pybullet = MockPyBullet()
 
 
 @pytest.fixture(autouse=True)
-def mock_pybullet_module(monkeypatch):
+def mock_pybullet_module(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Replace pybullet module completely"""
     # Patch all pybullet functions used in sim.py
     monkeypatch.setattr("ManipulaPy.sim.p", mock_pybullet)
@@ -197,7 +222,7 @@ def mock_pybullet_module(monkeypatch):
 
 
 @pytest.fixture
-def mock_dependencies(monkeypatch):
+def mock_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
     """Mock external dependencies that aren't PyBullet"""
     # Mock matplotlib
     mock_plt = Mock()
@@ -207,14 +232,14 @@ def mock_dependencies(monkeypatch):
 
 
 @pytest.fixture
-def basic_sim():
+def basic_sim() -> Simulation:
     """Create a basic simulation instance for testing"""
     joint_limits = [(-np.pi, np.pi)] * 6
     return Simulation("test_robot.urdf", joint_limits)
 
 
 @pytest.fixture
-def mock_urdf_processor(monkeypatch):
+def mock_urdf_processor(monkeypatch: pytest.MonkeyPatch) -> Mock:
     """Mock the URDFToSerialManipulator"""
     mock_processor = Mock()
     mock_robot = Mock()
@@ -223,7 +248,8 @@ def mock_urdf_processor(monkeypatch):
     mock_processor.serial_manipulator = mock_robot
     mock_processor.dynamics = mock_dynamics
 
-    def mock_urdf_processor_init(urdf_path):
+    def mock_urdf_processor_init(urdf_path) -> Mock:
+        """Return the shared mocked URDF processor."""
         return mock_processor
 
     monkeypatch.setattr(
@@ -235,7 +261,7 @@ def mock_urdf_processor(monkeypatch):
 class TestSimulationInitialization:
     """Test simulation setup and initialization"""
 
-    def test_basic_initialization(self):
+    def test_basic_initialization(self) -> None:
         """Test basic simulation initialization"""
         joint_limits = [(-np.pi, np.pi)] * 3
         sim = Simulation("test_robot.urdf", joint_limits)
@@ -248,7 +274,7 @@ class TestSimulationInitialization:
         assert isinstance(sim.logger, logging.Logger)
         # no GUI sliders or trajectory bodies asserted here—this test only covers basic ctor
 
-    def test_initialization_with_custom_parameters(self):
+    def test_initialization_with_custom_parameters(self) -> None:
         """Test initialization with custom parameters"""
         joint_limits = [(-1, 1), (-2, 2)]
         torque_limits = [(-10, 10), (-20, 20)]
@@ -268,7 +294,7 @@ class TestSimulationInitialization:
         assert sim.real_time_factor == 2.0
         assert sim.physics_client == 42
 
-    def test_logger_setup(self):
+    def test_logger_setup(self) -> None:
         """Test logger configuration"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -280,7 +306,7 @@ class TestSimulationInitialization:
 class TestConnectionManagement:
     """Test PyBullet connection management"""
 
-    def test_connect_simulation(self):
+    def test_connect_simulation(self) -> None:
         """Test simulation connection"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.physics_client = None
@@ -288,14 +314,14 @@ class TestConnectionManagement:
 
         assert sim.physics_client == 1  # Mock returns 1
 
-    def test_disconnect_simulation(self):
+    def test_disconnect_simulation(self) -> None:
         """Test simulation disconnection"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.disconnect_simulation()
 
         assert sim.physics_client is None
 
-    def test_disconnect_when_already_none(self):
+    def test_disconnect_when_already_none(self) -> None:
         """Test disconnection when physics_client is already None"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.physics_client = None
@@ -308,7 +334,7 @@ class TestConnectionManagement:
 class TestRobotInitialization:
     """Test robot model initialization"""
 
-    def test_initialize_robot_first_time(self, mock_urdf_processor):
+    def test_initialize_robot_first_time(self, mock_urdf_processor) -> None:
         """Test robot initialization from URDF"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -321,7 +347,7 @@ class TestRobotInitialization:
         assert hasattr(sim, "robot")
         assert hasattr(sim, "dynamics")
 
-    def test_initialize_robot_already_exists(self):
+    def test_initialize_robot_already_exists(self) -> None:
         """Test robot initialization when robot already exists"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.robot = Mock()
@@ -332,7 +358,7 @@ class TestRobotInitialization:
         # Robot should remain unchanged
         assert sim.robot is initial_robot
 
-    def test_set_robot_models(self):
+    def test_set_robot_models(self) -> None:
         """Test setting pre-existing robot models"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -348,7 +374,7 @@ class TestRobotInitialization:
 class TestJointManagement:
     """Test joint parameter and control management"""
 
-    def test_add_joint_parameters(self):
+    def test_add_joint_parameters(self) -> None:
         """Test adding joint parameter sliders"""
         sim = Simulation("test.urdf", [(-1, 1), (-2, 2), (-3, 3)])
         sim.non_fixed_joints = [0, 1, 2]
@@ -359,7 +385,7 @@ class TestJointManagement:
         assert len(sim.joint_params) == 3
         assert all(isinstance(param_id, int) for param_id in sim.joint_params)
 
-    def test_add_joint_parameters_idempotent(self):
+    def test_add_joint_parameters_idempotent(self) -> None:
         """Test that adding joint parameters multiple times doesn't duplicate"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.non_fixed_joints = [0]
@@ -371,7 +397,7 @@ class TestJointManagement:
         sim.add_joint_parameters()
         assert len(sim.joint_params) == initial_count
 
-    def test_add_reset_button_success(self):
+    def test_add_reset_button_success(self) -> None:
         """Test successful reset button addition"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.reset_button = None
@@ -380,10 +406,11 @@ class TestJointManagement:
 
         assert sim.reset_button is not None
 
-    def test_add_reset_button_failure(self, monkeypatch):
+    def test_add_reset_button_failure(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test reset button addition failure handling"""
 
-        def failing_add_param(*args, **kwargs):
+        def failing_add_param(*args, **kwargs) -> None:
+            """Raise to simulate a failing debug-parameter call."""
             raise Exception("Debug parameter failed")
 
         # Patch the specific mock method
@@ -395,11 +422,12 @@ class TestJointManagement:
         sim.add_reset_button()
         assert sim.reset_button is None
 
-    def test_set_joint_positions(self):
+    def test_set_joint_positions(self) -> None:
         """Test setting joint positions"""
         control_calls = []
 
-        def mock_control(robot_id, joints, mode, targetPositions=None, **kwargs):
+        def mock_control(robot_id, joints, mode, targetPositions=None, **kwargs) -> None:
+            """Record the arguments of each joint-control call."""
             control_calls.append(
                 {
                     "robot_id": robot_id,
@@ -421,7 +449,7 @@ class TestJointManagement:
         assert control_calls[0]["positions"] == positions
         assert control_calls[0]["joints"] == [0, 1]
 
-    def test_get_joint_positions(self):
+    def test_get_joint_positions(self) -> None:
         """Test getting current joint positions"""
         sim = Simulation("test.urdf", [(-1, 1), (-2, 2)])
         sim.non_fixed_joints = [0, 1]
@@ -433,11 +461,12 @@ class TestJointManagement:
         # Mock returns idx * 0.1 as position
         assert np.allclose(positions, [0.0, 0.1])
 
-    def test_get_joint_parameters(self):
+    def test_get_joint_parameters(self) -> None:
         """Test reading joint parameter values"""
 
         # Set up mock to return specific values
-        def mock_read_param(param_id):
+        def mock_read_param(param_id) -> float:
+            """Return a preset debug-parameter value for the given id."""
             param_values = {1: 0.5, 2: -0.3, 3: 1.2}
             return param_values.get(param_id, 0)
 
@@ -454,54 +483,27 @@ class TestJointManagement:
 class TestControllerIntegration:
     """Test controller integration"""
 
-    def test_run_controller(self):
-        """Test running controller with trajectory"""
-        # Mock cupy
-        with patch("cupy.array") as mock_array, patch("cupy.asnumpy") as mock_asnumpy:
+    def test_run_controller(self) -> None:
+        """run_controller performs open-loop position tracking — set_joint_positions is called once per desired configuration in order."""
+        sim = Simulation("test.urdf", [(-1, 1)] * 6)  # Make sure we have 6 joints
+        sim.non_fixed_joints = list(range(6))  # 6 joints to match mock
 
-            mock_array.side_effect = lambda x: np.array(x)
-            mock_asnumpy.side_effect = lambda x: (
-                np.array(x) if not isinstance(x, np.ndarray) else x
-            )
+        desired_positions = [[0.0] * 6, [0.5] * 6]  # 6 joints
 
-            sim = Simulation("test.urdf", [(-1, 1)] * 6)  # Make sure we have 6 joints
-            sim.non_fixed_joints = list(range(6))  # 6 joints to match mock
-
-            # Mock controller
-            mock_controller = Mock()
-            mock_controller.computed_torque_control.return_value = np.array(
-                [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
-            )
-
-            desired_positions = [[0.0] * 6, [0.5] * 6]  # 6 joints
-            desired_velocities = [[0.0] * 6, [0.1] * 6]
-            desired_accelerations = [[0.0] * 6, [0.01] * 6]
-            g = [0, 0, -9.81]
-            Ftip = [0, 0, 0, 0, 0, 0]
-            Kp = [10] * 6
-            Ki = [1] * 6
-            Kd = [0.1] * 6
-
-            final_pos = sim.run_controller(
-                mock_controller,
-                desired_positions,
-                desired_velocities,
-                desired_accelerations,
-                g,
-                Ftip,
-                Kp,
-                Ki,
-                Kd,
-            )
+        with patch.object(sim, "set_joint_positions") as mock_set:
+            final_pos = sim.run_controller(desired_positions)
 
             assert final_pos is not None
-            assert mock_controller.computed_torque_control.called
+            actual_calls = [c.args[0] for c in mock_set.call_args_list]
+            assert len(actual_calls) == len(desired_positions)
+            for actual, expected in zip(actual_calls, desired_positions):
+                np.testing.assert_array_equal(actual, expected)
 
 
 class TestParameterManagement:
     """Test simulation parameter management"""
 
-    def test_add_additional_parameters(self):
+    def test_add_additional_parameters(self) -> None:
         """Test adding additional GUI parameters"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -510,7 +512,7 @@ class TestParameterManagement:
         assert sim.gravity_param is not None
         assert sim.time_step_param is not None
 
-    def test_add_additional_parameters_idempotent(self):
+    def test_add_additional_parameters_idempotent(self) -> None:
         """Test that additional parameters aren't duplicated"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -520,11 +522,12 @@ class TestParameterManagement:
         sim.add_additional_parameters()
         assert sim.gravity_param == gravity_param_1
 
-    def test_update_simulation_parameters(self, monkeypatch):
+    def test_update_simulation_parameters(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test updating simulation parameters from GUI"""
         param_values = {}
 
-        def mock_read_param(param_id):
+        def mock_read_param(param_id) -> float:
+            """Return the staged debug-parameter value for the given id."""
             return param_values.get(param_id, 0)
 
         monkeypatch.setattr(mock_pybullet, "readUserDebugParameter", mock_read_param)
@@ -532,10 +535,12 @@ class TestParameterManagement:
         gravity_calls = []
         timestep_calls = []
 
-        def mock_set_gravity(x, y, z):
+        def mock_set_gravity(x, y, z) -> None:
+            """Record each gravity-setting call."""
             gravity_calls.append((x, y, z))
 
-        def mock_set_timestep(t):
+        def mock_set_timestep(t) -> None:
+            """Record each time-step-setting call."""
             timestep_calls.append(t)
 
         monkeypatch.setattr(mock_pybullet, "setGravity", mock_set_gravity)
@@ -558,7 +563,7 @@ class TestParameterManagement:
         assert 0.005 in timestep_calls
         assert sim.time_step == 0.005
 
-    def test_update_parameters_without_gui(self):
+    def test_update_parameters_without_gui(self) -> None:
         """Test parameter update when GUI parameters don't exist"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -573,7 +578,7 @@ class TestParameterManagement:
 class TestTrajectoryVisualization:
     """Test trajectory visualization with real geometry"""
 
-    def test_capsule_line_creation(self):
+    def test_capsule_line_creation(self) -> None:
         """Test creating capsule lines between points"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -585,7 +590,7 @@ class TestTrajectoryVisualization:
         invalid_body_id = sim._capsule_line([0, 0, 0], [0, 0, 0])
         assert invalid_body_id == -1
 
-    def test_plot_trajectory_empty(self):
+    def test_plot_trajectory_empty(self) -> None:
         """Test plotting trajectory with insufficient points"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -597,7 +602,7 @@ class TestTrajectoryVisualization:
         result = sim.plot_trajectory([[0, 0, 0]])
         assert result == []
 
-    def test_plot_trajectory_success(self):
+    def test_plot_trajectory_success(self) -> None:
         """Test successful trajectory plotting"""
         sim = Simulation("test.urdf", [(-1, 1)])
         ee_positions = [[0, 0, 0], [0.1, 0.1, 0.1], [0.2, 0.2, 0.2]]
@@ -611,7 +616,7 @@ class TestTrajectoryVisualization:
             trajectory_bodies
         )  # Includes markers
 
-    def test_clear_trajectory_visualization(self):
+    def test_clear_trajectory_visualization(self) -> None:
         """Test clearing trajectory visualization"""
         removed_bodies = []
         mock_pybullet.removeBody = lambda bid: removed_bodies.append(bid)
@@ -628,7 +633,7 @@ class TestTrajectoryVisualization:
 class TestTrajectoryExecution:
     """Test trajectory execution and simulation"""
 
-    def test_run_trajectory(self):
+    def test_run_trajectory(self) -> None:
         """Test running a joint trajectory"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.non_fixed_joints = [0]
@@ -641,7 +646,7 @@ class TestTrajectoryExecution:
         assert final_position is not None
         assert len(sim.trajectory_body_ids) >= 0  # Trajectory should be plotted
 
-    def test_simulate_robot_motion(self):
+    def test_simulate_robot_motion(self) -> None:
         """Test robot motion simulation"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -654,7 +659,7 @@ class TestTrajectoryExecution:
 class TestCollisionDetection:
     """Test collision detection functionality"""
 
-    def test_check_collisions_no_robot(self):
+    def test_check_collisions_no_robot(self) -> None:
         """Test collision check when robot_id is None"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.robot_id = None
@@ -662,12 +667,14 @@ class TestCollisionDetection:
         # Should log warning but not crash
         sim.check_collisions()
 
-    def test_check_collisions_with_contacts(self, monkeypatch):
-        """Test collision check with detected contacts"""
-        # Mock contact points
+    def test_check_collisions_with_contacts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test collision check with detected contacts returns contact list."""
+        # Mock contact points in PyBullet tuple format:
+        # index 3 = linkIndexA, index 4 = linkIndexB, index 5 = positionOnA
+        # Full tuple has 9+ fields; only 0-8 are used here for brevity.
         mock_contacts = [
-            {"contact_point": [0, 0, 0], "force": 10},
-            {"contact_point": [0.1, 0.1, 0.1], "force": 5},
+            (None, None, None, 0, 1, (0.0, 0.0, 0.0), None, None, None),
+            (None, None, None, 1, 2, (0.1, 0.1, 0.1), None, None, None),
         ]
 
         monkeypatch.setattr(
@@ -677,10 +684,13 @@ class TestCollisionDetection:
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.non_fixed_joints = [0]
 
-        # Should log warnings but not crash
-        sim.check_collisions()
+        contacts = sim.check_collisions()
+        assert isinstance(contacts, list)
+        assert len(contacts) == 2
+        assert contacts[0] == (0, 1, (0.0, 0.0, 0.0))
+        assert contacts[1] == (1, 2, (0.1, 0.1, 0.1))
 
-    def test_check_collisions_no_contacts(self):
+    def test_check_collisions_no_contacts(self) -> None:
         """Test collision check with no contacts"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.non_fixed_joints = [0, 1]
@@ -692,7 +702,7 @@ class TestCollisionDetection:
 class TestFileOperations:
     """Test file I/O operations"""
 
-    def test_save_joint_states(self, tmp_path):
+    def test_save_joint_states(self, tmp_path: Path) -> None:
         """Test saving joint states to CSV"""
         sim = Simulation("test.urdf", [(-1, 1), (-2, 2)])
         sim.non_fixed_joints = [0, 1]
@@ -713,12 +723,13 @@ class TestFileOperations:
 class TestResourceManagement:
     """Test resource management and cleanup"""
 
-    def test_close_simulation(self):
+    def test_close_simulation(self) -> None:
         """Test simulation cleanup"""
         disconnect_called = []
         original_disconnect = mock_pybullet.disconnect
 
-        def track_disconnect():
+        def track_disconnect() -> None:
+            """Record the disconnect call and delegate to the original."""
             disconnect_called.append(True)
             return original_disconnect()
 
@@ -733,7 +744,7 @@ class TestResourceManagement:
         assert sim.trajectory_body_ids == []
         assert sim.physics_client is None
 
-    def test_destructor_cleanup(self):
+    def test_destructor_cleanup(self) -> None:
         """Test destructor cleanup"""
         sim = Simulation("test.urdf", [(-1, 1)])
         sim.trajectory_body_ids = [100, 101]
@@ -741,7 +752,7 @@ class TestResourceManagement:
         # Should not raise exception during cleanup
         sim.__del__()
 
-    def test_destructor_without_trajectory_bodies(self):
+    def test_destructor_without_trajectory_bodies(self) -> None:
         """Test destructor when trajectory_body_ids doesn't exist"""
         sim = Simulation("test.urdf", [(-1, 1)])
 
@@ -755,12 +766,13 @@ class TestResourceManagement:
 class TestManualControl:
     """Test manual control functionality"""
 
-    def test_manual_control_setup(self, monkeypatch):
+    def test_manual_control_setup(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test manual control setup"""
         # Mock manual control to exit after first iteration
         call_count = [0]
 
-        def mock_read_param(param_id):
+        def mock_read_param(param_id) -> float:
+            """Return a fixed value, raising KeyboardInterrupt after a few calls."""
             call_count[0] += 1
             if call_count[0] > 5:  # Exit after a few calls
                 raise KeyboardInterrupt("Test exit")
@@ -839,10 +851,11 @@ class MockPyBullet:
     GEOM_CAPSULE = 7
     GEOM_SPHERE = 2
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the mock and reset its internal state."""
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all internal counters and state"""
         self._body_counter = 1000
         self._shape_counter = 100
@@ -850,32 +863,41 @@ class MockPyBullet:
         self._joint_states = {}
         self._physics_client = None
 
-    def connect(self, mode):
+    def connect(self, mode) -> int:
+        """Pretend to connect and return a fake physics-client id."""
         self._physics_client = 1
         return 1
 
-    def disconnect(self):
+    def disconnect(self) -> None:
+        """Clear the fake physics-client id to mimic PyBullet disconnect."""
         self._physics_client = None
 
-    def resetSimulation(self):
+    def resetSimulation(self) -> None:
+        """No-op stand-in for PyBullet's resetSimulation."""
         pass
 
-    def setAdditionalSearchPath(self, path):
+    def setAdditionalSearchPath(self, path) -> None:
+        """No-op stand-in for PyBullet's setAdditionalSearchPath."""
         pass
 
-    def setGravity(self, x, y, z):
+    def setGravity(self, x, y, z) -> None:
+        """No-op stand-in for PyBullet's setGravity."""
         pass
 
-    def setTimeStep(self, dt):
+    def setTimeStep(self, dt) -> None:
+        """No-op stand-in for PyBullet's setTimeStep."""
         pass
 
-    def loadURDF(self, path, *args, **kwargs):
+    def loadURDF(self, path, *args, **kwargs) -> int:
+        """Return a fake URDF body id."""
         return 1
 
-    def getNumJoints(self, robot_id):
+    def getNumJoints(self, robot_id) -> int:
+        """Return a fixed joint count for the mocked robot."""
         return 6
 
-    def getJointInfo(self, robot_id, joint_idx):
+    def getJointInfo(self, robot_id, joint_idx) -> tuple:
+        """Return a synthetic joint-info tuple for the given joint index."""
         joint_types = [self.JOINT_REVOLUTE] * 6
         return (
             joint_idx,
@@ -892,41 +914,51 @@ class MockPyBullet:
             0,
         )
 
-    def getJointState(self, robot_id, joint_idx):
+    def getJointState(self, robot_id, joint_idx) -> tuple:
+        """Return a synthetic (position, velocity) pair for the joint."""
         return (joint_idx * 0.1, joint_idx * 0.05)
 
-    def setJointMotorControlArray(self, *args, **kwargs):
+    def setJointMotorControlArray(self, *args, **kwargs) -> None:
+        """No-op stand-in for PyBullet's setJointMotorControlArray."""
         pass
 
-    def createCollisionShape(self, *args, **kwargs):
+    def createCollisionShape(self, *args, **kwargs) -> int:
+        """Return an incrementing fake collision-shape id."""
         self._shape_counter += 1
         return self._shape_counter
 
-    def createVisualShape(self, *args, **kwargs):
+    def createVisualShape(self, *args, **kwargs) -> int:
+        """Return an incrementing fake visual-shape id."""
         self._shape_counter += 1
         return self._shape_counter
 
-    def createMultiBody(self, *args, **kwargs):
+    def createMultiBody(self, *args, **kwargs) -> int:
+        """Return an incrementing fake multi-body id."""
         self._body_counter += 1
         return self._body_counter
 
-    def removeBody(self, body_id):
+    def removeBody(self, body_id) -> None:
+        """No-op stand-in for PyBullet's removeBody."""
         pass
 
-    def getQuaternionFromEuler(self, euler):
+    def getQuaternionFromEuler(self, euler) -> list:
+        """Return a fixed identity quaternion."""
         return [0, 0, 0, 1]
 
-    def getQuaternionFromAxisAngle(self, axis, angle):
+    def getQuaternionFromAxisAngle(self, axis, angle) -> list:
+        """Return a fixed identity quaternion."""
         return [0, 0, 0, 1]
 
-    def addUserDebugParameter(self, name, low, high, init):
+    def addUserDebugParameter(self, name, low, high, init) -> int:
+        """Return an incrementing fake debug-parameter id."""
         self._param_counter += 1
         return self._param_counter
 
-    def readUserDebugParameter(self, param_id):
+    def readUserDebugParameter(self, param_id) -> float:
+        """Return a fixed debug-parameter value."""
         return 0.5
 
-    def step_simulation(self):
+    def step_simulation(self) -> None:
         """
         Steps the simulation forward by one time step.
         """

@@ -20,7 +20,7 @@ import sys
 from typing import Any, Dict, List, Optional
 
 # Package metadata (always available, no imports)
-__version__ = "1.3.1"
+__version__ = "1.3.2"
 __author__ = "Mohamed Aboelnasr"
 __license__ = "AGPL-3.0-or-later"
 
@@ -122,7 +122,7 @@ def _get_available_features() -> Dict[str, bool]:
     return _available_features
 
 
-def _lazy_import(module_name: str):
+def _lazy_import(module_name: str) -> Any:
     """
     Lazily import a ManipulaPy submodule.
 
@@ -171,7 +171,7 @@ def _lazy_import(module_name: str):
         raise ImportError(f"Failed to import ManipulaPy.{module_name}: {e}") from e
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     """
     Lazy module loading via __getattr__.
 
@@ -220,7 +220,7 @@ def __getattr__(name: str):
     raise AttributeError(f"module 'ManipulaPy' has no attribute '{name}'")
 
 
-def __dir__():
+def __dir__() -> List[str]:
     """
     Provide tab-completion support for lazy-loaded modules.
     """

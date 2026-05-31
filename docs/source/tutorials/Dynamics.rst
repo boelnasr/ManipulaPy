@@ -1,10 +1,10 @@
-# Dynamics User Guide
+Dynamics User Guide
 ===================
 
-This comprehensive guide covers robot dynamics computations in ManipulaPy, optimized for Python 3.10.12.
+This comprehensive guide covers robot dynamics computations in ManipulaPy, compatible with Python 3.9 through 3.12.
 
 .. note::
-   This guide is written for Python 3.10.12 users and includes version-specific optimizations and performance improvements.
+   This guide is compatible with Python 3.9 through 3.12 and includes performance improvements that work across supported versions.
 
 Introduction to Robot Dynamics
 -------------------------------
@@ -123,7 +123,7 @@ Mass Matrix Computation
 The mass matrix represents the robot's inertial properties and varies with configuration.
 
 Computing Mass Matrix
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -180,7 +180,7 @@ The mass matrix changes with robot configuration:
    plt.show()
 
 Caching for Performance
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 For real-time applications, cache mass matrix computations:
 
@@ -229,7 +229,7 @@ Computing Velocity Forces
    print(f"Force magnitude: {np.linalg.norm(c)}")
 
 Analyzing Velocity Effects
-~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -631,7 +631,7 @@ For large-scale simulations, use GPU acceleration:
        print("CuPy not available - GPU acceleration not supported")
 
 Parallel Processing
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
 
 Use multiprocessing for CPU parallelization:
 
@@ -683,7 +683,7 @@ Advanced Topics
 ---------------
 
 Energy Analysis
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 Analyze kinetic and potential energy:
 
@@ -715,7 +715,7 @@ Analyze kinetic and potential energy:
    print(f"Total energy: {energy['total']:.3f} J")
 
 Linearization
-~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 Linearize dynamics about an operating point:
 
@@ -769,7 +769,7 @@ Linearize dynamics about an operating point:
    print(f"Mass matrix at operating point:\n{linearization['M_0']}")
 
 Model Identification
-~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 Estimate robot parameters from experimental data:
 
@@ -855,7 +855,7 @@ Estimate robot parameters from experimental data:
    parameter_identification_demo()
 
 Manipulator Inertia Ellipsoid
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Visualize the manipulator's inertial characteristics:
 
@@ -1097,7 +1097,7 @@ Integrate dynamics with control systems:
    print(f"Control torques: {tau_control}")
 
 Simulation Integration
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 Integrate with physics simulators:
 
@@ -1365,17 +1365,17 @@ Analyze required forces and torques for different tasks:
            else:
                tau_external = np.zeros(3)
            
-           print(f"Joint angles: {np.degrees(theta):.1f} degrees")
-           print(f"Joint velocities: {theta_dot:.2f} rad/s")
-           print(f"Joint accelerations: {theta_ddot:.2f} rad/s²")
-           print(f"External forces: {F_ext[:3]:.1f} N, {F_ext[3:]:.2f} N⋅m")
+           print(f"Joint angles: {np.array2string(np.degrees(theta), precision=1)} degrees")
+           print(f"Joint velocities: {np.array2string(theta_dot, precision=2)} rad/s")
+           print(f"Joint accelerations: {np.array2string(theta_ddot, precision=2)} rad/s²")
+           print(f"External forces: {np.array2string(F_ext[:3], precision=1)} N, {np.array2string(F_ext[3:], precision=2)} N⋅m")
            print()
            print("Torque breakdown:")
-           print(f"  Inertial:   {tau_inertial:.2f} N⋅m")
-           print(f"  Coriolis:   {tau_coriolis:.2f} N⋅m")
-           print(f"  Gravity:    {tau_gravity:.2f} N⋅m")
-           print(f"  External:   {tau_external:.2f} N⋅m")
-           print(f"  Total:      {tau_total:.2f} N⋅m")
+           print(f"  Inertial:   {np.array2string(tau_inertial, precision=2)} N⋅m")
+           print(f"  Coriolis:   {np.array2string(tau_coriolis, precision=2)} N⋅m")
+           print(f"  Gravity:    {np.array2string(tau_gravity, precision=2)} N⋅m")
+           print(f"  External:   {np.array2string(tau_external, precision=2)} N⋅m")
+           print(f"  Total:      {np.array2string(tau_total, precision=2)} N⋅m")
            print(f"  Magnitude:  {np.linalg.norm(tau_total):.2f} N⋅m")
            
            # Check against typical actuator limits
@@ -1394,7 +1394,7 @@ Troubleshooting
 ---------------
 
 Common Issues
-~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
 **Numerical Instability**
 
@@ -1568,12 +1568,13 @@ Best Practices
 --------------
 
 Code Organization
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
+   class RobotDynamicsManager:
        """Best practice organization for dynamics computations."""
-       
+
        def __init__(self, dynamics_instance):
            self.dynamics = dynamics_instance
            self.cache_enabled = True
@@ -1622,7 +1623,7 @@ Code Organization
    print(f"Verification error: {results['verification_error']:.6f}")
 
 Error Handling
-~~~~~~~~~~~~~
+~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1695,7 +1696,7 @@ Error Handling
        print(f"Recommendation: {result['recommendation']}")
 
 Documentation Standards
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1800,7 +1801,7 @@ Documentation Standards
        }
 
 Testing and Validation
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -1920,7 +1921,7 @@ Testing and Validation
    validation_results = validate_dynamics_implementation(dynamics)
 
 ManipulatorDynamics Class Reference
-----------------------------------
+-----------------------------------
 
 The ManipulatorDynamics Class
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2009,7 +2010,7 @@ Computes resulting accelerations from applied torques:
    # Returns: np.ndarray, shape (n,) - Joint accelerations
 
 Implementation Details
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 **Caching System**
 
@@ -2047,7 +2048,7 @@ The velocity_quadratic_forces method uses numerical differentiation:
        return (M_plus[i, j] - M_minus[i, j]) / (2 * epsilon)
 
 Mathematical Foundation
-~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 The implementation is based on the Newton-Euler formulation of robot dynamics:
 

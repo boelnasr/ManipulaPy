@@ -21,7 +21,7 @@ cat > index.rst << 'EOL'
 ManipulaPy Documentation
 ========================
 
-.. image:: https://img.shields.io/badge/python-3.8%2B-blue.svg
+.. image:: https://img.shields.io/badge/python-3.9%2B-blue.svg
    :target: https://www.python.org/downloads/
    :alt: Python Version
 

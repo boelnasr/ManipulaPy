@@ -7,7 +7,7 @@ Singularity API Reference
 This page documents **ManipulaPy.singularity**, the module for comprehensive singularity analysis of robotic manipulators including detection, visualization, and workspace analysis with optional CUDA acceleration.
 
 .. tip::
-   For conceptual explanations, see :doc:`../user_guide/Singularity_Analysis `.
+   For conceptual explanations, see :doc:`../user_guide/Singularity_Analysis`.
 
 ---
 
@@ -17,6 +17,7 @@ Quick Navigation
 .. contents::
    :local:
    :depth: 2
+   :backlinks: none
 
 ---
 
@@ -26,7 +27,7 @@ Singularity Class
 .. currentmodule:: ManipulaPy.singularity
 
 .. autoclass:: Singularity
-   :members:
+   :no-members:
    :show-inheritance:
 
    Main class for singularity analysis of robotic manipulators providing detection, manipulability analysis, workspace visualization, and condition number computations.
@@ -58,7 +59,7 @@ Primary Detection Methods
 
    **Returns:**
    
-   - **bool** -- True if at singularity (|det(J)| < 1e-4), False otherwise
+   - **bool** -- True if at singularity (:math:`\lvert \det(J) \rvert` < 1e-4), False otherwise
 
 .. automethod:: Singularity.near_singularity_detection
 
@@ -74,7 +75,7 @@ Primary Detection Methods
    - **bool** -- True if near singularity (condition number > threshold), False otherwise
 
 Condition Analysis
------------------
+------------------
 
 .. automethod:: Singularity.condition_number
 
@@ -91,10 +92,10 @@ Condition Analysis
 ---
 
 Manipulability Analysis
-======================
+=======================
 
 Ellipsoid Visualization
-----------------------
+-----------------------
 
 .. automethod:: Singularity.manipulability_ellipsoid
 
@@ -155,7 +156,7 @@ Mathematical Implementation
 ===========================
 
 Jacobian Analysis
-----------------
+-----------------
 
 All methods rely on the Jacobian matrix computation from the SerialManipulator:
 
@@ -166,7 +167,7 @@ All methods rely on the Jacobian matrix computation from the SerialManipulator:
 - **Components**: Upper 3 rows (linear), lower 3 rows (angular)
 
 Determinant Computation
-----------------------
+-----------------------
 
 Singularity detection uses numpy.linalg.det() with absolute value comparison:
 
@@ -177,7 +178,7 @@ Singularity detection uses numpy.linalg.det() with absolute value comparison:
 - **Precision**: Double precision floating point
 
 Condition Number Calculation
----------------------------
+----------------------------
 
 Uses numpy.linalg.cond() which implements:
 
@@ -188,7 +189,7 @@ Uses numpy.linalg.cond() which implements:
 - **Stability**: Numerically stable for ill-conditioned matrices
 
 SVD Implementation
------------------
+------------------
 
 Manipulability ellipsoid generation uses numpy.linalg.svd():
 
@@ -199,7 +200,7 @@ Manipulability ellipsoid generation uses numpy.linalg.svd():
 - **Transformation**: Ellipsoid points = U @ diag(radii) @ sphere_points
 
 Convex Hull Generation
----------------------
+----------------------
 
 Workspace visualization uses scipy.spatial.ConvexHull:
 
@@ -240,7 +241,7 @@ Computational Complexity
      - k×forward_kinematics + convex_hull
 
 Memory Requirements
-------------------
+-------------------
 
 CUDA kernel memory allocation:
 
@@ -251,7 +252,7 @@ CUDA kernel memory allocation:
 - **device_joint_limits**: num_joints × 2 × float32
 
 Thread Configuration
--------------------
+--------------------
 
 CUDA kernel execution parameters:
 
@@ -264,10 +265,10 @@ CUDA kernel execution parameters:
 ---
 
 Data Flow Architecture
-=====================
+======================
 
 Singularity Analysis Pipeline
-----------------------------
+-----------------------------
 
 1. **Input**: Joint angles (numpy.ndarray)
 
@@ -320,7 +321,7 @@ Input Validation
 - **Thresholds**: Checked for positive numeric values
 
 Numerical Stability
-------------------
+-------------------
 
 - **Singular matrices**: Handled gracefully in condition number computation
 
@@ -329,7 +330,7 @@ Numerical Stability
 - **Ill-conditioned systems**: SVD provides robust decomposition
 
 CUDA Error Management
---------------------
+---------------------
 
 - **Memory allocation**: Automatic cleanup on kernel completion
 

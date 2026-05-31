@@ -21,6 +21,90 @@ Thank you for your interest in contributing to ManipulaPy! We welcome contributi
 
 ---
 
+## Development
+
+### Build & Development Commands
+
+```bash
+# Install in dev mode
+pip install -e ".[dev]"
+
+# Run all tests
+python -m pytest tests/ -v
+
+# Run a single test file
+python -m pytest tests/test_kinematics.py -v
+
+# Run a single test
+python -m pytest tests/test_control.py::TestManipulatorController::test_pid_control -v
+
+# Run tests by marker
+python -m pytest tests/ -v -m "not (cuda or vision or simulation)"
+
+# Run with coverage
+python -m pytest tests/ --cov=ManipulaPy --cov-report=term-missing
+
+# Lint (check only)
+python -m black --check ManipulaPy/ tests/
+python -m isort --check-only ManipulaPy/ tests/
+python -m flake8 ManipulaPy/ tests/
+
+# Lint (auto-fix)
+python -m black ManipulaPy/ tests/
+python -m isort ManipulaPy/ tests/
+
+# Build docs
+python -m sphinx -b html docs/source docs/build/html
+```
+
+### CI/CD
+
+- **test.yml**: Python 3.8/3.9/3.10/3.11 matrix, PyTorch CPU, Codecov. Env: `SKIP_CUDA_TESTS=true`, `SKIP_VISION_TESTS=true`, `SKIP_SIMULATION_TESTS=true`
+- **lint.yml**: black --check + flake8, auto-commits formatting fixes
+- **pypi-publish.yml**: Triggered by `v*` tags, publishes to PyPI via `PYPI_API_TOKEN`
+
+For architecture details, class hierarchy, GPU/CPU strategy, and code conventions,
+see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+## Regression Test Discipline
+
+Every bug fix follows a RED→GREEN workflow:
+
+1. Write the failing test first. Run it and confirm it fails with the bug's actual
+   symptom (not an unrelated error). Commit the failing test on its own or together
+   with the fix in a single commit whose message names the symptom.
+2. Apply the fix. The test must turn green. Do not merge a fix whose test is still
+   red or that only passes because the assertion was weakened.
+3. Each fix gets its own focused commit. Bundling unrelated changes into the same
+   commit makes bisect and revert harder.
+
+The canonical regression file is `tests/test_v132_regressions.py`. Add new test
+classes there for new modules or subsystems.
+
+**Optional-dependency behavior** (sim and control importable without cupy/pybullet)
+is tested with a subprocess-style probe so the check is side-effect-free:
+
+```python
+def test_sim_module_imports_without_pybullet(self):
+    """ManipulaPy.sim must import even when pybullet is missing."""
+    import subprocess, sys
+    result = subprocess.run(
+        [sys.executable, "-c",
+         "import sys; sys.modules['pybullet'] = None; import ManipulaPy.sim"],
+        capture_output=True, text=True,
+    )
+    self.assertEqual(result.returncode, 0,
+                     f"sim import failed: {result.stderr}")
+```
+
+Use this pattern (not in-process `sys.modules` mutation) for any test that needs
+to simulate a missing optional dependency — in-process reloads leak across test
+modules and corrupt shared state.
+
+---
+
 ## AI Usage Policy
 
 We value transparency and responsibility in software development. While generative AI tools (e.g., GitHub Copilot, ChatGPT, CodeWhisperer) can be helpful in drafting and brainstorming, **all contributions must be human-verified and reviewed**.

@@ -28,7 +28,7 @@ class MeshData:
     normals: Optional[np.ndarray] = None
 
 
-def load_mesh(filename: str, scale: np.ndarray = None) -> Optional[MeshData]:
+def load_mesh(filename: str, scale: Optional[np.ndarray] = None) -> Optional[MeshData]:
     """
     Load mesh from file.
 
@@ -203,8 +203,11 @@ def _load_with_trimesh(path: Path) -> Optional[MeshData]:
         )
 
     except ImportError:
-        logger.warning("trimesh not available for loading complex mesh formats")
+        logger.warning(
+            f"Cannot load {str(path)!r} — trimesh is required for "
+            f"{path.suffix} files. Install with: pip install trimesh"
+        )
         return None
     except Exception as e:
-        logger.warning(f"trimesh failed to load {path}: {e}")
+        logger.warning(f"trimesh failed to load {str(path)!r}: {e!r}")
         return None

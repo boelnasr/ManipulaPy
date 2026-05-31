@@ -23,7 +23,7 @@ class TestKinematics(unittest.TestCase):
     end-effector velocity, joint velocity, and error handling.
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures with a standard 6-DOF robot configuration."""
         # 1) Screw axes in space frame (6,6)
         self.Slist = np.array(
@@ -64,7 +64,7 @@ class TestKinematics(unittest.TestCase):
         self.test_angles = np.array([0.1, 0.2, -0.3, 0.4, -0.5, 0.6])
         self.zero_angles = np.zeros(6)
 
-    def test_constructor_with_all_parameters(self):
+    def test_constructor_with_all_parameters(self) -> None:
         """Test constructor with all parameters specified."""
         r_list = np.random.rand(3, 6)
         b_list = np.random.rand(3, 6)
@@ -86,7 +86,7 @@ class TestKinematics(unittest.TestCase):
         np.testing.assert_array_equal(robot.G_list, G_list)
         self.assertEqual(robot.joint_limits, self.joint_limits)
 
-    def test_constructor_with_minimal_parameters(self):
+    def test_constructor_with_minimal_parameters(self) -> None:
         """Test constructor with minimal parameters (automatic extraction)."""
         # Create proper r_list and b_list for this test
         r_list = np.array(
@@ -110,7 +110,7 @@ class TestKinematics(unittest.TestCase):
         self.assertEqual(len(robot.joint_limits), 6)
         self.assertEqual(robot.joint_limits[0], (None, None))
 
-    def test_constructor_without_s_and_b_lists(self):
+    def test_constructor_without_s_and_b_lists(self) -> None:
         """Test constructor automatic generation of S_list and B_list."""
         # Provide proper r_list and b_list to avoid extraction from empty arrays
         r_list = np.zeros((3, 6))  # 3x6 array of zeros
@@ -127,7 +127,7 @@ class TestKinematics(unittest.TestCase):
         self.assertIsNotNone(robot.S_list)
         self.assertIsNotNone(robot.B_list)
 
-    def test_update_state(self):
+    def test_update_state(self) -> None:
         """Test the update_state method."""
         joint_positions = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
         joint_velocities = np.array([0.01, 0.02, 0.03, 0.04, 0.05, 0.06])
@@ -143,7 +143,7 @@ class TestKinematics(unittest.TestCase):
         np.testing.assert_array_equal(self.robot.joint_positions, new_positions)
         np.testing.assert_array_equal(self.robot.joint_velocities, np.zeros(6))
 
-    def test_forward_kinematics_space(self):
+    def test_forward_kinematics_space(self) -> None:
         """Test forward kinematics in space frame."""
         # Zero angles should give M
         T_space = self.robot.forward_kinematics(self.zero_angles, frame="space")
@@ -166,7 +166,7 @@ class TestKinematics(unittest.TestCase):
         R = T_space_nonzero[:3, :3]
         np.testing.assert_array_almost_equal(R @ R.T, np.eye(3), decimal=4)
 
-    def test_forward_kinematics_body(self):
+    def test_forward_kinematics_body(self) -> None:
         """Test forward kinematics in body frame."""
         # Zero angles should give M
         T_body = self.robot.forward_kinematics(self.zero_angles, frame="body")
@@ -181,13 +181,13 @@ class TestKinematics(unittest.TestCase):
         T_body_nonzero = self.robot.forward_kinematics(self.test_angles, frame="body")
         self.assertEqual(T_body_nonzero.shape, (4, 4))
 
-    def test_forward_kinematics_invalid_frame(self):
+    def test_forward_kinematics_invalid_frame(self) -> None:
         """Test forward kinematics with invalid frame."""
         with self.assertRaises(ValueError) as context:
             self.robot.forward_kinematics(self.test_angles, frame="invalid")
         self.assertIn("Invalid frame specified", str(context.exception))
 
-    def test_jacobian_space_frame(self):
+    def test_jacobian_space_frame(self) -> None:
         """Test Jacobian calculation in space frame."""
         J = self.robot.jacobian(self.test_angles, frame="space")
 
@@ -197,20 +197,20 @@ class TestKinematics(unittest.TestCase):
         # Jacobian should not be all zeros for non-zero joint angles
         self.assertFalse(np.allclose(J, np.zeros((6, 6))))
 
-    def test_jacobian_body_frame(self):
+    def test_jacobian_body_frame(self) -> None:
         """Test Jacobian calculation in body frame."""
         J = self.robot.jacobian(self.test_angles, frame="body")
 
         # Should be 6 x n_joints
         self.assertEqual(J.shape, (6, 6))
 
-    def test_jacobian_invalid_frame(self):
+    def test_jacobian_invalid_frame(self) -> None:
         """Test Jacobian with invalid frame."""
         with self.assertRaises(ValueError) as context:
             self.robot.jacobian(self.test_angles, frame="invalid")
         self.assertIn("Invalid frame specified", str(context.exception))
 
-    def test_end_effector_velocity_space(self):
+    def test_end_effector_velocity_space(self) -> None:
         """Test end-effector velocity calculation in space frame."""
         dthetalist = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
 
@@ -221,7 +221,7 @@ class TestKinematics(unittest.TestCase):
         # Should be a 6-element vector (3 angular + 3 linear velocity)
         self.assertEqual(V_ee.shape, (6,))
 
-    def test_end_effector_velocity_body(self):
+    def test_end_effector_velocity_body(self) -> None:
         """Test end-effector velocity calculation in body frame."""
         dthetalist = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
 
@@ -232,7 +232,7 @@ class TestKinematics(unittest.TestCase):
         # Should be a 6-element vector
         self.assertEqual(V_ee.shape, (6,))
 
-    def test_end_effector_velocity_invalid_frame(self):
+    def test_end_effector_velocity_invalid_frame(self) -> None:
         """Test end-effector velocity with invalid frame."""
         dthetalist = np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
 
@@ -242,7 +242,7 @@ class TestKinematics(unittest.TestCase):
             )
         self.assertIn("Invalid frame specified", str(context.exception))
 
-    def test_joint_velocity_space(self):
+    def test_joint_velocity_space(self) -> None:
         """Test joint velocity calculation in space frame."""
         V_ee = np.array([0.1, 0.2, 0.3, 0.01, 0.02, 0.03])
 
@@ -251,7 +251,7 @@ class TestKinematics(unittest.TestCase):
         # Should be same length as number of joints
         self.assertEqual(joint_vel.shape, (6,))
 
-    def test_joint_velocity_body(self):
+    def test_joint_velocity_body(self) -> None:
         """Test joint velocity calculation in body frame."""
         V_ee = np.array([0.1, 0.2, 0.3, 0.01, 0.02, 0.03])
 
@@ -260,7 +260,7 @@ class TestKinematics(unittest.TestCase):
         # Should be same length as number of joints
         self.assertEqual(joint_vel.shape, (6,))
 
-    def test_joint_velocity_invalid_frame(self):
+    def test_joint_velocity_invalid_frame(self) -> None:
         """Test joint velocity with invalid frame."""
         V_ee = np.array([0.1, 0.2, 0.3, 0.01, 0.02, 0.03])
 
@@ -268,7 +268,7 @@ class TestKinematics(unittest.TestCase):
             self.robot.joint_velocity(self.test_angles, V_ee, frame="invalid")
         self.assertIn("Invalid frame specified", str(context.exception))
 
-    def test_end_effector_pose(self):
+    def test_end_effector_pose(self) -> None:
         """Test end-effector pose calculation."""
         pose = self.robot.end_effector_pose(self.test_angles)
 
@@ -280,7 +280,7 @@ class TestKinematics(unittest.TestCase):
         expected_position = T[:3, 3]
         np.testing.assert_array_almost_equal(pose[:3], expected_position)
 
-    def test_simple_inverse_kinematics(self):
+    def test_simple_inverse_kinematics(self) -> None:
         """Test simple inverse kinematics case."""
         target_pose = np.copy(self.M)
         init_guess = np.zeros(6)
@@ -305,7 +305,7 @@ class TestKinematics(unittest.TestCase):
             err_msg="IK solution's forward kinematics does not match target.",
         )
 
-    def test_inverse_kinematics_with_joint_limits(self):
+    def test_inverse_kinematics_with_joint_limits(self) -> None:
         """Test inverse kinematics with joint limits enforcement."""
         # Set tight joint limits
         robot_limited = SerialManipulator(
@@ -334,7 +334,7 @@ class TestKinematics(unittest.TestCase):
             if max_limit is not None:
                 self.assertLessEqual(solution[i], max_limit)
 
-    def test_inverse_kinematics_convergence_failure(self):
+    def test_inverse_kinematics_convergence_failure(self) -> None:
         """Test inverse kinematics when convergence fails."""
         # Create impossible target (very far away)
         target_pose = np.copy(self.M)
@@ -351,7 +351,7 @@ class TestKinematics(unittest.TestCase):
         self.assertFalse(success)
         self.assertEqual(iterations, 11)  # max_iterations + 1
 
-    def test_inverse_kinematics_step_capping(self):
+    def test_inverse_kinematics_step_capping(self) -> None:
         """Test inverse kinematics with step size capping."""
         target_pose = np.copy(self.M)
         target_pose[:3, 3] = [0.5, 0.5, 0.5]  # Moderate displacement
@@ -392,7 +392,7 @@ class TestKinematics(unittest.TestCase):
         mock_tight_layout,
         mock_close,
         mock_savefig,
-    ):
+    ) -> None:
         """Test inverse kinematics with residual plotting."""
         target_pose = np.copy(self.M)
         init_guess = np.zeros(6)
@@ -414,7 +414,7 @@ class TestKinematics(unittest.TestCase):
             mock_savefig.assert_called_with(png_path, dpi=400)
             mock_close.assert_called()
 
-    def test_inverse_kinematics_damping_parameter(self):
+    def test_inverse_kinematics_damping_parameter(self) -> None:
         """Test inverse kinematics with different damping values."""
         target_pose = np.copy(self.M)
         target_pose[0, 3] += 0.1  # Small displacement
@@ -451,7 +451,7 @@ class TestKinematics(unittest.TestCase):
             self.assertLess(error_high, 0.01)
             self.assertLess(error_low, 0.01)
 
-    def test_smart_inverse_kinematics_workspace(self):
+    def test_smart_inverse_kinematics_workspace(self) -> None:
         """Smart IK using workspace heuristic should converge near home pose."""
         target_pose = np.copy(self.M)
         theta, success, _ = self.robot.smart_inverse_kinematics(
@@ -468,7 +468,7 @@ class TestKinematics(unittest.TestCase):
         self.assertLess(pos_err, 0.1)
         self.assertTrue(success or pos_err < 0.05)
 
-    def test_smart_inverse_kinematics_cached(self):
+    def test_smart_inverse_kinematics_cached(self) -> None:
         """Smart IK should leverage cache when provided."""
         cache = IKInitialGuessCache(max_size=3)
         target_pose = np.copy(self.M)
@@ -486,7 +486,7 @@ class TestKinematics(unittest.TestCase):
         self.assertTrue(success)
         self.assertLess(np.linalg.norm(theta - cached_theta), 0.2)
 
-    def test_smart_inverse_kinematics_extrapolate(self):
+    def test_smart_inverse_kinematics_extrapolate(self) -> None:
         """Smart IK extrapolation should converge for a nearby target."""
         theta_current = np.zeros(6)
         T_current = self.robot.forward_kinematics(theta_current)
@@ -509,11 +509,12 @@ class TestKinematics(unittest.TestCase):
         self.assertLess(pos_err, 0.1)
         self.assertTrue(success or pos_err < 0.05)
 
-    def test_smart_inverse_kinematics_invalid_strategy(self):
+    def test_smart_inverse_kinematics_invalid_strategy(self) -> None:
+        """Smart IK should reject an unknown strategy name."""
         with self.assertRaises(ValueError):
             self.robot.smart_inverse_kinematics(self.M, strategy="unknown")
 
-    def test_velocity_consistency(self):
+    def test_velocity_consistency(self) -> None:
         """Test consistency between forward kinematics and velocity calculations."""
         # Use small time step for numerical differentiation
         dt = 1e-7  # Even smaller time step for better accuracy
@@ -594,7 +595,7 @@ class TestKinematics(unittest.TestCase):
                     analytical_velocity, numerical_velocity, decimal=0
                 )
 
-    def test_jacobian_consistency_between_frames(self):
+    def test_jacobian_consistency_between_frames(self) -> None:
         """Test that Jacobian calculations are consistent between frames."""
         J_space = self.robot.jacobian(self.test_angles, frame="space")
         J_body = self.robot.jacobian(self.test_angles, frame="body")
@@ -606,7 +607,7 @@ class TestKinematics(unittest.TestCase):
         if not np.allclose(self.test_angles, 0):
             self.assertFalse(np.allclose(J_space, J_body))
 
-    def test_edge_cases_with_small_angles(self):
+    def test_edge_cases_with_small_angles(self) -> None:
         """Test edge cases with very small joint angles."""
         small_angles = np.array([1e-10, -1e-10, 1e-12, -1e-12, 1e-8, -1e-8])
 
@@ -614,7 +615,7 @@ class TestKinematics(unittest.TestCase):
         T = self.robot.forward_kinematics(small_angles)
         np.testing.assert_array_almost_equal(T, self.M, decimal=6)
 
-    def test_edge_cases_with_large_angles(self):
+    def test_edge_cases_with_large_angles(self) -> None:
         """Test edge cases with large joint angles."""
         large_angles = np.array(
             [10 * np.pi, -10 * np.pi, 5 * np.pi, -5 * np.pi, 20 * np.pi, -20 * np.pi]
@@ -628,7 +629,7 @@ class TestKinematics(unittest.TestCase):
         J = self.robot.jacobian(large_angles)
         self.assertEqual(J.shape, (6, 6))
 
-    def test_consistency_across_methods(self):
+    def test_consistency_across_methods(self) -> None:
         """Test consistency between different methods."""
         # Test that forward kinematics and end_effector_pose are consistent
         T = self.robot.forward_kinematics(self.test_angles)
@@ -637,7 +638,8 @@ class TestKinematics(unittest.TestCase):
         # Position should match
         np.testing.assert_array_almost_equal(T[:3, 3], pose[:3])
 
-    def test_robust_inverse_kinematics_success(self):
+    def test_robust_inverse_kinematics_success(self) -> None:
+        """Robust IK should converge near the home pose and report a valid strategy."""
         target_pose = np.copy(self.M)
 
         theta, success, total_iters, strategy = self.robot.robust_inverse_kinematics(
@@ -657,10 +659,12 @@ class TestKinematics(unittest.TestCase):
         final_pose = self.robot.forward_kinematics(theta)
         self.assertLess(np.linalg.norm(final_pose[:3, 3] - target_pose[:3, 3]), 5e-2)
 
-    def test_adaptive_multi_start_ik_sequence(self):
+    def test_adaptive_multi_start_ik_sequence(self) -> None:
+        """Adaptive multi-start IK should try strategies in order until one succeeds."""
         call_order = []
 
-        def fake_solver(T_desired, strategy, **kwargs):
+        def fake_solver(T_desired, strategy, **kwargs) -> tuple:
+            """Stub IK solver that only succeeds for the 'random' strategy."""
             call_order.append(strategy)
             if strategy == "random":
                 return np.ones(6), True, 4
@@ -683,7 +687,7 @@ class TestKinematics(unittest.TestCase):
         self.assertGreater(total_iters, 3)
         np.testing.assert_array_almost_equal(theta, np.ones(6))
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         """Clean up after tests."""
         # Clean up any temporary files or resources if needed
         pass

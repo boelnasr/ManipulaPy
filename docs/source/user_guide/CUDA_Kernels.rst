@@ -6,6 +6,7 @@ This guide covers the **CUDA acceleration** features in ManipulaPy, which provid
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 What is GPU Acceleration?
 ----------------------------
@@ -80,7 +81,7 @@ System Requirements
 
 - NVIDIA GPU drivers (latest recommended)
 - CUDA Toolkit 11.0+ or 12.0+
-- Python 3.8+
+- Python 3.9+
 
 Installation Options
 ~~~~~~~~~~~~~~~~~~~~~~~

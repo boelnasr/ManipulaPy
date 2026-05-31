@@ -5,7 +5,8 @@ Tutorials
    :maxdepth: 2
 
    kinematics_guide
+   Kinematics
    dynamics_guide
-   trajectory_planning
-   installation
-   urdf_processor
+   Dynamics
+   Trajectory_Planning
+   Urdf Procsssor

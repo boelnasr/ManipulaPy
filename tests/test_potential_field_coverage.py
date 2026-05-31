@@ -22,7 +22,7 @@ from ManipulaPy.potential_field import PotentialField
 class TestPotentialFieldExtended(unittest.TestCase):
     """Additional coverage for PotentialField gradient and edge cases."""
 
-    def test_repulsive_outside_influence(self):
+    def test_repulsive_outside_influence(self) -> None:
         """Obstacle outside influence distance → 0 repulsive potential."""
         pf = PotentialField(influence_distance=0.5)
         q = np.array([0.0, 0.0])
@@ -30,7 +30,7 @@ class TestPotentialFieldExtended(unittest.TestCase):
         pot = pf.compute_repulsive_potential(q, [obstacle])
         self.assertAlmostEqual(pot, 0.0)
 
-    def test_gradient_far_obstacle(self):
+    def test_gradient_far_obstacle(self) -> None:
         """Far obstacle contributes no repulsive gradient."""
         pf = PotentialField(influence_distance=0.5)
         q = np.array([0.0, 0.0])
@@ -41,7 +41,7 @@ class TestPotentialFieldExtended(unittest.TestCase):
         expected = pf.attractive_gain * (q - q_goal)
         np.testing.assert_array_almost_equal(grad, expected)
 
-    def test_gradient_near_obstacle(self):
+    def test_gradient_near_obstacle(self) -> None:
         """Close obstacle adds repulsive gradient component."""
         pf = PotentialField(influence_distance=2.0, repulsive_gain=100.0)
         q = np.array([0.1, 0.0])
@@ -52,7 +52,7 @@ class TestPotentialFieldExtended(unittest.TestCase):
         # The repulsive gradient should differ from the purely attractive one
         self.assertGreater(np.linalg.norm(grad_with - grad_without), 0.1)
 
-    def test_multiple_obstacles(self):
+    def test_multiple_obstacles(self) -> None:
         """Multiple obstacles within influence."""
         pf = PotentialField(influence_distance=5.0)
         q = np.array([0.0, 0.0])
@@ -64,7 +64,7 @@ class TestPotentialFieldExtended(unittest.TestCase):
 class TestCollisionCheckerMocked(unittest.TestCase):
     """Test CollisionChecker with mocked URDF objects."""
 
-    def _make_convex_hull(self, offset=None):
+    def _make_convex_hull(self, offset=None) -> ConvexHull:
         """Create a small tetrahedron convex hull."""
         pts = np.array(
             [
@@ -78,7 +78,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
             pts += offset
         return ConvexHull(pts)
 
-    def test_hulls_intersect_overlapping(self):
+    def test_hulls_intersect_overlapping(self) -> None:
         """Two overlapping hulls should intersect."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -96,7 +96,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         self.assertTrue(checker._hulls_intersect(hull1, hull2))
 
-    def test_hulls_intersect_separated(self):
+    def test_hulls_intersect_separated(self) -> None:
         """Two well-separated hulls should not intersect."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -110,7 +110,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         self.assertFalse(checker._hulls_intersect(hull1, hull2))
 
-    def test_transform_convex_hull(self):
+    def test_transform_convex_hull(self) -> None:
         """Transformation should shift hull vertices."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -125,7 +125,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         # All x coordinates should be >= 5.0
         self.assertGreater(np.min(transformed.points[:, 0]), 4.9)
 
-    def test_check_collision_with_mock_fk(self):
+    def test_check_collision_with_mock_fk(self) -> None:
         """check_collision with mocked link_fk and convex hulls."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -143,10 +143,11 @@ class TestCollisionCheckerMocked(unittest.TestCase):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
             checker.convex_hulls = {"link_a": hull, "link_b": hull}
+            checker._acm = set()  # no exclusions — both links should collide
 
         self.assertTrue(checker.check_collision(np.zeros(6)))
 
-    def test_check_collision_no_collision(self):
+    def test_check_collision_no_collision(self) -> None:
         """Separated links → no collision."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -167,10 +168,11 @@ class TestCollisionCheckerMocked(unittest.TestCase):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
             checker.convex_hulls = {"link_a": hull1, "link_b": hull2}
+            checker._acm = set()  # no exclusions
 
         self.assertFalse(checker.check_collision(np.zeros(6)))
 
-    def test_check_collision_missing_hull(self):
+    def test_check_collision_missing_hull(self) -> None:
         """Links without convex hulls should be skipped."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -185,11 +187,12 @@ class TestCollisionCheckerMocked(unittest.TestCase):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
             checker.convex_hulls = {}  # No hulls
+            checker._acm = set()
 
         self.assertFalse(checker.check_collision(np.zeros(6)))
 
-    def test_create_convex_hulls_mesh_data(self):
-        """_create_convex_hulls with mesh_data attribute."""
+    def test_create_convex_hulls_mesh_data(self) -> None:
+        """_create_convex_hulls with mesh_data attribute (via visual fallback)."""
         from ManipulaPy.potential_field import CollisionChecker
 
         # Create mock URDF with mesh_data
@@ -206,6 +209,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         mock_link = MagicMock()
         mock_link.name = "test_link"
+        mock_link.collisions = []  # no collision meshes → falls back to visuals
         mock_link.visuals = [mock_visual]
 
         mock_robot = MagicMock()
@@ -214,12 +218,103 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
 
         hulls = checker._create_convex_hulls()
         self.assertIn("test_link", hulls)
 
-    def test_create_convex_hulls_legacy_mesh(self):
-        """_create_convex_hulls with legacy mesh attribute."""
+    def test_create_convex_hulls_aggregates_multiple_meshes(self) -> None:
+        """A link with multiple collision meshes must be enclosed by a single
+        hull spanning ALL of them. Regression: the builder used to overwrite the
+        per-link entry on each iteration, keeping only the last mesh and silently
+        dropping the rest, which could miss self-collisions."""
+        from ManipulaPy.potential_field import CollisionChecker
+
+        def _tetra(offset):
+            base = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=float)
+            return base + np.asarray(offset, dtype=float)
+
+        # First mesh is far away; the last is near the origin. The old
+        # "keep last" behaviour would drop the far mesh entirely.
+        far_geom = MagicMock()
+        far_geom.mesh_data = MagicMock()
+        far_geom.mesh_data.vertices = _tetra([10.0, 10.0, 10.0])
+        far_col = MagicMock()
+        far_col.geometry = far_geom
+
+        near_geom = MagicMock()
+        near_geom.mesh_data = MagicMock()
+        near_geom.mesh_data.vertices = _tetra([0.0, 0.0, 0.0])
+        near_col = MagicMock()
+        near_col.geometry = near_geom
+
+        mock_link = MagicMock()
+        mock_link.name = "multi_link"
+        mock_link.collisions = [far_col, near_col]
+        mock_link.visuals = []
+
+        mock_robot = MagicMock()
+        mock_robot.links = [mock_link]
+
+        with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
+            checker = CollisionChecker.__new__(CollisionChecker)
+            checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
+
+        hulls = checker._create_convex_hulls()
+        self.assertIn("multi_link", hulls)
+        pts = hulls["multi_link"].points
+        # The far mesh (~[10,10,10]) must be represented in the hull, not dropped...
+        self.assertGreaterEqual(pts.max(), 10.0)
+        # ...and the near mesh (~origin) too.
+        self.assertLessEqual(pts.min(), 0.5)
+
+    def test_create_convex_hulls_applies_geometry_origin(self) -> None:
+        """Each geometry's <origin> offset must be applied to its vertices before
+        the per-link hull is built, so meshes positioned by their origin land in
+        the right place instead of all stacked at the link frame."""
+        from ManipulaPy.potential_field import CollisionChecker
+        from ManipulaPy.urdf.types import Origin
+
+        base = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=float)
+
+        near_geom = MagicMock()
+        near_geom.mesh_data = MagicMock()
+        near_geom.mesh_data.vertices = base
+        near_col = MagicMock()
+        near_col.geometry = near_geom
+        near_col.origin = Origin()  # identity
+
+        far_geom = MagicMock()
+        far_geom.mesh_data = MagicMock()
+        far_geom.mesh_data.vertices = base
+        far_col = MagicMock()
+        far_col.geometry = far_geom
+        far_col.origin = Origin(xyz=[5.0, 0.0, 0.0])  # shifted +5 in x by its origin
+
+        mock_link = MagicMock()
+        mock_link.name = "origin_link"
+        mock_link.collisions = [near_col, far_col]
+        mock_link.visuals = []
+
+        mock_robot = MagicMock()
+        mock_robot.links = [mock_link]
+
+        with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
+            checker = CollisionChecker.__new__(CollisionChecker)
+            checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
+
+        hulls = checker._create_convex_hulls()
+        self.assertIn("origin_link", hulls)
+        pts = hulls["origin_link"].points
+        # The far mesh is shifted to x≈5..6 by its origin; if origins were
+        # ignored, both meshes would sit at x<=1.
+        self.assertGreaterEqual(pts[:, 0].max(), 5.0)
+        self.assertLessEqual(pts[:, 0].min(), 0.5)
+
+    def test_create_convex_hulls_legacy_mesh(self) -> None:
+        """_create_convex_hulls with legacy mesh attribute (via visual fallback)."""
         from ManipulaPy.potential_field import CollisionChecker
 
         vertices = np.array(
@@ -237,6 +332,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         mock_link = MagicMock()
         mock_link.name = "legacy_link"
+        mock_link.collisions = []  # no collision meshes → falls back to visuals
         mock_link.visuals = [mock_visual]
 
         mock_robot = MagicMock()
@@ -245,11 +341,12 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
 
         hulls = checker._create_convex_hulls()
         self.assertIn("legacy_link", hulls)
 
-    def test_create_convex_hulls_no_geometry(self):
+    def test_create_convex_hulls_no_geometry(self) -> None:
         """Visual with geometry=None should be skipped."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -258,6 +355,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
 
         mock_link = MagicMock()
         mock_link.name = "empty_link"
+        mock_link.collisions = []  # no collision meshes → falls back to visuals
         mock_link.visuals = [mock_visual]
 
         mock_robot = MagicMock()
@@ -266,16 +364,18 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
 
         hulls = checker._create_convex_hulls()
         self.assertEqual(len(hulls), 0)
 
-    def test_create_convex_hulls_no_visuals(self):
-        """Link with no visuals should be skipped."""
+    def test_create_convex_hulls_no_visuals(self) -> None:
+        """Link with no visuals and no collisions should be skipped."""
         from ManipulaPy.potential_field import CollisionChecker
 
         mock_link = MagicMock()
         mock_link.name = "no_vis_link"
+        mock_link.collisions = []
         mock_link.visuals = []
 
         mock_robot = MagicMock()
@@ -284,6 +384,7 @@ class TestCollisionCheckerMocked(unittest.TestCase):
         with patch.object(CollisionChecker, "__init__", lambda self, *a, **kw: None):
             checker = CollisionChecker.__new__(CollisionChecker)
             checker.robot = mock_robot
+            checker._visual_fallback_warned = set()
 
         hulls = checker._create_convex_hulls()
         self.assertEqual(len(hulls), 0)

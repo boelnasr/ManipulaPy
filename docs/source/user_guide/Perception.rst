@@ -8,6 +8,7 @@ This comprehensive guide covers the Perception module in ManipulaPy, which provi
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 Overview
 ----------

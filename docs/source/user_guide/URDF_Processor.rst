@@ -74,7 +74,7 @@ Class Constructor
 - ``dynamics``: ManipulatorDynamics object for dynamics  
 - ``robot_data``: Dictionary containing extracted parameters
 - ``urdf_name``: Path to the loaded URDF file
-- ``robot``: Loaded URDF object from urchin library
+- ``robot``: Loaded ManipulaPy URDF object
 
 Extracted Parameters
 ~~~~~~~~~~~~~~~~~~~~
@@ -102,6 +102,8 @@ load_urdf()
 Extracts kinematic and dynamic parameters from the URDF file:
 
 .. code-block:: python
+
+   import numpy as np
 
    def parameter_extraction_example():
        processor = URDFToSerialManipulator("robot.urdf")
@@ -147,9 +149,11 @@ Creates the ManipulatorDynamics object:
 
 .. code-block:: python
 
+   import numpy as np
+
    processor = URDFToSerialManipulator("robot.urdf")
    dynamics = processor.dynamics
-   
+
    # Use dynamics for computations
    theta = np.array([0.1, 0.3, -0.2])
    theta_dot = np.array([0.5, -0.3, 0.8])
@@ -172,6 +176,8 @@ When ``use_pybullet_limits=True``, the processor extracts joint limits from PyBu
 
 .. code-block:: python
 
+   import numpy as np
+
    # With PyBullet limits (default)
    processor_pyb = URDFToSerialManipulator("robot.urdf", use_pybullet_limits=True)
    
@@ -192,9 +198,11 @@ Custom Joint Limits
 
 .. code-block:: python
 
+   import numpy as np
+
    processor = URDFToSerialManipulator("robot.urdf")
    robot = processor.serial_manipulator
-   
+
    # Set custom limits
    custom_limits = [
        (-np.pi, np.pi),        # Joint 1: full rotation
@@ -211,6 +219,8 @@ Static Methods
 ~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    # Extract position from transformation matrix
    T = np.eye(4)
@@ -233,9 +243,11 @@ Visualization Methods
 
 .. code-block:: python
 
+   import numpy as np
+
    processor = URDFToSerialManipulator("robot.urdf")
-   
-   # Visualize robot using urchin (matplotlib)
+
+   # Visualize robot
    processor.visualize_robot()
    
    # Visualize trajectory animation
@@ -260,6 +272,8 @@ Complete Robot Setup
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def complete_robot_setup():
        """Complete example of setting up a robot from URDF."""
@@ -302,6 +316,8 @@ Kinematics and Dynamics Usage
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def kinematics_dynamics_example():
        """Example using both kinematics and dynamics."""
@@ -358,6 +374,8 @@ Common Issues and Solutions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
+
+   import numpy as np
 
    def robust_urdf_loading(urdf_path):
        """Robust URDF loading with error handling."""
@@ -446,6 +464,8 @@ Validation Checklist
 Before using a processed URDF:
 
 .. code-block:: python
+
+   import numpy as np
 
    def validate_processor(processor):
        """Quick validation of URDF processor results."""

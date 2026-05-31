@@ -1,9 +1,19 @@
 # ManipulaPy Robot Data Manifest
 
-This directory contains URDF models and mesh assets for 25+ robot manipulators from 7 manufacturers.
+This directory contains URDF models for 25+ robot manipulators from 7 manufacturers.
 
-**Total Size:** ~143 MB
-**Last Updated:** 2026-01-05
+> **PyPI wheel note:** The `pip install ManipulaPy` wheel ships **URDF
+> descriptions only**. Mesh files (`.stl`, `.dae`, `.obj`, `.mesh`) are
+> **NOT bundled** — `MANIFEST.in` excludes them globally to keep the
+> wheel small. To use visualization or collision meshes, clone the
+> repository or download the mesh archive separately. Code paths that
+> request meshes (e.g., `URDFToSerialManipulator(load_meshes=True)`)
+> emit a "Mesh file not found" warning when called from a PyPI install
+> rather than failing silently.
+
+**Repository size (with meshes):** ~143 MB
+**Wheel size (URDF only):** ~240 KB
+**Last Updated:** 2026-05-10
 
 ---
 
@@ -200,13 +210,18 @@ Universal Robots URDFs use `package://` URIs for mesh references:
 <mesh filename="package://ur_description/meshes/ur5/visual/base.dae"/>
 ```
 
-**Resolution:** The native ManipulaPy URDF parser's `PackageResolver` automatically handles these paths:
+**Resolution:** When the repository is cloned, the native ManipulaPy URDF
+parser's `PackageResolver` resolves these paths automatically:
 
 ```python
 from ManipulaPy.urdf import URDF
+from ManipulaPy.ManipulaPy_data import get_robot_urdf
 
-# PackageResolver automatically handles package:// URIs
-robot = URDF.load(get_robot_urdf('ur5'))  # Works automatically
+# Works automatically when running from a repo checkout (meshes present).
+# On a PyPI install the URDF still loads, but `package://...` references
+# resolve to nothing — `_load_mesh()` emits a per-mesh "not found" warning
+# and the visualization paths render placeholder geometry.
+robot = URDF.load(get_robot_urdf('ur5'))
 ```
 
 The resolver searches:
@@ -361,6 +376,8 @@ robot = URDF.load(urdf_path)  # Automatically sets up mesh paths
 
 1. **Use the database API** instead of hardcoding paths:
    ```python
+   from ManipulaPy.ManipulaPy_data import get_robot_urdf
+
    # ✓ Good
    urdf_path = get_robot_urdf('ur5')
 
@@ -370,6 +387,9 @@ robot = URDF.load(urdf_path)  # Automatically sets up mesh paths
 
 2. **Check availability** before loading:
    ```python
+   from ManipulaPy.urdf import URDF
+   from ManipulaPy.ManipulaPy_data import get_robot_urdf, check_robot_available
+
    if check_robot_available('ur5'):
        robot = URDF.load(get_robot_urdf('ur5'))
    ```
@@ -377,6 +397,7 @@ robot = URDF.load(urdf_path)  # Automatically sets up mesh paths
 3. **Use the native parser** for best compatibility:
    ```python
    from ManipulaPy.urdf import URDF
+   from ManipulaPy.ManipulaPy_data import get_robot_urdf
    robot = URDF.load(get_robot_urdf('panda'))  # NumPy 2.0+ compatible
    ```
 

@@ -19,7 +19,14 @@ Expected Output:
 Author: ManipulaPy Development Team
 """
 
+import os
 import numpy as np
+import matplotlib
+
+# Honor a pre-set non-interactive backend (e.g. MPLBACKEND=Agg for headless runs);
+# otherwise pick Agg so the demo saves figures to disk without needing a display.
+if "MPLBACKEND" not in os.environ:
+    matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
@@ -34,21 +41,24 @@ except ImportError:
 
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 from ManipulaPy.kinematics import SerialManipulator
-import matplotlib
-matplotlib.use('TkAgg')
+
+# Directory next to this script for saved plots.
+OUTPUT_DIR = Path(__file__).resolve().parent
 
 class KinematicsBasicDemo:
     """
     Comprehensive demonstration of basic kinematics operations.
     """
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the demo with robot model loading."""
         self.robot = None
         self.joint_limits = None
         self.n_joints = 0
+        # Deterministic sampling so reported numbers are reproducible run-to-run.
+        np.random.seed(0)
         
-    def run_demo(self):
+    def run_demo(self) -> bool:
         """Run the complete kinematics demonstration."""
         print("=" * 70)
         print("   ManipulaPy: Basic Kinematics Demo")
@@ -81,7 +91,7 @@ class KinematicsBasicDemo:
         
         return True
     
-    def load_robot_model(self):
+    def load_robot_model(self) -> bool:
         """Load and initialize robot model."""
         print("🤖 Loading Robot Model")
         print("-" * 30)
@@ -130,7 +140,7 @@ class KinematicsBasicDemo:
             traceback.print_exc()
             return False
     
-    def demonstrate_forward_kinematics(self):
+    def demonstrate_forward_kinematics(self) -> None:
         """Demonstrate forward kinematics with multiple configurations."""
         print(f"\n🔧 Forward Kinematics Demonstration")
         print("-" * 40)
@@ -184,7 +194,7 @@ class KinematicsBasicDemo:
         print(f"   Average computation time: {avg_time*1000:.2f} ms")
         print(f"   Frequency capability: {1/avg_time:.0f} Hz")
     
-    def demonstrate_inverse_kinematics(self):
+    def demonstrate_inverse_kinematics(self) -> None:
         """Demonstrate inverse kinematics with different target poses."""
         print(f"\n🎯 Inverse Kinematics Demonstration")
         print("-" * 40)
@@ -220,15 +230,17 @@ class KinematicsBasicDemo:
                 print(f"   ✅ IK converged in {iterations} iterations ({ik_time*1000:.1f} ms) using smart IK")
                 print(f"   Solution: {solution}")
                 
-                # Verify the solution
+                # Verify the solution in task space (FK of the IK solution vs. target).
                 verification_pose = self.robot.forward_kinematics(solution)
                 position_error = np.linalg.norm(verification_pose[:3, 3] - target_position)
                 orientation_error = self._compute_orientation_error(verification_pose[:3, :3], target_pose[:3, :3])
-                
+                # Joint-space residual against the configuration that produced the target.
+                joint_error = float(np.linalg.norm(solution - fk_result['joint_angles']))
+
                 print(f"   Verification:")
                 print(f"     Position error: {position_error:.2e} m")
                 print(f"     Orientation error: {orientation_error:.2e} rad")
-                
+
                 self.ik_results[config_name] = {
                     'target_pose': target_pose,
                     'solution': solution,
@@ -236,6 +248,7 @@ class KinematicsBasicDemo:
                     'computation_time': ik_time,
                     'position_error': position_error,
                     'orientation_error': orientation_error,
+                    'joint_error': joint_error,
                     'success': True
                 }
                 
@@ -260,7 +273,7 @@ class KinematicsBasicDemo:
             print(f"   Average computation time: {avg_time*1000:.1f} ms")
             print(f"   Average position accuracy: {avg_position_error:.2e} m")
     
-    def demonstrate_jacobian_analysis(self):
+    def demonstrate_jacobian_analysis(self) -> None:
         """Demonstrate Jacobian computation and analysis."""
         print(f"\n📐 Jacobian Analysis Demonstration")
         print("-" * 40)
@@ -322,7 +335,7 @@ class KinematicsBasicDemo:
         print(f"   Average computation time: {avg_time*1000:.2f} ms")
         print(f"   Frequency capability: {1/avg_time:.0f} Hz")
     
-    def demonstrate_workspace_analysis(self):
+    def demonstrate_workspace_analysis(self) -> None:
         """Demonstrate basic workspace analysis."""
         print(f"\n🌍 Workspace Analysis Demonstration")
         print("-" * 40)
@@ -366,7 +379,7 @@ class KinematicsBasicDemo:
             'sampling_time': sampling_time
         }
     
-    def create_visualizations(self):
+    def create_visualizations(self) -> None:
         """Create comprehensive visualization plots."""
         print(f"\n📊 Creating Visualization Plots")
         print("-" * 40)
@@ -425,15 +438,18 @@ class KinematicsBasicDemo:
             self._plot_error_analysis(ax12)
             
             plt.tight_layout()
-            plt.show()
-            
-            print("✅ Visualization plots created successfully!")
-            
+            out_path = OUTPUT_DIR / "kinematics_basic_demo.png"
+            fig.savefig(out_path, dpi=120, bbox_inches="tight")
+            plt.close(fig)
+
+            print(f"✅ Visualization saved to {out_path}")
+
         except Exception as e:
             print(f"⚠️ Error creating visualizations: {e}")
-            print("This might be due to missing display or matplotlib backend issues.")
+            import traceback
+            traceback.print_exc()
     
-    def _plot_joint_configurations(self, ax):
+    def _plot_joint_configurations(self, ax) -> None:
         """Plot joint configurations comparison."""
         configs = list(self.fk_results.keys())
         joint_angles_data = [self.fk_results[config]['joint_angles'] for config in configs]
@@ -452,7 +468,7 @@ class KinematicsBasicDemo:
         ax.legend()
         ax.grid(True, alpha=0.3)
     
-    def _plot_end_effector_positions(self, ax):
+    def _plot_end_effector_positions(self, ax) -> None:
         """Plot end-effector positions."""
         configs = list(self.fk_results.keys())
         positions = [self.fk_results[config]['position'] for config in configs]
@@ -477,7 +493,7 @@ class KinematicsBasicDemo:
         cbar = plt.colorbar(ax.collections[0], ax=ax)
         cbar.set_label('Z Position (m)')
     
-    def _plot_jacobian_analysis(self, ax):
+    def _plot_jacobian_analysis(self, ax) -> None:
         """Plot Jacobian condition numbers."""
         configs = list(self.jacobian_results.keys())
         condition_numbers = [self.jacobian_results[config]['condition_number'] for config in configs]
@@ -494,7 +510,7 @@ class KinematicsBasicDemo:
             ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
                    f'{value:.1f}', ha='center', va='bottom', fontsize=8)
     
-    def _plot_manipulability_analysis(self, ax):
+    def _plot_manipulability_analysis(self, ax) -> None:
         """Plot manipulability analysis."""
         configs = list(self.jacobian_results.keys())
         manipulability = [self.jacobian_results[config]['manipulability'] for config in configs]
@@ -511,7 +527,7 @@ class KinematicsBasicDemo:
             ax.text(bar.get_x() + bar.get_width()/2., height + 0.001,
                    f'{value:.3f}', ha='center', va='bottom', fontsize=8)
     
-    def _plot_workspace_3d(self, ax):
+    def _plot_workspace_3d(self, ax) -> None:
         """Plot 3D workspace."""
         points = self.workspace_results['points']
         
@@ -528,7 +544,7 @@ class KinematicsBasicDemo:
         ax.set_zlabel('Z (m)')
         ax.set_title('Robot Workspace (3D)')
     
-    def _plot_workspace_projections(self, ax):
+    def _plot_workspace_projections(self, ax) -> None:
         """Plot workspace projections."""
         points = self.workspace_results['points']
         
@@ -540,7 +556,7 @@ class KinematicsBasicDemo:
         ax.axis('equal')
         ax.legend()
     
-    def _plot_ik_convergence(self, ax):
+    def _plot_ik_convergence(self, ax) -> None:
         """Plot IK convergence analysis."""
         if not self.ik_results:
             ax.text(0.5, 0.5, 'No IK results\navailable', ha='center', va='center', transform=ax.transAxes)
@@ -569,7 +585,7 @@ class KinematicsBasicDemo:
         ax.legend(loc='upper left')
         ax2.legend(loc='upper right')
     
-    def _plot_jacobian_heatmap(self, ax):
+    def _plot_jacobian_heatmap(self, ax) -> None:
         """Plot Jacobian matrix heatmap."""
         # Use the first available Jacobian
         config = list(self.jacobian_results.keys())[0]
@@ -588,7 +604,7 @@ class KinematicsBasicDemo:
         ax.set_yticks(range(J.shape[0]))
         ax.grid(True, alpha=0.3)
     
-    def _plot_joint_limits(self, ax):
+    def _plot_joint_limits(self, ax) -> None:
         """Plot joint limits and current configurations."""
         joint_indices = range(self.n_joints)
         
@@ -611,7 +627,7 @@ class KinematicsBasicDemo:
         ax.legend()
         ax.grid(True, alpha=0.3)
     
-    def _plot_performance_metrics(self, ax):
+    def _plot_performance_metrics(self, ax) -> None:
         """Plot performance metrics summary."""
         metrics = {
             'FK Time (ms)': np.mean([r['computation_time']*1000 for r in self.fk_results.values()]),
@@ -635,7 +651,7 @@ class KinematicsBasicDemo:
             ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
                    f'{value:.2f}', ha='center', va='bottom', fontsize=8)
     
-    def _plot_singular_values(self, ax):
+    def _plot_singular_values(self, ax) -> None:
         """Plot singular values analysis."""
         configs = list(self.jacobian_results.keys())
         
@@ -650,7 +666,7 @@ class KinematicsBasicDemo:
         ax.grid(True, alpha=0.3)
         ax.set_yscale('log')
     
-    def _plot_error_analysis(self, ax):
+    def _plot_error_analysis(self, ax) -> None:
         """Plot error analysis for IK solutions."""
         if not self.ik_results:
             ax.text(0.5, 0.5, 'No IK results\navailable', ha='center', va='center', transform=ax.transAxes)
@@ -685,12 +701,12 @@ class KinematicsBasicDemo:
         ax.set_yscale('log')
     
     # Helper methods
-    def _generate_safe_test_pose(self):
+    def _generate_safe_test_pose(self) -> np.ndarray:
         """Generate a safe test pose within joint limits."""
         # Generate pose that's 70% towards joint limits to avoid extreme configurations
         return 0.7 * np.random.uniform(self.joint_limits[:, 0], self.joint_limits[:, 1])
     
-    def _rotation_matrix_to_euler_zyx(self, R):
+    def _rotation_matrix_to_euler_zyx(self, R) -> np.ndarray:
         """Convert rotation matrix to ZYX Euler angles."""
         # ZYX Euler angles (roll, pitch, yaw)
         sy = np.sqrt(R[0, 0]**2 + R[1, 0]**2)
@@ -708,7 +724,7 @@ class KinematicsBasicDemo:
         
         return np.array([x, y, z])
     
-    def _compute_orientation_error(self, R1, R2):
+    def _compute_orientation_error(self, R1, R2) -> float:
         """Compute orientation error between two rotation matrices."""
         R_error = R1.T @ R2
         # Convert to axis-angle representation and get angle
@@ -717,7 +733,7 @@ class KinematicsBasicDemo:
         return angle
 
 
-def main():
+def main() -> None:
     """Main function to run the kinematics basic demo."""
     try:
         # Create and run demo

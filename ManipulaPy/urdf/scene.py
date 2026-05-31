@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
-from .types import Origin
+from .types import Geometry, Origin
 
 
 @dataclass
@@ -33,7 +33,8 @@ class RobotInstance:
     )
     namespace: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Coerce the base transform to a 4x4 float64 matrix and validate it."""
         self.base_transform = np.asarray(self.base_transform, dtype=np.float64)
         if self.base_transform.shape != (4, 4):
             raise ValueError("base_transform must be a 4x4 matrix")
@@ -68,7 +69,7 @@ class Scene:
         >>> world_fk = scene.world_link_fk({"robot1": [0]*6, "robot2": [0]*6})
     """
 
-    def __init__(self, name: str = "scene"):
+    def __init__(self, name: str = "scene") -> None:
         """
         Initialize an empty scene.
 
@@ -388,7 +389,21 @@ class Scene:
         return collisions
 
     def _bboxes_overlap(self, geom1: Dict, geom2: Dict) -> bool:
-        """Simple axis-aligned bounding box overlap check."""
+        """
+        Test whether two collision geometries' world-frame AABBs overlap.
+
+        Computes the axis-aligned bounding box (AABB) of each geometry in the
+        world frame and reports whether they intersect along every axis.
+
+        Args:
+            geom1: Geometry record with a ``"geometry"`` (a Geometry instance)
+                and a ``"transform"`` (4x4 world pose ndarray) key.
+            geom2: Second geometry record, same structure as ``geom1``.
+
+        Returns:
+            bool: True if both AABBs could be computed and they overlap on all
+            three axes; False otherwise (including when either bbox is None).
+        """
         # Get bounding boxes in world frame
         bbox1 = self._get_geometry_bbox(geom1["geometry"], geom1["transform"])
         bbox2 = self._get_geometry_bbox(geom2["geometry"], geom2["transform"])
@@ -403,9 +418,28 @@ class Scene:
         return np.all(max1 >= min2) and np.all(max2 >= min1)
 
     def _get_geometry_bbox(
-        self, geometry, transform: np.ndarray
+        self, geometry: Geometry, transform: np.ndarray
     ) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-        """Get axis-aligned bounding box for geometry in world frame."""
+        """
+        Compute a geometry's axis-aligned bounding box in the world frame.
+
+        Handles Box, Sphere, Cylinder, and Mesh primitives. Box uses the
+        rotated half-size; Sphere uses its radius; Cylinder uses a conservative
+        bound of ``max(radius, length / 2)``; Mesh transforms its vertices (if
+        present) and takes their per-axis min/max.
+
+        Args:
+            geometry: Geometry primitive to bound (Box, Sphere, Cylinder, or
+                Mesh).
+            transform: (4, 4) homogeneous world-frame pose ndarray; the
+                translation column gives the geometry center and the rotation
+                block orients box/mesh extents.
+
+        Returns:
+            Optional[Tuple[np.ndarray, np.ndarray]]: (min_corner, max_corner)
+            pair of length-3 ndarrays describing the AABB, or None when the
+            geometry type is unsupported or a mesh lacks vertices.
+        """
         from .types import Box, Cylinder, Mesh, Sphere
 
         center = transform[:3, 3]
@@ -477,5 +511,6 @@ class Scene:
         return scene
 
     def __repr__(self) -> str:
+        """Return a compact scene representation."""
         robot_list = ", ".join(self.robot_names)
         return f"Scene(name='{self.name}', robots=[{robot_list}])"

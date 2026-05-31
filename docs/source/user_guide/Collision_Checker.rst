@@ -10,10 +10,12 @@ using URDF meshes.
 .. contents:: **Quick navigation**
    :local:
    :depth: 2
+   :backlinks: none
 
 .. note::
-   Examples target **Python 3.10+**, **SciPy 1.10+**, and the ``urchin.urdf`` parser
-   for loading URDF meshes and building convex hulls for collision tests.
+   Examples target **Python 3.10+**, **SciPy 1.10+**, and ManipulaPy's native
+   URDF parser for loading URDF meshes and building convex hulls for collision
+   tests.
 
 Introduction
 ------------
@@ -62,7 +64,8 @@ API Reference
 .. currentmodule:: ManipulaPy.potential_field
 
 .. autoclass:: CollisionChecker
-   :members:
+   :no-members:
+   :no-index:
    :undoc-members:
    :inherited-members:
 
@@ -73,7 +76,7 @@ Ensure dependencies are installed:
 
 .. code-block:: bash
 
-   pip install manipulapy[core] scipy urchin
+   pip install manipulapy[core] scipy
 
 Usage Examples
 --------------
@@ -181,6 +184,5 @@ References
 
 - SciPy *ConvexHull* documentation:
   https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
-- ``urchin.urdf`` — URDF parser for Python
 - Latombe, J.-C., *Robot Motion Planning*, Kluwer, 1991
 - Ericson, C., *Real-Time Collision Detection*, Morgan Kaufmann, 2005

@@ -17,6 +17,7 @@ Quick Navigation
 .. contents::
    :local:
    :depth: 2
+   :backlinks: none
 
 ---
 
@@ -26,7 +27,7 @@ Perception Class
 .. currentmodule:: ManipulaPy.perception
 
 .. autoclass:: Perception
-   :members:
+   :no-members:
    :show-inheritance:
 
    Higher-level perception module that integrates Vision capabilities with machine learning algorithms for comprehensive environmental understanding and obstacle analysis.
@@ -88,10 +89,10 @@ Obstacle Detection Pipeline
 ---
 
 Stereo Vision Integration
-========================
+=========================
 
 Disparity Computation
---------------------
+---------------------
 
 .. automethod:: Perception.compute_stereo_disparity
 
@@ -113,7 +114,7 @@ Disparity Computation
    - Delegates to vision.compute_disparity()
 
 Point Cloud Generation
----------------------
+----------------------
 
 .. automethod:: Perception.get_stereo_point_cloud
 
@@ -140,7 +141,7 @@ Machine Learning Components
 ===========================
 
 Clustering Analysis
-------------------
+-------------------
 
 .. automethod:: Perception.cluster_obstacles
 
@@ -157,6 +158,14 @@ Clustering Analysis
    - **labels** (*np.ndarray*) -- Shape (N,) cluster assignments
    - **num_clusters** (*int*) -- Count of identified clusters excluding noise
 
+   :raises ImportError: if scikit-learn is not installed. Install the
+       optional ML extra with ``pip install "ManipulaPy[ml]"``.
+
+   .. versionchanged:: 1.3.2
+      ``import ManipulaPy.perception`` now succeeds without scikit-learn —
+      only ``cluster_obstacles`` (and pipelines that call it) raise
+      ``ImportError`` at call time.
+
    **DBSCAN Implementation:**
    
    - Uses sklearn.cluster.DBSCAN with L2 distance metric
@@ -172,7 +181,7 @@ Clustering Analysis
 
    3. **Fitting**: dbscan_model.fit(points) on 3D coordinates
 
-   4. **Label Extraction**: dbscan_model.labels_ array
+   4. **Label Extraction**: ``dbscan_model.labels_`` array
 
    5. **Statistics Computation**: Unique label counting and noise analysis
 
@@ -182,7 +191,7 @@ Resource Management
 ===================
 
 Cleanup Methods
---------------
+---------------
 
 .. automethod:: Perception.release
 
@@ -207,10 +216,10 @@ Cleanup Methods
 ---
 
 Logging Infrastructure
-=====================
+======================
 
 Logger Configuration
--------------------
+--------------------
 
 .. automethod:: Perception._setup_logger
 
@@ -252,10 +261,10 @@ Error Handling Hierarchy
 ---
 
 Dependencies and Integration
-===========================
+============================
 
 Required Dependencies
---------------------
+---------------------
 
 .. list-table::
    :header-rows: 1
@@ -264,9 +273,9 @@ Required Dependencies
    * - Module
      - Purpose
      - Integration Point
-   * - ``sklearn.cluster.DBSCAN``
+   * - ``sklearn.cluster.DBSCAN`` *(optional, since v1.3.2)*
      - Point clustering
-     - cluster_obstacles() method
+     - cluster_obstacles() method — install via ``pip install "ManipulaPy[ml]"``
    * - ``numpy``
      - Array operations
      - All coordinate manipulations
@@ -277,8 +286,16 @@ Required Dependencies
      - Low-level vision
      - vision_instance dependency
 
+.. note::
+   As of v1.3.2, ``import ManipulaPy.perception`` no longer requires
+   scikit-learn — the import is guarded internally. Only
+   :py:meth:`Perception.cluster_obstacles` (and the
+   :py:meth:`Perception.detect_and_cluster_obstacles` pipeline that calls it)
+   raise ``ImportError`` if the ``ml`` extra is missing.
+
+
 Vision Module Interface
-----------------------
+-----------------------
 
 Perception requires Vision instance with specific methods:
 

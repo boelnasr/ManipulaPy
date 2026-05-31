@@ -480,7 +480,7 @@ def get_all_available_robots() -> Dict[str, Dict]:
     return available
 
 
-def print_robot_catalog():
+def print_robot_catalog() -> None:
     """
     Print a formatted catalog of all available robots.
     """
@@ -516,6 +516,19 @@ def get_robot_path(robot_name: str, model: Optional[str] = None) -> str:
 
     This function is provided for backward compatibility.
     Use get_robot_urdf() for new code.
+
+    Args:
+        robot_name: Robot identifier (e.g., 'ur5', 'panda', 'iiwa').
+        model: Optional model/variant suffix. When given, it is appended to
+            ``robot_name`` as ``"{robot_name}_{model}"`` before lookup
+            (e.g. robot_name='xarm', model='6' -> 'xarm_6').
+
+    Returns:
+        str: Absolute path to the resolved URDF file.
+
+    Raises:
+        ValueError: If the resolved robot name is not in the robot database.
+        FileNotFoundError: If the URDF file does not exist on disk.
     """
     if model:
         robot_name = f"{robot_name}_{model}"
@@ -533,7 +546,20 @@ def get_ur5_urdf() -> str:
 
 
 def get_xarm_urdf(model: str = 'xarm6') -> str:
-    """Get xArm URDF path (convenience function)."""
+    """
+    Get xArm URDF path (convenience function).
+
+    Args:
+        model: xArm model identifier used as the database key
+            (e.g. 'xarm5', 'xarm6', 'xarm7'). Defaults to 'xarm6'.
+
+    Returns:
+        str: Absolute path to the xArm URDF file.
+
+    Raises:
+        ValueError: If ``model`` is not a known robot.
+        FileNotFoundError: If the URDF file does not exist on disk.
+    """
     return get_robot_urdf(model)
 
 
@@ -543,7 +569,20 @@ def get_panda_urdf() -> str:
 
 
 def get_iiwa_urdf(variant: str = 'iiwa14') -> str:
-    """Get KUKA iiwa URDF path (convenience function)."""
+    """
+    Get KUKA iiwa URDF path (convenience function).
+
+    Args:
+        variant: KUKA iiwa variant identifier used as the database key
+            (e.g. 'iiwa7', 'iiwa14'). Defaults to 'iiwa14'.
+
+    Returns:
+        str: Absolute path to the iiwa URDF file.
+
+    Raises:
+        ValueError: If ``variant`` is not a known robot.
+        FileNotFoundError: If the URDF file does not exist on disk.
+    """
     return get_robot_urdf(variant)
 
 

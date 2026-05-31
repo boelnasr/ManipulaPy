@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Tests for URDF processor construction and file validation."""
 
 import os
 import unittest
@@ -8,10 +9,11 @@ from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
 
 class TestURDFProcessor(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
+        """Set the xArm URDF path used by the processor tests."""
         self.urdf_path = xarm_urdf_file
 
-    def test_urdf_load(self):
+    def test_urdf_load(self) -> None:
         """Test loading a URDF file."""
         # Check that the file exists
         self.assertTrue(os.path.isfile(self.urdf_path))
@@ -30,7 +32,7 @@ class TestURDFProcessor(unittest.TestCase):
         except Exception as e:
             self.fail(f"Failed to load URDF: {e}")
 
-    def test_serial_manipulator_creation(self):
+    def test_serial_manipulator_creation(self) -> None:
         """Test creation of SerialManipulator from URDF."""
         try:
             processor = URDFToSerialManipulator(self.urdf_path)
@@ -52,7 +54,7 @@ class TestURDFProcessor(unittest.TestCase):
         except Exception as e:
             self.fail(f"Failed to create SerialManipulator: {e}")
 
-    def test_dynamics_creation(self):
+    def test_dynamics_creation(self) -> None:
         """Test creation of ManipulatorDynamics from URDF."""
         try:
             processor = URDFToSerialManipulator(self.urdf_path)
@@ -74,7 +76,7 @@ class TestURDFProcessor(unittest.TestCase):
         except Exception as e:
             self.fail(f"Failed to create ManipulatorDynamics: {e}")
 
-    def test_urdf_processor_with_mock_urdf(self):
+    def test_urdf_processor_with_mock_urdf(self) -> None:
         """Test URDF processor with a simple mock scenario."""
         # This test will work regardless of the actual URDF content
         try:
@@ -104,7 +106,7 @@ class TestURDFProcessor(unittest.TestCase):
             self.assertTrue(hasattr(URDFToSerialManipulator, "load_urdf"))
             print("✅ URDFToSerialManipulator class structure is correct")
 
-    def test_urdf_file_exists(self):
+    def test_urdf_file_exists(self) -> None:
         """Test that the URDF file actually exists."""
         self.assertTrue(
             os.path.exists(self.urdf_path),

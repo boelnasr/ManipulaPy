@@ -33,7 +33,7 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -60,7 +60,6 @@ class URDFToSerialManipulator:
 
     Supports multiple URDF parser backends:
         - "builtin": Native ManipulaPy parser (NumPy 2.0 compatible, default)
-        - "urchin": Legacy urchin parser (requires urchin, not NumPy 2.0 compatible)
         - "pybullet": PyBullet-based parser (requires pybullet)
 
     Features:
@@ -87,7 +86,7 @@ class URDFToSerialManipulator:
         backend: str = "builtin",
         load_meshes: bool = False,
         validate: bool = False,
-    ):
+    ) -> None:
         """
         Initializes the object with the given urdf_name.
 
@@ -95,7 +94,7 @@ class URDFToSerialManipulator:
             urdf_name (str | Path): Path to the URDF file.
             use_pybullet_limits (bool): Whether to override URDF limits with PyBullet's.
                                         Default False (use URDF limits directly).
-            backend (str): Parser backend - "builtin" (default), "urchin", or "pybullet"
+            backend (str): Parser backend - "builtin" (default) or "pybullet"
             load_meshes (bool): Whether to load mesh geometry. Default False.
             validate (bool): Whether to validate URDF structure. Default False.
         """
@@ -147,7 +146,7 @@ class URDFToSerialManipulator:
         return np.array(T[0:3, 3])
 
     @staticmethod
-    def get_link(robot: URDF, link_name: str):
+    def get_link(robot: URDF, link_name: str) -> Any:
         """
         Given a robot URDF and a link name, returns the link associated with that name.
         Returns None if not found.
@@ -168,7 +167,7 @@ class URDFToSerialManipulator:
             Slist.append([w_[0], w_[1], w_[2], v_[0], v_[1], v_[2]])
         return np.transpose(Slist)
 
-    def _extract_robot_data(self) -> dict:
+    def _extract_robot_data(self) -> Dict[str, Any]:
         """
         Extract kinematic/dynamic parameters from the loaded URDF.
 
@@ -187,14 +186,16 @@ class URDFToSerialManipulator:
 
         return {
             "M": params["M"],
+            "omega_list": params["S_list"][:3, :],
             "Slist": params["S_list"],
             "Blist": params["B_list"],
             "Glist": params["G_list"],
             "actuated_joints_num": self.robot.num_dofs,
             "joint_limits": params["joint_limits"],
+            "Mlist_per_link": params.get("Mlist_per_link"),
         }
 
-    def load_urdf(self, urdf_name: str) -> dict:
+    def load_urdf(self, urdf_name: str) -> Dict[str, Any]:
         """
         Load the URDF file and extract the necessary info for the robot model.
 
@@ -276,30 +277,33 @@ class URDFToSerialManipulator:
 
         return SerialManipulator(
             M_list=data["M"],
-            omega_list=utils.extract_omega_list(data["Slist"]),
+            omega_list=data["omega_list"],
             S_list=data["Slist"],
             B_list=data["Blist"],
             G_list=data["Glist"],
             joint_limits=jlimits,
         )
 
-    def initialize_manipulator_dynamics(self):
+    def initialize_manipulator_dynamics(self) -> ManipulatorDynamics:
         """
         Initializes the ManipulatorDynamics object using the extracted URDF data.
         """
         data = self.robot_data
         self.manipulator_dynamics = ManipulatorDynamics(
             M_list=data["M"],
-            omega_list=data["Slist"][:, :3],
+            omega_list=data["omega_list"],
             r_list=utils.extract_r_list(data["Slist"]),
             b_list=None,  # If needed, define or extract from URDF
             S_list=data["Slist"],
             B_list=data["Blist"],
             Glist=data["Glist"],
+            Mlist_per_link=data.get("Mlist_per_link"),  # ← ADD THIS LINE
         )
         return self.manipulator_dynamics
 
-    def visualize_robot(self, cfg=None):
+    def visualize_robot(
+        self, cfg: Optional[Union[np.ndarray, Dict[str, Any]]] = None
+    ) -> None:
         """
         Visualizes the URDF model.
 
@@ -309,8 +313,11 @@ class URDFToSerialManipulator:
         self.robot.show(cfg=cfg)
 
     def visualize_trajectory(
-        self, cfg_trajectory=None, loop_time=3.0, use_collision=False
-    ):
+        self,
+        cfg_trajectory: Optional[Union[np.ndarray, Dict[str, np.ndarray]]] = None,
+        loop_time: float = 3.0,
+        use_collision: bool = False,
+    ) -> None:
         """
         Animate robot along a trajectory.
 
@@ -353,7 +360,7 @@ class URDFToSerialManipulator:
             use_collision=use_collision,
         )
 
-    def print_joint_info(self):
+    def print_joint_info(self) -> Dict[str, Union[int, List[str]]]:
         """
         Returns the joint names instead of printing them to console.
 
@@ -497,7 +504,7 @@ class URDFToSerialManipulator:
         T_desired: np.ndarray,
         initial_guess: Optional[np.ndarray] = None,
         method: str = "robust",
-        **kwargs,
+        **kwargs: Any,
     ) -> Tuple[np.ndarray, bool, int]:
         """
         Compute inverse kinematics to reach desired pose.
@@ -593,7 +600,7 @@ class URDFToSerialManipulator:
         """
         return URDFModifier(self.robot)
 
-    def validate(self) -> Dict:
+    def validate(self) -> Dict[str, Any]:
         """
         Validate the URDF structure.
 
@@ -610,6 +617,7 @@ class URDFToSerialManipulator:
         }
 
     def __repr__(self) -> str:
+        """Return a concise representation for debugging."""
         return (
             f"URDFToSerialManipulator(urdf='{self.urdf_name}', "
             f"dofs={self.num_dofs}, backend='{self.backend}')"
@@ -631,7 +639,7 @@ def load_robot(
 
     Parameters:
         urdf_path: Path to URDF file
-        backend: Parser backend ("builtin", "urchin", or "pybullet")
+        backend: Parser backend ("builtin" or "pybullet")
         use_pybullet_limits: Whether to use PyBullet for joint limits
 
     Returns:

@@ -32,6 +32,7 @@ This section contains auto-generated documentation for all key modules, classes,
    trac_ik
    ik_helpers
    utils
+   urdf
    urdf_processor
 
 .. rubric:: 🧠 Planning, Simulation & Optimization

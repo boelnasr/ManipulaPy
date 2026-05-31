@@ -29,6 +29,8 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
+from __future__ import annotations
+
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -49,7 +51,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def _to_numpy(arr):
+def _to_numpy(arr: Any) -> NDArray[Any]:
     """
     Safely convert array to NumPy, handling both NumPy and CuPy arrays.
 
@@ -78,7 +80,26 @@ def _to_numpy(arr):
     return np.asarray(arr)
 
 
+def _validate_i_clamp(i_clamp: Optional[float]) -> Optional[float]:
+    """Return a scalar positive finite integral clamp, or None if disabled."""
+    if i_clamp is None:
+        return None
+
+    clamp = np.asarray(_to_numpy(i_clamp), dtype=float)
+    if clamp.size != 1:
+        raise ValueError(f"i_clamp must be a scalar, got shape {clamp.shape}")
+
+    clamp_value = float(clamp.reshape(-1)[0])
+    if not np.isfinite(clamp_value) or clamp_value <= 0:
+        raise ValueError(
+            f"i_clamp must be positive and finite when set, got {i_clamp!r}"
+        )
+    return clamp_value
+
+
 class ManipulatorController:
+    """CPU-based manipulator controller implementations and tuning utilities."""
+
     def __init__(self, dynamics: Any) -> None:
         """
         Initialize the ManipulatorController with the dynamics of the manipulator.
@@ -107,6 +128,7 @@ class ManipulatorController:
         Kp: Union[NDArray[np.float64], List[float]],
         Ki: Union[NDArray[np.float64], List[float]],
         Kd: Union[NDArray[np.float64], List[float]],
+        i_clamp: Optional[float] = None,
     ) -> NDArray[np.float64]:
         """
         Computed Torque Control.
@@ -142,11 +164,20 @@ class ManipulatorController:
         Ki = _to_numpy(Ki)
         Kd = _to_numpy(Kd)
 
-        if self.eint is None:
-            self.eint = np.zeros_like(thetalist)
+        if self.eint is None or self.eint.shape != thetalist.shape:
+            if self.eint is not None and self.eint.shape != thetalist.shape:
+                logger.debug(
+                    "Controller state shape mismatch (%s vs %s); resetting integral.",
+                    self.eint.shape,
+                    thetalist.shape,
+                )
+            self.eint = np.zeros_like(thetalist, dtype=float)
 
         e = thetalistd - thetalist
         self.eint += e * dt
+        i_clamp = _validate_i_clamp(i_clamp)
+        if i_clamp is not None:
+            np.clip(self.eint, -i_clamp, i_clamp, out=self.eint)
 
         # Dynamics computations (no GPU↔CPU transfers)
         M = self.dynamics.mass_matrix(thetalist)
@@ -208,6 +239,7 @@ class ManipulatorController:
         Kp: Union[NDArray[np.float64], List[float]],
         Ki: Union[NDArray[np.float64], List[float]],
         Kd: Union[NDArray[np.float64], List[float]],
+        i_clamp: Optional[float] = None,
     ) -> NDArray[np.float64]:
         """
         PID Control.
@@ -235,11 +267,20 @@ class ManipulatorController:
         Ki = _to_numpy(Ki)
         Kd = _to_numpy(Kd)
 
-        if self.eint is None:
-            self.eint = np.zeros_like(thetalist)
+        if self.eint is None or self.eint.shape != thetalist.shape:
+            if self.eint is not None and self.eint.shape != thetalist.shape:
+                logger.debug(
+                    "Controller state shape mismatch (%s vs %s); resetting integral.",
+                    self.eint.shape,
+                    thetalist.shape,
+                )
+            self.eint = np.zeros_like(thetalist, dtype=float)
 
         e = thetalistd - thetalist
         self.eint += e * dt
+        i_clamp = _validate_i_clamp(i_clamp)
+        if i_clamp is not None:
+            np.clip(self.eint, -i_clamp, i_clamp, out=self.eint)
 
         e_dot = dthetalistd - dthetalist
         tau = Kp * e + Ki * self.eint + Kd * e_dot
@@ -279,12 +320,16 @@ class ManipulatorController:
         g = _to_numpy(g)
         Ftip = _to_numpy(Ftip)
         disturbance_estimate = _to_numpy(disturbance_estimate)
+        adaptation_gain = _to_numpy(adaptation_gain)
 
-        # Dynamics computations (no GPU↔CPU transfers)
-        M = self.dynamics.mass_matrix(thetalist)
-        c = self.dynamics.velocity_quadratic_forces(thetalist, dthetalist)
-        g_forces = self.dynamics.gravity_forces(thetalist, g)
-        J_transpose = self.dynamics.jacobian(thetalist).T
+        # Dynamics computations — _to_numpy guards keep us on the CPU
+        # path even when the dynamics backend would otherwise hand back
+        # CuPy arrays. Mixing the two raises TypeError on a real CuPy
+        # install (previously masked by the CPU-only test mock).
+        M = _to_numpy(self.dynamics.mass_matrix(thetalist))
+        c = _to_numpy(self.dynamics.velocity_quadratic_forces(thetalist, dthetalist))
+        g_forces = _to_numpy(self.dynamics.gravity_forces(thetalist, g))
+        J_transpose = _to_numpy(self.dynamics.jacobian(thetalist)).T
         tau = (
             M @ ddthetalist
             + c
@@ -391,6 +436,9 @@ class ManipulatorController:
         g = _to_numpy(g)
         Ftip = _to_numpy(Ftip)
         Q = _to_numpy(Q)
+        n = self.x_hat.shape[0] if self.x_hat is not None else len(thetalist) * 2
+        if Q.shape != (n, n):
+            raise ValueError(f"Q must have shape ({n}, {n}), got {Q.shape}")
 
         if self.x_hat is None:
             self.x_hat = np.concatenate((thetalist, dthetalist))
@@ -398,13 +446,18 @@ class ManipulatorController:
         thetalist_pred = (
             self.x_hat[: len(thetalist)] + self.x_hat[len(thetalist) :] * dt
         )
+        # forward_dynamics may return a CuPy array when the backend is
+        # CuPy; coerce so x_hat stays NumPy throughout the filter cycle
+        # (otherwise the update step's H @ x_hat raises TypeError).
         dthetalist_pred = (
-            self.dynamics.forward_dynamics(
-                self.x_hat[: len(thetalist)],
-                self.x_hat[len(thetalist) :],
-                taulist,
-                g,
-                Ftip,
+            _to_numpy(
+                self.dynamics.forward_dynamics(
+                    self.x_hat[: len(thetalist)],
+                    self.x_hat[len(thetalist) :],
+                    taulist,
+                    g,
+                    Ftip,
+                )
             )
             * dt
             + self.x_hat[len(thetalist) :]
@@ -435,6 +488,28 @@ class ManipulatorController:
         """
         z = _to_numpy(z)
         R = _to_numpy(R)
+        if self.x_hat is None:
+            raise ValueError(
+                "kalman_filter_update called before kalman_filter_predict; "
+                "x_hat has not been initialized"
+            )
+        self.x_hat = _to_numpy(self.x_hat)
+        n = self.x_hat.shape[0]
+        if self.P is None:
+            raise ValueError(
+                f"P must be initialized with shape ({n}, {n}) before update; "
+                "got None"
+            )
+        self.P = _to_numpy(self.P)
+        if getattr(self.P, "shape", None) != (n, n):
+            raise ValueError(
+                f"P must be initialized with shape ({n}, {n}) before update; "
+                f"got {self.P.shape}"
+            )
+        if z.shape != (n,):
+            raise ValueError(f"z must have shape ({n},) to match x_hat, got {z.shape}")
+        if R.shape != (n, n):
+            raise ValueError(f"R must have shape ({n}, {n}), got {R.shape}")
 
         H = np.eye(len(self.x_hat))
         y = z - H @ self.x_hat
@@ -573,10 +648,8 @@ class ManipulatorController:
         thetalist: Union[NDArray[np.float64], List[float]],
         dthetalist: Union[NDArray[np.float64], List[float]],
         tau: Union[NDArray[np.float64], List[float]],
-        joint_limits: Union[cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]],
-        torque_limits: Union[
-            cp.ndarray, NDArray[np.float64], List[Tuple[float, float]]
-        ],
+        joint_limits: Union[NDArray[np.float64], List[Tuple[float, float]]],
+        torque_limits: Union[NDArray[np.float64], List[Tuple[float, float]]],
     ) -> Tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
         """
         Enforce joint and torque limits.
@@ -604,8 +677,12 @@ class ManipulatorController:
         return thetalist, dthetalist, tau
 
     def plot_steady_state_response(
-        self, time, response, set_point, title="Steady State Response"
-    ):
+        self,
+        time: Union[NDArray[np.float64], List[float]],
+        response: Union[NDArray[np.float64], List[float]],
+        set_point: float,
+        title: str = "Steady State Response",
+    ) -> None:
         """
         Plot the steady-state response of the controller.
 
@@ -661,7 +738,12 @@ class ManipulatorController:
         plt.grid(True)
         plt.show()
 
-    def calculate_rise_time(self, time, response, set_point):
+    def calculate_rise_time(
+        self,
+        time: Union[NDArray[np.float64], List[float]],
+        response: Union[NDArray[np.float64], List[float]],
+        set_point: float,
+    ) -> float:
         """
         Calculate the rise time.
 
@@ -678,12 +760,15 @@ class ManipulatorController:
 
         rise_start = 0.1 * set_point
         rise_end = 0.9 * set_point
-        start_idx = np.where(response >= rise_start)[0][0]
-        end_idx = np.where(response >= rise_end)[0][0]
-        rise_time = time[end_idx] - time[start_idx]
-        return rise_time
+        start_idx = np.where(response >= rise_start)[0]
+        end_idx = np.where(response >= rise_end)[0]
+        if len(start_idx) == 0 or len(end_idx) == 0:
+            return float("inf")
+        return time[end_idx[0]] - time[start_idx[0]]
 
-    def calculate_percent_overshoot(self, response, set_point):
+    def calculate_percent_overshoot(
+        self, response: Union[NDArray[np.float64], List[float]], set_point: float
+    ) -> float:
         """
         Calculate the percent overshoot.
 
@@ -695,33 +780,56 @@ class ManipulatorController:
             float: Percent overshoot.
         """
         response = _to_numpy(response)
-
+        if set_point == 0:
+            return 0.0
         max_response = np.max(response)
-        percent_overshoot = ((max_response - set_point) / set_point) * 100
-        return percent_overshoot
+        return ((max_response - set_point) / set_point) * 100
 
-    def calculate_settling_time(self, time, response, set_point, tolerance=0.02):
+    def calculate_settling_time(
+        self,
+        time: Union[NDArray[np.float64], List[float]],
+        response: Union[NDArray[np.float64], List[float]],
+        set_point: float,
+        tolerance: float = 0.02,
+    ) -> float:
         """
         Calculate the settling time.
+
+        Returns the first time at which the response enters the tolerance band
+        and never leaves it again.  Returns ``float('inf')`` when the response
+        never enters the band, or enters but does not remain settled through
+        the end of the recorded data.
 
         Parameters:
             time (np.ndarray): Array of time steps.
             response (np.ndarray): Array of response values.
             set_point (float): Desired set point value.
-            tolerance (float): Tolerance for settling time calculation.
+            tolerance (float): Fractional tolerance band (default 0.02 = 2 %).
 
         Returns:
-            float: Settling time.
+            float: Settling time, or inf if the response never settles.
         """
         time = _to_numpy(time)
         response = _to_numpy(response)
 
-        settling_threshold = set_point * tolerance
-        settling_idx = np.where(np.abs(response - set_point) <= settling_threshold)[0]
-        settling_time = time[settling_idx[-1]] if len(settling_idx) > 0 else time[-1]
-        return settling_time
+        settling_threshold = abs(set_point) * tolerance
+        in_band = np.abs(response - set_point) <= settling_threshold
+        if not np.any(in_band):
+            return float("inf")
+        n = len(in_band)
+        last_excursion = -1
+        for i in range(n - 1, -1, -1):
+            if not in_band[i]:
+                last_excursion = i
+                break
+        if last_excursion == n - 1:
+            return float("inf")  # never settles
+        first_settled_idx = last_excursion + 1
+        return float(time[first_settled_idx])
 
-    def calculate_steady_state_error(self, response, set_point):
+    def calculate_steady_state_error(
+        self, response: Union[NDArray[np.float64], List[float]], set_point: float
+    ) -> float:
         """
         Calculate the steady-state error.
 
@@ -802,27 +910,60 @@ class ManipulatorController:
 
         current_position = self.dynamics.forward_kinematics(current_joint_angles)[:3, 3]
         e = desired_position - current_position
-        dthetalist = current_joint_velocities
-        J = self.dynamics.jacobian(current_joint_angles)
-        tau = J.T @ (Kp * e - Kd @ J @ dthetalist)
+        # Position-only control: use linear (3xN) part of Jacobian
+        J_v = self.dynamics.jacobian(current_joint_angles)[:3, :]
+        cartesian_velocity = J_v @ current_joint_velocities
+        Kp_term = Kp @ e if np.ndim(Kp) == 2 else Kp * e
+        Kd_term = (
+            Kd @ cartesian_velocity if np.ndim(Kd) == 2 else Kd * cartesian_velocity
+        )
+        tau = J_v.T @ (Kp_term - Kd_term)
         return tau
 
     # ------------------------------------------------------------------------
-    def ziegler_nichols_tuning(self, Ku, Tu, kind="PID"):
-        Ku = _to_numpy(Ku).astype(float)
-        Tu = _to_numpy(Tu).astype(float)
+    def ziegler_nichols_tuning(
+        self,
+        Ku: Union[float, NDArray[np.float64], List[float]],
+        Tu: Union[float, NDArray[np.float64], List[float]],
+        kind: str = "PID",
+    ) -> Tuple[
+        Union[float, NDArray[np.float64]],
+        Union[float, NDArray[np.float64]],
+        Union[float, NDArray[np.float64]],
+    ]:
+        """
+        Compute Ziegler-Nichols controller gains.
 
+        Args:
+            Ku: Ultimate gain as a scalar or vector.
+            Tu: Ultimate period as a scalar or vector.
+            kind: Controller type: ``"P"``, ``"PI"``, or ``"PID"``.
+
+        Returns:
+            Tuple of ``(Kp, Ki, Kd)`` gains.
+        """
+        Ku = _to_numpy(Ku).astype(float)
         kind = kind.upper()
+
         if kind == "P":
             Kp, Ki, Kd = 0.50 * Ku, 0.0 * Ku, 0.0 * Ku
-        elif kind == "PI":
-            Kp, Ki, Kd = 0.45 * Ku, 1.2 * Ku / Tu, 0.0 * Ku
-        elif kind == "PID":
-            Kp = 0.60 * Ku
-            Ki = 2.0 * Kp / Tu
-            Kd = 0.125 * Kp * Tu
         else:
-            raise ValueError("kind must be 'P', 'PI' or 'PID'")
+            Tu = _to_numpy(Tu).astype(float)
+            if not np.all(np.isfinite(Tu)) or np.any(Tu <= 0):
+                raise ValueError(
+                    f"Tu (ultimate period) must be positive and finite, got Tu={Tu!r}. "
+                    "Tu == 0 typically indicates find_ultimate_gain_and_period found no "
+                    "sustained oscillation; check your gain sweep."
+                )
+
+            if kind == "PI":
+                Kp, Ki, Kd = 0.45 * Ku, 1.2 * Ku / Tu, 0.0 * Ku
+            elif kind == "PID":
+                Kp = 0.60 * Ku
+                Ki = 2.0 * Kp / Tu
+                Kd = 0.125 * Kp * Tu
+            else:
+                raise ValueError("kind must be 'P', 'PI' or 'PID'")
 
         # Return scalars as plain floats so assertEqual passes exactly
         if Ku.size == 1:
@@ -830,7 +971,16 @@ class ManipulatorController:
         return Kp, Ki, Kd
 
     # ------------------------------------------------------------------------
-    def tune_controller(self, Ku, Tu, kind="PID"):
+    def tune_controller(
+        self,
+        Ku: Union[float, NDArray[np.float64], List[float]],
+        Tu: Union[float, NDArray[np.float64], List[float]],
+        kind: str = "PID",
+    ) -> Tuple[
+        Union[float, NDArray[np.float64]],
+        Union[float, NDArray[np.float64]],
+        Union[float, NDArray[np.float64]],
+    ]:
         """
         Convenience wrapper that logs and returns NumPy arrays (length = DOF).
         """

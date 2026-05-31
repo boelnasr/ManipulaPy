@@ -25,13 +25,13 @@ from ManipulaPy.potential_field import PotentialField
 class TestPotentialFieldAttractive(unittest.TestCase):
     """Tests for attractive potential computation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.pf = PotentialField(
             attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
         )
 
-    def test_attractive_potential_at_goal(self):
+    def test_attractive_potential_at_goal(self) -> None:
         """Test attractive potential is zero at goal."""
         q = np.array([1.0, 2.0, 3.0])
         q_goal = q.copy()
@@ -40,7 +40,7 @@ class TestPotentialFieldAttractive(unittest.TestCase):
 
         self.assertAlmostEqual(U_att, 0.0, places=10)
 
-    def test_attractive_potential_away_from_goal(self):
+    def test_attractive_potential_away_from_goal(self) -> None:
         """Test attractive potential increases with distance."""
         q_goal = np.array([0.0, 0.0, 0.0])
         q1 = np.array([1.0, 0.0, 0.0])  # Distance = 1
@@ -55,7 +55,7 @@ class TestPotentialFieldAttractive(unittest.TestCase):
         self.assertAlmostEqual(U_att2, 0.5 * 1.0 * 2.0**2, places=6)
         self.assertGreater(U_att2, U_att1)
 
-    def test_attractive_potential_gain_scaling(self):
+    def test_attractive_potential_gain_scaling(self) -> None:
         """Test attractive potential scales with gain."""
         pf_low_gain = PotentialField(attractive_gain=1.0)
         pf_high_gain = PotentialField(attractive_gain=10.0)
@@ -68,7 +68,7 @@ class TestPotentialFieldAttractive(unittest.TestCase):
 
         self.assertAlmostEqual(U_high, 10.0 * U_low, places=6)
 
-    def test_attractive_potential_symmetric(self):
+    def test_attractive_potential_symmetric(self) -> None:
         """Test attractive potential is symmetric."""
         q1 = np.array([1.0, 2.0, 3.0])
         q2 = np.array([4.0, 5.0, 6.0])
@@ -82,13 +82,13 @@ class TestPotentialFieldAttractive(unittest.TestCase):
 class TestPotentialFieldRepulsive(unittest.TestCase):
     """Tests for repulsive potential computation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.pf = PotentialField(
             attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
         )
 
-    def test_repulsive_potential_no_obstacles(self):
+    def test_repulsive_potential_no_obstacles(self) -> None:
         """Test repulsive potential is zero with no obstacles."""
         q = np.array([1.0, 2.0, 3.0])
         obstacles = []
@@ -97,7 +97,7 @@ class TestPotentialFieldRepulsive(unittest.TestCase):
 
         self.assertAlmostEqual(U_rep, 0.0, places=10)
 
-    def test_repulsive_potential_outside_influence(self):
+    def test_repulsive_potential_outside_influence(self) -> None:
         """Test repulsive potential is zero outside influence distance."""
         q = np.array([0.0, 0.0, 0.0])
         obstacle = np.array([1.0, 0.0, 0.0])  # Distance = 1.0 > 0.5
@@ -107,7 +107,7 @@ class TestPotentialFieldRepulsive(unittest.TestCase):
 
         self.assertAlmostEqual(U_rep, 0.0, places=10)
 
-    def test_repulsive_potential_inside_influence(self):
+    def test_repulsive_potential_inside_influence(self) -> None:
         """Test repulsive potential is non-zero inside influence distance."""
         q = np.array([0.0, 0.0, 0.0])
         obstacle = np.array([0.2, 0.0, 0.0])  # Distance = 0.2 < 0.5
@@ -117,7 +117,7 @@ class TestPotentialFieldRepulsive(unittest.TestCase):
 
         self.assertGreater(U_rep, 0.0)
 
-    def test_repulsive_potential_increases_near_obstacle(self):
+    def test_repulsive_potential_increases_near_obstacle(self) -> None:
         """Test repulsive potential increases as we get closer to obstacle."""
         obstacle = np.array([1.0, 0.0, 0.0])
         obstacles = [obstacle]
@@ -131,7 +131,7 @@ class TestPotentialFieldRepulsive(unittest.TestCase):
         # Closer to obstacle => higher potential
         self.assertGreater(U_near, U_far)
 
-    def test_repulsive_potential_multiple_obstacles(self):
+    def test_repulsive_potential_multiple_obstacles(self) -> None:
         """Test repulsive potential with multiple obstacles."""
         q = np.array([0.0, 0.0, 0.0])
         obstacle1 = np.array([0.2, 0.0, 0.0])
@@ -146,7 +146,7 @@ class TestPotentialFieldRepulsive(unittest.TestCase):
 
         self.assertAlmostEqual(U_rep, U1 + U2, places=6)
 
-    def test_repulsive_potential_gain_scaling(self):
+    def test_repulsive_potential_gain_scaling(self) -> None:
         """Test repulsive potential scales with gain."""
         pf_low_gain = PotentialField(repulsive_gain=10.0, influence_distance=0.5)
         pf_high_gain = PotentialField(repulsive_gain=100.0, influence_distance=0.5)
@@ -165,13 +165,13 @@ class TestPotentialFieldRepulsive(unittest.TestCase):
 class TestPotentialFieldGradient(unittest.TestCase):
     """Tests for potential field gradient computation."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.pf = PotentialField(
             attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
         )
 
-    def test_gradient_at_goal_no_obstacles(self):
+    def test_gradient_at_goal_no_obstacles(self) -> None:
         """Test gradient is zero at goal with no obstacles."""
         q = np.array([1.0, 2.0, 3.0])
         q_goal = q.copy()
@@ -181,7 +181,7 @@ class TestPotentialFieldGradient(unittest.TestCase):
 
         np.testing.assert_array_almost_equal(grad, np.zeros(3), decimal=10)
 
-    def test_gradient_attractive_direction(self):
+    def test_gradient_attractive_direction(self) -> None:
         """Test attractive gradient points toward goal."""
         q = np.array([1.0, 0.0, 0.0])
         q_goal = np.array([0.0, 0.0, 0.0])
@@ -195,7 +195,7 @@ class TestPotentialFieldGradient(unittest.TestCase):
 
         np.testing.assert_array_almost_equal(grad, expected, decimal=6)
 
-    def test_gradient_repulsive_direction(self):
+    def test_gradient_repulsive_direction(self) -> None:
         """Test gradient computation with obstacle nearby."""
         q = np.array([0.5, 0.0, 0.0])
         q_goal = np.array([1.0, 0.0, 0.0])  # Same direction as position
@@ -209,7 +209,7 @@ class TestPotentialFieldGradient(unittest.TestCase):
         self.assertFalse(np.any(np.isinf(grad)))
         self.assertGreater(np.linalg.norm(grad), 0)  # Non-zero gradient
 
-    def test_gradient_multiple_obstacles(self):
+    def test_gradient_multiple_obstacles(self) -> None:
         """Test gradient with multiple obstacles."""
         q = np.array([0.0, 0.0, 0.0])
         q_goal = np.array([10.0, 10.0, 10.0])
@@ -223,7 +223,7 @@ class TestPotentialFieldGradient(unittest.TestCase):
         self.assertEqual(grad.shape, (3,))
         self.assertFalse(np.any(np.isnan(grad)))
 
-    def test_gradient_numerical_finite(self):
+    def test_gradient_numerical_finite(self) -> None:
         """Test that gradient is always finite (no NaN or Inf)."""
         np.random.seed(42)
 
@@ -241,13 +241,13 @@ class TestPotentialFieldGradient(unittest.TestCase):
 class TestPotentialFieldEdgeCases(unittest.TestCase):
     """Tests for edge cases and numerical stability."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.pf = PotentialField(
             attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
         )
 
-    def test_zero_influence_distance(self):
+    def test_zero_influence_distance(self) -> None:
         """Test behavior with zero influence distance."""
         pf = PotentialField(influence_distance=0.0)
 
@@ -262,7 +262,7 @@ class TestPotentialFieldEdgeCases(unittest.TestCase):
         self.assertFalse(np.isnan(U_rep))
         self.assertFalse(np.any(np.isnan(grad)))
 
-    def test_very_close_to_obstacle(self):
+    def test_very_close_to_obstacle(self) -> None:
         """Test behavior when very close to obstacle (near singularity)."""
         q = np.array([0.0, 0.0, 0.0])
         obstacle = np.array([1e-6, 0.0, 0.0])  # Very close
@@ -275,7 +275,7 @@ class TestPotentialFieldEdgeCases(unittest.TestCase):
         self.assertTrue(np.isfinite(U_rep))
         self.assertTrue(np.all(np.isfinite(grad)))
 
-    def test_higher_dimensions(self):
+    def test_higher_dimensions(self) -> None:
         """Test potential field works in higher dimensions."""
         q = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         q_goal = np.zeros(5)
@@ -290,7 +290,7 @@ class TestPotentialFieldEdgeCases(unittest.TestCase):
         self.assertEqual(grad.shape, (5,))
         self.assertFalse(np.any(np.isnan(grad)))
 
-    def test_negative_gains(self):
+    def test_negative_gains(self) -> None:
         """Test behavior with negative gains (unusual but should not crash)."""
         pf = PotentialField(attractive_gain=-1.0, repulsive_gain=-100.0)
 
@@ -312,13 +312,13 @@ class TestPotentialFieldEdgeCases(unittest.TestCase):
 class TestPotentialFieldProperties(unittest.TestCase):
     """Tests for mathematical properties of potential fields."""
 
-    def setUp(self):
+    def setUp(self) -> None:
         """Set up test fixtures."""
         self.pf = PotentialField(
             attractive_gain=1.0, repulsive_gain=100.0, influence_distance=0.5
         )
 
-    def test_attractive_potential_positive(self):
+    def test_attractive_potential_positive(self) -> None:
         """Test attractive potential is always non-negative."""
         q_goal = np.zeros(3)
         test_points = [
@@ -333,7 +333,7 @@ class TestPotentialFieldProperties(unittest.TestCase):
             U_att = self.pf.compute_attractive_potential(q, q_goal)
             self.assertGreaterEqual(U_att, 0.0)
 
-    def test_repulsive_potential_positive(self):
+    def test_repulsive_potential_positive(self) -> None:
         """Test repulsive potential is always non-negative."""
         q = np.array([0.0, 0.0, 0.0])
         obstacle = np.array([0.2, 0.0, 0.0])
@@ -343,7 +343,7 @@ class TestPotentialFieldProperties(unittest.TestCase):
 
         self.assertGreaterEqual(U_rep, 0.0)
 
-    def test_potential_continuity(self):
+    def test_potential_continuity(self) -> None:
         """Test that potential changes smoothly (continuity)."""
         q_goal = np.zeros(3)
         obstacle = np.array([1.0, 0.0, 0.0])
@@ -386,7 +386,7 @@ class TestPotentialFieldProperties(unittest.TestCase):
 class TestCollisionChecker(unittest.TestCase):
     """Tests for CollisionChecker class."""
 
-    def test_collision_checker_requires_urdf(self):
+    def test_collision_checker_requires_urdf(self) -> None:
         """Test that CollisionChecker requires valid URDF path."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -394,7 +394,7 @@ class TestCollisionChecker(unittest.TestCase):
         with self.assertRaises((FileNotFoundError, IOError, Exception)):
             CollisionChecker("nonexistent_robot.urdf")
 
-    def test_collision_checker_initialization(self):
+    def test_collision_checker_initialization(self) -> None:
         """Test CollisionChecker initialization with mock."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -405,7 +405,7 @@ class TestCollisionChecker(unittest.TestCase):
         self.assertTrue(hasattr(CollisionChecker, "_transform_convex_hull"))
 
     @patch("ManipulaPy.potential_field.URDF")
-    def test_collision_checker_with_mock_urdf(self, mock_urdf):
+    def test_collision_checker_with_mock_urdf(self, mock_urdf) -> None:
         """Test CollisionChecker with mocked URDF."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -424,7 +424,7 @@ class TestCollisionChecker(unittest.TestCase):
             self.assertIn("URDF", str(e))
 
     @patch("ManipulaPy.potential_field.URDF")
-    def test_collision_checker_create_convex_hulls(self, mock_urdf):
+    def test_collision_checker_create_convex_hulls(self, mock_urdf) -> None:
         """Test convex hull creation."""
         from ManipulaPy.potential_field import CollisionChecker
 
@@ -441,7 +441,7 @@ class TestCollisionChecker(unittest.TestCase):
             # If initialization fails, that's acceptable for mock
             pass
 
-    def test_collision_checker_methods_exist(self):
+    def test_collision_checker_methods_exist(self) -> None:
         """Test that CollisionChecker has all required methods."""
         import inspect
 

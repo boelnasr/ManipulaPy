@@ -19,40 +19,49 @@ from ManipulaPy.control import ManipulatorController
 class MockDynamics:
     """Minimal dynamics model with deterministic outputs for testing."""
 
-    def __init__(self, n=2):
+    def __init__(self, n=2) -> None:
+        """Initialize the mock dynamics with constant terms for ``n`` joints."""
         self.n = n
         self.M_const = np.diag([2.0] * n)
         self.C_const = np.ones(n) * 0.1
         self.G_const = np.ones(n) * 0.05
         self.J_const = np.eye(6, n)  # shape (6,n) so J^T is (n,6)
 
-    def mass_matrix(self, thetalist):
+    def mass_matrix(self, thetalist) -> np.ndarray:
+        """Return the constant mass matrix."""
         return self.M_const
 
-    def velocity_quadratic_forces(self, thetalist, dthetalist):
+    def velocity_quadratic_forces(self, thetalist, dthetalist) -> np.ndarray:
+        """Return the constant velocity-quadratic (Coriolis) forces."""
         return self.C_const
 
-    def gravity_forces(self, thetalist, g):
+    def gravity_forces(self, thetalist, g) -> np.ndarray:
+        """Return the constant gravity forces."""
         return self.G_const
 
-    def jacobian(self, thetalist):
+    def jacobian(self, thetalist) -> np.ndarray:
+        """Return the constant Jacobian."""
         return self.J_const
 
-    def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip):
+    def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+        """Return the inverse-dynamics torque for a simple linear model."""
         # simple linear model: M*qdd + C*dq + G
         return self.M_const @ ddthetalist + self.C_const + self.G_const
 
-    def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip):
+    def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+        """Return the joint accelerations for a naive forward-dynamics model."""
         # naive model: qdd = (tau - C - G)
         return taulist - self.C_const - self.G_const
 
 
 @pytest.fixture
-def controller():
+def controller() -> ManipulatorController:
+    """Provide a controller backed by two-joint mock dynamics."""
     return ManipulatorController(MockDynamics(n=2))
 
 
-def test_pid_control_zero_gains(controller: ManipulatorController):
+def test_pid_control_zero_gains(controller: ManipulatorController) -> None:
+    """PID control with zero gains yields zero torque."""
     thetalistd = np.array([1.0, -1.0])
     dthetalistd = np.zeros(2)
     thetalist = np.array([0.5, -0.5])
@@ -68,7 +77,8 @@ def test_pid_control_zero_gains(controller: ManipulatorController):
     assert np.allclose(tau, 0.0)
 
 
-def test_pid_control_integral_accumulates(controller: ManipulatorController):
+def test_pid_control_integral_accumulates(controller: ManipulatorController) -> None:
+    """PID integral term accumulates across successive calls."""
     thetalistd = np.array([1.0, 1.0])
     dthetalistd = np.zeros(2)
     thetalist = np.array([0.0, 0.0])
@@ -88,7 +98,8 @@ def test_pid_control_integral_accumulates(controller: ManipulatorController):
     assert np.allclose(tau_2, 2 * tau_1)
 
 
-def test_pd_control_matches_formula(controller: ManipulatorController):
+def test_pd_control_matches_formula(controller: ManipulatorController) -> None:
+    """PD control matches the explicit Kp/Kd error formula."""
     desired_pos = np.array([0.5, -0.5])
     desired_vel = np.array([0.1, -0.1])
     current_pos = np.array([0.2, -0.6])
@@ -103,7 +114,8 @@ def test_pd_control_matches_formula(controller: ManipulatorController):
     assert np.allclose(tau, expected)
 
 
-def test_computed_torque_control_combines_terms(controller: ManipulatorController):
+def test_computed_torque_control_combines_terms(controller: ManipulatorController) -> None:
+    """Computed-torque control combines the feedback and inverse-dynamics terms."""
     n = 2
     thetalistd = np.zeros(n)
     dthetalistd = np.zeros(n)
@@ -131,7 +143,8 @@ def test_computed_torque_control_combines_terms(controller: ManipulatorControlle
     assert np.allclose(tau, expected)
 
 
-def test_robust_control_includes_adaptation_term(controller: ManipulatorController):
+def test_robust_control_includes_adaptation_term(controller: ManipulatorController) -> None:
+    """Robust control adds the disturbance adaptation term to the base torque."""
     n = 2
     thetalist = np.zeros(n)
     dthetalist = np.zeros(n)
@@ -153,7 +166,8 @@ def test_robust_control_includes_adaptation_term(controller: ManipulatorControll
     assert np.allclose(tau, expected)
 
 
-def test_adaptive_control_updates_parameters(controller: ManipulatorController):
+def test_adaptive_control_updates_parameters(controller: ManipulatorController) -> None:
+    """Adaptive control updates the parameter estimate and applies it to the torque."""
     n = 2
     thetalist = np.zeros(n)
     dthetalist = np.zeros(n)
@@ -176,7 +190,8 @@ def test_adaptive_control_updates_parameters(controller: ManipulatorController):
     assert np.allclose(tau, base + expected_params)
 
 
-def test_feedforward_controls_use_inverse_dynamics(controller: ManipulatorController):
+def test_feedforward_controls_use_inverse_dynamics(controller: ManipulatorController) -> None:
+    """Feedforward and PD-feedforward controls build on the inverse-dynamics torque."""
     n = 2
     desired_position = np.array([0.1, -0.2])
     desired_velocity = np.zeros(n)
