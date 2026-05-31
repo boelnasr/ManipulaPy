@@ -32,8 +32,9 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Pin YOLO to CPU *before* importing ManipulaPy.vision so the model never tries
-# to return CUDA tensors on a GPU-less / driver-mismatched machine.
+# Pin YOLO to CPU for deterministic, portable runs on GPU-less or
+# driver-mismatched machines. (ManipulaPy.vision already moves detections to the
+# host before NumPy conversion, so this is a portability default, not a workaround.)
 os.environ.setdefault("MANIPULAPY_YOLO_DEVICE", "cpu")
 
 import numpy as np

@@ -36,6 +36,7 @@ try:
     from ManipulaPy.dynamics import ManipulatorDynamics
     from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
     from ManipulaPy.cuda_kernels import CUDA_AVAILABLE, check_cuda_availability
+    from ManipulaPy.ManipulaPy_data.xarm import urdf_file as _XARM_URDF
 except ImportError as e:  # pragma: no cover - import guard for standalone runs
     print(f"Error importing ManipulaPy modules: {e}")
     print("Please ensure ManipulaPy is properly installed.")
@@ -135,9 +136,13 @@ class BatchProcessingDemo:
             Glist=G_list,
         )
         # use_cuda=None lets the planner auto-detect and fall back to CPU.
+        # Batch generation does not run collision checking, but the planner builds
+        # a CollisionChecker from urdf_path; point it at the bundled 6-DOF xArm URDF
+        # (dimensionally matching this synthetic 6-joint robot) so initialisation
+        # succeeds cleanly instead of logging a missing-file warning.
         self.planner = OptimizedTrajectoryPlanning(
             serial_manipulator=self.robot,
-            urdf_path="batch_demo_robot.urdf",
+            urdf_path=_XARM_URDF,
             dynamics=self.dynamics,
             joint_limits=self.joint_limits,
             torque_limits=self.torque_limits,

@@ -493,34 +493,52 @@ class BasicControlDemo:
         for joint in range(pos_hist.shape[1]):
             target = targets[joint]
             response = pos_hist[:, joint]
-            
-            # Rise time (10% to 90% of final value)
+            initial = response[0]
             final_value = response[-1]
-            rise_start_idx = np.where(response >= 0.1 * target)[0]
-            rise_end_idx = np.where(response >= 0.9 * target)[0]
-            
+
+            # All step metrics are referenced to the commanded step magnitude
+            # (target - initial), not the raw target value. This keeps them well
+            # defined for small, negative, or limit-clipped targets, where the
+            # old "divide by target" formulation produced nan/garbage percentages.
+            step = target - initial
+            magnitude = abs(step)
+
+            if magnitude < 1e-6:
+                # No commanded motion (target ~ start): step metrics are undefined.
+                logger.info(f"  Joint {joint+1}: target ≈ start "
+                            f"({target:.3f} rad); step metrics N/A")
+                continue
+
+            sign = np.sign(step)
+            progress = (response - initial) * sign  # 0 at start -> magnitude at target
+
+            # Rise time (10% -> 90% of the step), direction-aware
+            rise_start_idx = np.where(progress >= 0.1 * magnitude)[0]
+            rise_end_idx = np.where(progress >= 0.9 * magnitude)[0]
             if len(rise_start_idx) > 0 and len(rise_end_idx) > 0:
                 rise_time = time_hist[rise_end_idx[0]] - time_hist[rise_start_idx[0]]
             else:
                 rise_time = float('inf')
-            
-            # Settling time (within 2% of target)
-            settling_indices = np.where(np.abs(response - target) <= 0.02 * target)[0]
-            if len(settling_indices) > 0:
-                settling_time = time_hist[settling_indices[0]]
-            else:
-                settling_time = float('inf')
-            
-            # Overshoot
-            max_response = np.max(response)
-            overshoot = max(0, (max_response - target) / target * 100)
-            
+
+            # Settling time (within 2% of the step magnitude around the target)
+            settling_indices = np.where(np.abs(response - target) <= 0.02 * magnitude)[0]
+            settling_time = (time_hist[settling_indices[0]]
+                             if len(settling_indices) > 0 else float('inf'))
+
+            # Overshoot beyond the target, as a percentage of the step magnitude
+            overshoot = max(0.0, (np.max(progress) - magnitude) / magnitude * 100.0)
+
             # Steady-state error
             steady_state_error = abs(final_value - target)
-            
+
+            # inf means the joint never reached 90% / never settled within the
+            # band (e.g. large steady-state error) — report it as n/a, not "infs".
+            rise_str = f"{rise_time:.3f}s" if np.isfinite(rise_time) else "n/a (never reached 90%)"
+            settle_str = f"{settling_time:.3f}s" if np.isfinite(settling_time) else "n/a (never settled)"
+
             logger.info(f"  Joint {joint+1}:")
-            logger.info(f"    Rise time: {rise_time:.3f}s")
-            logger.info(f"    Settling time: {settling_time:.3f}s")
+            logger.info(f"    Rise time: {rise_str}")
+            logger.info(f"    Settling time: {settle_str}")
             logger.info(f"    Overshoot: {overshoot:.1f}%")
             logger.info(f"    Steady-state error: {steady_state_error:.4f} rad")
             
