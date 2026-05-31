@@ -1203,14 +1203,14 @@ When making changes, add entries under `[Unreleased]` in the appropriate categor
 
 - [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 - [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
-- [ManipulaPy Repository](https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy)
+- [ManipulaPy Repository](https://github.com/boelnasr/ManipulaPy)
 - [ManipulaPy Documentation](https://manipulapy.readthedocs.io/)
 
 ---
 
-[Unreleased]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.2...HEAD
-[1.3.2]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.1...v1.3.2
-[1.3.1]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.3.0...v1.3.1
-[1.3.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/compare/v1.1.3...v1.2.0
-[1.1.3]: https://github.com/DR-ROBOTICS-RESEARCH-GROUP/ManipulaPy/releases/tag/v1.1.3
+[Unreleased]: https://github.com/boelnasr/ManipulaPy/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/boelnasr/ManipulaPy/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/boelnasr/ManipulaPy/compare/v1.3.0...v1.3.1
+[1.3.0]: https://github.com/boelnasr/ManipulaPy/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/boelnasr/ManipulaPy/compare/v1.1.3...v1.2.0
+[1.1.3]: https://github.com/boelnasr/ManipulaPy/releases/tag/v1.1.3
