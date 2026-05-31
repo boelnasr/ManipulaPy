@@ -42,7 +42,6 @@ from .cuda_kernels import (
     make_2d_grid,
     make_2d_grid_optimized,
     optimized_batch_trajectory_generation,
-    optimized_potential_field,
     optimized_trajectory_generation,
     optimized_trajectory_generation_monitored,
     print_performance_recommendations,
@@ -741,13 +740,12 @@ class OptimizedTrajectoryPlanning:
     def _apply_collision_avoidance_gpu(
         self, traj_pos: np.ndarray, thetaend: np.ndarray
     ) -> np.ndarray:
-        """Apply GPU-accelerated potential field collision avoidance.
+        """Apply potential-field collision avoidance on the CUDA-enabled path.
 
-        For each colliding trajectory point, iteratively descends the GPU
-        potential-field gradient toward ``thetaend`` (up to 100 iterations)
-        until the configuration is collision-free, falling back to the CPU
-        gradient on per-iteration failure and to the full CPU routine if CUDA
-        is unavailable or the GPU path errors.
+        Collision avoidance is a joint-space computation and has no GPU kernel
+        (the GPU potential field is 3-D Cartesian, not joint-space), so this
+        delegates to the validated joint-space CPU routine. Kept as a distinct
+        dispatch target so the GPU/CPU planning code paths stay symmetric.
 
         Args:
             traj_pos: (N, num_joints) ndarray of joint positions (rad);
@@ -758,57 +756,16 @@ class OptimizedTrajectoryPlanning:
         Returns:
             np.ndarray: The (possibly adjusted) ``(N, num_joints)`` trajectory.
         """
-        if not self.cuda_available:
-            return self._apply_collision_avoidance_cpu(traj_pos, thetaend)
-
-        try:
-            q_goal = thetaend
-            obstacles = []  # Define obstacles here as needed
-
-            # Use GPU-accelerated potential field computation
-            for idx, step in enumerate(traj_pos):
-                if self.collision_checker.check_collision(step):
-                    # Prepare data for GPU computation
-                    positions = step.reshape(1, -1)
-
-                    for iteration in range(100):  # Max iterations
-                        try:
-                            # Use optimized potential field computation
-                            potential, gradient = optimized_potential_field(
-                                positions,
-                                q_goal,
-                                np.array(obstacles),
-                                influence_distance=0.5,
-                                use_pinned=True,
-                            )
-
-                            # Update position
-                            step -= 0.01 * gradient[0]  # Adjust step size as needed
-                            positions[0] = step
-
-                            if not self.collision_checker.check_collision(step):
-                                break
-
-                        except Exception as e:
-                            logger.warning(
-                                f"GPU potential field computation failed: {e}"
-                            )
-                            # Fall back to CPU method
-                            gradient = self.potential_field.compute_gradient(
-                                step, q_goal, obstacles
-                            )
-                            step -= 0.01 * gradient
-
-                            if not self.collision_checker.check_collision(step):
-                                break
-
-                    traj_pos[idx] = step
-
-            return traj_pos
-
-        except Exception as e:
-            logger.warning(f"GPU collision avoidance failed: {e}, falling back to CPU")
-            return self._apply_collision_avoidance_cpu(traj_pos, thetaend)
+        # Collision avoidance operates in JOINT space: ``traj_pos`` holds joint
+        # configurations and each is nudged by ``step -= gradient``, so the
+        # potential-field gradient must be joint-space too (see PotentialField and
+        # _apply_collision_avoidance_cpu). The GPU ``optimized_potential_field``
+        # kernel is a 3-D *Cartesian* field — feeding it an (N, num_joints) array
+        # and an (num_joints,) goal is a dimension mismatch that yields a wrong
+        # gradient and a 6-vs-3 broadcast error on update. There is no joint-space
+        # GPU potential-field kernel, so we run the validated joint-space routine
+        # rather than silently erroring per iteration and falling back anyway.
+        return self._apply_collision_avoidance_cpu(traj_pos, thetaend)
 
     def _apply_collision_avoidance_cpu(
         self, traj_pos: np.ndarray, thetaend: np.ndarray
