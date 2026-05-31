@@ -137,6 +137,8 @@ PLAN.md
 NOTES.md
 SCRATCH.md
 STATUS.md
+URDF_FIXES.md
+tasks/
 
 # =============================================================================
 # ML model weights (large binaries, downloaded on demand)
