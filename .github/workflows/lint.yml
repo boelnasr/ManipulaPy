@@ -6,10 +6,15 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Code Linting and Autoformat
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # autoformat step commits & pushes fixes
 
     steps:
       - name: Checkout repository

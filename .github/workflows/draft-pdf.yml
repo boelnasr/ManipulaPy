@@ -1,7 +1,7 @@
 # .github/workflows/draft-pdf.yml
 
 permissions:
-  contents: write   # needed to create/upload a Release
+  contents: read
 
 on:
   push:
@@ -11,6 +11,8 @@ on:
 jobs:
   paper-draft:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to create/upload a Release
     steps:
       - uses: actions/checkout@v4
 
