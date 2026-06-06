@@ -1,0 +1,37 @@
+name: Feature request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement to ManipulaPy. Please describe the problem you are trying to solve, not only the solution you have in mind.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem would this feature solve? What is the use case?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature or API you would like to see.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches or existing workarounds you have tried.
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links to papers, other libraries, or examples that illustrate the request.
+    validations:
+      required: false

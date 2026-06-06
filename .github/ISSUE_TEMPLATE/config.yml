@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://manipulapy.readthedocs.io/
+    about: Tutorials, user guide, and API reference.
+  - name: Examples
+    url: https://github.com/boelnasr/ManipulaPy/tree/main/Examples
+    about: Runnable example scripts covering kinematics, dynamics, planning, vision, and simulation.

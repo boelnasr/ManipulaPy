@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use ManipulaPy in your research, please cite it as below."
+title: "ManipulaPy: A GPU-accelerated Python toolkit for manipulator kinematics, dynamics, planning, control, and simulation"
+type: software
+authors:
+  - family-names: AboElNasr
+    given-names: "M. I. M."
+    email: aboelnasr1997@gmail.com
+    orcid: "https://orcid.org/0000-0002-1768-2031"
+    affiliation: "Universität Duisburg-Essen"
+version: 1.3.2
+date-released: "2026-05-31"
+license: AGPL-3.0-or-later
+repository-code: "https://github.com/boelnasr/ManipulaPy"
+url: "https://manipulapy.readthedocs.io/"
+# doi: 10.5281/zenodo.XXXXXXX  # TODO: mint a Zenodo DOI for v1.3.2 and fill in
+keywords:
+  - robotics
+  - manipulator
+  - kinematics
+  - dynamics
+  - motion-planning
+  - control
+  - simulation
+  - gpu
+  - cuda
+  - python

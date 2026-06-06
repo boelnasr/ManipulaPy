@@ -1,0 +1,33 @@
+name: Question / support
+description: Ask a usage question about ManipulaPy
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a usage question? Please check the [documentation](https://manipulapy.readthedocs.io/) and the [Examples](https://github.com/boelnasr/ManipulaPy/tree/main/Examples) first. For open-ended discussion, consider using GitHub Discussions instead.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What are you trying to do, and where are you stuck?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you have tried
+      description: Code snippets, docs you have read, or approaches you have already attempted.
+    validations:
+      required: false
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (if relevant)
+      value: |
+        - ManipulaPy version:
+        - Python version:
+        - OS:
+    validations:
+      required: false
