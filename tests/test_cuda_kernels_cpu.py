@@ -61,7 +61,9 @@ def test_trajectory_cpu_fallback_quintic_endpoints_exact() -> None:
     assert np.isclose(acc[-1, 0], 0.0, atol=1e-6)
 
 
-def test_optimized_trajectory_generation_uses_cpu_when_no_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_optimized_trajectory_generation_uses_cpu_when_no_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verify optimized_trajectory_generation matches the CPU fallback when CUDA is unavailable."""
     # Force CUDA unavailable
     monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
@@ -105,9 +107,9 @@ def test_import_never_crashes_on_broken_cuda_driver() -> None:
         text=True,
         timeout=120,
     )
-    assert proc.returncode == 0, (
-        f"import crashed (rc={proc.returncode}): {proc.stderr[-2000:]}"
-    )
+    assert (
+        proc.returncode == 0
+    ), f"import crashed (rc={proc.returncode}): {proc.stderr[-2000:]}"
     assert "ok" in proc.stdout
 
 
@@ -121,7 +123,9 @@ def test_import_never_crashes_on_broken_cuda_driver() -> None:
         "without a working GPU."
     ),
 )
-def test_gpu_only_entrypoints_raise_when_no_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gpu_only_entrypoints_raise_when_no_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verify GPU-only entrypoints raise RuntimeError when CUDA is unavailable."""
     monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     assert check_cuda_availability() is False
@@ -150,7 +154,9 @@ def test_gpu_only_entrypoints_raise_when_no_cuda(monkeypatch: pytest.MonkeyPatch
     cuda_kernels.CUDA_AVAILABLE,
     reason="See test_gpu_only_entrypoints_raise_when_no_cuda — same import-time dispatch limitation.",
 )
-def test_kernel_selection_fallbacks_when_no_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_kernel_selection_fallbacks_when_no_cuda(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verify kernel selection helpers report no available kernel when CUDA is unavailable."""
     monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     assert auto_select_optimal_kernel(100, 6) == "none"

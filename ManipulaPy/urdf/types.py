@@ -640,9 +640,7 @@ class Joint:
 
     def get_child_pose(
         self,
-        q: Optional[
-            Union[float, np.ndarray, List[float], Tuple[float, ...]]
-        ] = None,
+        q: Optional[Union[float, np.ndarray, List[float], Tuple[float, ...]]] = None,
     ) -> np.ndarray:
         """
         Compute child link pose relative to parent for given configuration.

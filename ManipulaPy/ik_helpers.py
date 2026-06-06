@@ -159,7 +159,7 @@ def extrapolate_from_current(
 
 
 def random_in_limits(
-    joint_limits: List[Tuple[Optional[float], Optional[float]]]
+    joint_limits: List[Tuple[Optional[float], Optional[float]]],
 ) -> NDArray[np.float64]:
     """
     Generate random joint configuration within limits.
@@ -192,7 +192,7 @@ def random_in_limits(
 
 
 def midpoint_of_limits(
-    joint_limits: List[Tuple[Optional[float], Optional[float]]]
+    joint_limits: List[Tuple[Optional[float], Optional[float]]],
 ) -> NDArray[np.float64]:
     """
     Start from midpoint of joint limits.

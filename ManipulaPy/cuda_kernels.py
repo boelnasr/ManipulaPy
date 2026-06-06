@@ -206,6 +206,7 @@ if not CUDA_AVAILABLE:
                 A wrapper callable that raises ``RuntimeError`` on invocation, or
                 the same wrapper already applied to ``func`` when ``func`` is given.
             """
+
             def wrapper(*args, **kwargs) -> NoReturn:
                 """Raise because no CUDA device is available to run the kernel."""
                 raise RuntimeError(
@@ -266,6 +267,7 @@ if not CUDA_AVAILABLE:
         @staticmethod
         def get_current_device() -> Any:
             """Return a mock device exposing minimal hardware property defaults."""
+
             class MockDevice:
                 MULTIPROCESSOR_COUNT = 1
                 MAX_THREADS_PER_BLOCK = 1024
@@ -280,6 +282,7 @@ if not CUDA_AVAILABLE:
         @staticmethod
         def shared() -> Any:
             """Return a mock shared-memory namespace whose array() raises."""
+
             class SharedMock:
                 @staticmethod
                 def array(*args, **kwargs) -> NoReturn:
@@ -1790,9 +1793,7 @@ if CUDA_AVAILABLE:
 
     # AUTO-TUNING FOR MAXIMUM PERFORMANCE
     @lru_cache(maxsize=64)
-    def _best_2d_config(
-        N: int, J: int
-    ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    def _best_2d_config(N: int, J: int) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         """
         Auto-tune 2D CUDA kernel launch configuration for optimal performance.
 
@@ -1818,9 +1819,7 @@ if CUDA_AVAILABLE:
         return make_2d_grid(N, J)
 
     @lru_cache(maxsize=64)
-    def _auto_tune_kernel_config(
-        N: int, num_joints: int
-    ) -> Optional[Dict[str, Any]]:
+    def _auto_tune_kernel_config(N: int, num_joints: int) -> Optional[Dict[str, Any]]:
         """Auto-tune kernel configuration for specific problem size.
 
         Benchmarks each candidate kernel type on small test arrays and returns
@@ -2299,7 +2298,9 @@ else:
         """Return empty memory-pool stats when CUDA is unavailable."""
         return {}
 
-    def get_optimal_kernel_config(*args: Any, **kwargs: Any) -> Optional[Dict[str, Any]]:
+    def get_optimal_kernel_config(
+        *args: Any, **kwargs: Any
+    ) -> Optional[Dict[str, Any]]:
         """Return no kernel configuration when CUDA is unavailable."""
         return None
 
@@ -2313,7 +2314,9 @@ else:
         """Use the CPU trajectory fallback when CUDA is unavailable."""
         return trajectory_cpu_fallback(args[0], args[1], args[2], args[3], args[4])
 
-    def _best_2d_config(*args: Any, **kwargs: Any) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+    def _best_2d_config(
+        *args: Any, **kwargs: Any
+    ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         """Return a minimal launch shape when CUDA is unavailable."""
         return ((1, 1), (1, 1))
 
@@ -2325,7 +2328,9 @@ else:
         """Return empty CUDA profiler stats in CPU-only environments."""
         return {}
 
-    def benchmark_kernel_performance(*args: Any, **kwargs: Any) -> Optional[Dict[str, Any]]:
+    def benchmark_kernel_performance(
+        *args: Any, **kwargs: Any
+    ) -> Optional[Dict[str, Any]]:
         """Report that CUDA benchmarking is unavailable."""
         print("CUDA benchmarking not available")
         return None

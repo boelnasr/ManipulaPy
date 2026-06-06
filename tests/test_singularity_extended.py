@@ -235,7 +235,9 @@ class TestManipulabilityEllipsoid(unittest.TestCase):
             self.fail(f"manipulability_ellipsoid raised exception: {e}")
 
     @patch("matplotlib.pyplot.show")
-    def test_manipulability_ellipsoid_at_different_configurations(self, mock_show) -> None:
+    def test_manipulability_ellipsoid_at_different_configurations(
+        self, mock_show
+    ) -> None:
         """Test manipulability ellipsoid at various configurations."""
         test_configs = [
             np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),

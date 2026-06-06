@@ -3,6 +3,7 @@
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
+
 import os
 import tempfile
 import time
@@ -175,11 +176,15 @@ class TestTrajectoryPlanning(unittest.TestCase):
                 self.S_list = np.random.randn(6, 6).astype(np.float32)
                 self.M_list = np.eye(4)
 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+            def forward_dynamics(
+                self, thetalist, dthetalist, taulist, g, Ftip
+            ) -> np.ndarray:
                 """Return mock joint accelerations."""
                 return np.random.randn(*thetalist.shape) * 0.1
 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+            def inverse_dynamics(
+                self, thetalist, dthetalist, ddthetalist, g, Ftip
+            ) -> np.ndarray:
                 """Return mock joint torques."""
                 return np.random.randn(*thetalist.shape) * 10.0
 
@@ -224,7 +229,9 @@ class TestTrajectoryPlanning(unittest.TestCase):
                 )
                 return T
 
-            def iterative_inverse_kinematics(self, T_desired, thetalist0, **kwargs) -> tuple:
+            def iterative_inverse_kinematics(
+                self, T_desired, thetalist0, **kwargs
+            ) -> tuple:
                 """Return a mock IK solution near the initial guess."""
                 # Simple mock IK that returns a solution close to initial guess
                 solution = np.array(thetalist0) + np.random.randn(len(thetalist0)) * 0.1
@@ -236,7 +243,9 @@ class TestTrajectoryPlanning(unittest.TestCase):
                 """Return a mock Jacobian matrix."""
                 return np.random.randn(6, len(thetalist))
 
-            def end_effector_velocity(self, thetalist, dthetalist, frame="space") -> np.ndarray:
+            def end_effector_velocity(
+                self, thetalist, dthetalist, frame="space"
+            ) -> np.ndarray:
                 """Return a mock end-effector twist."""
                 return np.random.randn(6) * 0.1
 
@@ -1913,7 +1922,9 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                 self.S_list = np.random.randn(6, 6).astype(np.float32)
                 self.M_list = np.eye(4)
 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+            def forward_dynamics(
+                self, thetalist, dthetalist, taulist, g, Ftip
+            ) -> np.ndarray:
                 """Return mock joint accelerations with bounded noise."""
                 # Add some realistic noise/complexity but keep values finite
                 result = np.random.randn(*thetalist.shape) * 0.01  # Small noise
@@ -1923,7 +1934,9 @@ class TestTrajectoryPlanningRobustness(unittest.TestCase):
                 result = np.nan_to_num(result, nan=0.0, posinf=1.0, neginf=-1.0)
                 return result
 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+            def inverse_dynamics(
+                self, thetalist, dthetalist, ddthetalist, g, Ftip
+            ) -> np.ndarray:
                 """Return mock joint torques with bounded magnitude."""
                 # Simulate complex dynamics with gravity and coupling
                 result = 1.0 * ddthetalist  # Mass effect (reduced from 10.0)

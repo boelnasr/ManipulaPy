@@ -426,7 +426,9 @@ class TestJointManagement:
         """Test setting joint positions"""
         control_calls = []
 
-        def mock_control(robot_id, joints, mode, targetPositions=None, **kwargs) -> None:
+        def mock_control(
+            robot_id, joints, mode, targetPositions=None, **kwargs
+        ) -> None:
             """Record the arguments of each joint-control call."""
             control_calls.append(
                 {
@@ -522,7 +524,9 @@ class TestParameterManagement:
         sim.add_additional_parameters()
         assert sim.gravity_param == gravity_param_1
 
-    def test_update_simulation_parameters(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_update_simulation_parameters(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test updating simulation parameters from GUI"""
         param_values = {}
 
@@ -667,7 +671,9 @@ class TestCollisionDetection:
         # Should log warning but not crash
         sim.check_collisions()
 
-    def test_check_collisions_with_contacts(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_check_collisions_with_contacts(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Test collision check with detected contacts returns contact list."""
         # Mock contact points in PyBullet tuple format:
         # index 3 = linkIndexA, index 4 = linkIndexB, index 5 = positionOnA

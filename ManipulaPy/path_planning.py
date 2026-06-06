@@ -3,7 +3,7 @@
 """
 Optimized Path Planning Module - ManipulaPy
 
-This module provides highly optimized trajectory planning capabilities including joint space 
+This module provides highly optimized trajectory planning capabilities including joint space
 and Cartesian space trajectory generation with CUDA acceleration and collision avoidance.
 
 Key optimizations:
@@ -1514,7 +1514,9 @@ class OptimizedTrajectoryPlanning:
             "accelerations": ddthetamat,
         }
 
-    def cartesian_trajectory(self, Xstart, Xend, Tf, N, method) -> Dict[str, np.ndarray]:
+    def cartesian_trajectory(
+        self, Xstart, Xend, Tf, N, method
+    ) -> Dict[str, np.ndarray]:
         """
         Enhanced Cartesian trajectory generation with optimal kernel selection.
 

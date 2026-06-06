@@ -604,7 +604,9 @@ class TestKernelConfiguration:
             ]
 
     @pytest.mark.skipif(not CUDA_AVAILABLE, reason="CUDA not available")
-    def test_performance_recommendations(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_performance_recommendations(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test performance recommendations output."""
         N, num_joints = 1000, 6
         print_performance_recommendations(N, num_joints)

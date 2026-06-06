@@ -43,7 +43,9 @@ class MockDynamics:
         """Return the constant Jacobian."""
         return self.J_const
 
-    def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+    def inverse_dynamics(
+        self, thetalist, dthetalist, ddthetalist, g, Ftip
+    ) -> np.ndarray:
         """Return the inverse-dynamics torque for a simple linear model."""
         # simple linear model: M*qdd + C*dq + G
         return self.M_const @ ddthetalist + self.C_const + self.G_const
@@ -114,7 +116,9 @@ def test_pd_control_matches_formula(controller: ManipulatorController) -> None:
     assert np.allclose(tau, expected)
 
 
-def test_computed_torque_control_combines_terms(controller: ManipulatorController) -> None:
+def test_computed_torque_control_combines_terms(
+    controller: ManipulatorController,
+) -> None:
     """Computed-torque control combines the feedback and inverse-dynamics terms."""
     n = 2
     thetalistd = np.zeros(n)
@@ -143,7 +147,9 @@ def test_computed_torque_control_combines_terms(controller: ManipulatorControlle
     assert np.allclose(tau, expected)
 
 
-def test_robust_control_includes_adaptation_term(controller: ManipulatorController) -> None:
+def test_robust_control_includes_adaptation_term(
+    controller: ManipulatorController,
+) -> None:
     """Robust control adds the disturbance adaptation term to the base torque."""
     n = 2
     thetalist = np.zeros(n)
@@ -190,7 +196,9 @@ def test_adaptive_control_updates_parameters(controller: ManipulatorController) 
     assert np.allclose(tau, base + expected_params)
 
 
-def test_feedforward_controls_use_inverse_dynamics(controller: ManipulatorController) -> None:
+def test_feedforward_controls_use_inverse_dynamics(
+    controller: ManipulatorController,
+) -> None:
     """Feedforward and PD-feedforward controls build on the inverse-dynamics torque."""
     n = 2
     desired_position = np.array([0.1, -0.2])

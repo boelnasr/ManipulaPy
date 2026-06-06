@@ -255,9 +255,7 @@ class TestDynamicsRegressions(unittest.TestCase):
         M_link2 = np.eye(4)
         M_link2[0, 3] = L1 + L2
 
-        Glist = np.array(
-            [np.diag([0.0, 0.0, 0.0, m, m, m]) for m in (m1, m2)]
-        )
+        Glist = np.array([np.diag([0.0, 0.0, 0.0, m, m, m]) for m in (m1, m2)])
 
         dyn = ManipulatorDynamics(
             M_list=M_list,
@@ -331,9 +329,7 @@ class TestKinematicsRegressions(unittest.TestCase):
         urdf_path = os.path.join(
             os.path.dirname(__file__), "urdf_fixtures", "simple_arm.urdf"
         )
-        self.assertTrue(
-            os.path.exists(urdf_path), f"Test fixture missing: {urdf_path}"
-        )
+        self.assertTrue(os.path.exists(urdf_path), f"Test fixture missing: {urdf_path}")
         return URDFToSerialManipulator(urdf_path).serial_manipulator
 
     def test_body_jacobian_satisfies_adjoint_identity(self) -> None:
@@ -362,9 +358,7 @@ class TestKinematicsRegressions(unittest.TestCase):
             err_msg="Js != Ad_{T_sb} @ Jb — body Jacobian is inconsistent",
         )
         # Last column of the body Jacobian must equal B_n exactly (Ad(I) @ B_n).
-        np.testing.assert_array_almost_equal(
-            Jb[:, -1], robot.B_list[:, -1], decimal=6
-        )
+        np.testing.assert_array_almost_equal(Jb[:, -1], robot.B_list[:, -1], decimal=6)
 
     def test_generate_path_screws_match_analytical_2r_off_home(self) -> None:
         """CM-5: building from omega_list/r_list (no S_list) must give correct
@@ -386,9 +380,7 @@ class TestKinematicsRegressions(unittest.TestCase):
         M_list[0, 3] = L1 + L2  # home pose: EE at full extension
 
         # Generate path: omega_list/r_list only, no S_list or B_list.
-        robot = SerialManipulator(
-            M_list=M_list, omega_list=omega_list, r_list=r_list
-        )
+        robot = SerialManipulator(M_list=M_list, omega_list=omega_list, r_list=r_list)
 
         theta = np.array([0.3, 0.5])
         T = robot.forward_kinematics(theta, frame="space")
@@ -958,7 +950,9 @@ class TestControlRegressions(unittest.TestCase):
                 raise TypeError("Implicit conversion to a NumPy array is not allowed")
 
         class Dynamics:
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+            def forward_dynamics(
+                self, thetalist, dthetalist, taulist, g, Ftip
+            ) -> np.ndarray:
                 """Return zero joint accelerations matching thetalist."""
                 return np.zeros_like(thetalist)
 
@@ -992,8 +986,7 @@ class TestControlRegressions(unittest.TestCase):
         """
         import subprocess, sys, textwrap
 
-        script = textwrap.dedent(
-            """
+        script = textwrap.dedent("""
             import builtins, importlib, sys
             real = builtins.__import__
             def fake(name, *a, **k):
@@ -1003,8 +996,7 @@ class TestControlRegressions(unittest.TestCase):
             builtins.__import__ = fake
             sys.modules.pop('ManipulaPy.control', None)
             importlib.import_module('ManipulaPy.control')
-        """
-        )
+        """)
         result = subprocess.run(
             [sys.executable, "-c", script],
             capture_output=True,
@@ -1196,8 +1188,7 @@ class TestSimRegressions(unittest.TestCase):
         import sys
         import textwrap
 
-        script = textwrap.dedent(
-            """
+        script = textwrap.dedent("""
             import builtins
             import importlib
             import sys
@@ -1225,8 +1216,7 @@ class TestSimRegressions(unittest.TestCase):
                 assert "ManipulaPy[simulation]" in str(exc), str(exc)
             else:
                 raise AssertionError("Simulation() did not raise ImportError")
-            """
-        )
+            """)
         result = subprocess.run(
             [sys.executable, "-c", script],
             capture_output=True,
@@ -1644,7 +1634,9 @@ class TestSimPybulletGuards(unittest.TestCase):
 class TestVisionRegressions(unittest.TestCase):
     """Regressions for ManipulaPy/vision.py bugs."""
 
-    def test_detect_obstacles_default_threshold_does_not_filter_everything(self) -> None:
+    def test_detect_obstacles_default_threshold_does_not_filter_everything(
+        self,
+    ) -> None:
         """depth_threshold=0.0 + 'if mean_depth > threshold: continue' was
         filtering out every detection with positive depth (i.e., all real
         obstacles). With the new 5.0m default a 1m obstacle survives.
@@ -2514,8 +2506,7 @@ class TestTestInfraRegressions(unittest.TestCase):
 
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         test_control_path = os.path.join(repo_root, "tests", "test_control.py")
-        code = textwrap.dedent(
-            f"""
+        code = textwrap.dedent(f"""
             import importlib.util
             import sys
             import types
@@ -2540,8 +2531,7 @@ class TestTestInfraRegressions(unittest.TestCase):
 
             if mod.is_module_available("cupy"):
                 raise AssertionError("Broken CuPy runtime must not be selected")
-            """
-        )
+            """)
         result = subprocess.run(
             [sys.executable, "-c", code],
             capture_output=True,
@@ -3231,8 +3221,7 @@ class TestSelfCollision(unittest.TestCase):
         import tempfile
         import textwrap
 
-        urdf = textwrap.dedent(
-            """\
+        urdf = textwrap.dedent("""\
             <?xml version="1.0"?>
             <robot name="self_contact_fixture">
               <link name="base">
@@ -3278,8 +3267,7 @@ class TestSelfCollision(unittest.TestCase):
                 <limit lower="-3.14" upper="3.14" effort="10" velocity="10"/>
               </joint>
             </robot>
-            """
-        )
+            """)
         fd, path = tempfile.mkstemp(suffix=".urdf", prefix="manipulapy_self_contact_")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(urdf)

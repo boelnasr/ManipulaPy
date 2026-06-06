@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-""""
+""" "
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
+
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -111,14 +112,18 @@ class TestManipulatorController(unittest.TestCase):
                     ]
                 )
 
-            def inverse_dynamics(self, thetalist, dthetalist, ddthetalist, g, Ftip) -> np.ndarray:
+            def inverse_dynamics(
+                self, thetalist, dthetalist, ddthetalist, g, Ftip
+            ) -> np.ndarray:
                 """Return the joint torques required to follow the given motion."""
                 M = self.mass_matrix(thetalist)
                 c = self.velocity_quadratic_forces(thetalist, dthetalist)
                 grav = self.gravity_forces(thetalist, g)
                 return M.dot(ddthetalist) + c + grav
 
-            def forward_dynamics(self, thetalist, dthetalist, taulist, g, Ftip) -> np.ndarray:
+            def forward_dynamics(
+                self, thetalist, dthetalist, taulist, g, Ftip
+            ) -> np.ndarray:
                 """Return the joint accelerations produced by the given torques."""
                 M = self.mass_matrix(thetalist)
                 c = self.velocity_quadratic_forces(thetalist, dthetalist)
