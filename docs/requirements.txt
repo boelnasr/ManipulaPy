@@ -6,7 +6,7 @@ myst-parser>=4.0.0,<5.0.0
 
 # For better API documentation
 sphinx-autodoc-typehints>=3.0.0,<4.0.0
-sphinx-copybutton>=0.5.0,<1.0.0
+sphinx-copybutton>=0.5.2,<1.0.0
 
 # For mathematical expressions
 sphinxcontrib-katex>=0.9.11,<1.0.0
