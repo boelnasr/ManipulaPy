@@ -17,7 +17,7 @@ matplotlib>=3.9.0,<4.0.0
 
 # Required for proper documentation build
 packaging>=26.2
-docutils>=0.21,<0.22
+docutils>=0.23,<0.24
 
 # For proper reStructuredText parsing
 Pygments>=2.20.0,<3.0.0
