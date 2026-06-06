@@ -9,7 +9,7 @@ sphinx-autodoc-typehints>=3.0.0,<4.0.0
 sphinx-copybutton>=0.5.0,<1.0.0
 
 # For mathematical expressions
-sphinxcontrib-katex>=0.8.6,<1.0.0
+sphinxcontrib-katex>=0.9.11,<1.0.0
 
 # Basic scientific computing (NumPy 2-compatible docs build)
 numpy>=2.0,<3.0
