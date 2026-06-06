@@ -16,7 +16,7 @@ numpy>=2.0,<3.0
 matplotlib>=3.9.0,<4.0.0
 
 # Required for proper documentation build
-packaging>=21.0
+packaging>=26.2
 docutils>=0.21,<0.22
 
 # For proper reStructuredText parsing
