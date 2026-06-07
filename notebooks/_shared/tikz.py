@@ -10,10 +10,38 @@ IPython.display.Image for inline embedding, so they render on GitHub and survive
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tempfile
 
 _DEF_OUTDIR = os.path.join(os.path.dirname(__file__), "..", "_figures")
+
+
+def have_tex():
+    """True if the TikZ pipeline (lualatex + pdftoppm) is available on this machine."""
+    return shutil.which("lualatex") is not None and shutil.which("pdftoppm") is not None
+
+
+def _fallback_or_raise(png, name, reason):
+    """When live compilation is unavailable, show the committed PNG if it exists.
+
+    This is what makes the notebooks portable to Colab/Kaggle/Binder without a TeX
+    install: the figure source is committed AND pre-rendered, so a missing lualatex
+    just means "display the checked-in PNG" rather than an error.
+    """
+    from IPython.display import Image
+
+    if os.path.exists(png):
+        print(
+            f"[tikz] {reason}; showing the committed figure '{name}.png'. "
+            "Install TeX Live (lualatex) + poppler (pdftoppm) to re-render from source."
+        )
+        return Image(filename=png)
+    raise RuntimeError(
+        f"Cannot render '{name}': {reason}, and no committed PNG exists at {png}. "
+        "Install TeX Live (lualatex) and poppler-utils (pdftoppm), or run this notebook "
+        "from a clone of the repo where the rendered figure is present."
+    )
 
 _STANDALONE = r"""\documentclass[tikz,border=4pt]{standalone}
 \usepackage{amsmath}
@@ -50,17 +78,22 @@ def render_tikz(code, name, outdir=None, dpi=200):
 
     outdir = _ensure(outdir)
     png = os.path.join(outdir, f"{name}.png")
-    with tempfile.TemporaryDirectory() as td:
-        with open(os.path.join(td, f"{name}.tex"), "w") as f:
-            f.write(_STANDALONE % code)
-        subprocess.run(
-            ["lualatex", "-interaction=nonstopmode", f"{name}.tex"],
-            cwd=td,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        _pdf_to_png(os.path.join(td, f"{name}.pdf"), png, dpi=dpi)
+    if not have_tex():
+        return _fallback_or_raise(png, name, "lualatex/pdftoppm not found")
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            with open(os.path.join(td, f"{name}.tex"), "w") as f:
+                f.write(_STANDALONE % code)
+            subprocess.run(
+                ["lualatex", "-interaction=nonstopmode", f"{name}.tex"],
+                cwd=td,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            _pdf_to_png(os.path.join(td, f"{name}.pdf"), png, dpi=dpi)
+    except subprocess.CalledProcessError:
+        return _fallback_or_raise(png, name, "lualatex/pdftoppm failed to compile")
     return Image(filename=png)
 
 
@@ -83,19 +116,24 @@ def render_tikz_file(tex_path, name=None, outdir=None, dpi=200):
     name = name or os.path.splitext(os.path.basename(tex_path))[0]
     outdir = _ensure(outdir)
     png = os.path.join(outdir, f"{name}.png")
-    with open(tex_path) as f:
-        doc = f.read()
-    with tempfile.TemporaryDirectory() as td:
-        with open(os.path.join(td, f"{name}.tex"), "w") as f:
-            f.write(doc)
-        subprocess.run(
-            ["lualatex", "-interaction=nonstopmode", f"{name}.tex"],
-            cwd=td,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        _pdf_to_png(os.path.join(td, f"{name}.pdf"), png, dpi=dpi)
+    if not have_tex():
+        return _fallback_or_raise(png, name, "lualatex/pdftoppm not found")
+    try:
+        with open(tex_path) as f:
+            doc = f.read()
+        with tempfile.TemporaryDirectory() as td:
+            with open(os.path.join(td, f"{name}.tex"), "w") as f:
+                f.write(doc)
+            subprocess.run(
+                ["lualatex", "-interaction=nonstopmode", f"{name}.tex"],
+                cwd=td,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            _pdf_to_png(os.path.join(td, f"{name}.pdf"), png, dpi=dpi)
+    except subprocess.CalledProcessError:
+        return _fallback_or_raise(png, name, "lualatex/pdftoppm failed to compile")
     return Image(filename=png)
 
 

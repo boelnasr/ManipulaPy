@@ -24,6 +24,10 @@ cells = [
     md(
         "# 01 · Rigid-Body Motions and Screw Axis Theory\n"
         "\n"
+        "[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]"
+        "(https://colab.research.google.com/github/boelnasr/ManipulaPy/blob/main/"
+        "notebooks/01_rigid_body_motions.ipynb)\n"
+        "\n"
         "> **ManipulaPy teaching course — notebook 1 of 11.** Running robot: Franka Panda.\n"
         "\n"
         "This is where the whole course begins. Every later notebook — forward "
@@ -39,6 +43,25 @@ cells = [
         "\n"
         "Throughout, the concepts are demonstrated with the matching functions in "
         "`ManipulaPy.utils`."
+    ),
+    md(
+        "### Running on Colab or another cloud platform?\n"
+        "\n"
+        "The next cell bootstraps the environment when it detects Google Colab: it clones "
+        "the repository (so the shared helpers and figure sources are available) and "
+        "installs ManipulaPy. It is a **no-op when you run locally** from a clone of the "
+        "repo. Figures are pre-rendered and committed, so they display even without a TeX "
+        "installation — install TeX Live + poppler only if you want to re-render them from "
+        "the `.tex` sources."
+    ),
+    code(
+        "# Cloud bootstrap (no-op when running locally from the repo).\n"
+        "import sys\n"
+        'if "google.colab" in sys.modules:\n'
+        "    !git clone -q https://github.com/boelnasr/ManipulaPy.git\n"
+        "    %cd ManipulaPy/notebooks\n"
+        "    !pip install -q -e ..\n"
+        '    print("Colab setup complete.")'
     ),
     code(
         "import os, sys\n"
@@ -102,7 +125,7 @@ cells = [
         'print("log(R)   =", recovered, "(expect [0, 0, %.4f])" % (np.pi / 2))'
     ),
     md(
-        "#### `rotation_logm`: axis and angle directly\n"
+        "### `rotation_logm`: axis and angle directly\n"
         "\n"
         "Often you want the **axis** and **angle** separately rather than the stacked "
         "vector $\\hat{\\omega}\\theta$. `rotation_logm(R)` returns exactly "
@@ -114,7 +137,7 @@ cells = [
         "assert np.allclose(axis * angle, recovered, atol=1e-9)   # consistent with MatrixLog3"
     ),
     md(
-        "#### The log is **not** a unique inverse\n"
+        "### The log is **not** a unique inverse\n"
         "\n"
         "Exponentiation is many-to-one, so the matrix log must *choose* a representative:\n"
         "\n"
@@ -155,7 +178,7 @@ cells = [
         '      "degrades to a near-zero matrix at theta = pi.")'
     ),
     md(
-        "#### Sidebar: Euler angles (and why we avoid them)\n"
+        "### Sidebar: Euler angles (and why we avoid them)\n"
         "\n"
         "Euler angles parameterize a rotation with three scalars. ManipulaPy offers "
         "`euler_to_rotation_matrix` (ZYX) and its inverse. **Watch the units — they are "
@@ -172,7 +195,7 @@ cells = [
         "assert np.allclose(R_euler @ np.array([1, 0, 0]), [0, 1, 0], atol=1e-9)"
     ),
     md(
-        "#### Angular velocity: space vs body\n"
+        "### Angular velocity: space vs body\n"
         "\n"
         "When a frame rotates, $R=R(t)$ and its rate $\\dot R$ encodes the **angular "
         "velocity**. There are two equally valid expressions, differing only in the frame "
@@ -308,7 +331,7 @@ cells = [
         'print("log(exp(S*theta)) == S*theta :", np.allclose(recovered, S * theta))'
     ),
     md(
-        "#### `transform_from_twist`: the same thing, in one call\n"
+        "### `transform_from_twist`: the same thing, in one call\n"
         "\n"
         "ManipulaPy bundles “build $[\\mathcal{S}]\\theta$ then exponentiate” into "
         "`transform_from_twist(S, theta)`. It is exactly "
@@ -331,7 +354,7 @@ cells = [
         "                   MatrixExp6(VecTose3(S_pris * 0.5)))"
     ),
     md(
-        "#### Looking ahead: `extract_screw_list`\n"
+        "### Looking ahead: `extract_screw_list`\n"
         "\n"
         "A serial robot is a *chain* of these screws — one per joint. "
         "`extract_screw_list(omega_list, r_list)` assembles the $6\\times n$ matrix of "
