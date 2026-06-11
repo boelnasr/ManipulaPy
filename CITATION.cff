@@ -13,7 +13,7 @@ date-released: "2026-05-31"
 license: AGPL-3.0-or-later
 repository-code: "https://github.com/boelnasr/ManipulaPy"
 url: "https://manipulapy.readthedocs.io/"
-# doi: 10.5281/zenodo.XXXXXXX  # TODO: mint a Zenodo DOI for v1.3.2 and fill in
+doi: 10.5281/zenodo.17323204  # concept DOI — resolves to the latest archived version on Zenodo
 keywords:
   - robotics
   - manipulator
