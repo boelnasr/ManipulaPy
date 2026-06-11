@@ -25,7 +25,7 @@ cells = [
         "# 01 · Rigid-Body Motions and Screw Axis Theory\n"
         "\n"
         "[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]"
-        "(https://colab.research.google.com/github/boelnasr/ManipulaPy/blob/main/"
+        "(https://colab.research.google.com/github/boelnasr/ManipulaPy/blob/notebooks/tutorials/"
         "notebooks/01_rigid_body_motions.ipynb)\n"
         "\n"
         "> **ManipulaPy teaching course — notebook 1 of 11.** Running robot: Franka Panda.\n"
