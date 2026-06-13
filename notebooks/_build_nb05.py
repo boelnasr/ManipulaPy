@@ -148,6 +148,34 @@ cells = [
         "ax.grid(True, ls=':', alpha=0.5)\n"
         'embed_pgf_fig(fig, name="gravity_joint2_sweep")'
     ),
+    md(
+        "### The gravity load across the workspace\n"
+        "\n"
+        "That 1-D sweep is one slice. Sweeping the **shoulder (joint 2)** and **elbow "
+        "(joint 4)** together maps the shoulder's gravity torque over a whole plane of "
+        "configurations. The diverging bands show where the load reverses sign as the arm "
+        "swings through the vertical — a torque map a gravity-compensating controller has "
+        "to supply everywhere it operates."
+    ),
+    code(
+        "q2s = np.linspace(-1.76, 1.76, 50)\n"
+        "q4s = np.linspace(-3.07, -0.07, 50)\n"
+        "G = np.zeros((len(q4s), len(q2s)))\n"
+        "for i, a in enumerate(q2s):\n"
+        "    for j, b in enumerate(q4s):\n"
+        "        q = HOME.copy(); q[1] = a; q[3] = b\n"
+        "        G[j, i] = dyn.gravity_forces(q, g)[1]\n"
+        "\n"
+        "plt = setup_pgf()\n"
+        "fig, ax = plt.subplots(figsize=(5.4, 3.9))\n"
+        "lim = np.abs(G).max()\n"
+        "im = ax.contourf(np.degrees(q2s), np.degrees(q4s), G, levels=20,\n"
+        "                 cmap='RdBu_r', vmin=-lim, vmax=lim)\n"
+        "fig.colorbar(im, ax=ax, label='gravity torque on joint 2 (N$\\\\cdot$m)')\n"
+        "ax.set_xlabel('joint 2 angle (deg)'); ax.set_ylabel('joint 4 angle (deg)')\n"
+        "ax.set_title('Shoulder gravity load over the (joint 2, joint 4) plane')\n"
+        'embed_pgf_fig(fig, name="gravity_workspace_map")'
+    ),
 
     # --- 3. coriolis ---
     md(
@@ -189,6 +217,44 @@ cells = [
         "tau_static = dyn.inverse_dynamics(HOME, np.zeros(N_JOINTS), np.zeros(N_JOINTS), g, Ftip)\n"
         "assert np.allclose(tau_static, dyn.gravity_forces(HOME, g))\n"
         'print("at rest, inverse dynamics == gravity_forces :", True)'
+    ),
+    md(
+        "### Anatomy of the torque along a motion\n"
+        "\n"
+        "Inverse dynamics is most revealing watched over a *motion*. Drive every joint "
+        "along a slow sinusoid and split the joint-4 torque into its three physical "
+        "contributions: the **inertial** term $M(\\theta)\\ddot\\theta$, the **Coriolis** "
+        "term $c(\\theta,\\dot\\theta)$, and **gravity** $g(\\theta)$. Gravity sets the "
+        "slowly-varying baseline, the inertial term tracks the acceleration, and Coriolis "
+        "adds the velocity-dependent ripple — and the three sum **exactly** to the "
+        "inverse-dynamics torque."
+    ),
+    code(
+        "tsim = np.linspace(0, 2, 100)\n"
+        "amp = np.array([0.4, 0.5, 0.4, 0.5, 0.4, 0.5, 0.4]); wsin = 2 * np.pi * 0.5\n"
+        "J4 = 3                                              # report joint 4\n"
+        "total, inertial, coriolis, gravity = [], [], [], []\n"
+        "for t in tsim:\n"
+        "    qt = HOME + amp * np.sin(wsin * t)\n"
+        "    dqt = amp * wsin * np.cos(wsin * t)\n"
+        "    ddqt = -amp * wsin**2 * np.sin(wsin * t)\n"
+        "    inertial.append((dyn.mass_matrix(qt) @ ddqt)[J4])\n"
+        "    coriolis.append(dyn.velocity_quadratic_forces(qt, dqt)[J4])\n"
+        "    gravity.append(dyn.gravity_forces(qt, g)[J4])\n"
+        "    total.append(dyn.inverse_dynamics(qt, dqt, ddqt, g, Ftip)[J4])\n"
+        "total = np.array(total)\n"
+        "assert np.allclose(total, np.array(inertial) + np.array(coriolis) + np.array(gravity), atol=1e-9)\n"
+        "\n"
+        "plt = setup_pgf()\n"
+        "fig, ax = plt.subplots(figsize=(5.8, 3.6))\n"
+        "ax.plot(tsim, total, 'k', lw=2.2, label='total (inverse dynamics)')\n"
+        "ax.plot(tsim, inertial, label='inertial $M\\\\ddot\\\\theta$')\n"
+        "ax.plot(tsim, coriolis, label='Coriolis $c$')\n"
+        "ax.plot(tsim, gravity, label='gravity $g$')\n"
+        "ax.set_xlabel('time (s)'); ax.set_ylabel('torque on joint 4 (N$\\\\cdot$m)')\n"
+        "ax.set_title('Inverse-dynamics torque, decomposed')\n"
+        "ax.legend(fontsize=8, ncol=2); ax.grid(True, ls=':', alpha=0.5)\n"
+        'embed_pgf_fig(fig, name="torque_decomposition")'
     ),
 
     # --- 5. forward dynamics ---

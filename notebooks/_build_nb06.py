@@ -122,6 +122,41 @@ cells = [
         "ax.legend()\n"
         'embed_pgf_fig(fig, name="singular_value_spectrum")'
     ),
+    md(
+        "### The manipulability ellipsoid in 3-D\n"
+        "\n"
+        "Geometry makes \"losing a direction\" concrete. The end-effector linear velocities "
+        "reachable with **unit-norm joint speed** form an ellipsoid whose semi-axes are the "
+        "*linear* singular values. At `HOME` it is a healthy, rounded ellipsoid — the hand "
+        "moves comfortably in every direction. At the near-singular pose it flattens into a "
+        "**pancake**: its shortest axis ($\\sigma\\approx0.04$) is the direction the "
+        "end-effector can barely move at all."
+    ),
+    code(
+        "def linear_ellipsoid(q):\n"
+        "    Jv = sm.jacobian(q, frame='space')[3:6]          # linear-velocity rows\n"
+        "    U, S, _ = np.linalg.svd(Jv)\n"
+        "    u, v = np.mgrid[0:2 * np.pi:30j, 0:np.pi:15j]\n"
+        "    sphere = np.array([np.cos(u) * np.sin(v), np.sin(u) * np.sin(v), np.cos(v)])\n"
+        "    pts = U @ np.diag(S) @ sphere.reshape(3, -1)      # image of the unit sphere\n"
+        "    return [pts[k].reshape(u.shape) for k in range(3)]\n"
+        "\n"
+        "plt = setup_pgf()\n"
+        "fig = plt.figure(figsize=(7.8, 3.8))\n"
+        "for k, (q, title, color) in enumerate(\n"
+        "        [(HOME, 'HOME (healthy)', 'tab:blue'),\n"
+        "         (q_near, 'near-singular (collapsed)', 'tab:red')], 1):\n"
+        "    ax = fig.add_subplot(1, 2, k, projection='3d')\n"
+        "    X, Y, Z = linear_ellipsoid(q)\n"
+        "    ax.plot_surface(X, Y, Z, color=color, alpha=0.6, linewidth=0)\n"
+        "    ax.set_title(title, fontsize=10)\n"
+        "    ax.set_xlabel('$v_x$'); ax.set_ylabel('$v_y$'); ax.set_zlabel('$v_z$')\n"
+        "    lim = 1.3\n"
+        "    ax.set_xlim(-lim, lim); ax.set_ylim(-lim, lim); ax.set_zlim(-lim, lim)\n"
+        "    ax.set_box_aspect((1, 1, 1)); ax.view_init(elev=18, azim=-60)\n"
+        "fig.suptitle('Linear-velocity manipulability ellipsoid')\n"
+        'embed_pgf_fig(fig, name="manipulability_ellipsoid_3d")'
+    ),
 
     # --- 2. approaching a singularity ---
     md(
@@ -153,6 +188,33 @@ cells = [
         "axL.legend(lines, [l.get_label() for l in lines], loc='center left', fontsize=8)\n"
         "axL.set_title('Approaching a singularity')\n"
         'embed_pgf_fig(fig, name="singularity_approach")'
+    ),
+    md(
+        "### The singularity landscape\n"
+        "\n"
+        "That sweep followed one path; sweeping **two** joints maps manipulability over a "
+        "whole slice of configuration space. Bright regions are dexterous, the dark "
+        "trenches are where $w$ collapses toward a singularity. The structure is not a "
+        "single point — singularities form **surfaces** the arm must steer around, which "
+        "is exactly what makes them a planning concern (notebook 07)."
+    ),
+    code(
+        "q2s = np.linspace(-1.76, 1.76, 50)\n"
+        "q4s = np.linspace(-3.07, -0.07, 50)\n"
+        "Wmap = np.zeros((len(q4s), len(q2s)))\n"
+        "for i, a in enumerate(q2s):\n"
+        "    for j, b in enumerate(q4s):\n"
+        "        q = HOME.copy(); q[1] = a; q[3] = b\n"
+        "        J = sm.jacobian(q, frame='space')\n"
+        "        Wmap[j, i] = np.sqrt(max(np.linalg.det(J @ J.T), 0))\n"
+        "\n"
+        "plt = setup_pgf()\n"
+        "fig, ax = plt.subplots(figsize=(5.4, 3.9))\n"
+        "im = ax.contourf(np.degrees(q2s), np.degrees(q4s), Wmap, levels=20, cmap='viridis')\n"
+        "fig.colorbar(im, ax=ax, label='manipulability $w$')\n"
+        "ax.set_xlabel('joint 2 angle (deg)'); ax.set_ylabel('joint 4 angle (deg)')\n"
+        "ax.set_title('Manipulability landscape over (joint 2, joint 4)')\n"
+        'embed_pgf_fig(fig, name="manipulability_landscape")'
     ),
 
     # --- 3. detecting ---
