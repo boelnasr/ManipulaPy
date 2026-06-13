@@ -34,7 +34,7 @@ cells = [
         "Differentiating that map relates joint *velocities* to end-effector *velocity* — "
         "and the matrix that does it is the **Jacobian** $J(\\theta)$. The Jacobian is the "
         "workhorse of robotics: it drives velocity control, inverse kinematics (notebook "
-        "04), force/torque relationships, singularity analysis (notebook 08), and — for the "
+        "04), force/torque relationships, singularity analysis (notebook 06), and — for the "
         "7-DOF Panda — **redundancy**."
     ),
     md(
@@ -91,7 +91,7 @@ cells = [
         "\n"
         "Geometrically, $J$ is the linear map that sends the unit ball of joint rates to "
         "the **manipulability ellipsoid** of achievable end-effector velocities — its "
-        "principal axes are the singular values of $J$ (we return to this in notebook 08)."
+        "principal axes are the singular values of $J$ (we return to this in notebook 06)."
     ),
     code('render_tikz_file("_figures/src/jacobian_map.tex", name="jacobian_map")'),
     code(
@@ -271,7 +271,7 @@ cells = [
         "$J_v$ of the body Jacobian maps the unit joint-rate ball to an ellipsoid whose "
         "axes are the singular values of $J_v$. A scalar summary is "
         "$w=\\sqrt{\\det(J_vJ_v^{\\top})}$ — larger means more dexterous, zero means a "
-        "singularity. Below we draw the velocity ellipse in the $x$–$z$ plane; notebook 08 "
+        "singularity. Below we draw the velocity ellipse in the $x$–$z$ plane; notebook 06 "
         "treats singularities and manipulability in full."
     ),
     code(
