@@ -45,6 +45,7 @@ def _fallback_or_raise(png, name, reason):
 
 _STANDALONE = r"""\documentclass[tikz,border=4pt]{standalone}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{tikz}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}

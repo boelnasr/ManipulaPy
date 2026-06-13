@@ -217,9 +217,8 @@ cells = [
         "Colab). We use it to draw the Panda as a 3D stick figure at several "
         "configurations.\n"
         "\n"
-        "*(The mesh-based PyBullet simulator is covered in notebook 09; it needs the Franka "
-        "mesh package, which isn't bundled with ManipulaPy, so we visualize from the "
-        "kinematic structure here.)*"
+        "*(Mesh-free rendering is handy when there is no display; the next section loads "
+        "the full meshed model into ManipulaPy's PyBullet simulator.)*"
     ),
     code(
         "from ManipulaPy.urdf_processor import URDFToSerialManipulator\n"
@@ -273,6 +272,66 @@ cells = [
         '    ax.view_init(elev=18, azim=-60)\n'
         'fig.suptitle("Panda kinematic skeleton (URDF module link_fk)")\n'
         'embed_pgf_fig(fig, name="panda_skeleton_montage")'
+    ),
+
+    # --- 8. the same robot in a physics engine ---
+    md(
+        "## 8. The same robot in a physics engine\n"
+        "\n"
+        "The stick figure above came from pure kinematics. ManipulaPy's **simulation "
+        "module** (`ManipulaPy.sim.Simulation`) loads the same URDF into **PyBullet** — "
+        "meshes, ground plane and all. We run it headless "
+        "(`MANIPULAPY_PYBULLET_CONNECT=DIRECT`) and photograph it with the simulator's "
+        "camera, so this works on Colab and CI too.\n"
+        "\n"
+        "One wrinkle: the bundled `panda.urdf` references its meshes through ROS "
+        "`package://` URIs. ManipulaPy's URDF parser resolves those (that is how "
+        "`link_fk` worked above), but PyBullet's own loader does not — so "
+        "`helpers.panda_pybullet_urdf()` hands the simulator a copy of the same file "
+        "with plain relative mesh paths."
+    ),
+    code(
+        "import os\n"
+        'os.environ.setdefault("MANIPULAPY_PYBULLET_CONNECT", "DIRECT")  # headless; remove to watch in a GUI\n'
+        "import logging\n"
+        "from helpers import panda_pybullet_urdf, joint_limits, sim_snapshot, quiet_pybullet\n"
+        "from ManipulaPy.sim import Simulation\n"
+        "import pybullet as p\n"
+        "\n"
+        "with quiet_pybullet():\n"
+        "    sim = Simulation(panda_pybullet_urdf(), joint_limits())\n"
+        "# Simulation's logger defaults to DEBUG; keep the notebook output clean.\n"
+        'logging.getLogger("SimulationLogger").setLevel(logging.WARNING)\n'
+        "\n"
+        "# Pose the arm at HOME kinematically: exact angles, no settling, no gravity sag.\n"
+        "# The Panda's two gripper fingers are also non-fixed joints -- pad them with 0.\n"
+        "for j, qj in zip(sim.non_fixed_joints, list(HOME) + [0.0, 0.0]):\n"
+        "    p.resetJointState(sim.robot_id, j, qj)\n"
+        'sim_snapshot("sim_panda_home")'
+    ),
+    md(
+        "PyBullet computes link poses from the same URDF with its **own** forward "
+        "kinematics — an independent physics-engine check of our Product of Exponentials. "
+        "ManipulaPy's end-effector frame is the gripper's finger-mount (\"grasp\") frame, "
+        "which PyBullet exposes as the `panda_leftfinger` link frame."
+    ),
+    code(
+        "link_idx = {p.getJointInfo(sim.robot_id, i)[12].decode(): i\n"
+        "            for i in range(p.getNumJoints(sim.robot_id))}\n"
+        "\n"
+        "for q_test in [np.zeros(N_JOINTS), HOME,\n"
+        "               np.array([0.5, -0.6, 0.3, -1.5, 0.2, 1.2, 0.4])]:\n"
+        "    for j, qj in zip(sim.non_fixed_joints, list(q_test) + [0.0, 0.0]):\n"
+        "        p.resetJointState(sim.robot_id, j, qj)\n"
+        '    state = p.getLinkState(sim.robot_id, link_idx["panda_leftfinger"],\n'
+        "                           computeForwardKinematics=True)\n"
+        "    T_fk = sm.forward_kinematics(q_test)\n"
+        "    R_pb = np.array(p.getMatrixFromQuaternion(state[5])).reshape(3, 3)\n"
+        "    assert np.allclose(T_fk[:3, 3], state[4], atol=1e-6)   # position agrees\n"
+        "    assert np.allclose(T_fk[:3, :3], R_pb, atol=1e-6)      # orientation agrees\n"
+        "\n"
+        'print("PoE forward kinematics matches the physics engine at 3 configurations")\n'
+        "sim.disconnect_simulation()"
     ),
 
     # --- smoke test ---

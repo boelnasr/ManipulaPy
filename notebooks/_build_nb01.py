@@ -354,6 +354,60 @@ cells = [
         "                   MatrixExp6(VecTose3(S_pris * 0.5)))"
     ),
     md(
+        "### Watching a screw motion in simulation\n"
+        "\n"
+        "The corkscrew picture is easier to believe when a body actually follows it. "
+        "ManipulaPy's **simulation module** (`ManipulaPy.sim.Simulation`) wraps PyBullet; "
+        "here we run it **headless** (`MANIPULAPY_PYBULLET_CONNECT=DIRECT`, so this also "
+        "works on Colab and CI) and use its camera to photograph the scene. We sweep "
+        "$\\theta$, place a small block at $T(\\theta)=e^{[\\mathcal{S}]\\theta}\\,T_0$, "
+        "and trace the path with `plot_trajectory`, which draws it as real geometry the "
+        "camera can see.\n"
+        "\n"
+        "With pitch $h=0.1$ the screw is a true corkscrew: the block circles the axis "
+        "while climbing $h\\,\\theta$ along it."
+    ),
+    code(
+        "import os\n"
+        'os.environ.setdefault("MANIPULAPY_PYBULLET_CONNECT", "DIRECT")  # headless; remove to watch in a GUI\n'
+        "import logging\n"
+        "from helpers import sim_snapshot, quiet_pybullet\n"
+        "from ManipulaPy.sim import Simulation\n"
+        "import pybullet as p\n"
+        "\n"
+        "with quiet_pybullet():\n"
+        '    sim = Simulation("cube_small.urdf", joint_limits=[])   # a lone block + ground plane\n'
+        "# Simulation's logger defaults to DEBUG; keep the notebook output clean.\n"
+        'logging.getLogger("SimulationLogger").setLevel(logging.WARNING)\n'
+        "\n"
+        "h = 0.1                                       # pitch: metres advanced per radian\n"
+        "S_screw = np.concatenate([s_hat, -np.cross(s_hat, q) + h * s_hat])\n"
+        "T0 = np.eye(4); T0[:3, 3] = [0.0, 0.0, 0.15]  # block's start pose\n"
+        "\n"
+        "thetas = np.linspace(0, 1.5 * np.pi, 60)\n"
+        "path = []\n"
+        "for th in thetas:\n"
+        "    Tt = transform_from_twist(S_screw, th) @ T0\n"
+        "    path.append(Tt[:3, 3])\n"
+        "    p.resetBasePositionAndOrientation(\n"
+        "        sim.robot_id, Tt[:3, 3],\n"
+        "        p.getQuaternionFromEuler(rotation_matrix_to_euler_angles(Tt[:3, :3])))\n"
+        "\n"
+        "# Chasles in numbers: constant radius about the axis, climb = h * theta.\n"
+        "P = np.array(path)\n"
+        "radii = np.linalg.norm(P[:, :2] - q[:2], axis=1)\n"
+        "assert np.allclose(radii, radii[0], atol=1e-9)\n"
+        "assert np.allclose(P[:, 2] - P[0, 2], h * thetas, atol=1e-9)\n"
+        'print("screw path: radius constant at %.2f m, climb = h*theta (max %.3f m)"\n'
+        "      % (radii[0], h * thetas[-1]))"
+    ),
+    code(
+        "sim.plot_trajectory(path, color=[0.9, 0.4, 0.1])   # orange capsules + start/end markers\n"
+        'img = sim_snapshot("sim_screw_motion", target=(0.15, 0, 0.4), distance=1.4, yaw=40, pitch=-30)\n'
+        "sim.disconnect_simulation()\n"
+        "img"
+    ),
+    md(
         "### Looking ahead: `extract_screw_list`\n"
         "\n"
         "A serial robot is a *chain* of these screws — one per joint. "
