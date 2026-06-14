@@ -59,9 +59,11 @@ python -m sphinx -b html docs/source docs/build/html
 
 ### CI/CD
 
-- **test.yml**: Python 3.8/3.9/3.10/3.11 matrix, PyTorch CPU, Codecov. Env: `SKIP_CUDA_TESTS=true`, `SKIP_VISION_TESTS=true`, `SKIP_SIMULATION_TESTS=true`
-- **lint.yml**: black --check + flake8, auto-commits formatting fixes
-- **pypi-publish.yml**: Triggered by `v*` tags, publishes to PyPI via `PYPI_API_TOKEN`
+- **test.yml** (*CI Tests*): Python 3.9/3.10/3.11/3.12 matrix on `ubuntu-latest`, PyTorch CPU, Codecov. Env: `SKIP_CUDA_TESTS=true`, `SKIP_VISION_TESTS=true`, `SKIP_SIMULATION_TESTS=true`. Runs on push and pull request.
+- **lint.yml** (*Lint with flake8 and black*): `flake8 ManipulaPy tests --max-line-length=88` + `black --check`; auto-commits formatting fixes (`contents: write`).
+- **publish.yml** (*Publish to PyPI*): triggered when a GitHub **Release** is published; builds the sdist/wheel and uploads via PyPI **Trusted Publishing** (OIDC `id-token: write`, `pypi` environment) — no API token.
+- **draft-pdf.yml**: builds the JOSS `paper.pdf` on `v*` tags and attaches it to the release.
+- **codeql.yml** (*CodeQL Advanced*) and **scorecard.yml** (*Scorecard supply-chain security*): security analysis on push/PR plus weekly schedules.
 
 For architecture details, class hierarchy, GPU/CPU strategy, and code conventions,
 see [ARCHITECTURE.md](ARCHITECTURE.md).

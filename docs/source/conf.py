@@ -89,7 +89,27 @@ _optional_extensions = {
     "myst_parser": try_add_extension("myst_parser"),
     "sphinx_copybutton": try_add_extension("sphinx_copybutton"),
     "sphinx_design": try_add_extension("sphinx_design"),
+    "nbsphinx": try_add_extension("nbsphinx"),
 }
+
+# ── Notebook course: render the executed teaching notebooks via nbsphinx ──
+# The committed notebooks already embed their figures as output images, so we
+# render with the pre-computed outputs (no kernel / TeX / GPU needed at build).
+if _optional_extensions.get("nbsphinx", False):
+    import shutil as _shutil
+    import glob as _glob
+
+    nbsphinx_execute = "never"           # use committed outputs; never re-run at build
+    nbsphinx_allow_errors = False
+    # Copy the notebook-course .ipynb into the docs tree so Sphinx can find them.
+    _NB_SRC = os.path.join(PROJECT_ROOT, "notebooks")
+    _NB_DST = os.path.join(DOCS_DIR, "tutorials", "notebooks")
+    if os.path.isdir(_NB_SRC):
+        os.makedirs(_NB_DST, exist_ok=True)
+        for _nb in _glob.glob(os.path.join(_NB_SRC, "*.ipynb")):
+            _shutil.copy2(_nb, _NB_DST)
+        print(f"📓 Copied {len(_glob.glob(os.path.join(_NB_SRC, '*.ipynb')))} "
+              f"notebook(s) into the docs tree for nbsphinx.")
 
 # Only add these if we're not on RTD (they may not be available)
 if not os.environ.get('READTHEDOCS'):

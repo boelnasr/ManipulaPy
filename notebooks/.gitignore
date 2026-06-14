@@ -1,0 +1,5 @@
+# TikZ/PGF build intermediates — only the rendered PNGs and .tex sources are tracked.
+_figures/*.pdf
+_figures/*.aux
+_figures/*.log
+__pycache__/

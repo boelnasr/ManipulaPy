@@ -492,12 +492,15 @@ If you use ManipulaPy in academic work, please cite the JOSS paper:
   author  = {AboElNasr, M. I. M.},
   journal = {Journal of Open Source Software},
   year    = {2025},
-  note    = {Submission in review},
-  url     = {https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa}
+  volume  = {10},
+  number  = {114},
+  pages   = {8490},
+  doi     = {10.21105/joss.08490},
+  url     = {https://doi.org/10.21105/joss.08490}
 }
 ```
 
-Paper source: [`paper/paper.md`](paper/paper.md) · review status: [JOSS submission e0e68c2](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa).
+Paper source: [`paper/paper.md`](paper/paper.md) · published in JOSS: [10.21105/joss.08490](https://doi.org/10.21105/joss.08490).
 
 ---
 

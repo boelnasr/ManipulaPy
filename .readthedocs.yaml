@@ -8,6 +8,9 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
+  # nbsphinx needs pandoc to convert notebook markdown cells
+  apt_packages:
+    - pandoc
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:

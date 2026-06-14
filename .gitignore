@@ -139,6 +139,7 @@ SCRATCH.md
 STATUS.md
 URDF_FIXES.md
 VERSIONING.md
+ROS2_COMPATIBILITY.md
 INDEX.md
 tasks/
 
@@ -212,3 +213,6 @@ Examples/**/*_demo_outputs/
 # Generated per-run example reports/logs
 Examples/**/*_analysis_report.txt
 Examples/**/*_demo_report.txt
+
+# nbsphinx: notebooks copied into the docs tree at build time
+docs/source/tutorials/notebooks/

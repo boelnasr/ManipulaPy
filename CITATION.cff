@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use ManipulaPy in your research, please cite it as below."
+message: "If you use ManipulaPy in your research, please cite the JOSS paper (see preferred-citation)."
 title: "ManipulaPy: A GPU-accelerated Python toolkit for manipulator kinematics, dynamics, planning, control, and simulation"
 type: software
 authors:
@@ -13,7 +13,7 @@ date-released: "2026-05-31"
 license: AGPL-3.0-or-later
 repository-code: "https://github.com/boelnasr/ManipulaPy"
 url: "https://manipulapy.readthedocs.io/"
-# doi: 10.5281/zenodo.XXXXXXX  # TODO: mint a Zenodo DOI for v1.3.2 and fill in
+doi: 10.5281/zenodo.17323204  # concept DOI — resolves to the latest archived version on Zenodo
 keywords:
   - robotics
   - manipulator
@@ -25,3 +25,20 @@ keywords:
   - gpu
   - cuda
   - python
+preferred-citation:
+  type: article
+  title: "ManipulaPy: A GPU-Accelerated Python Framework for Robotic Manipulation, Perception, and Control"
+  authors:
+    - family-names: AboElNasr
+      given-names: "M. I. M."
+      orcid: "https://orcid.org/0000-0002-1768-2031"
+      affiliation: "Universität Duisburg-Essen"
+  journal: "Journal of Open Source Software"
+  year: 2025
+  month: 10
+  volume: 10
+  issue: 114
+  start: 8490
+  doi: "10.21105/joss.08490"
+  publisher:
+    name: "The Open Journal"
