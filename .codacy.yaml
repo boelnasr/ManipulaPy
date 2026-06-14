@@ -1,0 +1,35 @@
+# Codacy Analysis CLI configuration.
+#
+# ManipulaPy is a pure-Python project. The Codacy "Security Scan" workflow was
+# failing because the CLI auto-ran non-Python engines whose results crashed the
+# SARIF formatter:
+#   - pmd / pmd-legacy -> "No rules found ... (null)" (IllegalArgumentException)
+#   - eslint           -> "No ESLint configuration found in /src/Benchmark"
+# The null PMD result then broke Sarif.addAll(...) and the step exited 1, so the
+# SARIF was never uploaded to GitHub code scanning.
+#
+# This config scopes analysis to Python source and disables the offending engines.
+---
+exclude_paths:
+  - 'Benchmark/**'
+  - 'Examples/**'
+  - 'docs/**'
+  - 'notebooks/**'
+  - 'build/**'
+  - 'dist/**'
+  - 'tools/**'
+  - '**/*.png'
+  - '**/*.ipynb'
+
+engines:
+  bandit:
+    enabled: true
+  pylint:
+    enabled: true
+  prospector:
+    enabled: true
+  # Non-Python engines that crashed the SARIF step on this repo:
+  pmd:
+    enabled: false
+  eslint:
+    enabled: false
