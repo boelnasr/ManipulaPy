@@ -157,6 +157,19 @@ cells = [
         "fig.suptitle('Linear-velocity manipulability ellipsoid')\n"
         'embed_pgf_fig(fig, name="manipulability_ellipsoid_3d")'
     ),
+    md(
+        "> **Why not `Singularity.manipulability_ellipsoid()`?** The library ships a "
+        "ready-made plotter, but it draws a different object. Its semi-axes are "
+        "$1/\\sqrt{\\sigma}$ (singularity.py), i.e. the **force** (dual) ellipsoid — the "
+        "directions in which the arm exerts force easily — not the **velocity** ellipsoid "
+        "with axes $\\propto\\sigma$ that we use here. Under that reciprocal, the "
+        "near-singular axis *grows* toward $\\infty$ instead of collapsing, which would "
+        "fight the \"pancake\" intuition; a `1e-10` floor also caps the short axis so it "
+        "never truly reaches zero. It additionally calls `plt.show()` on its own figure and "
+        "draws the linear and angular ellipsoids on a shared axis, so it won't compose with "
+        "our PGF backend or the `HOME`-vs-`q_near` side-by-side. Hence the few lines of SVD "
+        "above. Use the class method when you want the force ellipsoid in a throwaway plot."
+    ),
 
     # --- 2. approaching a singularity ---
     md(
