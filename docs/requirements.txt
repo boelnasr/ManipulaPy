@@ -10,7 +10,7 @@ sphinx-copybutton>=0.5.2,<1.0.0
 
 # For rendering the executed teaching notebooks (requires pandoc; see .readthedocs.yaml)
 nbsphinx>=0.9.0,<1.0.0
-nbconvert>=7.16            # 6.x calls the removed jinja2.utils.escape; needs 7.x for Jinja2 3.1+
+nbconvert>=7.17.1            # 6.x calls the removed jinja2.utils.escape; needs 7.x for Jinja2 3.1+
 ipython>=8.0.0
 
 # For mathematical expressions
