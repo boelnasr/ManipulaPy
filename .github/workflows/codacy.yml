@@ -29,8 +29,6 @@ jobs:
   codacy-security-scan:
     permissions:
       contents: read # for actions/checkout to fetch code
-      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
-      actions: read # only required for a private repository by github/codeql-action/upload-sarif to get the Action run status
     name: Codacy Security Scan
     runs-on: ubuntu-latest
     steps:
@@ -38,24 +36,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      # Execute Codacy Analysis CLI and generate a SARIF output with the security issues identified during the analysis
+      # Execute Codacy Analysis CLI as a non-blocking quality smoke check.
+      #
+      # The SARIF is intentionally NOT uploaded to GitHub code scanning. Codacy
+      # emits one SARIF run per tool (Bandit, Pylint, Prospector, Trivy, ...);
+      # github/codeql-action/upload-sarif@v4 rejects that multi-run-per-category
+      # file ("multiple SARIF runs with the same category"), and the quality
+      # linters flooded the Security tab with thousands of style alerts that are
+      # not vulnerabilities. Codacy still runs here; supply-chain findings come
+      # from the separate Scorecard workflow. max-allowed-issues keeps this step
+      # green so it never blocks a PR.
       - name: Run Codacy Analysis CLI
         uses: codacy/codacy-analysis-cli-action@562ee3e92b8e92df8b67e0a5ff8aa8e261919c08
         with:
-          # Run in LOCAL mode (no project token) so the repo-root .codacy.yaml is authoritative —
-          # it disables the PMD/ESLint engines that crashed the SARIF formatter on this Python repo.
-          # (To restore Codacy.com dashboard sync, re-add: project-token: ${{ secrets.CODACY_PROJECT_TOKEN }})
           verbose: true
-          output: results.sarif
-          format: sarif
-          # Adjust severity of non-security issues
-          gh-code-scanning-compat: true
-          # Force 0 exit code to allow SARIF file generation
-          # This will handover control about PR rejection to the GitHub side
           max-allowed-issues: 2147483647
-
-      # Upload the SARIF file generated in the previous step
-      - name: Upload SARIF results file
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
