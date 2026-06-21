@@ -1,14 +1,21 @@
 # Codacy Analysis CLI configuration.
 #
-# ManipulaPy is a pure-Python project. The Codacy "Security Scan" workflow was
-# failing because the CLI auto-ran non-Python engines whose results crashed the
-# SARIF formatter:
-#   - pmd / pmd-legacy -> "No rules found ... (null)" (IllegalArgumentException)
-#   - eslint           -> "No ESLint configuration found in /src/Benchmark"
-# The null PMD result then broke Sarif.addAll(...) and the step exited 1, so the
-# SARIF was never uploaded to GitHub code scanning.
+# ManipulaPy is a pure-Python project. The Codacy "Security Scan" workflow feeds
+# its SARIF into GitHub code scanning, so this config keeps that upload to a
+# single security tool (Bandit) and disables everything else:
 #
-# This config scopes analysis to Python source and disables the offending engines.
+#   - pmd / eslint  -> non-Python engines that crashed the SARIF formatter
+#                      (pmd "No rules found ... (null)"; eslint "No ESLint config").
+#   - trivy         -> auto-enabled by CLI 4.4.7, aborts with "no patterns
+#                      configured" (Docker exit 1) on this repo.
+#   - pylint / prospector -> code-quality linters, not security tools. Emitting
+#                      them produced thousands of style alerts in the Security
+#                      tab and, as separate SARIF runs sharing one category,
+#                      tripped github/codeql-action/upload-sarif@v4's
+#                      "multiple runs with the same category" rejection.
+#
+# Bandit-only keeps the SARIF to one run (upload succeeds under v4) and limits
+# GitHub code scanning to genuine security findings.
 ---
 exclude_paths:
   - 'Benchmark/**'
@@ -24,12 +31,15 @@ exclude_paths:
 engines:
   bandit:
     enabled: true
+  # Code-quality linters (style noise in the Security tab; multi-run SARIF):
   pylint:
-    enabled: true
+    enabled: false
   prospector:
-    enabled: true
-  # Non-Python engines that crashed the SARIF step on this repo:
+    enabled: false
+  # Engines that crash the SARIF step on this repo:
   pmd:
     enabled: false
   eslint:
+    enabled: false
+  trivy:
     enabled: false
