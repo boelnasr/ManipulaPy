@@ -8,5 +8,5 @@ matplotlib>=3.9
 scikit-learn>=1.0
 opencv-python>=4.5
 ultralytics>=8.4.0  # For YOLO-based perception with NumPy 2.x
-cupy-cuda12x>=13.0,<14.0  # CUDA 12.x arrays/kernels (Ubuntu 22.04 default); use cupy-cuda11x for legacy CUDA 11.x
+cupy-cuda12x>=13.0,<15.0  # CUDA 12.x arrays/kernels (Ubuntu 22.04 default); use cupy-cuda11x for legacy CUDA 11.x
 torch>=1.8.0      # Required for YOLO (PyTorch-based)
