@@ -58,7 +58,7 @@ setup(
         # NVIDIA apt repos, driver 525+). Pinned to 13.x because CuPy
         # 14.x raised its numpy floor to 2.2 and breaks ultralytics.
         "cuda": [
-            "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+            "cupy-cuda12x>=13.0,<15.0; sys_platform != 'darwin'",
         ],
         "all": [
             "pybullet>=3.2.5,<4.0",
@@ -67,13 +67,13 @@ setup(
             "ultralytics>=8.4.0",
             "torch>=1.8.0",
             "scikit-learn>=1.0",
-            "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+            "cupy-cuda12x>=13.0,<15.0; sys_platform != 'darwin'",
         ],
         "gpu-cuda11": [
             "cupy-cuda11x>=13.0,<14.0; sys_platform != 'darwin'",
         ],
         "gpu-cuda12": [
-            "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+            "cupy-cuda12x>=13.0,<15.0; sys_platform != 'darwin'",
         ],
         "gpu-rocm": [
             "cupy-rocm-4-3>=10.0.0",

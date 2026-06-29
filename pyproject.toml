@@ -88,7 +88,7 @@ ml = ["torch>=1.8.0", "scikit-learn>=1.0"]
 # on driver 580. Pinned to the 13.x series because CuPy 14.x raised its
 # floor to numpy 2.2+ and broke transitive resolver chains with
 # ultralytics. Use [gpu-cuda11] for legacy CUDA 11.x systems.
-cuda = ["cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'"]
+cuda = ["cupy-cuda12x>=13.0,<15.0; sys_platform != 'darwin'"]
 
 # Convenience: install everything (no self-references — the resolver
 # handles direct deps more reliably than ``ManipulaPy[simulation,...]``).
@@ -99,12 +99,12 @@ all = [
     "ultralytics>=8.4.0",
     "torch>=1.8.0",
     "scikit-learn>=1.0",
-    "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+    "cupy-cuda12x>=13.0,<15.0; sys_platform != 'darwin'",
 ]
 
 # Alternative GPU options for legacy CUDA versions and AMD/PyCUDA paths.
 gpu-cuda11 = ["cupy-cuda11x>=13.0,<14.0; sys_platform != 'darwin'"]
-gpu-cuda12 = ["cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'"]
+gpu-cuda12 = ["cupy-cuda12x>=13.0,<15.0; sys_platform != 'darwin'"]
 gpu-rocm = ["cupy-rocm-4-3>=10.0.0"]
 gpu-pycuda = ["pycuda>=2021.1"]
 
