@@ -65,6 +65,17 @@ python -m sphinx -b html docs/source docs/build/html
 - **draft-pdf.yml**: builds the JOSS `paper.pdf` on `v*` tags and attaches it to the release.
 - **codeql.yml** (*CodeQL Advanced*) and **scorecard.yml** (*Scorecard supply-chain security*): security analysis on push/PR plus weekly schedules.
 
+### Code Review & Branch Protection
+
+- All changes to `main` land through a pull request. Direct pushes are disabled by
+  branch protection.
+- A PR is mergeable only once its status checks are green — the `test` CI matrix
+  and the `lint` workflow must both pass.
+- This is a solo-maintainer project. External PRs receive a maintainer review
+  before merge; maintainer-authored PRs rely on the CI gates above plus
+  self-review. Community review on any PR is welcome and encouraged — leave a
+  comment on the PR.
+
 For architecture details, class hierarchy, GPU/CPU strategy, and code conventions,
 see [ARCHITECTURE.md](ARCHITECTURE.md).
 
