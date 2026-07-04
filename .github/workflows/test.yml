@@ -56,8 +56,8 @@ jobs:
 
     - name: Install base dependencies
       run: |
-        python -m pip install --upgrade pip setuptools wheel
-        pip install pytest pytest-cov pytest-mock coverage[toml]
+        python -m pip install --upgrade pip==26.0.1 setuptools==82.0.1 wheel==0.47.0
+        pip install pytest==8.4.2 pytest-cov==7.1.0 pytest-mock==3.15.1 coverage[toml]==7.10.7
 
     - name: Debug TOML file
       run: |
@@ -90,7 +90,7 @@ jobs:
 
     - name: Install PyTorch (CPU version for CI)
       run: |
-        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
         python -c "import torch; print(f'✅ PyTorch {torch.__version__} installed successfully')"
 
     - name: Install ManipulaPy in development mode
@@ -100,22 +100,22 @@ jobs:
     - name: Install test dependencies
       run: |
         pip install \
-          numpy>=1.19.0 \
-          scipy>=1.6.0 \
-          matplotlib>=3.3.0 \
-          scikit-learn>=1.0.0 \
-          pillow>=8.0.0 \
-          pytest-xvfb>=2.0.0 \
-          pytest-timeout>=2.1.0
+          numpy==2.0.2 \
+          scipy==1.13.1 \
+          matplotlib==3.9.4 \
+          scikit-learn==1.6.1 \
+          pillow==11.3.0 \
+          pytest-xvfb==3.1.1 \
+          pytest-timeout==2.4.0
 
     - name: Install optional dependencies (continue on error)
       continue-on-error: true
       run: |
         # These may not be available in CI, but install if possible
-        pip install pybullet || echo "PyBullet installation failed (expected in CI)"
-        pip install opencv-python-headless || pip install opencv-python || echo "OpenCV installation failed"
-        pip install urchin || echo "URCHIN installation failed"
-        pip install ultralytics || echo "Ultralytics installation failed (expected in CI)"
+        pip install pybullet==3.2.7 || echo "PyBullet installation failed (expected in CI)"
+        pip install opencv-python-headless==5.0.0.93 || pip install opencv-python==5.0.0.93 || echo "OpenCV installation failed"
+        pip install urchin==0.0.30 || echo "URCHIN installation failed"
+        pip install ultralytics==8.4.87 || echo "Ultralytics installation failed (expected in CI)"
 
     - name: Verify ManipulaPy installation
       run: |
@@ -651,10 +651,10 @@ jobs:
 
     - name: Install ManipulaPy
       run: |
-        python -m pip install --upgrade pip
-        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        python -m pip install --upgrade pip==26.0.1
+        pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
         pip install -e .
-        pip install numpy scipy matplotlib
+        pip install numpy==2.0.2 scipy==1.13.1 matplotlib==3.9.4
 
     - name: Run integration tests
       env:
@@ -721,8 +721,8 @@ jobs:
 
     - name: Install linting tools
       run: |
-        python -m pip install --upgrade pip
-        pip install flake8 black isort
+        python -m pip install --upgrade pip==26.0.1
+        pip install flake8==7.3.0 black==25.11.0 isort==6.1.0
 
     - name: Check code formatting with black
       continue-on-error: true
@@ -755,11 +755,11 @@ jobs:
 
     - name: Install build tools
       run: |
-        python -m pip install --upgrade pip build wheel
+        python -m pip install --upgrade pip==26.0.1 build==1.4.4 wheel==0.47.0
 
     - name: Install PyTorch for build test
       run: |
-        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
 
     - name: Build package
       run: |
