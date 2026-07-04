@@ -46,13 +46,13 @@ setup(
             "trimesh>=3.9.14",
         ],
         "vision": [
-            "opencv-python>=4.5",
+            "opencv-python>=4.8.1.78",
             "ultralytics>=8.4.0",
-            "torch>=1.8.0",
+            "torch>=2.7.1",
         ],
         "ml": [
-            "torch>=1.8.0",
-            "scikit-learn>=1.0",
+            "torch>=2.7.1",
+            "scikit-learn>=1.5.0",
         ],
         # Default GPU extra targets CUDA 12.x (Ubuntu 22.04 + modern
         # NVIDIA apt repos, driver 525+). Pinned to 13.x because CuPy
@@ -63,10 +63,10 @@ setup(
         "all": [
             "pybullet>=3.2.5,<4.0",
             "trimesh>=3.9.14",
-            "opencv-python>=4.5",
+            "opencv-python>=4.8.1.78",
             "ultralytics>=8.4.0",
-            "torch>=1.8.0",
-            "scikit-learn>=1.0",
+            "torch>=2.7.1",
+            "scikit-learn>=1.5.0",
             "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
         ],
         "gpu-cuda11": [
@@ -82,7 +82,7 @@ setup(
             "pycuda>=2021.1",
         ],
         "vision-headless": [
-            "opencv-python-headless>=4.5",
+            "opencv-python-headless>=4.8.1.78",
             "ultralytics>=8.4.0",
             "pillow>=8.0.0",
         ],
