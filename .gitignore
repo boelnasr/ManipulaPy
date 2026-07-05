@@ -142,6 +142,11 @@ VERSIONING.md
 ROS2_COMPATIBILITY.md
 INDEX.md
 tasks/
+wiki/
+backend_protocol.md
+differentiable_contract.md
+public_api_invariant.md
+manipulapy_ros.md
 
 # =============================================================================
 # ML model weights (large binaries, downloaded on demand)
