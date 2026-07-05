@@ -10,6 +10,14 @@ upgrade to the most recent release before reporting a vulnerability.
 | 1.3.x   | :white_check_mark: |
 | < 1.3   | :x:                |
 
+## Untrusted URDF files
+
+When mesh loading is enabled, mesh references in a URDF are opened from the
+local filesystem. Relative and `package://` references are confined to the
+robot-description directory, but explicit `file://` and absolute paths are
+honored by design and can point anywhere the process can read. Only load robot
+descriptions from sources you trust.
+
 ## Reporting a Vulnerability
 
 Please **do not** open a public GitHub issue for security vulnerabilities.

@@ -244,6 +244,7 @@ class URDFParser:
             resolved filesystem path, returning the input unchanged if it
             cannot be resolved.
         """
+        from .resolver import _path_escapes_base
 
         def handler(filename: str) -> str:
             """Resolve a mesh filename, expanding package:// and file:// URIs.
@@ -265,6 +266,14 @@ class URDFParser:
                 path_parts = filename[10:].split("/", 1)
                 if len(path_parts) == 2:
                     package_name, rel_path = path_parts
+                    # Refuse traversal: a package-relative path must not escape
+                    # via ".." or be absolute (mirrors the PackageResolver guard).
+                    if ".." in Path(rel_path).parts or Path(rel_path).is_absolute():
+                        logger.warning(
+                            f"Refusing to resolve {filename!r}: relative path "
+                            "contains traversal or is absolute"
+                        )
+                        return filename
                     # Try to find in mesh_dir or base_path
                     if mesh_dir:
                         candidate = mesh_dir / rel_path
@@ -287,13 +296,25 @@ class URDFParser:
 
             # Handle relative paths
             if not Path(filename).is_absolute():
+                # Refuse traversal: a relative mesh reference must stay within
+                # the robot-description directory.
+                if ".." in Path(filename).parts:
+                    logger.warning(
+                        f"Refusing to resolve relative path {filename!r}: "
+                        "contains '..' traversal"
+                    )
+                    return filename
                 if mesh_dir:
                     candidate = mesh_dir / filename
-                    if candidate.exists():
+                    if candidate.exists() and not _path_escapes_base(
+                        candidate, mesh_dir
+                    ):
                         return str(candidate)
                 if base_path:
                     candidate = base_path / filename
-                    if candidate.exists():
+                    if candidate.exists() and not _path_escapes_base(
+                        candidate, base_path
+                    ):
                         return str(candidate)
 
             return filename

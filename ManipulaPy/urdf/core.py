@@ -294,6 +294,19 @@ class URDF:
     def from_xml_string(cls, xml_string: str, **kwargs: object) -> "URDF":
         """Load URDF from XML string."""
         from .parser import URDFParser
+        from .resolver import PackageResolver
+
+        # Default to the guarded PackageResolver rather than the weaker legacy
+        # filename handler, mirroring how URDF.load wires mesh resolution.
+        if kwargs.get("filename_handler") is None:
+            base_path = kwargs.get("base_path")
+            resolver = PackageResolver(
+                base_path=Path(base_path) if base_path else None
+            )
+            mesh_dir = kwargs.get("mesh_dir")
+            if mesh_dir:
+                resolver.add_search_path(mesh_dir)
+            kwargs["filename_handler"] = resolver.create_handler()
 
         return URDFParser.parse_string(xml_string, **kwargs)
 

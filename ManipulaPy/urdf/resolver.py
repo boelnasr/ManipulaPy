@@ -21,6 +21,20 @@ from urllib.request import url2pathname
 logger = logging.getLogger(__name__)
 
 
+def _path_escapes_base(candidate: Path, base: Path) -> bool:
+    """Return True if ``candidate`` resolves outside ``base``.
+
+    Guards against symlink/traversal escapes for relative mesh references:
+    a resolved path that is not contained within the resolved base directory
+    must be refused. Unresolvable paths are treated as escaping.
+    """
+    try:
+        candidate.resolve().relative_to(base.resolve())
+        return False
+    except (ValueError, OSError, RuntimeError):
+        return True
+
+
 class PackageResolver:
     """
     Resolve package:// URIs and relative paths for URDF resources.
@@ -315,22 +329,33 @@ class PackageResolver:
         """
         Resolve a relative path.
 
+        A relative mesh reference must stay within the robot-description
+        directory. Paths containing a ``..`` component, or whose resolved
+        location escapes the search root, are refused and returned unchanged
+        (mirroring the ``package://`` traversal guard).
+
         Args:
             path: Relative path
 
         Returns:
             Resolved absolute path
         """
+        if ".." in Path(path).parts:
+            logger.warning(
+                f"Refusing to resolve relative path {path!r}: contains '..' traversal"
+            )
+            return path
+
         # Try base path first
         if self.base_path:
             candidate = self.base_path / path
-            if candidate.exists():
+            if candidate.exists() and not _path_escapes_base(candidate, self.base_path):
                 return str(candidate)
 
         # Try search paths
         for search_path in self._search_paths:
             candidate = search_path / path
-            if candidate.exists():
+            if candidate.exists() and not _path_escapes_base(candidate, search_path):
                 return str(candidate)
 
         # Return as-is if not found
