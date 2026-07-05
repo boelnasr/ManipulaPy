@@ -32,7 +32,7 @@ from typing import Any, List, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from . import utils
+from .. import utils
 
 
 class SerialManipulator:
@@ -534,7 +534,7 @@ class SerialManipulator:
         Returns:
             Tuple of (theta, success, iterations)
         """
-        from . import ik_helpers
+        from .. import ik_helpers
 
         n_joints = len(self.joint_limits)
 
@@ -667,7 +667,7 @@ class SerialManipulator:
         Returns:
             Tuple of (theta, success, total_iterations, winning_strategy)
         """
-        from . import ik_helpers
+        from .. import ik_helpers
 
         n_joints = len(self.joint_limits)
 
@@ -842,7 +842,7 @@ class SerialManipulator:
             ...     num_restarts=2
             ... )
         """
-        from .trac_ik import trac_ik_solve
+        from ..trac_ik import trac_ik_solve
 
         if theta0 is not None:
             theta0 = np.array(theta0, dtype=float)
