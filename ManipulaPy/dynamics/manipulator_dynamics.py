@@ -30,8 +30,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from .kinematics import SerialManipulator
-from .utils import adjoint_transform as ad
+from ..kinematics import SerialManipulator
+from ..utils import adjoint_transform as ad
 
 
 class ManipulatorDynamics(SerialManipulator):
