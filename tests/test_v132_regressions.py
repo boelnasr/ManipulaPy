@@ -3119,7 +3119,7 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         """
         from pathlib import Path
 
-        src = Path(__file__).resolve().parents[1] / "ManipulaPy" / "cuda_kernels.py"
+        src = Path(__file__).resolve().parents[1] / "ManipulaPy" / "cuda_kernels" / "__init__.py"
         text = src.read_text(encoding="utf-8")
 
         # The unguarded forms must not appear anywhere.
