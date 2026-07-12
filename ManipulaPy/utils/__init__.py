@@ -34,12 +34,6 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import Optional, Tuple
-
-import numpy as np
-from numpy.typing import NDArray
-from scipy.linalg import expm
-
 from .screw import (
     extract_omega_list,
     extract_r_list,

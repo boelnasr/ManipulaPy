@@ -109,6 +109,9 @@ class NumpyBackend(ArrayBackend):
     def minimum(self, x1: Any, x2: Any) -> Any:
         return np.minimum(x1, x2)
 
+    def where(self, condition: Any, x: Any, y: Any) -> Any:
+        return np.where(condition, x, y)
+
     def cross(self, a: Any, b: Any) -> Any:
         return np.cross(a, b)
 

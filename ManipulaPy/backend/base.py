@@ -122,6 +122,9 @@ class ArrayBackend(ABC):
     def minimum(self, x1: Any, x2: Any) -> Any: ...
 
     @abstractmethod
+    def where(self, condition: Any, x: Any, y: Any) -> Any: ...
+
+    @abstractmethod
     def cross(self, a: Any, b: Any) -> Any: ...
 
     @abstractmethod

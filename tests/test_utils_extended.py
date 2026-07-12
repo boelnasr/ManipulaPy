@@ -162,6 +162,34 @@ class TestMatrixLog3Branches(unittest.TestCase):
         result = utils.MatrixLog3(R)
         self.assertEqual(result.shape, (3, 3))
 
+    def test_coordinate_axis_pi_round_trip(self) -> None:
+        """#42: near-minus-one coordinate half turns must not log to zero."""
+        for axis in np.eye(3):
+            R = 2.0 * np.outer(axis, axis) - np.eye(3)
+            negative_diagonal = np.flatnonzero(axis == 0.0)[0]
+            R[negative_diagonal, negative_diagonal] += np.finfo(float).eps
+
+            so3mat = utils.MatrixLog3(R)
+            self.assertAlmostEqual(np.linalg.norm(so3mat), np.sqrt(2) * np.pi, places=6)
+            np.testing.assert_allclose(
+                utils.MatrixExp3(so3mat),
+                R,
+                rtol=1e-7,
+                atol=1e-7,
+                err_msg=f"MatrixLog3 lost the pi rotation for axis {axis}",
+            )
+
+    def test_near_zero_rotation_round_trip(self) -> None:
+        """Small nonzero rotations retain their first-order logarithm."""
+        for angle in (1e-7, 5e-7, 9e-7):
+            expected = utils.VecToso3(np.array([angle, 0.0, 0.0]))
+            rotation = utils.MatrixExp3(expected)
+            actual = utils.MatrixLog3(rotation)
+            np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=1e-15)
+            np.testing.assert_allclose(
+                utils.MatrixExp3(actual), rotation, rtol=1e-12, atol=1e-12
+            )
+
     def test_general_rotation(self) -> None:
         """Non-trivial rotation."""
         angle = 0.7
@@ -253,6 +281,11 @@ class TestExtractRList(unittest.TestCase):
         """None input returns empty array."""
         result = utils.extract_r_list(None)
         self.assertEqual(len(result), 0)
+
+    def test_scaled_axis_uses_actual_norm(self) -> None:
+        """Non-unit revolute axes preserve the original geometric result."""
+        screw = np.array([[0.5], [0.0], [0.0], [0.0], [-1.0], [0.0]])
+        np.testing.assert_allclose(utils.extract_r_list(screw), [[0.0, 0.0, 2.0]])
 
 
 if __name__ == "__main__":

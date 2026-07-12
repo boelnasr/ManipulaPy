@@ -111,6 +111,9 @@ class CupyBackend(ArrayBackend):
     def minimum(self, x1: Any, x2: Any) -> Any:
         return cp.minimum(x1, x2)
 
+    def where(self, condition: Any, x: Any, y: Any) -> Any:
+        return cp.where(condition, x, y)
+
     def cross(self, a: Any, b: Any) -> Any:
         return cp.cross(a, b)
 

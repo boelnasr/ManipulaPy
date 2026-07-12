@@ -19,6 +19,7 @@ import numpy as np
 import pytest
 
 from ManipulaPy import backend as be
+from ManipulaPy import utils
 from ManipulaPy.backend.base import ArrayBackend
 from ManipulaPy.backend.numpy_backend import NumpyBackend
 
@@ -29,7 +30,7 @@ CONSTRUCTION = ["array", "asarray", "zeros", "eye", "stack", "concatenate", "dia
 LINALG = ["svd", "inv", "pinv", "solve", "norm", "trace"]
 ELEMENTWISE = [
     "sin", "cos", "sqrt", "arccos", "arctan2", "abs", "clip",
-    "maximum", "minimum", "cross", "matmul",
+    "maximum", "minimum", "where", "cross", "matmul",
 ]
 REDUCTIONS = ["sum", "amax", "amin", "mean", "argmax", "all", "any", "isfinite"]
 DEVICE = ["to_device", "to_numpy", "ascontiguous"]
@@ -51,6 +52,51 @@ def _restore_backend():
 def test_default_backend_is_numpy():
     """With no setup the active backend is NumPy."""
     assert isinstance(be.get_backend(), NumpyBackend)
+
+
+def test_utils_default_backend_preserves_numpy_return_contract():
+    """Core utils keep ndarray/shape/dtype contracts on the default backend."""
+    so3mat = utils.VecToso3(np.array([0.0, 0.0, np.pi / 3]))
+    transform = utils.transform_from_twist(
+        np.array([0.0, 0.0, 1.0, 0.5, -0.25, 0.0]), 0.4
+    )
+
+    results = {
+        "MatrixExp3": (utils.MatrixExp3(so3mat), (3, 3)),
+        "MatrixLog3": (utils.MatrixLog3(utils.MatrixExp3(so3mat)), (3, 3)),
+        "transform_from_twist": (transform, (4, 4)),
+        "adjoint_transform": (utils.adjoint_transform(transform), (6, 6)),
+        "logm": (utils.logm(transform), (6,)),
+    }
+    for name, (result, shape) in results.items():
+        assert isinstance(result, np.ndarray), f"{name} returned {type(result)!r}"
+        assert result.shape == shape
+        assert result.dtype == np.float64
+
+    _, theta = utils.rotation_logm(transform[:3, :3])
+    assert type(theta) is float
+
+
+def test_utils_numpy_backend_numeric_parity():
+    """Dispatch through NumPy preserves representative SO(3)/SE(3) values."""
+    twist = np.array([0.0, 0.0, 1.0, 0.5, -0.25, 0.0])
+    theta = 0.4
+    c, s = np.cos(theta), np.sin(theta)
+    expected = np.array(
+        [
+            [c, -s, 0.0, 0.5 * s + 0.25 * (1.0 - c)],
+            [s, c, 0.0, 0.5 * (1.0 - c) - 0.25 * s],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+
+    with be.use_backend("numpy"):
+        transform = utils.transform_from_twist(twist, theta)
+        rotation = utils.MatrixExp3(utils.MatrixLog3(transform[:3, :3]))
+
+    np.testing.assert_allclose(transform, expected, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(rotation, expected[:3, :3], rtol=1e-12, atol=1e-12)
 
 
 def test_use_backend_restores_on_normal_exit():
