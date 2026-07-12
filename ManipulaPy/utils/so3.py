@@ -47,7 +47,9 @@ def rotation_logm(R) -> Tuple[NDArray, Any]:
     """Return the unit rotation axis and angle for a 3x3 rotation matrix.
 
     The masked formulation avoids scalar extraction and value-dependent Python
-    branches, making the operation suitable for traced array backends.
+    branches, allowing value tracing on array backends. The principal-log
+    derivative is not defined at a half turn and is not guaranteed near the
+    identity or half-turn branch boundaries.
     """
     b = get_backend()
     R = b.asarray(R)
