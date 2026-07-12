@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 """
-TRAC-IK Style Solver - ManipulaPy (compatibility shim)
+Inverse Kinematics Module - ManipulaPy
 
-The implementation now lives in :mod:`ManipulaPy.ik.trac_ik`. This module is
-kept as a compatibility shim so the historical import path
-``from ManipulaPy.trac_ik import ...`` keeps working unchanged. It re-exports
-the full public namespace of ``ManipulaPy.ik.trac_ik``.
+This module provides inverse kinematics solvers and helpers, including a
+TRAC-IK style parallel solver and intelligent initial-guess strategies
+(workspace heuristic, current-config extrapolation, cached nearest neighbor,
+random/midpoint fallbacks) plus an adaptive multi-start driver.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -28,21 +28,23 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from .ik.trac_ik import (
-    Any,
-    Callable,
-    ErrorFunction,
-    List,
-    NDArray,
-    Optional,
-    ThreadPoolExecutor,
-    TracIKSolver,
-    Tuple,
-    __all__,
-    as_completed,
-    deque,
-    np,
-    threading,
-    time,
-    trac_ik_solve,
+from .trac_ik import TracIKSolver, trac_ik_solve
+from .ik_helpers import (
+    IKInitialGuessCache,
+    adaptive_multi_start_ik,
+    extrapolate_from_current,
+    midpoint_of_limits,
+    random_in_limits,
+    workspace_heuristic_guess,
 )
+
+__all__ = [
+    "TracIKSolver",
+    "trac_ik_solve",
+    "workspace_heuristic_guess",
+    "extrapolate_from_current",
+    "random_in_limits",
+    "midpoint_of_limits",
+    "IKInitialGuessCache",
+    "adaptive_multi_start_ik",
+]
