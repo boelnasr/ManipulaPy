@@ -33,6 +33,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .. import utils
+from ..backend import get_backend
 
 
 class SerialManipulator:
@@ -110,11 +111,12 @@ class SerialManipulator:
             self.joint_limits = [(None, None)] * n_joints
 
         # Cache whether M_list is a list of poses (3D array) for FK hot path
-        self._m_list_is_array_of_poses = (
-            isinstance(self.M_list, (list, np.ndarray))
-            and hasattr(self.M_list, "__len__")
-            and len(np.asarray(self.M_list).shape) > 2
+        m_shape = (
+            self.M_list.shape
+            if hasattr(self.M_list, "shape")
+            else np.shape(self.M_list)
         )
+        self._m_list_is_array_of_poses = len(m_shape) > 2
 
     def update_state(
         self,
@@ -128,11 +130,14 @@ class SerialManipulator:
             joint_positions (np.ndarray): Current joint positions.
             joint_velocities (np.ndarray, optional): Current joint velocities. Default is None.
         """
-        self.joint_positions = np.array(joint_positions)
+        backend = get_backend()
+        self.joint_positions = backend.asarray(joint_positions)
         if joint_velocities is not None:
-            self.joint_velocities = np.array(joint_velocities)
+            self.joint_velocities = backend.asarray(joint_velocities)
         else:
-            self.joint_velocities = np.zeros_like(self.joint_positions)
+            self.joint_velocities = backend.zeros(
+                self.joint_positions.shape, dtype=self.joint_positions.dtype
+            )
 
     def forward_kinematics(
         self, thetalist: Union[NDArray[np.float64], List[float]], frame: str = "space"
@@ -148,21 +153,35 @@ class SerialManipulator:
         Returns:
             numpy.ndarray: The 4x4 transformation matrix representing the end-effector's pose.
         """
+        backend = get_backend()
+        theta_input = thetalist
+        thetalist = backend.asarray(theta_input)
+        dtype_kind = getattr(thetalist.dtype, "kind", None)
+        if not backend.is_backend_array(theta_input) or dtype_kind in ("b", "i", "u"):
+            thetalist = backend.asarray(theta_input, dtype=backend.float64)
+        S_list = backend.asarray(self.S_list)
+        B_list = backend.asarray(self.B_list)
         if frame == "space":
             # T(θ) = e^[S1θ1] e^[S2θ2] ... e^[Snθn] * M
-            T = np.eye(4)
+            T = backend.eye(4, dtype=thetalist.dtype)
             for i, theta in enumerate(thetalist):
-                T = T @ utils.transform_from_twist(self.S_list[:, i], theta)
+                T = backend.matmul(
+                    T,
+                    utils.transform_from_twist(S_list[:, i], theta),
+                )
             M = self.M_list[-1] if self._m_list_is_array_of_poses else self.M_list
-            T = T @ M
+            T = backend.matmul(T, backend.asarray(M))
 
         elif frame == "body":
             # T(θ) = M * e^[B1θ1] e^[B2θ2] ... e^[Bnθn]
-            T = np.eye(4)
+            T = backend.eye(4, dtype=thetalist.dtype)
             for i, theta in enumerate(thetalist):
-                T = T @ utils.transform_from_twist(self.B_list[:, i], theta)
+                T = backend.matmul(
+                    T,
+                    utils.transform_from_twist(B_list[:, i], theta),
+                )
             M = self.M_list[-1] if self._m_list_is_array_of_poses else self.M_list
-            T = M @ T
+            T = backend.matmul(backend.asarray(M), T)
 
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
@@ -192,7 +211,8 @@ class SerialManipulator:
             J = self.jacobian(thetalist, frame="body")
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
-        return np.dot(J, dthetalist)
+        backend = get_backend()
+        return backend.matmul(J, backend.asarray(dthetalist))
 
     def jacobian(
         self, thetalist: Union[NDArray[np.float64], List[float]], frame: str = "space"
@@ -208,32 +228,46 @@ class SerialManipulator:
         Returns:
             numpy.ndarray: The Jacobian matrix of shape (6, len(thetalist)).
         """
-        J = np.zeros((6, len(thetalist)))
-        T = np.eye(4)
+        backend = get_backend()
+        theta_input = thetalist
+        thetalist = backend.asarray(theta_input)
+        dtype_kind = getattr(thetalist.dtype, "kind", None)
+        if not backend.is_backend_array(theta_input) or dtype_kind in ("b", "i", "u"):
+            thetalist = backend.asarray(theta_input, dtype=backend.float64)
+        S_list = backend.asarray(self.S_list)
+        B_list = backend.asarray(self.B_list)
+        T = backend.eye(4, dtype=thetalist.dtype)
         if frame == "space":
+            if len(thetalist) == 0:
+                return backend.zeros((6, 0), dtype=thetalist.dtype)
+            columns = []
             for i in range(len(thetalist)):
-                J[:, i] = np.dot(utils.adjoint_transform(T), self.S_list[:, i])
-                T = np.dot(
-                    T, utils.transform_from_twist(self.S_list[:, i], thetalist[i])
+                columns.append(
+                    backend.matmul(utils.adjoint_transform(T), S_list[:, i])
+                )
+                T = backend.matmul(
+                    T, utils.transform_from_twist(S_list[:, i], thetalist[i])
                 )
         elif frame == "body":
             # Modern Robotics JacobianBody: start from identity, accumulate
             # e^{-[B_{i+1}]theta_{i+1}} to the right. The last column is B_n
             # (Ad(I) @ B_n); each earlier column is Ad of the trailing product.
             n = len(thetalist)
-            J[:, n - 1] = self.B_list[:, n - 1]
-            T = np.eye(4)
+            columns = [None] * n
+            columns[n - 1] = B_list[:, n - 1]
             for i in range(n - 2, -1, -1):
-                T = np.dot(
+                T = backend.matmul(
                     T,
                     utils.transform_from_twist(
-                        self.B_list[:, i + 1], -thetalist[i + 1]
+                        B_list[:, i + 1], -thetalist[i + 1]
                     ),
                 )
-                J[:, i] = np.dot(utils.adjoint_transform(T), self.B_list[:, i])
+                columns[i] = backend.matmul(
+                    utils.adjoint_transform(T), B_list[:, i]
+                )
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
-        return J
+        return backend.stack(columns, axis=1)
 
     def iterative_inverse_kinematics(
         self,
@@ -262,7 +296,9 @@ class SerialManipulator:
         - Improved line search with multiple scales
         - Best solution tracking
         """
-        theta = np.array(thetalist0, dtype=float)
+        backend = get_backend()
+        theta = backend.asarray(thetalist0, dtype=backend.float64)
+        T_desired = backend.asarray(T_desired, dtype=backend.float64)
         residuals = []
         damping_local = damping
         step_cap_local = step_cap
@@ -285,50 +321,50 @@ class SerialManipulator:
             """Compute geometric error without adjoint amplification."""
             # Position error
             pos_err = T_target[:3, 3] - T_curr[:3, 3]
-            trans_err = np.linalg.norm(pos_err)
+            trans_err = backend.norm(pos_err)
 
             # Rotation error using axis-angle
             R_curr = T_curr[:3, :3]
             R_target = T_target[:3, :3]
-            R_err = R_curr.T @ R_target
+            R_err = backend.matmul(R_curr.T, R_target)
 
-            trace_val = np.clip((np.trace(R_err) - 1) / 2, -1, 1)
-            angle = np.arccos(trace_val)
-            rot_err = abs(angle)
+            trace_val = backend.clip((backend.trace(R_err) - 1) / 2, -1, 1)
+            angle = backend.arccos(trace_val)
+            rot_err = backend.abs(angle)
 
             # Extract rotation axis
             if angle < 1e-6:
                 omega_err = (
-                    np.array(
-                        [
+                    backend.stack(
+                        (
                             R_err[2, 1] - R_err[1, 2],
                             R_err[0, 2] - R_err[2, 0],
                             R_err[1, 0] - R_err[0, 1],
-                        ]
+                        )
                     )
                     / 2
                 )
             elif abs(angle - np.pi) < 1e-6:
-                diag = np.diag(R_err)
-                idx = np.argmax(diag)
-                axis = np.zeros(3)
+                diag = backend.diag(R_err)
+                idx = backend.argmax(diag)
+                axis = backend.zeros(3, dtype=R_err.dtype)
                 axis[idx] = 1.0
                 omega_err = angle * axis
             else:
-                axis = np.array(
-                    [
+                axis = backend.stack(
+                    (
                         R_err[2, 1] - R_err[1, 2],
                         R_err[0, 2] - R_err[2, 0],
                         R_err[1, 0] - R_err[0, 1],
-                    ]
-                ) / (2 * np.sin(angle) + 1e-10)
+                    )
+                ) / (2 * backend.sin(angle) + 1e-10)
                 omega_err = angle * axis
 
             # Transform to space frame
-            omega_err_space = R_curr @ omega_err
+            omega_err_space = backend.matmul(R_curr, omega_err)
 
             # 6D error [angular, linear]
-            V_err = np.concatenate([omega_err_space, pos_err])
+            V_err = backend.concatenate((omega_err_space, pos_err))
             return V_err, rot_err, trans_err
 
         def svd_robust_solve(
@@ -338,15 +374,22 @@ class SerialManipulator:
         ) -> NDArray[np.float64]:
             """SVD-based damped least squares for near-singular Jacobians."""
             try:
-                U, s, Vt = np.linalg.svd(J, full_matrices=False)
+                U, s, Vt = backend.svd(J, full_matrices=False)
                 # Damped pseudo-inverse: σ / (σ² + λ²)
                 s_damped = s / (s**2 + damping_val**2 + 1e-12)
-                return Vt.T @ (s_damped * (U.T @ V_err))
-            except np.linalg.LinAlgError:
+                return backend.matmul(
+                    Vt.T, s_damped * backend.matmul(U.T, V_err)
+                )
+            except Exception as exc:
+                # CuPy exposes its own LinAlgError class rather than NumPy's.
+                if not isinstance(exc, np.linalg.LinAlgError) and (
+                    exc.__class__.__name__ != "LinAlgError"
+                ):
+                    raise
                 # Fallback to standard solve
-                JTJ = J.T @ J
-                lambda_I = (damping_val**2) * np.eye(JTJ.shape[0])
-                return np.linalg.solve(JTJ + lambda_I, J.T @ V_err)
+                JTJ = backend.matmul(J.T, J)
+                lambda_I = (damping_val**2) * backend.eye(JTJ.shape[0])
+                return backend.solve(JTJ + lambda_I, backend.matmul(J.T, V_err))
 
         def clip_to_limits(th: NDArray[np.float64]) -> NDArray[np.float64]:
             """Clip joint angles to limits."""
@@ -416,7 +459,7 @@ class SerialManipulator:
             delta_theta = svd_robust_solve(J_space, V_weighted, damping_local)
 
             # Cap step size
-            norm_delta = np.linalg.norm(delta_theta)
+            norm_delta = backend.norm(delta_theta)
             if norm_delta > step_cap_local:
                 delta_theta *= step_cap_local / norm_delta
 
@@ -466,7 +509,12 @@ class SerialManipulator:
             import matplotlib.pyplot as plt
 
             it = np.arange(len(residuals))
-            tr, rt = zip(*residuals)
+            tr, rt = zip(
+                *(
+                    (float(backend.to_numpy(t)), float(backend.to_numpy(r)))
+                    for t, r in residuals
+                )
+            )
             plt.plot(it, tr, label="Translation error")
             plt.plot(it, rt, label="Rotation error")
             plt.xlabel("Iteration")
@@ -486,6 +534,9 @@ class SerialManipulator:
         T_curr: NDArray[np.float64], T_desired: NDArray[np.float64]
     ) -> float:
         """Compute combined position + orientation error between two poses."""
+        backend = get_backend()
+        T_curr = backend.to_numpy(T_curr)
+        T_desired = backend.to_numpy(T_desired)
         pos_err = np.linalg.norm(T_curr[:3, 3] - T_desired[:3, 3])
         R_err = T_curr[:3, :3].T @ T_desired[:3, :3]
         rot_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
@@ -730,8 +781,13 @@ class SerialManipulator:
 
                 # Evaluate error for tracking best
                 T_curr = self.forward_kinematics(theta, frame="space")
-                pos_err = np.linalg.norm(T_curr[:3, 3] - T_desired[:3, 3])
-                R_err = T_curr[:3, :3].T @ T_desired[:3, :3]
+                backend = get_backend()
+                T_curr_host = backend.to_numpy(T_curr)
+                T_desired_host = backend.to_numpy(T_desired)
+                pos_err = np.linalg.norm(
+                    T_curr_host[:3, 3] - T_desired_host[:3, 3]
+                )
+                R_err = T_curr_host[:3, :3].T @ T_desired_host[:3, :3]
                 rot_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
                 error = pos_err + rot_err
 
@@ -779,7 +835,8 @@ class SerialManipulator:
             J = self.jacobian(thetalist, frame="body")
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
-        return np.linalg.pinv(J) @ V_ee
+        backend = get_backend()
+        return backend.matmul(backend.pinv(J), backend.asarray(V_ee))
 
     def end_effector_pose(
         self, thetalist: Union[NDArray[np.float64], List[float]]

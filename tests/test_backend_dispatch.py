@@ -22,6 +22,7 @@ from ManipulaPy import backend as be
 from ManipulaPy import utils
 from ManipulaPy.backend.base import ArrayBackend
 from ManipulaPy.backend.numpy_backend import NumpyBackend
+from ManipulaPy.kinematics import SerialManipulator
 
 
 # The full protocol surface, mirrored from the call-site audit. Kept here so
@@ -216,3 +217,217 @@ def test_import_safety_without_cupy(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", _blocked_import)
     module = importlib.reload(importlib.import_module("ManipulaPy.backend"))
     assert isinstance(module.get_backend(), NumpyBackend)
+
+
+class _SpyNumpyBackend(NumpyBackend):
+    """NumPy delegate that records primitives used by migrated hot paths."""
+
+    def __init__(self):
+        self.calls = []
+
+    def eye(self, n, dtype=None):
+        self.calls.append("eye")
+        return super().eye(n, dtype=dtype)
+
+    def zeros(self, shape, dtype=None):
+        self.calls.append("zeros")
+        return super().zeros(shape, dtype=dtype)
+
+    def stack(self, arrays, axis=0):
+        self.calls.append("stack")
+        return super().stack(arrays, axis=axis)
+
+    def matmul(self, a, b):
+        self.calls.append("matmul")
+        return super().matmul(a, b)
+
+    def pinv(self, a):
+        self.calls.append("pinv")
+        return super().pinv(a)
+
+
+def _two_joint_manipulator():
+    """Return a deterministic planar arm with consistent space/body screws."""
+    s_list = np.array(
+        [
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 0.0],
+            [0.0, -1.0],
+            [0.0, 0.0],
+        ]
+    )
+    b_list = np.array(
+        [
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [1.0, 1.0],
+            [0.0, 0.0],
+            [2.0, 1.0],
+            [0.0, 0.0],
+        ]
+    )
+    home = np.array(
+        [
+            [1.0, 0.0, 0.0, 2.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    return SerialManipulator(
+        M_list=home,
+        omega_list=s_list[:3],
+        S_list=s_list,
+        B_list=b_list,
+        joint_limits=[(None, None)] * 2,
+    )
+
+
+def _kinematics_results(robot):
+    q = np.array([0.2, -0.3])
+    dq = np.array([0.4, -0.2])
+    results = {}
+    for frame in ("space", "body"):
+        velocity = robot.end_effector_velocity(q, dq, frame=frame)
+        results[(frame, "fk")] = robot.forward_kinematics(q, frame=frame)
+        results[(frame, "jacobian")] = robot.jacobian(q, frame=frame)
+        results[(frame, "velocity")] = velocity
+        results[(frame, "joint_velocity")] = robot.joint_velocity(
+            q, velocity, frame=frame
+        )
+    return results
+
+
+def test_kinematics_default_backend_numeric_and_return_contract():
+    """Default NumPy keeps FK/Jacobian/velocity values and array contracts."""
+    results = _kinematics_results(_two_joint_manipulator())
+
+    expected_fk = np.array(
+        [
+            [0.9950041653, 0.0998334166, 0.0, 1.9750707431],
+            [-0.0998334166, 0.9950041653, 0.0, 0.0988359141],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    np.testing.assert_allclose(results[("space", "fk")], expected_fk, atol=1e-9)
+    np.testing.assert_allclose(results[("body", "fk")], expected_fk, atol=1e-9)
+
+    # Preserve the corrected body-Jacobian seed: J_b[:, -1] is exactly B_n.
+    expected_body_seed = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
+    np.testing.assert_array_equal(
+        results[("body", "jacobian")][:, -1], expected_body_seed
+    )
+    np.testing.assert_allclose(
+        results[("space", "velocity")],
+        [0.0, 0.0, 0.2, -0.0397338662, 0.1960133156, 0.0],
+        atol=1e-9,
+    )
+    np.testing.assert_allclose(
+        results[("body", "velocity")],
+        [0.0, 0.0, 0.2, -0.1182080827, 0.5821345957, 0.0],
+        atol=1e-9,
+    )
+    for frame in ("space", "body"):
+        np.testing.assert_allclose(
+            results[(frame, "joint_velocity")], [0.4, -0.2], atol=1e-12
+        )
+        for operation, shape in (
+            ("fk", (4, 4)),
+            ("jacobian", (6, 2)),
+            ("velocity", (6,)),
+            ("joint_velocity", (2,)),
+        ):
+            result = results[(frame, operation)]
+            assert isinstance(result, np.ndarray)
+            assert result.shape == shape
+            assert result.dtype == np.float64
+
+
+def test_kinematics_hot_paths_dispatch_through_active_backend(monkeypatch):
+    """FK, Jacobians, and velocity helpers use the selected backend."""
+    robot = _two_joint_manipulator()
+    expected = _kinematics_results(robot)
+    spy = _SpyNumpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    actual = _kinematics_results(robot)
+
+    for key, expected_value in expected.items():
+        np.testing.assert_allclose(actual[key], expected_value, rtol=1e-12, atol=1e-12)
+    assert "eye" in spy.calls
+    assert "matmul" in spy.calls
+    assert "stack" in spy.calls
+    assert "pinv" in spy.calls
+
+
+def test_kinematics_cupy_native_parity():
+    """CuPy keeps migrated kinematics native while matching NumPy values."""
+    if importlib.util.find_spec("cupy") is None:
+        pytest.skip("CuPy is not installed")
+
+    import cupy as cp
+
+    if not isinstance(getattr(cp, "ndarray", None), type):
+        pytest.skip("CuPy test double does not provide native array types")
+    try:
+        cp.asarray([0.0])
+    except Exception as exc:  # pragma: no cover - device/runtime dependent
+        pytest.skip(f"CuPy runtime is unavailable: {exc}")
+
+    robot = _two_joint_manipulator()
+    expected = _kinematics_results(robot)
+    with be.use_backend("cupy"):
+        actual = _kinematics_results(robot)
+
+    for key, expected_value in expected.items():
+        assert isinstance(actual[key], cp.ndarray)
+        np.testing.assert_allclose(
+            cp.asnumpy(actual[key]), expected_value, rtol=1e-10, atol=1e-10
+        )
+
+
+def test_kinematics_integer_list_input_keeps_floating_point_contract():
+    """Integer Python lists must not select integer arithmetic for FK/Jacobians."""
+    robot = _two_joint_manipulator()
+
+    transform = robot.forward_kinematics([0, 0], frame="space")
+    jacobian = robot.jacobian([0, 0], frame="body")
+
+    assert transform.dtype == np.float64
+    assert jacobian.dtype == np.float64
+    np.testing.assert_array_equal(transform, robot.M_list)
+    np.testing.assert_array_equal(jacobian[:, -1], robot.B_list[:, -1])
+
+
+def test_kinematics_stacked_home_transforms_use_last_pose():
+    """FK preserves the established final-pose selection for stacked M_list."""
+    robot = _two_joint_manipulator()
+    first_home = np.eye(4)
+    final_home = robot.M_list.copy()
+    robot.M_list = np.stack((first_home, final_home))
+    robot._m_list_is_array_of_poses = True
+
+    for frame in ("space", "body"):
+        result = robot.forward_kinematics([0.0, 0.0], frame=frame)
+        np.testing.assert_array_equal(result, final_home)
+
+
+def test_space_jacobian_with_no_joints_preserves_empty_shape():
+    """A zero-joint space Jacobian remains a valid floating `(6, 0)` array."""
+    empty = np.empty((6, 0), dtype=np.float64)
+    robot = SerialManipulator(
+        M_list=np.eye(4),
+        omega_list=empty[:3],
+        S_list=empty,
+        B_list=empty,
+        joint_limits=[],
+    )
+
+    result = robot.jacobian([], frame="space")
+
+    assert isinstance(result, np.ndarray)
+    assert result.shape == (6, 0)
+    assert result.dtype == np.float64
