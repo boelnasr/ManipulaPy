@@ -39,63 +39,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 
-# Optional CuPy import for defensive array handling
-try:
-    import cupy as cp
-
-    CUPY_AVAILABLE = True
-except ImportError:
-    cp = None
-    CUPY_AVAILABLE = False
+from . import _to_numpy, _validate_i_clamp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-def _to_numpy(arr: Any) -> NDArray[Any]:
-    """
-    Safely convert array to NumPy, handling both NumPy and CuPy arrays.
-
-    Args:
-        arr: Input array (can be NumPy array, CuPy array, or list)
-
-    Returns:
-        NumPy array
-
-    Note:
-        This is necessary because np.asarray() does not work with CuPy arrays.
-        CuPy raises "Implicit conversion to a NumPy array is not allowed"
-        to prevent accidental performance issues. We must explicitly call .get()
-        to transfer CuPy arrays from GPU to CPU.
-    """
-    if CUPY_AVAILABLE and cp is not None:
-        try:
-            if isinstance(arr, cp.ndarray):
-                # CuPy array: explicitly transfer from GPU to CPU
-                return arr.get()
-        except (TypeError, AttributeError):
-            # cp.ndarray may not be a real type when CuPy is mocked; treat as non-CuPy
-            pass
-
-    # NumPy array, list, or other: convert to NumPy
-    return np.asarray(arr)
-
-
-def _validate_i_clamp(i_clamp: Optional[float]) -> Optional[float]:
-    """Return a scalar positive finite integral clamp, or None if disabled."""
-    if i_clamp is None:
-        return None
-
-    clamp = np.asarray(_to_numpy(i_clamp), dtype=float)
-    if clamp.size != 1:
-        raise ValueError(f"i_clamp must be a scalar, got shape {clamp.shape}")
-
-    clamp_value = float(clamp.reshape(-1)[0])
-    if not np.isfinite(clamp_value) or clamp_value <= 0:
-        raise ValueError(
-            f"i_clamp must be positive and finite when set, got {i_clamp!r}"
-        )
-    return clamp_value
 
 
 class ManipulatorController:
