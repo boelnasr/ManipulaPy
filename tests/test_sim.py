@@ -192,7 +192,7 @@ mock_pybullet = MockPyBullet()
 def mock_pybullet_module(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Replace pybullet module completely"""
     # Patch all pybullet functions used in sim.py
-    monkeypatch.setattr("ManipulaPy.sim.p", mock_pybullet)
+    monkeypatch.setattr("ManipulaPy.sim.simulation.p", mock_pybullet)
     # Also patch any direct imports
     monkeypatch.setattr("pybullet.connect", mock_pybullet.connect)
     monkeypatch.setattr("pybullet.disconnect", mock_pybullet.disconnect)
@@ -210,7 +210,7 @@ def mock_pybullet_module(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     # Mock pybullet_data
     mock_pybullet_data = Mock()
     mock_pybullet_data.getDataPath.return_value = "/fake/path"
-    monkeypatch.setattr("ManipulaPy.sim.pybullet_data", mock_pybullet_data)
+    monkeypatch.setattr("ManipulaPy.sim.simulation.pybullet_data", mock_pybullet_data)
 
     # Mock time.sleep to speed up tests
     monkeypatch.setattr("time.sleep", lambda x: None)

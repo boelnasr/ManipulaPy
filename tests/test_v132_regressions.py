@@ -1175,7 +1175,7 @@ class TestSimRegressions(unittest.TestCase):
         Runs in a subprocess so that mucking with ``sys.modules`` and the
         import system can't leak state into other tests in this process
         (notably tests/test_sim.py, which captures Simulation at import time
-        and relies on a monkeypatched ManipulaPy.sim.p).
+        and relies on a monkeypatched ManipulaPy.sim.simulation.p).
 
         Scope is intentionally limited to pybullet/pybullet_data. Blocking
         cupy too would crash a transitive import of ManipulaPy.control,
@@ -1243,8 +1243,8 @@ class TestSimRegressions(unittest.TestCase):
         ]
 
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p") as mock_p,
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p") as mock_p,
             patch("ManipulaPy.sim.time.sleep"),
         ):
             mock_p.getJointState.return_value = (1.0, 0.0)  # position, velocity
@@ -1278,8 +1278,8 @@ class TestSimRegressions(unittest.TestCase):
         from ManipulaPy.sim import Simulation
 
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p"),
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p"),
             patch("ManipulaPy.sim.time.sleep"),
         ):
             sim = Simulation.__new__(Simulation)
@@ -1301,8 +1301,8 @@ class TestSimRegressions(unittest.TestCase):
         from ManipulaPy.sim import Simulation
 
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p"),
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p"),
             patch("ManipulaPy.sim.time.sleep"),
         ):
             sim = Simulation.__new__(Simulation)
@@ -1324,8 +1324,8 @@ class TestSimRegressions(unittest.TestCase):
         from ManipulaPy.sim import Simulation
 
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p"),
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p"),
             patch("ManipulaPy.sim.time.sleep"),
         ):
             sim = Simulation.__new__(Simulation)
@@ -1351,8 +1351,8 @@ class TestSimRegressions(unittest.TestCase):
         desired_positions = (waypoint for waypoint in [first_waypoint, second_waypoint])
 
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p") as mock_p,
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p") as mock_p,
             patch("ManipulaPy.sim.time.sleep"),
         ):
             mock_p.stepSimulation = MagicMock()
@@ -1419,8 +1419,8 @@ class TestSimRegressions(unittest.TestCase):
             with self.subTest(method=method_name):
                 sim = make_sim()
                 with (
-                    patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-                    patch("ManipulaPy.sim.p") as mock_p,
+                    patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+                    patch("ManipulaPy.sim.simulation.p") as mock_p,
                     patch("ManipulaPy.sim.time.sleep"),
                 ):
                     mock_p.stepSimulation.side_effect = RuntimeError("boom")
@@ -1452,9 +1452,9 @@ class TestSimRegressions(unittest.TestCase):
         from ManipulaPy.sim import Simulation
 
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p") as mock_p,
-            patch("ManipulaPy.sim.pybullet_data") as mock_pd,
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p") as mock_p,
+            patch("ManipulaPy.sim.simulation.pybullet_data") as mock_pd,
         ):
             mock_p.loadURDF.side_effect = [101, 202]  # plane, robot
             mock_p.getNumJoints.return_value = 6
@@ -1484,8 +1484,8 @@ class TestSimRegressions(unittest.TestCase):
         sim.non_fixed_joints = list(range(6))
         sim.torque_limits = None
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p") as mock_p,
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p") as mock_p,
         ):
             sim.set_joint_positions(np.zeros(6))
             kwargs = mock_p.setJointMotorControlArray.call_args.kwargs
@@ -1501,9 +1501,9 @@ class TestSimRegressions(unittest.TestCase):
         # Clear any leftover handlers from prior test runs
         logging.getLogger("SimulationLogger").handlers.clear()
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p"),
-            patch("ManipulaPy.sim.pybullet_data"),
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p"),
+            patch("ManipulaPy.sim.simulation.pybullet_data"),
         ):
             sims = [Simulation.__new__(Simulation) for _ in range(3)]
             for s in sims:
@@ -1531,7 +1531,7 @@ class TestSimRegressions(unittest.TestCase):
         sim = Simulation.__new__(Simulation)
         sim.logger = MagicMock()
 
-        with patch("ManipulaPy.sim.p") as mock_p:
+        with patch("ManipulaPy.sim.simulation.p") as mock_p:
             mock_p.getQuaternionFromEuler.return_value = (0, 0, 0, 1)
             mock_p.createCollisionShape.return_value = 10
             mock_p.createVisualShape.return_value = 11
@@ -1619,8 +1619,8 @@ class TestSimPybulletGuards(unittest.TestCase):
                 method = getattr(sim, method_name)
                 args = args_factory()
                 with (
-                    patch("ManipulaPy.sim._PYBULLET_AVAILABLE", False),
-                    patch("ManipulaPy.sim.p", None),
+                    patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", False),
+                    patch("ManipulaPy.sim.simulation.p", None),
                 ):
                     with self.assertRaises(ImportError) as ctx:
                         method(*args)
@@ -2877,8 +2877,8 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
                 sim.urdf_file_path = "/nonexistent.urdf"
                 sim.time_step = 0.01
                 with (
-                    patch("ManipulaPy.sim._PYBULLET_AVAILABLE", False),
-                    patch("ManipulaPy.sim.p", None),
+                    patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", False),
+                    patch("ManipulaPy.sim.simulation.p", None),
                 ):
                     with self.assertRaises(ImportError) as ctx:
                         getattr(sim, method_name)()
@@ -2909,8 +2909,8 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         fake_p.setJointMotorControlArray.side_effect = fake_set_motor
         fake_p.POSITION_CONTROL = 0
         with (
-            patch("ManipulaPy.sim._PYBULLET_AVAILABLE", True),
-            patch("ManipulaPy.sim.p", fake_p),
+            patch("ManipulaPy.sim.simulation._PYBULLET_AVAILABLE", True),
+            patch("ManipulaPy.sim.simulation.p", fake_p),
         ):
             sim.set_joint_positions([0.0, 0.0, 0.0])
 
