@@ -33,7 +33,7 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial import ConvexHull
 
-from .urdf import URDF  # Use native parser
+from ..urdf import URDF  # Use native parser
 
 _logger = logging.getLogger(__name__)
 
