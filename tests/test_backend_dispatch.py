@@ -1203,3 +1203,176 @@ def test_each_scalar_method_dispatches_svd_in_isolation(monkeypatch):
         # non-finite input, so a regression back to it must fail here.
         assert "svdvals" in spy.calls
         assert "svd" not in spy.calls
+
+
+# ---------------------------------------------------------------------------
+# Trajectory-generation dispatch
+# ---------------------------------------------------------------------------
+
+from ManipulaPy.planning.trajectory_planning import OptimizedTrajectoryPlanning
+
+
+class _TrajectorySpyBackend(NumpyBackend):
+    """NumPy delegate that records primitives used by migrated generation paths.
+
+    ``stack`` also records the shape of each result so a test can single out the
+    Cartesian orientation assembly ((N, 3, 3)), which no other call on the path
+    produces.
+    """
+
+    def __init__(self):
+        self.calls = []
+        self.stack_shapes = []
+
+    def to_numpy(self, x):
+        self.calls.append("to_numpy")
+        return super().to_numpy(x)
+
+    def asarray(self, obj, dtype=None):
+        self.calls.append("asarray")
+        return super().asarray(obj, dtype=dtype)
+
+    def clip(self, x, a_min, a_max):
+        self.calls.append("clip")
+        return super().clip(x, a_min, a_max)
+
+    def matmul(self, a, b):
+        self.calls.append("matmul")
+        return super().matmul(a, b)
+
+    def stack(self, arrays, axis=0):
+        self.calls.append("stack")
+        out = super().stack(arrays, axis=axis)
+        self.stack_shapes.append(out.shape)
+        return out
+
+
+def _cpu_trajectory_planner():
+    """Force-CPU planner with wide joint limits and no collision checker."""
+    return OptimizedTrajectoryPlanning(
+        None,
+        "nonexistent.urdf",
+        None,
+        [(-5.0, 5.0), (-5.0, 5.0)],
+        use_cuda=False,
+    )
+
+
+def test_joint_trajectory_cpu_default_backend_parity():
+    """Default NumPy keeps quintic joint positions/velocities and float32 dtype."""
+    planner = _cpu_trajectory_planner()
+    traj = planner.joint_trajectory([0.0, 0.0], [1.0, -0.5], 1.0, 3, 5)
+
+    expected_pos = np.array(
+        [[0.0, 0.0], [0.5, -0.25], [1.0, -0.5]], dtype=np.float32
+    )
+    expected_vel = np.array(
+        [[0.0, 0.0], [1.875, -0.9375], [0.0, 0.0]], dtype=np.float32
+    )
+    expected_acc = np.zeros((3, 2), dtype=np.float32)
+
+    np.testing.assert_array_equal(traj["positions"], expected_pos)
+    np.testing.assert_array_equal(traj["velocities"], expected_vel)
+    np.testing.assert_array_equal(traj["accelerations"], expected_acc)
+    for key in ("positions", "velocities", "accelerations"):
+        assert traj[key].dtype == np.float32
+
+
+def test_batch_joint_trajectory_cpu_default_backend_parity():
+    """Default NumPy keeps batch quintic positions, shape and float32 dtype."""
+    planner = _cpu_trajectory_planner()
+    thetastart = np.array([[0.0, 0.0], [0.2, 0.3]], dtype=np.float32)
+    thetaend = np.array([[1.0, -0.5], [0.4, 0.1]], dtype=np.float32)
+    traj = planner.batch_joint_trajectory(thetastart, thetaend, 1.0, 3, 5)
+
+    expected_pos = np.array(
+        [
+            [[0.0, 0.0], [0.5, -0.25], [1.0, -0.5]],
+            [[0.2, 0.3], [0.3, 0.2], [0.4, 0.1]],
+        ],
+        dtype=np.float32,
+    )
+    assert traj["positions"].shape == (2, 3, 2)
+    np.testing.assert_allclose(traj["positions"], expected_pos, atol=1e-6)
+    for key in ("positions", "velocities", "accelerations"):
+        assert traj[key].dtype == np.float32
+
+
+def test_cartesian_trajectory_default_backend_parity():
+    """Default NumPy keeps Cartesian positions/velocities/orientations and dtype."""
+    planner = _cpu_trajectory_planner()
+    Xstart = np.eye(4)
+    Xend = np.eye(4)
+    Xend[:3, 3] = [1.0, 2.0, 3.0]
+    traj = planner.cartesian_trajectory(Xstart, Xend, 1.0, 5, 5)
+
+    expected_pos = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [0.103515625, 0.20703125, 0.310546875],
+            [0.5, 1.0, 1.5],
+            [0.896484375, 1.79296875, 2.689453125],
+            [1.0, 2.0, 3.0],
+        ],
+        dtype=np.float32,
+    )
+    expected_vel = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0546875, 2.109375, 3.1640625],
+            [1.875, 3.75, 5.625],
+            [1.0546875, 2.109375, 3.1640625],
+            [0.0, 0.0, 0.0],
+        ],
+        dtype=np.float32,
+    )
+
+    np.testing.assert_allclose(traj["positions"], expected_pos, atol=1e-6)
+    np.testing.assert_allclose(traj["velocities"], expected_vel, atol=1e-6)
+    assert traj["orientations"].shape == (5, 3, 3)
+    for i in range(5):
+        np.testing.assert_array_equal(traj["orientations"][i], np.eye(3, dtype=np.float32))
+    for key in ("positions", "velocities", "accelerations", "orientations"):
+        assert traj[key].dtype == np.float32
+
+
+def test_joint_trajectory_cpu_dispatches_through_active_backend(monkeypatch):
+    """The CPU joint path routes clipping and the njit boundary through the backend."""
+    planner = _cpu_trajectory_planner()
+    spy = _TrajectorySpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    planner.joint_trajectory([0.0, 0.0], [1.0, -0.5], 1.0, 3, 5)
+
+    assert "to_numpy" in spy.calls
+    assert "clip" in spy.calls
+
+
+def test_batch_joint_trajectory_cpu_dispatches_through_active_backend(monkeypatch):
+    """The CPU batch path stacks rows and clips limits through the backend."""
+    planner = _cpu_trajectory_planner()
+    thetastart = np.array([[0.0, 0.0], [0.2, 0.3]], dtype=np.float32)
+    thetaend = np.array([[1.0, -0.5], [0.4, 0.1]], dtype=np.float32)
+    spy = _TrajectorySpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    planner.batch_joint_trajectory(thetastart, thetaend, 1.0, 3, 5)
+
+    assert "stack" in spy.calls
+    assert "clip" in spy.calls
+
+
+def test_cartesian_trajectory_dispatches_through_active_backend(monkeypatch):
+    """Cartesian orientation assembly stacks (N, 3, 3) through the active backend."""
+    planner = _cpu_trajectory_planner()
+    Xstart = np.eye(4)
+    Xend = np.eye(4)
+    Xend[:3, 3] = [1.0, 2.0, 3.0]
+    spy = _TrajectorySpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    planner.cartesian_trajectory(Xstart, Xend, 1.0, 5, 5)
+
+    # The (N, 3, 3) orientation stack is unique to the migrated assembly; the
+    # SE(3) utilities on this path only stack rows/vectors (ndim <= 2).
+    assert (5, 3, 3) in spy.stack_shapes

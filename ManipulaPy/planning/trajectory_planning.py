@@ -50,6 +50,7 @@ from ..cuda_kernels import (
     return_cuda_array,
     setup_cuda_environment_for_40x_speedup,
 )
+from ..backend import get_backend
 from ..utils import (
     CubicTimeScaling,
     MatrixExp3,
@@ -566,8 +567,9 @@ class OptimizedTrajectoryPlanning:
             f"method={method}, kernel={kernel_type}"
         )
 
-        thetastart = np.array(thetastart, dtype=np.float32)
-        thetaend = np.array(thetaend, dtype=np.float32)
+        backend = get_backend()
+        thetastart = backend.asarray(thetastart, dtype=backend.float32)
+        thetaend = backend.asarray(thetaend, dtype=backend.float32)
         num_joints = len(thetastart)
 
         # Print performance recommendations if beneficial
@@ -703,19 +705,22 @@ class OptimizedTrajectoryPlanning:
             ``"velocities"`` and ``"accelerations"``, each an
             ``(N, num_joints)`` array.
         """
+        backend = get_backend()
         start_time = time.time()
 
-        # Use optimized CPU fallback
+        # Optimized CPU fallback: the Numba kernel is a host (real-NumPy)
+        # boundary, so convert at the call site and re-enter the backend.
         traj_pos, traj_vel, traj_acc = _traj_cpu_njit(
-            thetastart, thetaend, Tf, N, method
+            backend.to_numpy(thetastart), backend.to_numpy(thetaend), Tf, N, method
         )
+        traj_pos = backend.asarray(traj_pos)
+        traj_vel = backend.asarray(traj_vel)
+        traj_acc = backend.asarray(traj_acc)
 
-        # Apply joint limits
-        num_joints = len(thetastart)
-        for i in range(num_joints):
-            traj_pos[:, i] = np.clip(
-                traj_pos[:, i], self.joint_limits[i, 0], self.joint_limits[i, 1]
-            )
+        # Apply joint limits column-wise (broadcast, no in-place writes)
+        lower = backend.asarray(self.joint_limits[:, 0])
+        upper = backend.asarray(self.joint_limits[:, 1])
+        traj_pos = backend.clip(traj_pos, lower, upper)
 
         # Apply collision avoidance if available
         if self.collision_checker and self.potential_field:
@@ -907,32 +912,33 @@ class OptimizedTrajectoryPlanning:
             ``"velocities"`` and ``"accelerations"``, each a
             ``(batch_size, N, num_joints)`` array.
         """
+        backend = get_backend()
         start_time = time.time()
 
         batch_size, num_joints = thetastart_batch.shape
 
-        # Initialize result arrays
-        traj_pos_batch = np.zeros((batch_size, N, num_joints), dtype=np.float32)
-        traj_vel_batch = np.zeros((batch_size, N, num_joints), dtype=np.float32)
-        traj_acc_batch = np.zeros((batch_size, N, num_joints), dtype=np.float32)
+        # Numba kernel is a host (real-NumPy) boundary; convert at the call site.
+        start_host = backend.to_numpy(thetastart_batch)
+        end_host = backend.to_numpy(thetaend_batch)
 
-        # Process each trajectory in the batch
+        # Process each trajectory in the batch, then stack into one array
+        pos_rows, vel_rows, acc_rows = [], [], []
         for i in range(batch_size):
             traj_pos, traj_vel, traj_acc = _traj_cpu_njit(
-                thetastart_batch[i], thetaend_batch[i], Tf, N, method
+                start_host[i], end_host[i], Tf, N, method
             )
-            traj_pos_batch[i] = traj_pos
-            traj_vel_batch[i] = traj_vel
-            traj_acc_batch[i] = traj_acc
+            pos_rows.append(backend.asarray(traj_pos))
+            vel_rows.append(backend.asarray(traj_vel))
+            acc_rows.append(backend.asarray(traj_acc))
 
-        # Enforce joint limits for all trajectories (parity with GPU path)
-        for batch_idx in range(batch_size):
-            for j in range(num_joints):
-                traj_pos_batch[batch_idx, :, j] = np.clip(
-                    traj_pos_batch[batch_idx, :, j],
-                    self.joint_limits[j, 0],
-                    self.joint_limits[j, 1],
-                )
+        traj_pos_batch = backend.stack(pos_rows)
+        traj_vel_batch = backend.stack(vel_rows)
+        traj_acc_batch = backend.stack(acc_rows)
+
+        # Enforce joint limits column-wise (broadcast, parity with GPU path)
+        lower = backend.asarray(self.joint_limits[:, 0])
+        upper = backend.asarray(self.joint_limits[:, 1])
+        traj_pos_batch = backend.clip(traj_pos_batch, lower, upper)
 
         elapsed = time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
@@ -1532,33 +1538,38 @@ class OptimizedTrajectoryPlanning:
         """
         logger.info(f"Generating Cartesian trajectory: N={N}, method={method}")
 
+        backend = get_backend()
         N = int(N)
         timegap = Tf / (N - 1.0)
-        traj = [None] * N
         Rstart, pstart = TransToRp(Xstart)
         Rend, pend = TransToRp(Xend)
+        Rstart = backend.asarray(Rstart)
+        Rend = backend.asarray(Rend)
+        pstart = backend.asarray(pstart)
+        pend = backend.asarray(pend)
 
-        orientations = np.zeros((N, 3, 3), dtype=np.float32)
-
-        # Compute orientation interpolation on CPU (complex matrix operations)
+        # Compute orientation interpolation on the host (complex matrix ops).
+        # The straight-line position at step i is the SE(3) translation column,
+        # so it is assembled directly instead of building the full 4x4 pose.
+        orientation_rows = []
+        position_rows = []
         for i in range(N):
             if method == 3:
                 s = CubicTimeScaling(Tf, timegap * i)
             else:
                 s = QuinticTimeScaling(Tf, timegap * i)
 
-            traj[i] = np.r_[
-                np.c_[
-                    np.dot(Rstart, MatrixExp3(MatrixLog3(np.dot(Rstart.T, Rend)) * s)),
-                    s * pend + (1 - s) * pstart,
-                ],
-                [[0, 0, 0, 1]],
-            ]
-            orientations[i] = np.dot(
-                Rstart, MatrixExp3(MatrixLog3(np.dot(Rstart.T, Rend)) * s)
+            orientation_rows.append(
+                backend.matmul(
+                    Rstart, MatrixExp3(MatrixLog3(backend.matmul(Rstart.T, Rend)) * s)
+                )
             )
+            position_rows.append(s * pend + (1 - s) * pstart)
 
-        traj_pos = np.array([TransToRp(T)[1] for T in traj], dtype=np.float32)
+        orientations = backend.asarray(
+            backend.stack(orientation_rows), dtype=backend.float32
+        )
+        traj_pos = backend.asarray(backend.stack(position_rows), dtype=backend.float32)
 
         # Use GPU for position/velocity/acceleration computation if beneficial
         use_gpu = self._should_use_gpu(N, 3)  # 3 coordinates (x,y,z)
@@ -1676,11 +1687,12 @@ class OptimizedTrajectoryPlanning:
             ``(N, 3)`` array of linear velocity (m/s) and acceleration
             (m/s^2).
         """
+        backend = get_backend()
         start_time = time.time()
 
-        traj_vel = np.zeros((N, 3), dtype=np.float32)
-        traj_acc = np.zeros((N, 3), dtype=np.float32)
-
+        dp = backend.asarray(pend) - backend.asarray(pstart)
+        vel_rows = []
+        acc_rows = []
         for i in range(N):
             t = i * (Tf / (N - 1))
             tau = t / Tf
@@ -1697,9 +1709,11 @@ class OptimizedTrajectoryPlanning:
             else:
                 s_dot = s_ddot = 0.0
 
-            dp = pend - pstart
-            traj_vel[i] = s_dot * dp
-            traj_acc[i] = s_ddot * dp
+            vel_rows.append(s_dot * dp)
+            acc_rows.append(s_ddot * dp)
+
+        traj_vel = backend.asarray(backend.stack(vel_rows), dtype=backend.float32)
+        traj_acc = backend.asarray(backend.stack(acc_rows), dtype=backend.float32)
 
         elapsed = time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
