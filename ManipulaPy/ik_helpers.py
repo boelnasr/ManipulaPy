@@ -4,10 +4,10 @@
 """
 IK Helper Functions - ManipulaPy (compatibility shim)
 
-The implementation now lives in :mod:`ManipulaPy.ik.ik_helpers`. This module is
-kept as a compatibility shim so the historical import path
+The implementation now lives in :mod:`ManipulaPy.kinematics.ik_helpers`. This
+module is kept as a compatibility shim so the historical import path
 ``from ManipulaPy.ik_helpers import ...`` keeps working unchanged. It re-exports
-the full public namespace of ``ManipulaPy.ik.ik_helpers``.
+the full public namespace of ``ManipulaPy.kinematics.ik_helpers``.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -28,7 +28,7 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from .ik.ik_helpers import (
+from .kinematics.ik_helpers import (
     Callable,
     IKInitialGuessCache,
     List,

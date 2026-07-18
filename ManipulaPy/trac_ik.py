@@ -4,10 +4,10 @@
 """
 TRAC-IK Style Solver - ManipulaPy (compatibility shim)
 
-The implementation now lives in :mod:`ManipulaPy.ik.trac_ik`. This module is
-kept as a compatibility shim so the historical import path
+The implementation now lives in :mod:`ManipulaPy.kinematics.trac_ik`. This
+module is kept as a compatibility shim so the historical import path
 ``from ManipulaPy.trac_ik import ...`` keeps working unchanged. It re-exports
-the full public namespace of ``ManipulaPy.ik.trac_ik``.
+the full public namespace of ``ManipulaPy.kinematics.trac_ik``.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -28,7 +28,7 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from .ik.trac_ik import (
+from .kinematics.trac_ik import (
     Any,
     Callable,
     ErrorFunction,
