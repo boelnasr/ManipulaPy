@@ -43,6 +43,8 @@ from typing import Any, Callable, List, Optional, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
+from ..backend import get_backend
+
 ErrorFunction = Callable[
     [NDArray[np.float64], NDArray[np.float64]],
     Tuple[NDArray[np.float64], float, float],
@@ -284,6 +286,7 @@ class TracIKSolver:
         num_restarts: int,
     ) -> List[NDArray[np.float64]]:
         """Generate diverse initial guesses for broad workspace coverage."""
+        backend = get_backend()
         guesses = []
 
         # 1. User-provided or workspace heuristic
@@ -296,7 +299,7 @@ class TracIKSolver:
         guesses.append(self._midpoint_guess())
 
         # 3. Zero configuration
-        guesses.append(np.zeros(self.n_joints))
+        guesses.append(backend.zeros(self.n_joints, dtype=backend.float64))
 
         # 4. Flipped midpoint (negated, clipped)
         mid = self._midpoint_guess()
@@ -330,7 +333,15 @@ class TracIKSolver:
                 (good for sequential). Higher = more thorough search per guess
                 (good for parallel where all guesses run concurrently).
         """
-        theta = theta0.copy()
+        backend = get_backend()
+        # Preserve the seed dtype (float32 seeds stay float32); only promote
+        # bool/int or non-backend array-likes to float64, matching kinematics.
+        # Copy so the caller's seed array is never aliased.
+        theta = backend.asarray(theta0)
+        dtype_kind = getattr(theta.dtype, "kind", None)
+        if not backend.is_backend_array(theta0) or dtype_kind in ("b", "i", "u"):
+            theta = backend.asarray(theta0, dtype=backend.float64)
+        theta = theta.copy()
 
         # Adaptive damping parameters (LM-style) — match kinematics.py
         damping = 0.02  # Initial damping
@@ -367,6 +378,13 @@ class TracIKSolver:
             # Compute current error
             T_curr = self.fk_func(theta)
             V_err, rot_err, trans_err = self.error_func(T_curr, T_desired)
+            # Normalize the (possibly injected) error callable's vector onto the
+            # active backend so a NumPy-returning error_func keeps working.
+            V_err = backend.asarray(V_err)
+            # Convergence and stagnation are host decisions: pull the scalar
+            # error norms to the host explicitly at this boundary.
+            rot_err = float(rot_err)
+            trans_err = float(trans_err)
             current_error = rot_err + trans_err
 
             # Check convergence
@@ -386,7 +404,10 @@ class TracIKSolver:
                 perturbation_count += 1
                 if perturbation_count > max_perturbations:
                     break  # This guess is stuck, let caller try next guess
-                perturbation = 0.1 * np.random.randn(self.n_joints)
+                # np.random is the host RNG boundary; move the perturbation into
+                # the backend domain before adding it to the backend-native seed
+                # so a non-NumPy backend never mixes host and device arrays.
+                perturbation = backend.asarray(0.1 * np.random.randn(self.n_joints))
                 theta = self._clip_to_limits(best_theta + perturbation)
                 damping = 0.02  # Reset damping
                 stall_count = 0
@@ -401,8 +422,9 @@ class TracIKSolver:
                 damping = min(max_damping, damping * 4)
                 step_cap = max(min_step_cap, step_cap * 0.5)
 
-            # Get Jacobian
-            J = self.jacobian_func(theta)
+            # Get Jacobian (normalize the injected callable's output onto the
+            # active backend so a NumPy-returning jacobian_func keeps working).
+            J = backend.asarray(self.jacobian_func(theta))
 
             # Levenberg-Marquardt adaptive damping
             if iteration > 0:
@@ -421,22 +443,35 @@ class TracIKSolver:
 
             # SVD-robust Jacobian solve (primary path)
             try:
-                U, s, Vt = np.linalg.svd(J, full_matrices=False)
+                U, s, Vt = backend.svd(J, full_matrices=False)
                 s_damped = s / (s**2 + damping**2 + 1e-12)
-                delta_theta = Vt.T @ (s_damped * (U.T @ V_err))
-            except np.linalg.LinAlgError:
+                delta_theta = backend.matmul(
+                    Vt.T, s_damped * backend.matmul(U.T, V_err)
+                )
+            except Exception as exc:
+                # CuPy raises its own LinAlgError class rather than NumPy's.
+                if not isinstance(exc, np.linalg.LinAlgError) and (
+                    exc.__class__.__name__ != "LinAlgError"
+                ):
+                    raise
                 # Fallback to normal equations
-                JTJ = J.T @ J
-                lambda_I = (damping**2) * np.eye(JTJ.shape[0])
+                JTJ = backend.matmul(J.T, J)
+                lambda_I = (damping**2) * backend.eye(JTJ.shape[0])
                 try:
-                    delta_theta = np.linalg.solve(JTJ + lambda_I, J.T @ V_err)
-                except np.linalg.LinAlgError:
-                    delta_theta = np.zeros(self.n_joints)
+                    delta_theta = backend.solve(
+                        JTJ + lambda_I, backend.matmul(J.T, V_err)
+                    )
+                except Exception as exc2:
+                    if not isinstance(exc2, np.linalg.LinAlgError) and (
+                        exc2.__class__.__name__ != "LinAlgError"
+                    ):
+                        raise
+                    delta_theta = backend.zeros(self.n_joints)
 
             # Step size limiting
-            step_norm = np.linalg.norm(delta_theta)
+            step_norm = backend.norm(delta_theta)
             if step_norm > step_cap:
-                delta_theta *= step_cap / step_norm
+                delta_theta = delta_theta * (step_cap / step_norm)
 
             # Backtracking line search — accept best scale
             best_candidate = self._clip_to_limits(theta + delta_theta)
@@ -446,7 +481,7 @@ class TracIKSolver:
                 candidate = self._clip_to_limits(theta + scale * delta_theta)
                 T_try = self.fk_func(candidate)
                 _, rot_try, trans_try = self.error_func(T_try, T_desired)
-                err_try = rot_try + trans_try
+                err_try = float(rot_try) + float(trans_try)
                 if err_try < best_cand_err:
                     best_cand_err = err_try
                     best_candidate = candidate
@@ -454,7 +489,7 @@ class TracIKSolver:
             # Check full step too
             T_full = self.fk_func(self._clip_to_limits(theta + delta_theta))
             _, rot_full, trans_full = self.error_func(T_full, T_desired)
-            err_full = rot_full + trans_full
+            err_full = float(rot_full) + float(trans_full)
             if err_full < best_cand_err:
                 best_candidate = self._clip_to_limits(theta + delta_theta)
 
@@ -463,6 +498,8 @@ class TracIKSolver:
         # Return best found
         T_curr = self.fk_func(best_theta)
         _, rot_err, trans_err = self.error_func(T_curr, T_desired)
+        rot_err = float(rot_err)
+        trans_err = float(trans_err)
         success = rot_err < eomg and trans_err < ev
         return best_theta, success, rot_err + trans_err
 
@@ -510,7 +547,13 @@ class TracIKSolver:
         escaping local minima.
         """
         start_time = time.perf_counter()
+        backend = get_backend()
 
+        # SLSQP is host-bound: SciPy is not backend-dispatchable, so the
+        # optimizer and everything it hands back (objective scalars, gradient,
+        # and the x0 seed) live on the NumPy host. The backend-native math
+        # inside the error/Jacobian callables is converted to the host exactly
+        # here, at the optimizer boundary.
         def objective(theta: NDArray[np.float64]) -> float:
             """Objective function: minimize pose error."""
             if stop_event.is_set():
@@ -520,7 +563,7 @@ class TracIKSolver:
 
             T_curr = self.fk_func(theta)
             V_err, rot_err, trans_err = self.error_func(T_curr, T_desired)
-            return rot_err**2 + trans_err**2
+            return float(rot_err) ** 2 + float(trans_err) ** 2
 
         def jacobian_objective(theta: NDArray[np.float64]) -> NDArray[np.float64]:
             """Gradient of objective function."""
@@ -529,29 +572,34 @@ class TracIKSolver:
 
             T_curr = self.fk_func(theta)
             V_err, _, _ = self.error_func(T_curr, T_desired)
-            J = self.jacobian_func(theta)
-            return 2 * J.T @ V_err
+            V_err = backend.asarray(V_err)
+            J = backend.asarray(self.jacobian_func(theta))
+            return backend.to_numpy(2 * backend.matmul(J.T, V_err))
 
         try:
             from scipy.optimize import minimize
 
             result = minimize(
                 objective,
-                theta0,
+                backend.to_numpy(backend.asarray(theta0)),
                 method="SLSQP",
                 jac=jacobian_objective,
                 bounds=self.bounds,
                 options={"ftol": 1e-8, "maxiter": 500, "disp": False},
             )
 
-            theta = result.x
+            # SciPy hands back a NumPy x; normalize onto the active backend so
+            # solve() has one consistent (backend-native) return domain.
+            theta = backend.asarray(result.x)
 
         except Exception:
-            theta = theta0
+            theta = backend.asarray(theta0)
 
         # Check final error
         T_curr = self.fk_func(theta)
         _, rot_err, trans_err = self.error_func(T_curr, T_desired)
+        rot_err = float(rot_err)
+        trans_err = float(trans_err)
         success = rot_err < eomg and trans_err < ev
 
         return theta, success, rot_err + trans_err
@@ -596,37 +644,41 @@ class TracIKSolver:
             - rotation_error: Actual rotation error in radians
             - translation_error: Actual Cartesian position error in meters
         """
+        backend = get_backend()
+        T_current = backend.asarray(T_current)
+        T_desired = backend.asarray(T_desired)
+
         # Position error
         p_current = T_current[:3, 3]
         p_desired = T_desired[:3, 3]
         pos_error = p_desired - p_current
-        trans_err = np.linalg.norm(pos_error)
+        trans_err = backend.norm(pos_error)
 
         # Rotation error using axis-angle
         R_current = T_current[:3, :3]
         R_desired = T_desired[:3, :3]
-        R_err = R_current.T @ R_desired
+        R_err = backend.matmul(R_current.T, R_desired)
 
-        trace_val = np.clip((np.trace(R_err) - 1) / 2, -1, 1)
-        angle = np.arccos(trace_val)
-        rot_err = abs(angle)
+        trace_val = backend.clip((backend.trace(R_err) - 1) / 2, -1, 1)
+        angle = backend.arccos(trace_val)
+        rot_err = backend.abs(angle)
 
         # Compute rotation axis
         if angle < 1e-6:
             omega_err = (
-                np.array(
-                    [
+                backend.stack(
+                    (
                         R_err[2, 1] - R_err[1, 2],
                         R_err[0, 2] - R_err[2, 0],
                         R_err[1, 0] - R_err[0, 1],
-                    ]
+                    )
                 )
                 / 2
             )
-        elif abs(angle - np.pi) < 1e-6:
-            diag = np.diag(R_err)
-            k = np.argmax(diag)
-            axis = np.zeros(3)
+        elif abs(angle - np.pi) < 1e-6:  # np.pi: host constant
+            diag = backend.diag(R_err)
+            k = backend.argmax(diag)
+            axis = backend.zeros(3, dtype=R_err.dtype)
             axis[k] = 1.0
             if k == 0:
                 axis[1] = (
@@ -661,20 +713,20 @@ class TracIKSolver:
                     if abs(1 + R_err[2, 2]) > 1e-6
                     else 0
                 )
-            axis = axis / (np.linalg.norm(axis) + 1e-10)
+            axis = axis / (backend.norm(axis) + 1e-10)
             omega_err = angle * axis
         else:
-            axis = np.array(
-                [
+            axis = backend.stack(
+                (
                     R_err[2, 1] - R_err[1, 2],
                     R_err[0, 2] - R_err[2, 0],
                     R_err[1, 0] - R_err[0, 1],
-                ]
-            ) / (2 * np.sin(angle) + 1e-10)
+                )
+            ) / (2 * backend.sin(angle) + 1e-10)
             omega_err = angle * axis
 
-        omega_err_space = R_current @ omega_err
-        V_err = np.concatenate([omega_err_space, pos_error])
+        omega_err_space = backend.matmul(R_current, omega_err)
+        V_err = backend.concatenate((omega_err_space, pos_error))
 
         return V_err, rot_err, trans_err
 

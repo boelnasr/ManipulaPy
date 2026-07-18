@@ -22,6 +22,8 @@ from typing import Callable, List, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
+from ..backend import get_backend
+
 
 def workspace_heuristic_guess(
     T_desired: NDArray[np.float64],
@@ -53,41 +55,42 @@ def workspace_heuristic_guess(
         >>> theta0 = workspace_heuristic_guess(T_target, 6, limits)
         >>> theta, success, iters = robot.iterative_inverse_kinematics(T_target, theta0)
     """
-    theta = np.zeros(n_joints)
+    backend = get_backend()
+    theta = backend.zeros(n_joints, dtype=backend.float64)
 
     # Extract desired position
     p = T_desired[:3, 3]
 
     # Joint 1: Rotation in XY plane
     if n_joints >= 1:
-        theta[0] = np.arctan2(p[1], p[0])
+        theta[0] = backend.arctan2(p[1], p[0])
 
     # Joint 2: Elevation angle (rough approximation)
     if n_joints >= 2:
-        r_xy = np.sqrt(p[0] ** 2 + p[1] ** 2)
-        theta[1] = np.arctan2(p[2], r_xy) if r_xy > 1e-6 else 0.0
+        r_xy = backend.sqrt(p[0] ** 2 + p[1] ** 2)
+        theta[1] = backend.arctan2(p[2], r_xy) if r_xy > 1e-6 else 0.0
 
     # Joint 3: Elbow configuration (neutral position)
     if n_joints >= 3:
         # Use 45° as a neutral elbow angle
-        theta[2] = np.pi / 4
+        theta[2] = np.pi / 4  # host constant
 
     # Joints 4-6: Wrist orientation (if present)
     if n_joints > 3:
         R = T_desired[:3, :3]
         # Estimate wrist angles using ZYZ Euler decomposition
-        if np.abs(R[2, 2]) < 0.9999:
+        if backend.abs(R[2, 2]) < 0.9999:
             # Normal case
             if n_joints >= 5:
-                theta[4] = np.arccos(np.clip(R[2, 2], -1, 1))
+                theta[4] = backend.arccos(backend.clip(R[2, 2], -1, 1))
             if n_joints >= 4:
-                theta[3] = np.arctan2(R[1, 2], R[0, 2])
+                theta[3] = backend.arctan2(R[1, 2], R[0, 2])
             if n_joints >= 6:
-                theta[5] = np.arctan2(R[2, 1], -R[2, 0])
+                theta[5] = backend.arctan2(R[2, 1], -R[2, 0])
         else:
             # Gimbal lock case
             if n_joints >= 4:
-                theta[3] = np.arctan2(R[1, 0], R[0, 0])
+                theta[3] = backend.arctan2(R[1, 0], R[0, 0])
             if n_joints >= 5:
                 theta[4] = 0.0
             if n_joints >= 6:
@@ -137,17 +140,21 @@ def extrapolate_from_current(
     """
     from .. import utils
 
-    theta_current = np.array(theta_current, dtype=float)
+    backend = get_backend()
+    theta_current = backend.asarray(theta_current, dtype=backend.float64)
 
     # Compute pose error
-    T_err = T_desired @ np.linalg.inv(T_current)
+    T_err = backend.matmul(
+        backend.asarray(T_desired), backend.inv(backend.asarray(T_current))
+    )
 
     # Extract twist from error
     V_err = utils.se3ToVec(utils.MatrixLog6(T_err))
 
-    # Estimate joint velocity using Jacobian pseudoinverse
-    J = jacobian_func(theta_current)
-    dtheta = np.linalg.pinv(J) @ V_err
+    # Estimate joint velocity using Jacobian pseudoinverse (normalize the
+    # injected callable's output onto the active backend).
+    J = backend.asarray(jacobian_func(theta_current))
+    dtheta = backend.matmul(backend.pinv(J), V_err)
 
     # Extrapolate
     theta_guess = theta_current + alpha * dtheta
@@ -175,9 +182,12 @@ def random_in_limits(
     Example:
         >>> theta_random = random_in_limits(robot.joint_limits)
     """
+    backend = get_backend()
     n_joints = len(joint_limits)
-    theta = np.zeros(n_joints)
+    theta = backend.zeros(n_joints, dtype=backend.float64)
 
+    # np.random / np.pi are the host RNG boundary: seeds are drawn on the host
+    # and written into the backend-native array (no backend RNG primitive).
     for i, (mn, mx) in enumerate(joint_limits):
         if mn is not None and mx is not None:
             theta[i] = np.random.uniform(mn, mx)
@@ -213,8 +223,9 @@ def midpoint_of_limits(
     Example:
         >>> theta0 = midpoint_of_limits(robot.joint_limits)
     """
+    backend = get_backend()
     n_joints = len(joint_limits)
-    theta = np.zeros(n_joints)
+    theta = backend.zeros(n_joints, dtype=backend.float64)
 
     for i, (mn, mx) in enumerate(joint_limits):
         if mn is not None and mx is not None:
@@ -230,6 +241,14 @@ class IKInitialGuessCache:
 
     Maintains a database of (pose, solution) pairs and uses nearest neighbor
     lookup for new IK problems.
+
+    This cache is host-domain: ``add`` and ``get_nearest`` convert their inputs
+    to host NumPy at the boundary (``backend.to_numpy(backend.asarray(...))``),
+    so backend-native (device) arrays are never stored or scanned. Entries are
+    scanned with host linear algebra (``np.linalg.norm`` / ``np.mean``). It is a
+    linear-scan nearest-neighbor store, not a value-keyed hash, so it never
+    hashes backend tensors and needs no ``is_concrete`` gating; the retained
+    ``np.`` sites are that host boundary.
 
     Example:
         >>> cache = IKInitialGuessCache(max_size=100)
@@ -266,8 +285,14 @@ class IKInitialGuessCache:
             theta: Corresponding joint angles
             residual: Optional error metric for this solution (lower is better)
         """
+        # Host boundary: convert inputs to host NumPy so backend-native (device)
+        # arrays are never stored or scanned by the host lookup math. Copy so the
+        # caller's arrays are never aliased.
+        backend = get_backend()
         res_val = float(residual) if residual is not None else None
-        self.cache.append((T.copy(), theta.copy(), res_val))
+        T_host = np.array(backend.to_numpy(backend.asarray(T)))
+        theta_host = np.array(backend.to_numpy(backend.asarray(theta)))
+        self.cache.append((T_host, theta_host, res_val))
 
         # FIFO eviction
         if len(self.cache) > self.max_size:
@@ -297,6 +322,11 @@ class IKInitialGuessCache:
         """
         if len(self.cache) == 0:
             return None
+
+        # Host boundary: the lookup target may be backend-native, so pull it to
+        # host NumPy before the host distance math scans the cached entries.
+        backend = get_backend()
+        T_desired = backend.to_numpy(backend.asarray(T_desired))
 
         # Compute distances to all cached poses, prefer low-residual entries
         scored = []

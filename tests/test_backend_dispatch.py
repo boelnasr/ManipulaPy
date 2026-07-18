@@ -841,6 +841,279 @@ def test_manipulability_ellipsoid_axis_math_dispatches_through_backend(monkeypat
     assert "sqrt" in spy.calls
 
 
+# ---------------------------------------------------------------------------
+# IK dispatch (TRAC-IK DLS Newton branch + IK helpers)
+# ---------------------------------------------------------------------------
+
+
+class _IKSpyBackend(NumpyBackend):
+    """Concrete NumPy delegate that records primitives the IK paths use."""
+
+    is_concrete = True
+
+    def __init__(self):
+        self.calls = []
+
+    def svd(self, a, full_matrices=False):
+        self.calls.append("svd")
+        return super().svd(a, full_matrices=full_matrices)
+
+    def matmul(self, a, b):
+        self.calls.append("matmul")
+        return super().matmul(a, b)
+
+    def solve(self, a, b):
+        self.calls.append("solve")
+        return super().solve(a, b)
+
+    def norm(self, x, ord=None, axis=None):
+        self.calls.append("norm")
+        return super().norm(x, ord=ord, axis=axis)
+
+    def eye(self, n, dtype=None):
+        self.calls.append("eye")
+        return super().eye(n, dtype=dtype)
+
+    def inv(self, a):
+        self.calls.append("inv")
+        return super().inv(a)
+
+    def pinv(self, a):
+        self.calls.append("pinv")
+        return super().pinv(a)
+
+    def arctan2(self, y, x):
+        self.calls.append("arctan2")
+        return super().arctan2(y, x)
+
+    def arccos(self, x):
+        self.calls.append("arccos")
+        return super().arccos(x)
+
+    def concatenate(self, arrays, axis=0):
+        self.calls.append("concatenate")
+        return super().concatenate(arrays, axis=axis)
+
+
+def _trac_ik_fixture():
+    """Return a 6-DOF TRAC-IK solver, a reachable target, and the seed angles."""
+    from ManipulaPy.trac_ik import TracIKSolver
+
+    Slist = np.array(
+        [
+            [0, 0, 1, 0, 0, 0],
+            [0, -1, 0, -0.089, 0, 0],
+            [0, -1, 0, -0.089, 0, 0.425],
+            [0, -1, 0, -0.089, 0, 0.817],
+            [1, 0, 0, 0, 0.109, 0],
+            [0, -1, 0, -0.089, 0, 0.817],
+        ]
+    ).T
+    M = np.array([[1, 0, 0, 0.817], [0, 1, 0, 0], [0, 0, 1, 0.191], [0, 0, 0, 1]])
+    robot = SerialManipulator(
+        M_list=M,
+        omega_list=Slist[:3, :],
+        S_list=Slist,
+        B_list=np.copy(Slist),
+        joint_limits=[(-np.pi, np.pi)] * 6,
+    )
+    solver = TracIKSolver(
+        fk_func=lambda th: robot.forward_kinematics(th, frame="space"),
+        jacobian_func=lambda th: robot.jacobian(th, frame="space"),
+        joint_limits=robot.joint_limits,
+        n_joints=6,
+    )
+    theta_known = np.array([0.1, 0.2, -0.3, 0.4, -0.5, 0.6])
+    T_desired = robot.forward_kinematics(theta_known, frame="space")
+    return solver, T_desired, theta_known
+
+
+def test_trac_ik_default_backend_solution_and_return_contract():
+    """Default NumPy keeps the TRAC-IK solve solution and return-type contract."""
+    import threading
+
+    solver, T_desired, theta_known = _trac_ik_fixture()
+    theta, success, error = solver._dls_solver(
+        T_desired,
+        theta_known + 0.05,
+        eomg=1e-3,
+        ev=1e-3,
+        timeout=5.0,
+        stop_event=threading.Event(),
+    )
+    assert isinstance(theta, np.ndarray)
+    assert type(success) is bool
+    assert success
+    assert error < 1e-2
+
+
+def test_trac_ik_dls_newton_branch_dispatches_through_active_backend(monkeypatch):
+    """The DLS Newton inner loop routes its SVD/matmul/norm math through the
+    active backend rather than calling numpy directly."""
+    import threading
+
+    solver, T_desired, theta_known = _trac_ik_fixture()
+
+    spy = _IKSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    solver._dls_solver(
+        T_desired,
+        theta_known + 0.3,
+        eomg=1e-3,
+        ev=1e-3,
+        timeout=0.1,
+        stop_event=threading.Event(),
+    )
+
+    # The differentiable branch: SVD-robust damped least squares + step norm.
+    assert "svd" in spy.calls
+    assert "matmul" in spy.calls
+    assert "norm" in spy.calls
+
+
+def test_workspace_heuristic_guess_dispatches_through_active_backend(monkeypatch):
+    """The geometric seed heuristic routes its trig math through the backend."""
+    from ManipulaPy.kinematics import ik_helpers
+
+    # A tilted target so the non-gimbal wrist branch (arccos) is exercised.
+    T_desired = np.array(
+        [
+            [1.0, 0.0, 0.0, 0.3],
+            [0.0, 0.0, -1.0, 0.2],
+            [0.0, 1.0, 0.0, 0.4],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+    )
+    limits = [(-np.pi, np.pi)] * 6
+
+    expected = ik_helpers.workspace_heuristic_guess(T_desired, 6, limits)
+
+    spy = _IKSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    actual = ik_helpers.workspace_heuristic_guess(T_desired, 6, limits)
+
+    np.testing.assert_allclose(np.asarray(actual, dtype=float), expected, rtol=1e-12)
+    assert "arctan2" in spy.calls
+    assert "arccos" in spy.calls
+
+
+def test_extrapolate_from_current_dispatches_through_active_backend(monkeypatch):
+    """Extrapolation seed math routes pseudo-inverse and transform ops through
+    the backend it is driven by."""
+    from ManipulaPy.kinematics import ik_helpers
+
+    solver, T_desired, theta_known = _trac_ik_fixture()
+    jac = solver.jacobian_func
+    T_current = solver.fk_func(theta_known)
+
+    expected = ik_helpers.extrapolate_from_current(
+        theta_known, T_current, T_desired, jac, solver.joint_limits, alpha=0.5
+    )
+
+    spy = _IKSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    actual = ik_helpers.extrapolate_from_current(
+        theta_known, T_current, T_desired, jac, solver.joint_limits, alpha=0.5
+    )
+
+    np.testing.assert_allclose(np.asarray(actual, dtype=float), expected, rtol=1e-10)
+    assert "pinv" in spy.calls
+    assert "inv" in spy.calls
+
+
+def test_ik_initial_guess_cache_returns_host_array():
+    """IKInitialGuessCache stays host-domain: nearest-neighbor lookup returns a
+    plain NumPy array so it never hashes or stores traced tensors."""
+    from ManipulaPy.kinematics.ik_helpers import IKInitialGuessCache
+
+    cache = IKInitialGuessCache(max_size=10)
+    T = np.eye(4)
+    T[:3, 3] = [0.3, 0.2, 0.4]
+    cache.add(T, np.array([0.1, 0.2, -0.3, 0.4, -0.5, 0.6]), residual=1e-4)
+
+    guess = cache.get_nearest(T, k=1)
+    assert isinstance(guess, np.ndarray)
+
+
+def test_ik_initial_guess_cache_enforces_host_boundary():
+    """The cache converts inputs to host NumPy at its boundary: backend-native
+    (or plain array-like) entries must be stored and returned as host arrays so
+    the lookup math never runs on a device array."""
+    from ManipulaPy.kinematics.ik_helpers import IKInitialGuessCache
+
+    cache = IKInitialGuessCache(max_size=10)
+    # Non-ndarray array-likes (nested lists) stand in for device arrays here.
+    T = [[1, 0, 0, 0.3], [0, 0, -1, 0.2], [0, 1, 0, 0.4], [0, 0, 0, 1]]
+    theta = [0.1, 0.2, -0.3, 0.4, -0.5, 0.6]
+    cache.add(T, theta, residual=1e-4)
+
+    stored_T, stored_theta, _ = cache.cache[0]
+    assert isinstance(stored_T, np.ndarray)
+    assert isinstance(stored_theta, np.ndarray)
+
+    guess = cache.get_nearest(T, k=1)
+    assert isinstance(guess, np.ndarray)
+
+
+def test_trac_ik_solve_preserves_float32_seed_dtype():
+    """A float32 seed must round-trip as float32 through solve(): the DLS branch
+    preserves seed dtype (only bool/int/non-backend seeds are promoted)."""
+    solver, T_desired, theta_known = _trac_ik_fixture()
+    seed = theta_known.astype(np.float32)
+
+    theta, success, _ = solver.solve(T_desired, seed, timeout=1.0)
+
+    assert success
+    assert theta.dtype == np.float32
+
+
+def test_workspace_heuristic_shim_routing_stays_live(monkeypatch):
+    """The solver's inline ``from .. import ik_helpers`` must resolve through the
+    top-level shim, so patching the shim symbol is seen by the solver."""
+    import ManipulaPy.ik_helpers as shim
+
+    solver, T_desired, _ = _trac_ik_fixture()
+    sentinel = np.full(6, 0.123)
+    monkeypatch.setattr(
+        shim, "workspace_heuristic_guess", lambda *a, **k: sentinel.copy()
+    )
+
+    out = solver._workspace_heuristic(T_desired)
+    np.testing.assert_array_equal(out, sentinel)
+
+
+class _SvdFailingIKSpyBackend(_IKSpyBackend):
+    """IK spy whose SVD always raises LinAlgError to force the DLS fallback."""
+
+    def svd(self, a, full_matrices=False):
+        self.calls.append("svd")
+        raise np.linalg.LinAlgError("forced SVD failure")
+
+
+def test_dls_svd_failure_routes_fallback_through_backend(monkeypatch):
+    """When SVD raises, the normal-equations fallback must route through the
+    backend's solve/eye and still return a finite result."""
+    import threading
+
+    solver, T_desired, theta_known = _trac_ik_fixture()
+    spy = _SvdFailingIKSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    theta, success, error = solver._dls_solver(
+        T_desired,
+        theta_known + 0.3,
+        eomg=1e-3,
+        ev=1e-3,
+        timeout=0.1,
+        stop_event=threading.Event(),
+    )
+
+    assert "svd" in spy.calls
+    assert "solve" in spy.calls
+    assert "eye" in spy.calls
+    assert np.all(np.isfinite(np.asarray(theta, dtype=float)))
+
+
 class _FixedJacobianRobot:
     """Serial-manipulator stand-in returning a fixed Jacobian matrix."""
 
