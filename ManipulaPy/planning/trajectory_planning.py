@@ -1234,13 +1234,14 @@ class OptimizedTrajectoryPlanning:
             np.ndarray: (num_points, num_joints) array of joint torques,
             clipped to the configured torque limits.
         """
+        backend = get_backend()
         start_time = time.time()
 
         num_points = thetalist_trajectory.shape[0]
         num_joints = thetalist_trajectory.shape[1]
-        torques_trajectory = np.zeros((num_points, num_joints), dtype=np.float32)
 
-        # Process each trajectory point
+        # Compute each waypoint's torques, then stack (no in-place row writes).
+        torque_rows = []
         for i in range(num_points):
             try:
                 torques = self.dynamics.inverse_dynamics(
@@ -1250,15 +1251,19 @@ class OptimizedTrajectoryPlanning:
                     gravity_vector,
                     Ftip,
                 )
-                torques_trajectory[i] = np.array(torques, dtype=np.float32)
+                torque_rows.append(backend.asarray(torques, dtype=backend.float32))
             except Exception as e:
                 logger.warning(f"Error in inverse dynamics at point {i}: {e}")
                 # Use zero torques for problematic points
-                torques_trajectory[i] = np.zeros(num_joints, dtype=np.float32)
+                torque_rows.append(backend.zeros((num_joints,), dtype=backend.float32))
 
-        # Apply torque limits
-        torques_trajectory = np.clip(
-            torques_trajectory, self.torque_limits[:, 0], self.torque_limits[:, 1]
+        torques_trajectory = backend.stack(torque_rows)
+
+        # Apply torque limits (broadcast, no in-place writes)
+        torques_trajectory = backend.clip(
+            torques_trajectory,
+            backend.asarray(self.torque_limits[:, 0]),
+            backend.asarray(self.torque_limits[:, 1]),
         )
 
         elapsed = time.time() - start_time
@@ -1464,25 +1469,31 @@ class OptimizedTrajectoryPlanning:
             ``"velocities"`` and ``"accelerations"``, each a
             ``(num_steps, num_joints)`` array.
         """
+        backend = get_backend()
         start_time = time.time()
 
         num_steps = taumat.shape[0]
         num_joints = thetalist.shape[0]
 
-        thetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
-        dthetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
-        ddthetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
+        # Integrated state; keep its dtype fixed so the accumulation matches the
+        # original in-place ``+=`` semantics (which cast back to the state dtype).
+        current_theta = backend.asarray(thetalist)
+        current_dtheta = backend.asarray(dthetalist)
+        theta_dtype = current_theta.dtype
+        dtheta_dtype = current_dtheta.dtype
 
-        # Initialize with starting conditions
-        current_theta = thetalist.copy()
-        current_dtheta = dthetalist.copy()
+        lower = backend.asarray(self.joint_limits[:, 0])
+        upper = backend.asarray(self.joint_limits[:, 1])
 
-        thetamat[0, :] = current_theta
-        dthetamat[0, :] = current_dtheta
+        # Seed step 0; per-step rows are collected and stacked at the end.
+        theta_rows = [backend.asarray(current_theta, dtype=backend.float32)]
+        dtheta_rows = [backend.asarray(current_dtheta, dtype=backend.float32)]
+        ddtheta_rows = [backend.zeros((num_joints,), dtype=backend.float32)]
 
         dt_step = dt / intRes
 
         for i in range(1, num_steps):
+            ddtheta_step = backend.zeros((num_joints,), dtype=backend.float32)
             for _ in range(intRes):
                 try:
                     # Compute forward dynamics
@@ -1490,23 +1501,31 @@ class OptimizedTrajectoryPlanning:
                         current_theta, current_dtheta, taumat[i], g, Ftipmat[i]
                     )
 
-                    # Integrate
-                    current_dtheta += ddtheta * dt_step
-                    current_theta += current_dtheta * dt_step
-
-                    # Apply joint limits
-                    current_theta = np.clip(
-                        current_theta, self.joint_limits[:, 0], self.joint_limits[:, 1]
+                    # Integrate (functional; cast back to the state dtype so the
+                    # numerics match the original in-place accumulation)
+                    current_dtheta = backend.asarray(
+                        current_dtheta + ddtheta * dt_step, dtype=dtheta_dtype
+                    )
+                    current_theta = backend.asarray(
+                        current_theta + current_dtheta * dt_step, dtype=theta_dtype
                     )
 
-                    ddthetamat[i] = ddtheta
+                    # Apply joint limits
+                    current_theta = backend.clip(current_theta, lower, upper)
+
+                    ddtheta_step = ddtheta
 
                 except Exception as e:
                     logger.warning(f"Error in forward dynamics at step {i}: {e}")
-                    ddthetamat[i] = np.zeros(num_joints)
+                    ddtheta_step = backend.zeros((num_joints,))
 
-            thetamat[i, :] = current_theta
-            dthetamat[i, :] = current_dtheta
+            theta_rows.append(backend.asarray(current_theta, dtype=backend.float32))
+            dtheta_rows.append(backend.asarray(current_dtheta, dtype=backend.float32))
+            ddtheta_rows.append(backend.asarray(ddtheta_step, dtype=backend.float32))
+
+        thetamat = backend.stack(theta_rows)
+        dthetamat = backend.stack(dtheta_rows)
+        ddthetamat = backend.stack(ddtheta_rows)
 
         elapsed = time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
@@ -2144,10 +2163,12 @@ class OptimizedTrajectoryPlanning:
             acceleration (numpy.ndarray): An array of accelerations.
             jerk (numpy.ndarray): An array of jerks.
         """
-        positions = np.array(positions)
-        velocity = np.diff(positions, axis=0) / dt
-        acceleration = np.diff(velocity, axis=0) / dt
-        jerk = np.diff(acceleration, axis=0) / dt
+        backend = get_backend()
+        positions = backend.asarray(positions)
+        # First differences along the time axis (np.diff equivalent).
+        velocity = (positions[1:] - positions[:-1]) / dt
+        acceleration = (velocity[1:] - velocity[:-1]) / dt
+        jerk = (acceleration[1:] - acceleration[:-1]) / dt
         return velocity, acceleration, jerk
 
     def plot_ee_trajectory(

@@ -1376,3 +1376,169 @@ def test_cartesian_trajectory_dispatches_through_active_backend(monkeypatch):
     # The (N, 3, 3) orientation stack is unique to the migrated assembly; the
     # SE(3) utilities on this path only stack rows/vectors (ndim <= 2).
     assert (5, 3, 3) in spy.stack_shapes
+
+
+# ---------------------------------------------------------------------------
+# Trajectory-dynamics dispatch
+# ---------------------------------------------------------------------------
+
+
+class _TrajectoryDynamicsSpyBackend(NumpyBackend):
+    """NumPy delegate that records primitives used by migrated dynamics paths.
+
+    ``stack`` is the tell-tale of the per-waypoint / per-step assembly (the
+    pre-migration code pre-allocated and wrote in place, never stacking), and
+    ``clip`` is the torque/joint-limit enforcement. The migrated
+    ``ManipulatorDynamics`` layer routes through ``matmul``/``concatenate`` but
+    never ``stack`` or ``clip``, so these two single out the planning-layer work.
+    """
+
+    def __init__(self):
+        self.calls = []
+
+    def asarray(self, obj, dtype=None):
+        self.calls.append("asarray")
+        return super().asarray(obj, dtype=dtype)
+
+    def clip(self, x, a_min, a_max):
+        self.calls.append("clip")
+        return super().clip(x, a_min, a_max)
+
+    def stack(self, arrays, axis=0):
+        self.calls.append("stack")
+        return super().stack(arrays, axis=axis)
+
+
+class _SumInverseDynamics:
+    """Deterministic dynamics: torque = theta + dtheta + ddtheta (plain NumPy)."""
+
+    def inverse_dynamics(self, theta, dtheta, ddtheta, g, Ftip):
+        return np.asarray(theta) + np.asarray(dtheta) + np.asarray(ddtheta)
+
+
+class _TauForwardDynamics:
+    """Deterministic dynamics: joint acceleration equals applied torque (NumPy)."""
+
+    def forward_dynamics(self, theta, dtheta, tau, g, Ftip):
+        return np.asarray(tau, dtype=np.float64)
+
+
+def _dynamics_planner(dynamics, joint_limits, torque_limits):
+    """Force-CPU planner wired to a deterministic dynamics stub."""
+    return OptimizedTrajectoryPlanning(
+        None,
+        "nonexistent.urdf",
+        dynamics,
+        joint_limits,
+        torque_limits,
+        use_cuda=False,
+    )
+
+
+def test_inverse_dynamics_cpu_default_backend_parity():
+    """Default NumPy keeps per-waypoint torques, torque-limit clip and float32."""
+    planner = _dynamics_planner(
+        _SumInverseDynamics(), [(-5.0, 5.0), (-5.0, 5.0)], [[-3.0, 4.0], [-3.0, 4.0]]
+    )
+    theta = np.array([[0, 0], [1, 2], [3, 4]], dtype=np.float32)
+    dtheta = np.array([[0, 0], [0.5, 0.5], [1, 1]], dtype=np.float32)
+    ddtheta = np.array([[0, 0], [0.1, 0.1], [0.2, 0.2]], dtype=np.float32)
+
+    torques = planner.inverse_dynamics_trajectory(
+        theta, dtheta, ddtheta, np.array([0, 0, -9.81]), np.zeros(6)
+    )
+
+    expected = np.array([[0.0, 0.0], [1.6, 2.6], [4.0, 4.0]], dtype=np.float32)
+    np.testing.assert_array_equal(torques, expected)
+    assert torques.dtype == np.float32
+
+
+def test_forward_dynamics_cpu_default_backend_parity():
+    """Default NumPy keeps Euler integration order, joint clamp and float32."""
+    planner = _dynamics_planner(_TauForwardDynamics(), [(-5.0, 5.0), (-5.0, 5.0)], None)
+    thetalist = np.zeros(2, dtype=np.float32)
+    dthetalist = np.zeros(2, dtype=np.float32)
+    # Values chosen so the Euler recurrence stays exactly representable in
+    # float32, making assert_array_equal a bit-exact parity check.
+    taumat = np.array([[0, 0], [2, 2], [4, 4]], dtype=np.float64)
+    result = planner.forward_dynamics_trajectory(
+        thetalist, dthetalist, taumat, np.zeros(3), np.zeros((3, 6)), 0.5, 1
+    )
+
+    expected_pos = np.array([[0.0, 0.0], [0.5, 0.5], [2.0, 2.0]], dtype=np.float32)
+    expected_vel = np.array([[0.0, 0.0], [1.0, 1.0], [3.0, 3.0]], dtype=np.float32)
+    expected_acc = np.array([[0.0, 0.0], [2.0, 2.0], [4.0, 4.0]], dtype=np.float32)
+
+    np.testing.assert_array_equal(result["positions"], expected_pos)
+    np.testing.assert_array_equal(result["velocities"], expected_vel)
+    np.testing.assert_array_equal(result["accelerations"], expected_acc)
+    for key in ("positions", "velocities", "accelerations"):
+        assert result[key].dtype == np.float32
+
+
+def test_calculate_derivatives_default_backend_parity():
+    """Default NumPy keeps finite-difference derivatives, shapes and dtype."""
+    planner = _dynamics_planner(None, [(-5.0, 5.0), (-5.0, 5.0)], None)
+    positions = np.array(
+        [[0.0, 0.0], [1.0, 2.0], [4.0, 6.0], [9.0, 12.0], [16.0, 20.0]],
+        dtype=np.float64,
+    )
+    velocity, acceleration, jerk = planner.calculate_derivatives(positions, 0.5)
+
+    np.testing.assert_array_equal(velocity, np.diff(positions, axis=0) / 0.5)
+    np.testing.assert_array_equal(acceleration, np.diff(velocity, axis=0) / 0.5)
+    np.testing.assert_array_equal(jerk, np.diff(acceleration, axis=0) / 0.5)
+    assert velocity.shape == (4, 2)
+    assert acceleration.shape == (3, 2)
+    assert jerk.shape == (2, 2)
+    assert velocity.dtype == np.float64
+
+
+def test_inverse_dynamics_cpu_dispatches_through_active_backend(monkeypatch):
+    """The CPU inverse-dynamics path stacks per-waypoint torques and clips them."""
+    planner = _dynamics_planner(
+        _SumInverseDynamics(), [(-5.0, 5.0), (-5.0, 5.0)], [[-3.0, 4.0], [-3.0, 4.0]]
+    )
+    theta = np.array([[0, 0], [1, 2], [3, 4]], dtype=np.float32)
+    dtheta = np.array([[0, 0], [0.5, 0.5], [1, 1]], dtype=np.float32)
+    ddtheta = np.array([[0, 0], [0.1, 0.1], [0.2, 0.2]], dtype=np.float32)
+    spy = _TrajectoryDynamicsSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    planner.inverse_dynamics_trajectory(
+        theta, dtheta, ddtheta, np.array([0, 0, -9.81]), np.zeros(6)
+    )
+
+    assert "stack" in spy.calls
+    assert "clip" in spy.calls
+
+
+def test_forward_dynamics_cpu_dispatches_through_active_backend(monkeypatch):
+    """The CPU forward-dynamics path stacks per-step states and clamps joints."""
+    planner = _dynamics_planner(_TauForwardDynamics(), [(-5.0, 5.0), (-5.0, 5.0)], None)
+    thetalist = np.zeros(2, dtype=np.float32)
+    dthetalist = np.zeros(2, dtype=np.float32)
+    taumat = np.array([[0, 0], [1, 1], [2, 2]], dtype=np.float64)
+    spy = _TrajectoryDynamicsSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    planner.forward_dynamics_trajectory(
+        thetalist, dthetalist, taumat, np.zeros(3), np.zeros((3, 6)), 0.1, 1
+    )
+
+    assert "stack" in spy.calls
+    assert "clip" in spy.calls
+
+
+def test_calculate_derivatives_dispatches_through_active_backend(monkeypatch):
+    """calculate_derivatives adopts the active backend instead of raw NumPy."""
+    planner = _dynamics_planner(None, [(-5.0, 5.0), (-5.0, 5.0)], None)
+    positions = np.array(
+        [[0.0, 0.0], [1.0, 2.0], [4.0, 6.0], [9.0, 12.0]], dtype=np.float64
+    )
+    spy = _TrajectoryDynamicsSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    planner.calculate_derivatives(positions, 0.5)
+
+    assert "asarray" in spy.calls
