@@ -199,6 +199,27 @@ def test_protocol_completeness(member):
     assert hasattr(NumpyBackend(), member), f"NumpyBackend missing {member!r}"
 
 
+def test_top_level_lazy_access_exposes_backend_api():
+    """The package-level lazy loader resolves the backend package, the
+    selection API, and the planning package.
+
+    __getattr__ is exercised directly because a prior submodule import binds
+    the attribute on the package, which would let stale mappings pass.
+    """
+    import ManipulaPy
+
+    assert ManipulaPy.__getattr__("backend") is be
+    assert ManipulaPy.__getattr__("set_backend") is be.set_backend
+    assert ManipulaPy.__getattr__("use_backend") is be.use_backend
+    assert ManipulaPy.__getattr__("get_backend") is be.get_backend
+
+    import ManipulaPy.planning as planning_module
+
+    assert ManipulaPy.__getattr__("planning") is planning_module
+    for name in ("backend", "planning", "set_backend", "use_backend", "get_backend"):
+        assert name in dir(ManipulaPy)
+
+
 def test_dtype_handles_usable():
     """float32/float64 attributes are usable dtype handles."""
     b = NumpyBackend()

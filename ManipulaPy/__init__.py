@@ -185,9 +185,11 @@ def __getattr__(name: str) -> Any:
         "dynamics": "dynamics",
         "ik_helpers": "ik_helpers",
         "trac_ik": "trac_ik",
+        "backend": "backend",
         # Analysis modules
         "control": "control",
         "path_planning": "path_planning",
+        "planning": "planning",
         "singularity": "singularity",
         "potential_field": "potential_field",
         # Optional modules
@@ -202,6 +204,10 @@ def __getattr__(name: str) -> Any:
         "ManipulatorController": ("control", "ManipulatorController"),
         "Vision": ("vision", "Vision"),
         "TracIKSolver": ("trac_ik", "TracIKSolver"),
+        # Backend selection API
+        "set_backend": ("backend", "set_backend"),
+        "use_backend": ("backend", "use_backend"),
+        "get_backend": ("backend", "get_backend"),
     }
 
     if name in module_map:
@@ -234,10 +240,16 @@ def __dir__() -> List[str]:
         "dynamics",
         "ik_helpers",
         "trac_ik",
+        "backend",
         "control",
         "path_planning",
+        "planning",
         "singularity",
         "potential_field",
+        # Backend selection API
+        "set_backend",
+        "use_backend",
+        "get_backend",
         # Helper functions
         "check_dependencies",
         "get_available_features",
