@@ -22,6 +22,7 @@ from ManipulaPy import backend as be
 from ManipulaPy import utils
 from ManipulaPy.backend.base import ArrayBackend
 from ManipulaPy.backend.numpy_backend import NumpyBackend
+from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
 
 
@@ -36,7 +37,7 @@ ELEMENTWISE = [
 REDUCTIONS = ["sum", "amax", "amin", "mean", "argmax", "all", "any", "isfinite"]
 DEVICE = ["to_device", "to_numpy", "ascontiguous"]
 DTYPES = ["float32", "float64"]
-PREDICATE = ["is_backend_array"]
+PREDICATE = ["is_backend_array", "is_concrete"]
 FULL_SURFACE = (
     CONSTRUCTION + LINALG + ELEMENTWISE + REDUCTIONS + DEVICE + DTYPES + PREDICATE
 )
@@ -431,3 +432,184 @@ def test_space_jacobian_with_no_joints_preserves_empty_shape():
     assert isinstance(result, np.ndarray)
     assert result.shape == (6, 0)
     assert result.dtype == np.float64
+
+
+# ---------------------------------------------------------------------------
+# Dynamics dispatch
+# ---------------------------------------------------------------------------
+
+
+class _DynamicsSpyBackend(NumpyBackend):
+    """Concrete NumPy delegate that records primitives dynamics hot paths use."""
+
+    is_concrete = True
+
+    def __init__(self):
+        self.calls = []
+
+    def zeros(self, shape, dtype=None):
+        self.calls.append("zeros")
+        return super().zeros(shape, dtype=dtype)
+
+    def eye(self, n, dtype=None):
+        self.calls.append("eye")
+        return super().eye(n, dtype=dtype)
+
+    def matmul(self, a, b):
+        self.calls.append("matmul")
+        return super().matmul(a, b)
+
+    def inv(self, a):
+        self.calls.append("inv")
+        return super().inv(a)
+
+    def solve(self, a, b):
+        self.calls.append("solve")
+        return super().solve(a, b)
+
+    def concatenate(self, arrays, axis=0):
+        self.calls.append("concatenate")
+        return super().concatenate(arrays, axis=axis)
+
+
+class _NonConcreteNumpyBackend(NumpyBackend):
+    """NumPy numerics with the concrete flag flipped off (traced-style stand-in).
+
+    Computes real arrays so ManipulatorDynamics runs, but reports
+    ``is_concrete = False`` the way a future traced Torch/JAX backend would.
+    """
+
+    is_concrete = False
+
+
+def _planar_2r_dynamics():
+    """Analytical 2R planar arm with per-link CoM data (mirrors the v1.3.2 fixture)."""
+    from ManipulaPy.utils import extract_screw_list
+
+    L1 = L2 = 1.0
+    omega_list = np.array([[0, 0, 1], [0, 0, 1]]).T
+    r_list = np.array([[0, 0, 0], [L1, 0, 0]]).T
+    s_list = extract_screw_list(omega_list, r_list)
+
+    home = np.eye(4)
+    home[0, 3] = L1 + L2
+    m_link1 = np.eye(4)
+    m_link1[0, 3] = L1
+    m_link2 = np.eye(4)
+    m_link2[0, 3] = L1 + L2
+    glist = np.array([np.diag([0.0, 0.0, 0.0, m, m, m]) for m in (1.0, 1.0)])
+
+    return ManipulatorDynamics(
+        M_list=home,
+        omega_list=omega_list,
+        r_list=r_list,
+        b_list=r_list,
+        S_list=s_list,
+        B_list=None,
+        Glist=glist,
+        Mlist_per_link=[m_link1, m_link2],
+    )
+
+
+def _dynamics_results(dyn):
+    """Evaluate every migrated dynamics hot path with fixed deterministic inputs."""
+    theta = np.array([0.1, 0.2])
+    dtheta = np.array([0.3, -0.2])
+    ddtheta = np.array([0.5, 0.4])
+    tau = np.array([1.0, -0.5])
+    g = np.array([0.0, 0.0, -9.81])
+    ftip = np.zeros(6)
+    return {
+        "mass_matrix": dyn.mass_matrix(theta),
+        "gravity_forces": dyn.gravity_forces(theta, g),
+        "velocity_quadratic_forces": dyn.velocity_quadratic_forces(theta, dtheta),
+        "inverse_dynamics": dyn.inverse_dynamics(theta, dtheta, ddtheta, g, ftip),
+        "forward_dynamics": dyn.forward_dynamics(theta, dtheta, tau, g, ftip),
+    }
+
+
+def test_dynamics_default_backend_numeric_and_return_contract():
+    """Default NumPy keeps dynamics values and the float64 ndarray contract."""
+    results = _dynamics_results(_planar_2r_dynamics())
+
+    # Analytical 2R mass matrix at theta=(0.1, 0.2): m1=m2=L1=L2=1.
+    c2 = np.cos(0.2)
+    expected_mass = np.array(
+        [
+            [1.0 + (1.0 + 1.0 + 2.0 * c2), 1.0 + 1.0 * c2],
+            [1.0 + 1.0 * c2, 1.0],
+        ]
+    )
+    np.testing.assert_allclose(results["mass_matrix"], expected_mass, atol=1e-6)
+
+    shapes = {
+        "mass_matrix": (2, 2),
+        "gravity_forces": (2,),
+        "velocity_quadratic_forces": (2,),
+        "inverse_dynamics": (2,),
+        "forward_dynamics": (2,),
+    }
+    for name, shape in shapes.items():
+        value = results[name]
+        assert isinstance(value, np.ndarray), f"{name} returned {type(value)!r}"
+        assert value.shape == shape
+        assert value.dtype == np.float64
+
+
+def test_dynamics_hot_paths_dispatch_through_active_backend(monkeypatch):
+    """Mass matrix, gravity, Coriolis, and inverse/forward dynamics route through
+    the active backend."""
+    expected = _dynamics_results(_planar_2r_dynamics())
+
+    spy = _DynamicsSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    actual = _dynamics_results(_planar_2r_dynamics())
+
+    for key, expected_value in expected.items():
+        np.testing.assert_allclose(
+            actual[key], expected_value, rtol=1e-10, atol=1e-10
+        )
+    # Per-link mass/gravity build CoM Jacobians via inv + concatenate; forward
+    # dynamics solves M x = rhs; every path multiplies through matmul.
+    assert "matmul" in spy.calls
+    assert "inv" in spy.calls
+    assert "concatenate" in spy.calls
+    assert "solve" in spy.calls
+
+
+def test_mass_matrix_cache_used_on_concrete_backend():
+    """The value-keyed cache is populated and reused under the concrete NumPy backend."""
+    dyn = _planar_2r_dynamics()
+    theta = np.array([0.1, 0.2])
+
+    first = dyn.mass_matrix(theta)
+    assert len(dyn._mass_matrix_cache) == 1
+    second = dyn.mass_matrix(theta)
+    # A concrete cache hit returns the identical stored object.
+    assert second is first
+
+
+def test_mass_matrix_cache_bypassed_on_nonconcrete_backend(monkeypatch):
+    """A non-concrete (traced-style) backend must neither read nor write the
+    tuple-keyed mass-matrix cache."""
+    theta = np.array([0.1, 0.2])
+    poison = np.full((2, 2), 999.0)
+
+    # Read-bypass: a poisoned entry must be ignored, not returned.
+    dyn_read = _planar_2r_dynamics()
+    dyn_read._mass_matrix_cache[tuple(theta)] = poison
+    monkeypatch.setattr(be, "_active", _NonConcreteNumpyBackend())
+    out = dyn_read.mass_matrix(theta)
+    assert out is not poison
+    assert not np.array_equal(out, poison)
+    # It must equal the genuinely recomputed matrix.
+    c2 = np.cos(0.2)
+    expected_mass = np.array(
+        [[1.0 + (2.0 + 2.0 * c2), 1.0 + c2], [1.0 + c2, 1.0]]
+    )
+    np.testing.assert_allclose(out, expected_mass, atol=1e-6)
+
+    # Write-bypass: a fresh cache must stay empty after a non-concrete call.
+    dyn_write = _planar_2r_dynamics()
+    dyn_write.mass_matrix(theta)
+    assert len(dyn_write._mass_matrix_cache) == 0

@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
+from ..backend import get_backend
 from ..kinematics import SerialManipulator
 from ..utils import adjoint_transform as ad
 
@@ -86,11 +87,16 @@ class ManipulatorDynamics(SerialManipulator):
         If Mlist_per_link is None (legacy path), falls back to the previous
         EE-Jacobian approximation with a deprecation warning.
         """
-        from ManipulaPy.utils import adjoint_transform as _ad
-
-        thetalist_key = tuple(thetalist)
-        if thetalist_key in self._mass_matrix_cache:
-            return self._mass_matrix_cache[thetalist_key]
+        backend = get_backend()
+        # The tuple key hashes only for concrete (NumPy/CuPy) arrays; a traced
+        # tensor would hash by identity (silent never-hit) or need a host sync
+        # that breaks trace-safety, so the cache is skipped for such backends.
+        use_cache = backend.is_concrete
+        if use_cache:
+            thetalist_key = tuple(thetalist)
+            cached = self._mass_matrix_cache.get(thetalist_key)
+            if cached is not None:
+                return cached
 
         n = len(thetalist)
 
@@ -108,58 +114,76 @@ class ManipulatorDynamics(SerialManipulator):
             )
             return self._mass_matrix_legacy(thetalist)
 
-        M = np.zeros((n, n), dtype=np.float64)
-
         # Spatial Jacobian columns J_s[:, i] = Ad(prefix_i) @ S_i, built once
         # via the canonical incremental formula in kinematics.jacobian. Body
         # twist of link k is then J_b_k[:, i] = Ad(T_k_com^-1) @ J_s[:, i].
         J_s = self.jacobian(thetalist, frame="space")  # (6, n)
 
+        # Functional accumulation (M = M + term) keeps the hot path free of
+        # in-place writes so a future traced backend needs no further changes.
+        M = backend.zeros((n, n), dtype=backend.float64)
         for k in range(n):
             # T_k_com(θ): base → link k CoM at the current configuration.
             # Joints k+1..n don't move link k, so truncating thetalist to
             # k+1 entries gives the correct link pose; the inv(M_list)
             # @ Mlist_per_link[k] offset shifts from link frame to CoM frame.
-            T_k_zero = self.Mlist_per_link[k]
+            T_k_zero = backend.asarray(self.Mlist_per_link[k])
             T_k = self.forward_kinematics(thetalist[: k + 1], frame="space")
-            T_k_at_zero = self.forward_kinematics(np.zeros(k + 1), frame="space")
-            T_link_to_com = np.linalg.inv(T_k_at_zero) @ T_k_zero
-            T_k_com = T_k @ T_link_to_com
+            T_k_at_zero = self.forward_kinematics(
+                backend.zeros((k + 1,), dtype=backend.float64), frame="space"
+            )
+            T_link_to_com = backend.matmul(backend.inv(T_k_at_zero), T_k_zero)
+            T_k_com = backend.matmul(T_k, T_link_to_com)
 
             # Convert spatial → body for link k. Columns i > k stay zero
             # because joint i is downstream of link k and doesn't move it.
-            Ad_inv_T_k_com = _ad(np.linalg.inv(T_k_com))
-            J_k = np.zeros((6, n), dtype=np.float64)
-            J_k[:, : k + 1] = Ad_inv_T_k_com @ J_s[:, : k + 1]
+            Ad_inv_T_k_com = ad(backend.inv(T_k_com))
+            J_k_active = backend.matmul(Ad_inv_T_k_com, J_s[:, : k + 1])
+            J_k = backend.concatenate(
+                (
+                    J_k_active,
+                    backend.zeros((6, n - (k + 1)), dtype=J_k_active.dtype),
+                ),
+                axis=1,
+            )
 
-            M += J_k.T @ self.Glist[k] @ J_k
+            G_k = backend.asarray(self.Glist[k])
+            M = M + backend.matmul(backend.matmul(J_k.T, G_k), J_k)
 
         # Symmetrize against floating-point drift
         M = 0.5 * (M + M.T)
-        self._mass_matrix_cache[thetalist_key] = M
+        if use_cache:
+            self._mass_matrix_cache[thetalist_key] = M
         return M
 
     def _mass_matrix_legacy(
         self, thetalist: Union[NDArray[np.float64], List[float]]
     ) -> NDArray[np.float64]:
         """Legacy mass matrix (incorrect, kept for backward compat). DO NOT USE."""
-        thetalist_key = tuple(thetalist)
+        backend = get_backend()
+        use_cache = backend.is_concrete
         n = len(thetalist)
-        M = np.zeros((n, n), dtype=np.float64)
-        AdT = np.zeros((6, 6, n + 1))
-        AdT[:, :, 0] = np.eye(6)
-        for j in range(n):
-            T = self.forward_kinematics(thetalist[: j + 1], frame="space")
-            AdT[:, :, j + 1] = ad(T)
-        J_full = self.jacobian(thetalist, frame="space")
+
+        # Per-link spatial inertia in the base frame: I_base[i] = Ad_i^T G_i Ad_i.
+        eye_n = backend.eye(n, dtype=backend.float64)
+        I_base = []
         for i in range(n):
-            for j in range(n):
-                Ii_base = AdT[:, :, i + 1].T @ self.Glist[i] @ AdT[:, :, i + 1]
-                Ji = J_full[:, i]
-                Jj = J_full[:, j]
-                M[i, j] += Ji.T @ Ii_base @ Jj
+            AdT_i = ad(self.forward_kinematics(thetalist[: i + 1], frame="space"))
+            G_i = backend.asarray(self.Glist[i])
+            I_base.append(backend.matmul(backend.matmul(AdT_i.T, G_i), AdT_i))
+
+        J_full = self.jacobian(thetalist, frame="space")
+
+        # Row i of M is (J_i^T I_base[i]) @ J_full. Placing each row via a
+        # one-hot column keeps construction functional (no M[i, j] writes).
+        M = backend.zeros((n, n), dtype=backend.float64)
+        for i in range(n):
+            Ji = J_full[:, i]
+            row_i = backend.matmul(backend.matmul(Ji, I_base[i]), J_full)
+            M = M + eye_n[i][:, None] * row_i
         M = 0.5 * (M + M.T)
-        self._mass_matrix_cache[thetalist_key] = M
+        if use_cache:
+            self._mass_matrix_cache[tuple(thetalist)] = M
         return M
 
     def _mass_matrix_derivatives(
@@ -170,24 +194,34 @@ class ManipulatorDynamics(SerialManipulator):
         every joint angle, cached so repeated calls avoid recomputing
         full mass matrices inside tight loops.
         """
-        theta_key = tuple(np.asarray(thetalist, dtype=np.float64))
-        cache_key = (theta_key, float(epsilon))
-        if cache_key in self._mass_matrix_derivative_cache:
-            return self._mass_matrix_derivative_cache[cache_key]
+        backend = get_backend()
+        use_cache = backend.is_concrete
+        if use_cache:
+            theta_host = backend.to_numpy(
+                backend.asarray(thetalist, dtype=backend.float64)
+            )
+            cache_key = (tuple(theta_host), float(epsilon))
+            cached = self._mass_matrix_derivative_cache.get(cache_key)
+            if cached is not None:
+                return cached
 
         n = len(thetalist)
-        derivatives = np.zeros((n, n, n), dtype=np.float64)
+        theta = backend.asarray(thetalist, dtype=backend.float64)
+        eye_n = backend.eye(n, dtype=backend.float64)
+
+        # Perturb one joint at a time via a one-hot column (theta +/- eps*e_k)
+        # and place the slice at dM[:, :, k] with the same one-hot, avoiding
+        # in-place writes so the finite-difference stays trace-safe.
+        derivatives = backend.zeros((n, n, n), dtype=backend.float64)
         for k in range(n):
-            thetalist_plus = np.array(thetalist, dtype=np.float64)
-            thetalist_plus[k] += epsilon
-            thetalist_minus = np.array(thetalist, dtype=np.float64)
-            thetalist_minus[k] -= epsilon
+            e_k = eye_n[k]
+            M_plus = self.mass_matrix(theta + epsilon * e_k)
+            M_minus = self.mass_matrix(theta - epsilon * e_k)
+            slice_k = (M_plus - M_minus) / (2.0 * epsilon)
+            derivatives = derivatives + slice_k[:, :, None] * e_k
 
-            M_plus = self.mass_matrix(thetalist_plus)
-            M_minus = self.mass_matrix(thetalist_minus)
-            derivatives[:, :, k] = (M_plus - M_minus) / (2.0 * epsilon)
-
-        self._mass_matrix_derivative_cache[cache_key] = derivatives
+        if use_cache:
+            self._mass_matrix_derivative_cache[cache_key] = derivatives
         return derivatives
 
     def partial_derivative(
@@ -215,21 +249,24 @@ class ManipulatorDynamics(SerialManipulator):
         Returns:
             Joint-space velocity quadratic force vector.
         """
+        backend = get_backend()
         n = len(thetalist)
-        dtheta = np.asarray(dthetalist, dtype=np.float64)
-        if np.allclose(dtheta, 0.0):
-            return np.zeros(n, dtype=np.float64)
+        dtheta = backend.asarray(dthetalist, dtype=backend.float64)
 
         dM = self._mass_matrix_derivatives(thetalist)
-        c = np.zeros(n, dtype=np.float64)
+        eye_n = backend.eye(n, dtype=backend.float64)
 
+        # c_i = dtheta^T Gamma_i dtheta with the Christoffel matrix
+        # Gamma_i[j, k] = 0.5 (dM[i, j, k] + dM[i, k, j] - dM[j, k, i]).
+        # This is the quadratic-form of the original triple sum; at zero
+        # velocity every term vanishes, so the old zero-velocity short circuit
+        # is unnecessary and would branch on tensor values.
+        c = backend.zeros((n,), dtype=backend.float64)
         for i in range(n):
-            accum = 0.0
-            for j in range(n):
-                for k in range(n):
-                    gamma = 0.5 * (dM[i, j, k] + dM[i, k, j] - dM[j, k, i])
-                    accum += gamma * dtheta[j] * dtheta[k]
-            c[i] = accum
+            dM_i = dM[i]
+            gamma_i = 0.5 * (dM_i + dM_i.T - dM[:, :, i])
+            c_i = backend.matmul(dtheta, backend.matmul(gamma_i, dtheta))
+            c = c + c_i * eye_n[i]
         return c
 
     def gravity_forces(
@@ -247,9 +284,10 @@ class ManipulatorDynamics(SerialManipulator):
         Returns:
             Joint-space gravity compensation torques.
         """
+        backend = get_backend()
         if g is None:
             g = [0.0, 0.0, -9.81]
-        g = np.asarray(g, dtype=np.float64)
+        g = backend.asarray(g, dtype=backend.float64)
         n = len(thetalist)
 
         if self.Mlist_per_link is None:
@@ -270,27 +308,36 @@ class ManipulatorDynamics(SerialManipulator):
         # CoM and F_k = [0; m_k R_k^T (-g)] is the gravity-balancing wrench in
         # that CoM frame (Modern Robotics §8.3 / base accelerated by -g). The
         # per-link CoM Jacobian construction matches mass_matrix exactly.
-        grav = np.zeros(n, dtype=np.float64)
         J_s = self.jacobian(thetalist, frame="space")  # (6, n)
 
+        grav = backend.zeros((n,), dtype=backend.float64)
         for k in range(n):
-            T_k_zero = self.Mlist_per_link[k]
+            T_k_zero = backend.asarray(self.Mlist_per_link[k])
             T_k = self.forward_kinematics(thetalist[: k + 1], frame="space")
-            T_k_at_zero = self.forward_kinematics(np.zeros(k + 1), frame="space")
-            T_link_to_com = np.linalg.inv(T_k_at_zero) @ T_k_zero
-            T_k_com = T_k @ T_link_to_com
+            T_k_at_zero = self.forward_kinematics(
+                backend.zeros((k + 1,), dtype=backend.float64), frame="space"
+            )
+            T_link_to_com = backend.matmul(backend.inv(T_k_at_zero), T_k_zero)
+            T_k_com = backend.matmul(T_k, T_link_to_com)
 
             # Columns i > k stay zero: joint i is downstream of link k.
-            J_k = np.zeros((6, n), dtype=np.float64)
-            J_k[:, : k + 1] = ad(np.linalg.inv(T_k_com)) @ J_s[:, : k + 1]
+            J_k_active = backend.matmul(ad(backend.inv(T_k_com)), J_s[:, : k + 1])
+            J_k = backend.concatenate(
+                (
+                    J_k_active,
+                    backend.zeros((6, n - (k + 1)), dtype=J_k_active.dtype),
+                ),
+                axis=1,
+            )
 
             # Pure force m_k * R_k^T (-g) in the CoM body frame; no moment,
             # since the force acts through the CoM origin. [moment; force]
-            # ordering pairs with the [omega; v] twist of J_k.
-            m_k = self.Glist[k][3, 3]
-            F = np.zeros(6, dtype=np.float64)
-            F[3:6] = m_k * (T_k_com[:3, :3].T @ (-g))
-            grav += J_k.T @ F
+            # ordering pairs with the [omega; v] twist of J_k. The -g sign is
+            # the v1.3.2 gravity correction (base accelerated by -g).
+            m_k = backend.asarray(self.Glist[k])[3, 3]
+            force = m_k * backend.matmul(T_k_com[:3, :3].T, -g)
+            F = backend.concatenate((backend.zeros((3,), dtype=force.dtype), force))
+            grav = grav + backend.matmul(J_k.T, F)
 
         return grav
 
@@ -300,14 +347,19 @@ class ManipulatorDynamics(SerialManipulator):
         g: Union[NDArray[np.float64], List[float]],
     ) -> NDArray[np.float64]:
         """Legacy gravity approximation (incorrect, kept for backward compat)."""
+        backend = get_backend()
         n = len(thetalist)
-        grav = np.zeros(n)
-        G = np.asarray(g)
+        G = backend.asarray(g, dtype=backend.float64)
+        eye_n = backend.eye(n, dtype=backend.float64)
+        grav = backend.zeros((n,), dtype=backend.float64)
         for i in range(n):
             AdT = ad(self.forward_kinematics(thetalist[: i + 1], "space"))
-            grav[i] = np.dot(AdT.T[:3, :3], G[:3]).dot(
-                self.Glist[i][:3, :3].sum(axis=0)
+            G_i = backend.asarray(self.Glist[i])
+            val = backend.matmul(
+                backend.matmul(AdT.T[:3, :3], G[:3]),
+                backend.sum(G_i[:3, :3], axis=0),
             )
+            grav = grav + val * eye_n[i]
         return grav
 
     def inverse_dynamics(
@@ -331,12 +383,17 @@ class ManipulatorDynamics(SerialManipulator):
         Returns:
             Required joint torques.
         """
-        n = len(thetalist)
+        backend = get_backend()
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)
         J_transpose = self.jacobian(thetalist).T
-        taulist = np.dot(M, ddthetalist) + c + g_forces + np.dot(J_transpose, Ftip)
+        taulist = (
+            backend.matmul(M, backend.asarray(ddthetalist))
+            + c
+            + g_forces
+            + backend.matmul(J_transpose, backend.asarray(Ftip))
+        )
         return taulist
 
     def forward_dynamics(
@@ -360,10 +417,16 @@ class ManipulatorDynamics(SerialManipulator):
         Returns:
             Joint accelerations.
         """
+        backend = get_backend()
         M = self.mass_matrix(thetalist)
         c = self.velocity_quadratic_forces(thetalist, dthetalist)
         g_forces = self.gravity_forces(thetalist, g)
         J_transpose = self.jacobian(thetalist).T
-        rhs = taulist - c - g_forces - np.dot(J_transpose, Ftip)
-        ddthetalist = np.linalg.solve(M, rhs)
+        rhs = (
+            backend.asarray(taulist)
+            - c
+            - g_forces
+            - backend.matmul(J_transpose, backend.asarray(Ftip))
+        )
+        ddthetalist = backend.solve(M, rhs)
         return ddthetalist

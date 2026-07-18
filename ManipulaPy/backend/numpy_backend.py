@@ -37,6 +37,8 @@ class NumpyBackend(ArrayBackend):
 
     float32 = np.float32
     float64 = np.float64
+    #: NumPy arrays are concrete host values, so value-keyed caches are valid.
+    is_concrete = True
 
     # -- construction ---------------------------------------------------
     def array(self, obj: Any, dtype: Optional[Any] = None) -> Any:

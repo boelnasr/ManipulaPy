@@ -49,6 +49,13 @@ class ArrayBackend(ABC):
     float32: Any
     #: dtype handle usable in ``array(..., dtype=...)`` / ``astype(...)``.
     float64: Any
+    #: True iff this backend's arrays are concrete (host/device materialized)
+    #: and hashable by value, so value-keyed caches (e.g. the mass-matrix
+    #: cache keyed on ``tuple(thetalist)``) are valid. Future traced backends
+    #: (Torch/JAX under a tracing pass) override this to ``False`` so those
+    #: caches are bypassed rather than keyed by tensor identity or a
+    #: host-synced value that would break trace-safety.
+    is_concrete: bool
 
     # -- construction ---------------------------------------------------
     @abstractmethod

@@ -39,6 +39,8 @@ class CupyBackend(ArrayBackend):
 
     float32 = cp.float32
     float64 = cp.float64
+    #: CuPy arrays are concrete device values, so value-keyed caches are valid.
+    is_concrete = True
 
     # -- construction ---------------------------------------------------
     def array(self, obj: Any, dtype: Optional[Any] = None) -> Any:
