@@ -790,22 +790,30 @@ class OptimizedTrajectoryPlanning:
         Returns:
             np.ndarray: The (possibly adjusted) ``(N, num_joints)`` trajectory.
         """
+        backend = get_backend()
         q_goal = thetaend
         obstacles = []  # Define obstacles here as needed
 
-        # Apply potential field for collision avoidance
-        for idx, step in enumerate(traj_pos):
-            if self.collision_checker.check_collision(step):
+        # Rebuild the trajectory row by row (no in-place writes). The collision
+        # checker and potential field live in the host NumPy ``potential_field``
+        # module, so each is a host boundary: convert to NumPy at the call and
+        # cast the gradient step back into the backend at the row's dtype.
+        adjusted_rows = []
+        for step in traj_pos:
+            if self.collision_checker.check_collision(backend.to_numpy(step)):
                 for _ in range(100):  # Max iterations to adjust trajectory
                     gradient = self.potential_field.compute_gradient(
-                        step, q_goal, obstacles
+                        backend.to_numpy(step), backend.to_numpy(q_goal), obstacles
                     )
-                    step -= 0.01 * gradient  # Adjust step size as needed
-                    if not self.collision_checker.check_collision(step):
+                    # Adjust step size as needed
+                    step = backend.asarray(step - 0.01 * gradient, dtype=step.dtype)
+                    if not self.collision_checker.check_collision(
+                        backend.to_numpy(step)
+                    ):
                         break
-                traj_pos[idx] = step
+            adjusted_rows.append(backend.asarray(step))
 
-        return traj_pos
+        return backend.stack(adjusted_rows)
 
     def batch_joint_trajectory(
         self, thetastart_batch, thetaend_batch, Tf, N, method, kernel_type=None
@@ -2289,27 +2297,37 @@ class OptimizedTrajectoryPlanning:
         num_waypoints = 5
         joint_trajectory = []
 
-        start_pos = np.array(start_position)
-        target_pos = np.array(target_position)
+        backend = get_backend()
+        start_pos = backend.asarray(start_position)
+        target_pos = backend.asarray(target_position)
 
         for i in range(num_waypoints + 1):
             alpha = i / num_waypoints
             waypoint = (1 - alpha) * start_pos + alpha * target_pos
 
-            # Simple collision avoidance - move away from obstacles
+            # Simple collision avoidance - move away from obstacles. The
+            # potential field and collision checker are host NumPy boundaries,
+            # so convert at each call and re-enter the backend at the waypoint's
+            # dtype (no in-place writes).
             if obstacle_points and self.potential_field:
                 for _ in range(10):  # Max adjustment iterations
                     gradient = self.potential_field.compute_gradient(
-                        waypoint, target_pos, obstacle_points
+                        backend.to_numpy(waypoint),
+                        backend.to_numpy(target_pos),
+                        obstacle_points,
                     )
-                    waypoint -= 0.01 * gradient
+                    waypoint = backend.asarray(
+                        waypoint - 0.01 * gradient, dtype=waypoint.dtype
+                    )
 
                     # Check if waypoint is collision-free
                     if self.collision_checker:
-                        if not self.collision_checker.check_collision(waypoint):
+                        if not self.collision_checker.check_collision(
+                            backend.to_numpy(waypoint)
+                        ):
                             break
 
-            joint_trajectory.append(waypoint.tolist())
+            joint_trajectory.append(backend.to_numpy(waypoint).tolist())
 
         logger.info(f"Planned trajectory with {len(joint_trajectory)} waypoints")
         return joint_trajectory

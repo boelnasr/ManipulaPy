@@ -33,8 +33,18 @@ from ManipulaPy.singularity import Singularity
 CONSTRUCTION = ["array", "asarray", "zeros", "eye", "stack", "concatenate", "diag"]
 LINALG = ["svd", "svdvals", "inv", "pinv", "solve", "norm", "trace"]
 ELEMENTWISE = [
-    "sin", "cos", "sqrt", "arccos", "arctan2", "abs", "clip",
-    "maximum", "minimum", "where", "cross", "matmul",
+    "sin",
+    "cos",
+    "sqrt",
+    "arccos",
+    "arctan2",
+    "abs",
+    "clip",
+    "maximum",
+    "minimum",
+    "where",
+    "cross",
+    "matmul",
 ]
 REDUCTIONS = ["sum", "amax", "amin", "mean", "argmax", "all", "any", "isfinite"]
 DEVICE = ["to_device", "to_numpy", "ascontiguous"]
@@ -596,9 +606,7 @@ def test_dynamics_hot_paths_dispatch_through_active_backend(monkeypatch):
     actual = _dynamics_results(_planar_2r_dynamics())
 
     for key, expected_value in expected.items():
-        np.testing.assert_allclose(
-            actual[key], expected_value, rtol=1e-10, atol=1e-10
-        )
+        np.testing.assert_allclose(actual[key], expected_value, rtol=1e-10, atol=1e-10)
     # Per-link mass/gravity build CoM Jacobians via inv + concatenate; forward
     # dynamics solves M x = rhs; every path multiplies through matmul.
     assert "matmul" in spy.calls
@@ -634,9 +642,7 @@ def test_mass_matrix_cache_bypassed_on_nonconcrete_backend(monkeypatch):
     assert not np.array_equal(out, poison)
     # It must equal the genuinely recomputed matrix.
     c2 = np.cos(0.2)
-    expected_mass = np.array(
-        [[1.0 + (2.0 + 2.0 * c2), 1.0 + c2], [1.0 + c2, 1.0]]
-    )
+    expected_mass = np.array([[1.0 + (2.0 + 2.0 * c2), 1.0 + c2], [1.0 + c2, 1.0]])
     np.testing.assert_allclose(out, expected_mass, atol=1e-6)
 
     # Write-bypass: a fresh cache must stay empty after a non-concrete call.
@@ -714,15 +720,9 @@ def test_dynamics_native_cupy_parity_and_cache_safety():
         actual = {
             "mass_matrix": dyn.mass_matrix(theta),
             "gravity_forces": dyn.gravity_forces(theta, g),
-            "velocity_quadratic_forces": dyn.velocity_quadratic_forces(
-                theta, dtheta
-            ),
-            "inverse_dynamics": dyn.inverse_dynamics(
-                theta, dtheta, ddtheta, g, ftip
-            ),
-            "forward_dynamics": dyn.forward_dynamics(
-                theta, dtheta, tau, g, ftip
-            ),
+            "velocity_quadratic_forces": dyn.velocity_quadratic_forces(theta, dtheta),
+            "inverse_dynamics": dyn.inverse_dynamics(theta, dtheta, ddtheta, g, ftip),
+            "forward_dynamics": dyn.forward_dynamics(theta, dtheta, tau, g, ftip),
         }
         second = dyn.mass_matrix(theta)
         derivatives = dyn._mass_matrix_derivatives(theta)
@@ -1263,9 +1263,7 @@ def test_joint_trajectory_cpu_default_backend_parity():
     planner = _cpu_trajectory_planner()
     traj = planner.joint_trajectory([0.0, 0.0], [1.0, -0.5], 1.0, 3, 5)
 
-    expected_pos = np.array(
-        [[0.0, 0.0], [0.5, -0.25], [1.0, -0.5]], dtype=np.float32
-    )
+    expected_pos = np.array([[0.0, 0.0], [0.5, -0.25], [1.0, -0.5]], dtype=np.float32)
     expected_vel = np.array(
         [[0.0, 0.0], [1.875, -0.9375], [0.0, 0.0]], dtype=np.float32
     )
@@ -1331,7 +1329,9 @@ def test_cartesian_trajectory_default_backend_parity():
     np.testing.assert_allclose(traj["velocities"], expected_vel, atol=1e-6)
     assert traj["orientations"].shape == (5, 3, 3)
     for i in range(5):
-        np.testing.assert_array_equal(traj["orientations"][i], np.eye(3, dtype=np.float32))
+        np.testing.assert_array_equal(
+            traj["orientations"][i], np.eye(3, dtype=np.float32)
+        )
     for key in ("positions", "velocities", "accelerations", "orientations"):
         assert traj[key].dtype == np.float32
 
@@ -1542,3 +1542,137 @@ def test_calculate_derivatives_dispatches_through_active_backend(monkeypatch):
     planner.calculate_derivatives(positions, 0.5)
 
     assert "asarray" in spy.calls
+
+
+# ---------------------------------------------------------------------------
+# Path-planning / collision-avoidance dispatch
+# ---------------------------------------------------------------------------
+
+
+class _PathPlanningSpyBackend(NumpyBackend):
+    """NumPy delegate recording primitives used by the migrated planning paths.
+
+    ``stack`` is the tell-tale of the functional trajectory rebuild in
+    ``_apply_collision_avoidance_cpu`` (the pre-migration code mutated rows in
+    place and never stacked); ``asarray`` and ``to_numpy`` mark the backend
+    and host-boundary conversions the pre-migration ``np.array``/``.tolist``
+    and in-place code never made.
+    """
+
+    def __init__(self):
+        self.calls = []
+
+    def asarray(self, obj, dtype=None):
+        self.calls.append("asarray")
+        return super().asarray(obj, dtype=dtype)
+
+    def to_numpy(self, x):
+        self.calls.append("to_numpy")
+        return super().to_numpy(x)
+
+    def stack(self, arrays, axis=0):
+        self.calls.append("stack")
+        return super().stack(arrays, axis=axis)
+
+
+class _CollideOnceChecker:
+    """Collision checker reporting one colliding point, then clearing.
+
+    The first ``check_collision`` returns True and every later call returns
+    False, so the gradient-descent inner loop runs exactly one adjustment
+    iteration deterministically.
+    """
+
+    def __init__(self):
+        self.calls = 0
+
+    def check_collision(self, q):
+        self.calls += 1
+        return self.calls == 1
+
+
+class _AlwaysCollideChecker:
+    """Collision checker that always reports a collision."""
+
+    def check_collision(self, q):
+        return True
+
+
+class _ConstantGradientField:
+    """Potential field returning a fixed host-NumPy (float64) gradient of ones."""
+
+    def compute_gradient(self, q, q_goal, obstacles):
+        return np.ones_like(np.asarray(q, dtype=np.float64))
+
+
+def test_collision_avoidance_cpu_default_backend_parity():
+    """Default NumPy keeps the one-step gradient nudge, shape and float32 dtype."""
+    planner = _cpu_trajectory_planner()
+    planner.collision_checker = _CollideOnceChecker()
+    planner.potential_field = _ConstantGradientField()
+    traj_pos = np.array([[0.0, 0.0], [1.0, 1.0]], dtype=np.float32)
+
+    result = planner._apply_collision_avoidance_cpu(
+        traj_pos, np.array([0.0, 0.0], dtype=np.float32)
+    )
+
+    # Row 0 collides once: q -= 0.01 * ones. Row 1 never collides -> unchanged.
+    expected = np.array([[-0.01, -0.01], [1.0, 1.0]], dtype=np.float32)
+    np.testing.assert_allclose(result, expected, atol=1e-6)
+    assert result.shape == traj_pos.shape
+    assert result.dtype == np.float32
+
+
+def test_collision_avoidance_cpu_dispatches_through_active_backend(monkeypatch):
+    """The CPU collision path rebuilds via stack and crosses the host boundary."""
+    planner = _cpu_trajectory_planner()
+    planner.collision_checker = _CollideOnceChecker()
+    planner.potential_field = _ConstantGradientField()
+    traj_pos = np.array([[0.0, 0.0], [1.0, 1.0]], dtype=np.float32)
+    spy = _PathPlanningSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    planner._apply_collision_avoidance_cpu(
+        traj_pos, np.array([0.0, 0.0], dtype=np.float32)
+    )
+
+    assert "stack" in spy.calls
+    assert "to_numpy" in spy.calls
+
+
+def test_plan_trajectory_default_backend_parity():
+    """Default NumPy keeps the interpolated waypoints as a plain Python list."""
+    planner = _cpu_trajectory_planner()
+    result = planner.plan_trajectory([0.0, 0.0], [1.0, 2.0], [])
+
+    assert isinstance(result, list) and isinstance(result[0], list)
+    assert len(result) == 6
+    np.testing.assert_allclose(result[0], [0.0, 0.0], atol=1e-6)
+    np.testing.assert_allclose(result[-1], [1.0, 2.0], atol=1e-6)
+    np.testing.assert_allclose(result[2], [0.4, 0.8], atol=1e-6)
+
+
+def test_plan_trajectory_gradient_host_boundary_parity():
+    """The plan_trajectory gradient path integrates through the host boundary."""
+    planner = _cpu_trajectory_planner()
+    planner.potential_field = _ConstantGradientField()
+    planner.collision_checker = _AlwaysCollideChecker()
+
+    result = planner.plan_trajectory([0.0, 0.0], [1.0, 2.0], [(0.5, 0.5)])
+
+    # The checker never clears, so all 10 gradient steps of -0.01 * ones run.
+    np.testing.assert_allclose(result[0], [-0.1, -0.1], atol=1e-6)
+    np.testing.assert_allclose(result[-1], [0.9, 1.9], atol=1e-6)
+    assert isinstance(result[0], list)
+
+
+def test_plan_trajectory_dispatches_through_active_backend(monkeypatch):
+    """plan_trajectory adopts the active backend instead of raw NumPy."""
+    planner = _cpu_trajectory_planner()
+    spy = _PathPlanningSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    planner.plan_trajectory([0.0, 0.0], [1.0, 2.0], [])
+
+    assert "asarray" in spy.calls
+    assert "to_numpy" in spy.calls
