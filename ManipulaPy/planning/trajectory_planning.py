@@ -567,9 +567,14 @@ class OptimizedTrajectoryPlanning:
             f"method={method}, kernel={kernel_type}"
         )
 
-        backend = get_backend()
-        thetastart = backend.asarray(thetastart, dtype=backend.float32)
-        thetaend = backend.asarray(thetaend, dtype=backend.float32)
+        # Keep host NumPy inputs here: the unchanged CUDA path
+        # (_joint_trajectory_gpu -> optimized_trajectory_generation_monitored,
+        # np.ascontiguousarray, pinned H2D) requires real NumPy. The backend
+        # domain is entered inside _joint_trajectory_cpu, which converts at its
+        # njit boundary. Entering the backend before _should_use_gpu would feed
+        # device arrays to the GPU path and force a silent CPU fallback.
+        thetastart = np.array(thetastart, dtype=np.float32)
+        thetaend = np.array(thetaend, dtype=np.float32)
         num_joints = len(thetastart)
 
         # Print performance recommendations if beneficial
@@ -791,27 +796,34 @@ class OptimizedTrajectoryPlanning:
             np.ndarray: The (possibly adjusted) ``(N, num_joints)`` trajectory.
         """
         backend = get_backend()
-        q_goal = thetaend
+        if len(traj_pos) == 0:
+            # Base iterated an empty trajectory and returned it unchanged;
+            # ``stack([])`` would raise, so short-circuit the degenerate case.
+            return traj_pos
+
+        # The collision checker and potential field live in the host NumPy
+        # ``potential_field`` module, so cross the boundary explicitly: keep the
+        # goal on the host and integrate each row's gradient nudge entirely on
+        # the host (no backend-native / NumPy mixed arithmetic), then re-enter
+        # the backend. Rows are stacked (no in-place writes).
+        q_goal = backend.to_numpy(thetaend)
         obstacles = []  # Define obstacles here as needed
 
-        # Rebuild the trajectory row by row (no in-place writes). The collision
-        # checker and potential field live in the host NumPy ``potential_field``
-        # module, so each is a host boundary: convert to NumPy at the call and
-        # cast the gradient step back into the backend at the row's dtype.
         adjusted_rows = []
         for step in traj_pos:
-            if self.collision_checker.check_collision(backend.to_numpy(step)):
+            step_host = backend.to_numpy(step)
+            if self.collision_checker.check_collision(step_host):
                 for _ in range(100):  # Max iterations to adjust trajectory
                     gradient = self.potential_field.compute_gradient(
-                        backend.to_numpy(step), backend.to_numpy(q_goal), obstacles
+                        step_host, q_goal, obstacles
                     )
-                    # Adjust step size as needed
-                    step = backend.asarray(step - 0.01 * gradient, dtype=step.dtype)
-                    if not self.collision_checker.check_collision(
-                        backend.to_numpy(step)
-                    ):
+                    # Adjust step size as needed (host arithmetic, row dtype)
+                    step_host = np.asarray(
+                        step_host - 0.01 * gradient, dtype=step_host.dtype
+                    )
+                    if not self.collision_checker.check_collision(step_host):
                         break
-            adjusted_rows.append(backend.asarray(step))
+            adjusted_rows.append(backend.asarray(step_host))
 
         return backend.stack(adjusted_rows)
 
@@ -939,14 +951,22 @@ class OptimizedTrajectoryPlanning:
             vel_rows.append(backend.asarray(traj_vel))
             acc_rows.append(backend.asarray(traj_acc))
 
-        traj_pos_batch = backend.stack(pos_rows)
-        traj_vel_batch = backend.stack(vel_rows)
-        traj_acc_batch = backend.stack(acc_rows)
+        if pos_rows:
+            traj_pos_batch = backend.stack(pos_rows)
+            traj_vel_batch = backend.stack(vel_rows)
+            traj_acc_batch = backend.stack(acc_rows)
 
-        # Enforce joint limits column-wise (broadcast, parity with GPU path)
-        lower = backend.asarray(self.joint_limits[:, 0])
-        upper = backend.asarray(self.joint_limits[:, 1])
-        traj_pos_batch = backend.clip(traj_pos_batch, lower, upper)
+            # Enforce joint limits column-wise (broadcast, parity with GPU path)
+            lower = backend.asarray(self.joint_limits[:, 0])
+            upper = backend.asarray(self.joint_limits[:, 1])
+            traj_pos_batch = backend.clip(traj_pos_batch, lower, upper)
+        else:
+            # Base preallocated (0, N, num_joints) zeros and skipped the per-row
+            # and per-limit loops for an empty batch.
+            shape = (0, N, num_joints)
+            traj_pos_batch = backend.zeros(shape, dtype=backend.float32)
+            traj_vel_batch = backend.zeros(shape, dtype=backend.float32)
+            traj_acc_batch = backend.zeros(shape, dtype=backend.float32)
 
         elapsed = time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
@@ -1265,7 +1285,13 @@ class OptimizedTrajectoryPlanning:
                 # Use zero torques for problematic points
                 torque_rows.append(backend.zeros((num_joints,), dtype=backend.float32))
 
-        torques_trajectory = backend.stack(torque_rows)
+        if torque_rows:
+            torques_trajectory = backend.stack(torque_rows)
+        else:
+            # Base preallocated (0, num_joints) zeros for an empty trajectory.
+            torques_trajectory = backend.zeros(
+                (num_points, num_joints), dtype=backend.float32
+            )
 
         # Apply torque limits (broadcast, no in-place writes)
         torques_trajectory = backend.clip(
@@ -1483,6 +1509,11 @@ class OptimizedTrajectoryPlanning:
         num_steps = taumat.shape[0]
         num_joints = thetalist.shape[0]
 
+        if num_steps == 0:
+            # Base seeded row 0 unconditionally (``thetamat[0, :] = ...``) into a
+            # length-0 preallocation, so a zero-step request raised IndexError.
+            raise IndexError("index 0 is out of bounds for axis 0 with size 0")
+
         # Integrated state; keep its dtype fixed so the accumulation matches the
         # original in-place ``+=`` semantics (which cast back to the state dtype).
         current_theta = backend.asarray(thetalist)
@@ -1510,13 +1541,30 @@ class OptimizedTrajectoryPlanning:
                     )
 
                     # Integrate (functional; cast back to the state dtype so the
-                    # numerics match the original in-place accumulation)
-                    current_dtheta = backend.asarray(
-                        current_dtheta + ddtheta * dt_step, dtype=dtheta_dtype
-                    )
-                    current_theta = backend.asarray(
-                        current_theta + current_dtheta * dt_step, dtype=theta_dtype
-                    )
+                    # numerics match the original in-place accumulation). The
+                    # original ``+=`` used same-kind casting, which refuses e.g.
+                    # a float update into an integer state; reproduce that refusal
+                    # so an unsafe cast raises into the handler below instead of
+                    # silently truncating.
+                    new_dtheta = current_dtheta + ddtheta * dt_step
+                    if not np.can_cast(
+                        new_dtheta.dtype, dtheta_dtype, casting="same_kind"
+                    ):
+                        raise TypeError(
+                            f"Cannot cast ufunc 'add' output from {new_dtheta.dtype!r} "
+                            f"to {dtheta_dtype!r} with casting rule 'same_kind'"
+                        )
+                    current_dtheta = backend.asarray(new_dtheta, dtype=dtheta_dtype)
+
+                    new_theta = current_theta + current_dtheta * dt_step
+                    if not np.can_cast(
+                        new_theta.dtype, theta_dtype, casting="same_kind"
+                    ):
+                        raise TypeError(
+                            f"Cannot cast ufunc 'add' output from {new_theta.dtype!r} "
+                            f"to {theta_dtype!r} with casting rule 'same_kind'"
+                        )
+                    current_theta = backend.asarray(new_theta, dtype=theta_dtype)
 
                     # Apply joint limits
                     current_theta = backend.clip(current_theta, lower, upper)
@@ -1568,12 +1616,15 @@ class OptimizedTrajectoryPlanning:
         backend = get_backend()
         N = int(N)
         timegap = Tf / (N - 1.0)
+        # TransToRp returns host NumPy. Keep pstart/pend as host arrays for the
+        # unchanged GPU velocity path (see _cartesian_trajectory_gpu); enter the
+        # backend domain only through the local copies used for the assembly.
         Rstart, pstart = TransToRp(Xstart)
         Rend, pend = TransToRp(Xend)
-        Rstart = backend.asarray(Rstart)
-        Rend = backend.asarray(Rend)
-        pstart = backend.asarray(pstart)
-        pend = backend.asarray(pend)
+        Rstart_b = backend.asarray(Rstart)
+        Rend_b = backend.asarray(Rend)
+        pstart_b = backend.asarray(pstart)
+        pend_b = backend.asarray(pend)
 
         # Compute orientation interpolation on the host (complex matrix ops).
         # The straight-line position at step i is the SE(3) translation column,
@@ -1588,15 +1639,24 @@ class OptimizedTrajectoryPlanning:
 
             orientation_rows.append(
                 backend.matmul(
-                    Rstart, MatrixExp3(MatrixLog3(backend.matmul(Rstart.T, Rend)) * s)
+                    Rstart_b,
+                    MatrixExp3(MatrixLog3(backend.matmul(Rstart_b.T, Rend_b)) * s),
                 )
             )
-            position_rows.append(s * pend + (1 - s) * pstart)
+            position_rows.append(s * pend_b + (1 - s) * pstart_b)
 
-        orientations = backend.asarray(
-            backend.stack(orientation_rows), dtype=backend.float32
-        )
-        traj_pos = backend.asarray(backend.stack(position_rows), dtype=backend.float32)
+        if position_rows:
+            orientations = backend.asarray(
+                backend.stack(orientation_rows), dtype=backend.float32
+            )
+            traj_pos = backend.asarray(
+                backend.stack(position_rows), dtype=backend.float32
+            )
+        else:
+            # Base returned zero-length orientations (0, 3, 3) and a 1-D empty
+            # position array (np.array([]) -> shape (0,)) for N == 0.
+            orientations = backend.zeros((0, 3, 3), dtype=backend.float32)
+            traj_pos = backend.zeros((0,), dtype=backend.float32)
 
         # Use GPU for position/velocity/acceleration computation if beneficial
         use_gpu = self._should_use_gpu(N, 3)  # 3 coordinates (x,y,z)
@@ -1739,8 +1799,13 @@ class OptimizedTrajectoryPlanning:
             vel_rows.append(s_dot * dp)
             acc_rows.append(s_ddot * dp)
 
-        traj_vel = backend.asarray(backend.stack(vel_rows), dtype=backend.float32)
-        traj_acc = backend.asarray(backend.stack(acc_rows), dtype=backend.float32)
+        if vel_rows:
+            traj_vel = backend.asarray(backend.stack(vel_rows), dtype=backend.float32)
+            traj_acc = backend.asarray(backend.stack(acc_rows), dtype=backend.float32)
+        else:
+            # Base preallocated (0, 3) zeros for N == 0.
+            traj_vel = backend.zeros((0, 3), dtype=backend.float32)
+            traj_acc = backend.zeros((0, 3), dtype=backend.float32)
 
         elapsed = time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
@@ -2300,32 +2365,34 @@ class OptimizedTrajectoryPlanning:
         backend = get_backend()
         start_pos = backend.asarray(start_position)
         target_pos = backend.asarray(target_position)
+        # The potential field and collision checker are host NumPy boundaries.
+        # Keep host copies of the goal and obstacles so every field/checker call
+        # and the gradient nudge stay on the host (no backend-native / NumPy
+        # mixed arithmetic), then re-enter the backend with the result.
+        target_host = backend.to_numpy(target_pos)
 
         for i in range(num_waypoints + 1):
             alpha = i / num_waypoints
             waypoint = (1 - alpha) * start_pos + alpha * target_pos
 
-            # Simple collision avoidance - move away from obstacles. The
-            # potential field and collision checker are host NumPy boundaries,
-            # so convert at each call and re-enter the backend at the waypoint's
-            # dtype (no in-place writes).
+            # Simple collision avoidance - move away from obstacles.
             if obstacle_points and self.potential_field:
+                waypoint_host = backend.to_numpy(waypoint)
+                obstacles_host = [backend.to_numpy(o) for o in obstacle_points]
                 for _ in range(10):  # Max adjustment iterations
                     gradient = self.potential_field.compute_gradient(
-                        backend.to_numpy(waypoint),
-                        backend.to_numpy(target_pos),
-                        obstacle_points,
+                        waypoint_host, target_host, obstacles_host
                     )
-                    waypoint = backend.asarray(
-                        waypoint - 0.01 * gradient, dtype=waypoint.dtype
+                    # Host arithmetic at the waypoint dtype (no in-place writes)
+                    waypoint_host = np.asarray(
+                        waypoint_host - 0.01 * gradient, dtype=waypoint_host.dtype
                     )
 
                     # Check if waypoint is collision-free
                     if self.collision_checker:
-                        if not self.collision_checker.check_collision(
-                            backend.to_numpy(waypoint)
-                        ):
+                        if not self.collision_checker.check_collision(waypoint_host):
                             break
+                waypoint = backend.asarray(waypoint_host)
 
             joint_trajectory.append(backend.to_numpy(waypoint).tolist())
 

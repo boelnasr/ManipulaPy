@@ -1605,6 +1605,30 @@ class _ConstantGradientField:
         return np.ones_like(np.asarray(q, dtype=np.float64))
 
 
+class _RecordingGradientField:
+    """Ones gradient that records the argument types each call receives."""
+
+    def __init__(self):
+        self.arg_types = []
+
+    def compute_gradient(self, q, q_goal, obstacles):
+        self.arg_types.append((type(q), type(q_goal), [type(o) for o in obstacles]))
+        return np.ones_like(np.asarray(q, dtype=np.float64))
+
+
+class _RecordingCollideOnceChecker:
+    """Collide-once checker that records the type of each argument it receives."""
+
+    def __init__(self):
+        self.calls = 0
+        self.arg_types = []
+
+    def check_collision(self, q):
+        self.calls += 1
+        self.arg_types.append(type(q))
+        return self.calls == 1
+
+
 def test_collision_avoidance_cpu_default_backend_parity():
     """Default NumPy keeps the one-step gradient nudge, shape and float32 dtype."""
     planner = _cpu_trajectory_planner()
@@ -1624,10 +1648,18 @@ def test_collision_avoidance_cpu_default_backend_parity():
 
 
 def test_collision_avoidance_cpu_dispatches_through_active_backend(monkeypatch):
-    """The CPU collision path rebuilds via stack and crosses the host boundary."""
+    """The CPU collision path rebuilds via stack and crosses the host boundary.
+
+    Beyond routing, this locks the host boundary (fix): the row and the goal are
+    both converted before the host potential field / collision checker see them,
+    and those host modules only ever receive ``np.ndarray`` (never a
+    backend-native array), so the gradient update happens entirely on the host.
+    """
     planner = _cpu_trajectory_planner()
-    planner.collision_checker = _CollideOnceChecker()
-    planner.potential_field = _ConstantGradientField()
+    checker = _RecordingCollideOnceChecker()
+    field = _RecordingGradientField()
+    planner.collision_checker = checker
+    planner.potential_field = field
     traj_pos = np.array([[0.0, 0.0], [1.0, 1.0]], dtype=np.float32)
     spy = _PathPlanningSpyBackend()
     monkeypatch.setattr(be, "_active", spy)
@@ -1637,7 +1669,32 @@ def test_collision_avoidance_cpu_dispatches_through_active_backend(monkeypatch):
     )
 
     assert "stack" in spy.calls
-    assert "to_numpy" in spy.calls
+    # The goal plus each of the two rows cross the host boundary via to_numpy.
+    assert spy.calls.count("to_numpy") >= 3
+    # The host potential field only ever receives NumPy for q and q_goal.
+    assert field.arg_types
+    assert all(q is np.ndarray and g is np.ndarray for q, g, _ in field.arg_types)
+    # The collision checker likewise only ever sees NumPy rows.
+    assert checker.arg_types and all(t is np.ndarray for t in checker.arg_types)
+
+
+def test_collision_avoidance_cpu_empty_trajectory_returns_empty():
+    """An empty trajectory returns an empty (0, num_joints) float32 array.
+
+    Base iterated an empty trajectory and returned it unchanged; the migrated
+    stack-based rebuild must not raise on ``stack([])``.
+    """
+    planner = _cpu_trajectory_planner()
+    planner.collision_checker = _CollideOnceChecker()
+    planner.potential_field = _ConstantGradientField()
+    traj_pos = np.zeros((0, 2), dtype=np.float32)
+
+    result = planner._apply_collision_avoidance_cpu(
+        traj_pos, np.array([0.0, 0.0], dtype=np.float32)
+    )
+
+    assert result.shape == (0, 2)
+    assert result.dtype == np.float32
 
 
 def test_plan_trajectory_default_backend_parity():
@@ -1676,3 +1733,121 @@ def test_plan_trajectory_dispatches_through_active_backend(monkeypatch):
 
     assert "asarray" in spy.calls
     assert "to_numpy" in spy.calls
+
+
+def test_plan_trajectory_gradient_only_hosts_the_potential_field(monkeypatch):
+    """The gradient path passes only NumPy (waypoint, goal, obstacles) to the field.
+
+    Locks the host boundary: the waypoint, target and each obstacle are all
+    converted to NumPy before the host potential field sees them, so the nudge
+    integrates entirely on the host with no backend-native mixed arithmetic.
+    """
+    planner = _cpu_trajectory_planner()
+    field = _RecordingGradientField()
+    planner.potential_field = field
+    planner.collision_checker = _AlwaysCollideChecker()
+    spy = _PathPlanningSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    # A plain-tuple obstacle must be converted to NumPy at the boundary.
+    planner.plan_trajectory([0.0, 0.0], [1.0, 2.0], [(0.5, 0.5)])
+
+    assert field.arg_types
+    for q, g, obs in field.arg_types:
+        assert q is np.ndarray and g is np.ndarray
+        assert obs and all(o is np.ndarray for o in obs)
+
+
+# ---------------------------------------------------------------------------
+# Degenerate-input edge semantics (restore pre-migration behavior)
+# ---------------------------------------------------------------------------
+
+
+def test_batch_joint_trajectory_cpu_empty_batch_returns_empty_shape():
+    """A zero-length batch returns (0, N, num_joints) float32 arrays, not a raise.
+
+    Base preallocated the empty batch; the migrated stack-based rebuild must not
+    raise on ``stack([])``.
+    """
+    planner = _cpu_trajectory_planner()
+    thetastart = np.zeros((0, 2), dtype=np.float32)
+    thetaend = np.zeros((0, 2), dtype=np.float32)
+
+    traj = planner.batch_joint_trajectory(thetastart, thetaend, 1.0, 3, 5)
+
+    for key in ("positions", "velocities", "accelerations"):
+        assert traj[key].shape == (0, 3, 2)
+        assert traj[key].dtype == np.float32
+
+
+def test_inverse_dynamics_cpu_empty_trajectory_returns_empty_shape():
+    """A zero-point trajectory returns a (0, num_joints) float32 torque array."""
+    planner = _dynamics_planner(
+        _SumInverseDynamics(), [(-5.0, 5.0), (-5.0, 5.0)], [[-3.0, 4.0], [-3.0, 4.0]]
+    )
+    empty = np.zeros((0, 2), dtype=np.float32)
+
+    torques = planner.inverse_dynamics_trajectory(
+        empty, empty, empty, np.array([0, 0, -9.81]), np.zeros(6)
+    )
+
+    assert torques.shape == (0, 2)
+    assert torques.dtype == np.float32
+
+
+def test_cartesian_trajectory_zero_points_returns_base_empty_shapes():
+    """N == 0 returns base's empty shapes: (0,) positions, (0, 3, 3) orientations."""
+    planner = _cpu_trajectory_planner()
+    Xstart = np.eye(4)
+    Xend = np.eye(4)
+    Xend[:3, 3] = [1.0, 2.0, 3.0]
+
+    traj = planner.cartesian_trajectory(Xstart, Xend, 1.0, 0, 5)
+
+    assert traj["positions"].shape == (0,)
+    assert traj["orientations"].shape == (0, 3, 3)
+    assert traj["velocities"].shape == (0, 3)
+    assert traj["accelerations"].shape == (0, 3)
+    for key in ("positions", "velocities", "accelerations", "orientations"):
+        assert traj[key].dtype == np.float32
+
+
+def test_forward_dynamics_cpu_zero_steps_raises_like_base():
+    """A zero-step request raises IndexError exactly as the base preallocation did."""
+    planner = _dynamics_planner(_TauForwardDynamics(), [(-5.0, 5.0), (-5.0, 5.0)], None)
+    thetalist = np.zeros(2, dtype=np.float32)
+    dthetalist = np.zeros(2, dtype=np.float32)
+    taumat = np.zeros((0, 2), dtype=np.float64)
+
+    with pytest.raises(IndexError):
+        planner.forward_dynamics_trajectory(
+            thetalist, dthetalist, taumat, np.zeros(3), np.zeros((0, 6)), 0.1, 1
+        )
+
+
+def test_forward_dynamics_cpu_integer_state_freezes_like_base():
+    """Integer initial state refuses the float cast and freezes at the initial value.
+
+    Base integrated with in-place ``+=``, which raised an unsafe float->int
+    same-kind cast that the loop's except-handler turned into zero acceleration,
+    leaving the integer state frozen. The migrated functional cast must not
+    silently truncate to a diverging non-zero trajectory.
+    """
+    planner = _dynamics_planner(_TauForwardDynamics(), [(-5.0, 5.0), (-5.0, 5.0)], None)
+    thetalist = np.array([1, 2], dtype=np.int64)
+    dthetalist = np.array([0, 0], dtype=np.int64)
+    taumat = np.full((3, 2), 4.0, dtype=np.float64)
+
+    result = planner.forward_dynamics_trajectory(
+        thetalist, dthetalist, taumat, np.zeros(3), np.zeros((3, 6)), 0.5, 1
+    )
+
+    np.testing.assert_array_equal(
+        result["positions"], np.array([[1, 2], [1, 2], [1, 2]], dtype=np.float32)
+    )
+    np.testing.assert_array_equal(
+        result["velocities"], np.zeros((3, 2), dtype=np.float32)
+    )
+    np.testing.assert_array_equal(
+        result["accelerations"], np.zeros((3, 2), dtype=np.float32)
+    )
