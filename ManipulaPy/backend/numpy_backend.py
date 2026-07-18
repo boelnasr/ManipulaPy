@@ -70,6 +70,9 @@ class NumpyBackend(ArrayBackend):
     def svd(self, a: Any, full_matrices: bool = False) -> Tuple[Any, Any, Any]:
         return np.linalg.svd(a, full_matrices=full_matrices)
 
+    def svdvals(self, a: Any) -> Any:
+        return np.linalg.svd(a, compute_uv=False)
+
     def inv(self, a: Any) -> Any:
         return np.linalg.inv(a)
 

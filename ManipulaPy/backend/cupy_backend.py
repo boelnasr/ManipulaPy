@@ -72,6 +72,9 @@ class CupyBackend(ArrayBackend):
     def svd(self, a: Any, full_matrices: bool = False) -> Tuple[Any, Any, Any]:
         return cp.linalg.svd(a, full_matrices=full_matrices)
 
+    def svdvals(self, a: Any) -> Any:
+        return cp.linalg.svd(a, compute_uv=False)
+
     def inv(self, a: Any) -> Any:
         return cp.linalg.inv(a)
 

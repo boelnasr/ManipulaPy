@@ -31,7 +31,7 @@ from ManipulaPy.singularity import Singularity
 # The full protocol surface, mirrored from the call-site audit. Kept here so
 # the completeness test fails loudly if base.py and the impls drift apart.
 CONSTRUCTION = ["array", "asarray", "zeros", "eye", "stack", "concatenate", "diag"]
-LINALG = ["svd", "inv", "pinv", "solve", "norm", "trace"]
+LINALG = ["svd", "svdvals", "inv", "pinv", "solve", "norm", "trace"]
 ELEMENTWISE = [
     "sin", "cos", "sqrt", "arccos", "arctan2", "abs", "clip",
     "maximum", "minimum", "where", "cross", "matmul",
@@ -735,6 +735,10 @@ class _SingularitySpyBackend(NumpyBackend):
         self.calls.append("svd")
         return super().svd(a, full_matrices=full_matrices)
 
+    def svdvals(self, a):
+        self.calls.append("svdvals")
+        return super().svdvals(a)
+
     def amax(self, x, axis=None):
         self.calls.append("amax")
         return super().amax(x, axis=axis)
@@ -813,9 +817,9 @@ def test_singularity_hot_paths_dispatch_through_active_backend(monkeypatch):
             rtol=1e-12,
             atol=1e-12,
         )
-    # The smallest-singular-value test and condition number both go through svd;
-    # the condition number derives from the backend's amax/amin over the spectrum.
-    assert "svd" in spy.calls
+    # The smallest-singular-value test and condition number both go through the
+    # values-only SVD; the condition number derives from amax/amin over the spectrum.
+    assert "svdvals" in spy.calls
     assert "amax" in spy.calls
     assert "amin" in spy.calls
 
@@ -835,3 +839,73 @@ def test_manipulability_ellipsoid_axis_math_dispatches_through_backend(monkeypat
     assert "svd" in spy.calls
     assert "maximum" in spy.calls
     assert "sqrt" in spy.calls
+
+
+class _FixedJacobianRobot:
+    """Serial-manipulator stand-in returning a fixed Jacobian matrix."""
+
+    def __init__(self, J):
+        self._J = J
+
+    def jacobian(self, thetalist, frame="space"):
+        return self._J
+
+
+def test_condition_number_zero_jacobian_ignores_caller_errstate():
+    """np.linalg.cond suppresses the internal 0/0 for a rank-deficient matrix,
+    so condition_number must return inf even when the caller escalates
+    floating-point errors to exceptions."""
+    sing = Singularity(_FixedJacobianRobot(np.zeros((6, 3))))
+    with np.errstate(invalid="raise", divide="raise"):
+        cond = sing.condition_number(np.zeros(3))
+    assert np.isinf(cond)
+
+
+def test_condition_number_infinite_jacobian_matches_numpy_cond():
+    """An infinite entry gives NaN singular values, which np.linalg.cond
+    reports as an infinite condition number (values-only SVD — the full-USV
+    LAPACK path can spin forever on non-finite input)."""
+    J = np.eye(6)[:, :3].copy()
+    J[0, 0] = np.inf
+    cond = Singularity(_FixedJacobianRobot(J)).condition_number(np.zeros(3))
+    assert np.isinf(cond)
+
+
+def test_condition_number_nan_jacobian_raises_like_numpy_cond():
+    """np.linalg.cond raises LinAlgError for NaN input (SVD does not
+    converge); the migrated path must preserve that instead of masking it."""
+    J = np.eye(6)[:, :3].copy()
+    J[0, 0] = np.nan
+    sing = Singularity(_FixedJacobianRobot(J))
+    with pytest.raises(np.linalg.LinAlgError):
+        sing.condition_number(np.zeros(3))
+
+
+def test_condition_number_dtype_follows_input():
+    """np.linalg.cond lets the result dtype follow the input dtype; a float32
+    Jacobian must keep returning a float32 scalar."""
+    J = np.eye(6)[:, :3].astype(np.float32)
+    cond = Singularity(_FixedJacobianRobot(J)).condition_number(np.zeros(3))
+    assert cond.dtype == np.float32
+    assert cond == np.float32(1.0)
+
+
+def test_each_scalar_method_dispatches_svd_in_isolation(monkeypatch):
+    """Each scalar hot path must route its own SVD through the backend — an
+    aggregated assertion would let one method silently fall back to np.linalg."""
+    robot = _two_joint_manipulator()
+    sing = Singularity(robot)
+    theta = np.array([0.2, -0.3])
+
+    for method in (
+        lambda: sing.singularity_analysis(theta),
+        lambda: sing.condition_number(theta),
+        lambda: sing.near_singularity_detection(theta),
+    ):
+        spy = _SingularitySpyBackend()
+        monkeypatch.setattr(be, "_active", spy)
+        method()
+        # Values-only SVD is required: the full-USV LAPACK path can hang on
+        # non-finite input, so a regression back to it must fail here.
+        assert "svdvals" in spy.calls
+        assert "svd" not in spy.calls

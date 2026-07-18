@@ -66,29 +66,30 @@ class Singularity:
         """
         backend = get_backend()
         J = backend.asarray(self.serial_manipulator.jacobian(thetalist, frame="space"))
-        singular_values = backend.svd(J, full_matrices=False)[1]
+        singular_values = backend.svdvals(J)
         # Smallest singular value (SVD returns them in descending order). The
         # threshold comparison is the public bool contract, evaluated on host.
         smallest = backend.to_numpy(singular_values[-1])
         return bool(smallest < 1e-4)
 
     @staticmethod
-    def _ellipsoid_axes(jacobian_part: Any) -> Tuple[Any, Any]:
+    def _ellipsoid_axes(backend: Any, jacobian_part: Any) -> Tuple[Any, Any]:
         """Return the ellipsoid axes and guarded radii for a Jacobian block.
 
-        Dispatches the SVD and radii math through the active backend. The
+        Dispatches the SVD and radii math through the caller's backend (passed
+        in so one backend instance serves the whole ellipsoid computation). The
         singular-value spectrum is right-padded with zeros to the axis count so
         ``radii`` scales every axis of ``U``, and the ``maximum(S, 1e-10)`` floor
         preserves the existing divide-by-zero guard around degenerate axes.
 
         Args:
+            backend: The active ArrayBackend captured by the caller.
             jacobian_part: Linear or angular velocity block of the Jacobian.
 
         Returns:
-            Tuple ``(U, radii)`` in the active backend's array type: ``U`` are
-            the ellipsoid axes and ``radii`` the reciprocal-root singular values.
+            Tuple ``(U, radii)`` in the backend's array type: ``U`` are the
+            ellipsoid axes and ``radii`` the reciprocal-root singular values.
         """
-        backend = get_backend()
         U, S, _ = backend.svd(jacobian_part, full_matrices=True)
         pad = U.shape[1] - S.shape[0]
         if pad > 0:
@@ -115,8 +116,8 @@ class Singularity:
 
         # Ellipsoid axis math (SVD + guarded radii) is dispatched through the
         # active backend; converted to host arrays for the matplotlib plotting.
-        U_v, radii_v = self._ellipsoid_axes(J_v)
-        U_w, radii_w = self._ellipsoid_axes(J_w)
+        U_v, radii_v = self._ellipsoid_axes(backend, J_v)
+        U_w, radii_w = self._ellipsoid_axes(backend, J_w)
         U_v, radii_v = backend.to_numpy(U_v), backend.to_numpy(radii_v)
         U_w, radii_w = backend.to_numpy(U_w), backend.to_numpy(radii_w)
 
@@ -256,13 +257,20 @@ class Singularity:
         """
         backend = get_backend()
         J = backend.asarray(self.serial_manipulator.jacobian(thetalist, frame="space"))
-        singular_values = backend.svd(J, full_matrices=False)[1]
-        ratio = backend.amax(singular_values) / backend.amin(singular_values)
-        # Match np.linalg.cond: a fully rank-deficient Jacobian yields 0/0 = NaN,
-        # which cond reports as an infinite condition number. The host-side NaN
-        # fixup and float64 cast run only at this public return boundary.
-        ratio = backend.to_numpy(ratio)
-        return np.float64(np.where(np.isnan(ratio), np.inf, ratio))
+        # np.linalg.cond parity requires the values-only SVD (its full-USV
+        # LAPACK path can spin forever on non-finite input) and an errstate
+        # guard: cond suppresses the 0/0 of a fully rank-deficient matrix even
+        # when the caller escalates floating-point errors to exceptions.
+        with np.errstate(all="ignore"):
+            singular_values = backend.svdvals(J)
+            ratio = backend.amax(singular_values) / backend.amin(singular_values)
+        # Host public boundary: NaN ratio (0/0, or an inf-input spectrum) is
+        # reported as an infinite condition number, preserving the input dtype
+        # exactly as np.linalg.cond does.
+        value = backend.to_numpy(ratio)[()]
+        if np.isnan(value):
+            value = type(value)(np.inf)
+        return value
 
     def near_singularity_detection(
         self,

@@ -93,6 +93,9 @@ class ArrayBackend(ABC):
     def svd(self, a: Any, full_matrices: bool = False) -> Tuple[Any, Any, Any]: ...
 
     @abstractmethod
+    def svdvals(self, a: Any) -> Any: ...
+
+    @abstractmethod
     def inv(self, a: Any) -> Any: ...
 
     @abstractmethod
