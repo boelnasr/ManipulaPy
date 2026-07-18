@@ -34,6 +34,8 @@ from numba import cuda
 from numba.cuda.random import create_xoroshiro128p_states, xoroshiro128p_uniform_float32
 from scipy.spatial import ConvexHull
 
+from ..backend import get_backend
+
 
 class Singularity:
     """Singularity and manipulability analysis for a serial manipulator."""
@@ -62,9 +64,37 @@ class Singularity:
         Returns:
             bool: True if the configuration is (near-)singular, otherwise False.
         """
-        J = self.serial_manipulator.jacobian(thetalist, frame="space")
-        singular_values = np.linalg.svd(J, compute_uv=False)
-        return bool(singular_values[-1] < 1e-4)
+        backend = get_backend()
+        J = backend.asarray(self.serial_manipulator.jacobian(thetalist, frame="space"))
+        singular_values = backend.svd(J, full_matrices=False)[1]
+        # Smallest singular value (SVD returns them in descending order). The
+        # threshold comparison is the public bool contract, evaluated on host.
+        smallest = backend.to_numpy(singular_values[-1])
+        return bool(smallest < 1e-4)
+
+    @staticmethod
+    def _ellipsoid_axes(jacobian_part: Any) -> Tuple[Any, Any]:
+        """Return the ellipsoid axes and guarded radii for a Jacobian block.
+
+        Dispatches the SVD and radii math through the active backend. The
+        singular-value spectrum is right-padded with zeros to the axis count so
+        ``radii`` scales every axis of ``U``, and the ``maximum(S, 1e-10)`` floor
+        preserves the existing divide-by-zero guard around degenerate axes.
+
+        Args:
+            jacobian_part: Linear or angular velocity block of the Jacobian.
+
+        Returns:
+            Tuple ``(U, radii)`` in the active backend's array type: ``U`` are
+            the ellipsoid axes and ``radii`` the reciprocal-root singular values.
+        """
+        backend = get_backend()
+        U, S, _ = backend.svd(jacobian_part, full_matrices=True)
+        pad = U.shape[1] - S.shape[0]
+        if pad > 0:
+            S = backend.concatenate([S, backend.zeros(pad, dtype=S.dtype)])
+        radii = 1.0 / backend.sqrt(backend.maximum(S, 1e-10))
+        return U, radii
 
     def manipulability_ellipsoid(
         self,
@@ -78,18 +108,17 @@ class Singularity:
             thetalist (numpy.ndarray): Array of joint angles in radians.
             ax (matplotlib.axes._subplots.Axes3DSubplot, optional): Matplotlib 3D axis to plot on. Defaults to None.
         """
-        J = self.serial_manipulator.jacobian(thetalist, frame="space")
+        backend = get_backend()
+        J = backend.asarray(self.serial_manipulator.jacobian(thetalist, frame="space"))
         J_v = J[:3, :]  # Linear velocity part of the Jacobian
         J_w = J[3:, :]  # Angular velocity part of the Jacobian
 
-        # Singular Value Decomposition (SVD) for both parts
-        U_v, S_v, _ = np.linalg.svd(J_v, full_matrices=True)
-        S_v = np.pad(S_v, (0, U_v.shape[1] - S_v.shape[0]), constant_values=0.0)
-        radii_v = 1.0 / np.sqrt(np.maximum(S_v, 1e-10))
-
-        U_w, S_w, _ = np.linalg.svd(J_w, full_matrices=True)
-        S_w = np.pad(S_w, (0, U_w.shape[1] - S_w.shape[0]), constant_values=0.0)
-        radii_w = 1.0 / np.sqrt(np.maximum(S_w, 1e-10))
+        # Ellipsoid axis math (SVD + guarded radii) is dispatched through the
+        # active backend; converted to host arrays for the matplotlib plotting.
+        U_v, radii_v = self._ellipsoid_axes(J_v)
+        U_w, radii_w = self._ellipsoid_axes(J_w)
+        U_v, radii_v = backend.to_numpy(U_v), backend.to_numpy(radii_v)
+        U_w, radii_w = backend.to_numpy(U_w), backend.to_numpy(radii_w)
 
         # Generate points on a unit sphere
         u, v = np.mgrid[0 : 2 * np.pi : 20j, 0 : np.pi : 10j]
@@ -225,8 +254,15 @@ class Singularity:
         Returns:
             float: The condition number of the Jacobian matrix.
         """
-        J = self.serial_manipulator.jacobian(thetalist, frame="space")
-        return np.linalg.cond(J)
+        backend = get_backend()
+        J = backend.asarray(self.serial_manipulator.jacobian(thetalist, frame="space"))
+        singular_values = backend.svd(J, full_matrices=False)[1]
+        ratio = backend.amax(singular_values) / backend.amin(singular_values)
+        # Match np.linalg.cond: a fully rank-deficient Jacobian yields 0/0 = NaN,
+        # which cond reports as an infinite condition number. The host-side NaN
+        # fixup and float64 cast run only at this public return boundary.
+        ratio = backend.to_numpy(ratio)
+        return np.float64(np.where(np.isnan(ratio), np.inf, ratio))
 
     def near_singularity_detection(
         self,

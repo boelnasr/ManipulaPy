@@ -14,6 +14,7 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 import builtins
 import importlib
 import importlib.util
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -24,6 +25,7 @@ from ManipulaPy.backend.base import ArrayBackend
 from ManipulaPy.backend.numpy_backend import NumpyBackend
 from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
+from ManipulaPy.singularity import Singularity
 
 
 # The full protocol surface, mirrored from the call-site audit. Kept here so
@@ -714,3 +716,122 @@ def test_dynamics_native_cupy_parity_and_cache_safety():
     np.testing.assert_allclose(
         cp.asnumpy(derivatives), expected_derivatives, rtol=1e-8, atol=1e-8
     )
+
+
+# ---------------------------------------------------------------------------
+# Singularity dispatch
+# ---------------------------------------------------------------------------
+
+
+class _SingularitySpyBackend(NumpyBackend):
+    """Concrete NumPy delegate that records primitives singularity paths use."""
+
+    is_concrete = True
+
+    def __init__(self):
+        self.calls = []
+
+    def svd(self, a, full_matrices=False):
+        self.calls.append("svd")
+        return super().svd(a, full_matrices=full_matrices)
+
+    def amax(self, x, axis=None):
+        self.calls.append("amax")
+        return super().amax(x, axis=axis)
+
+    def amin(self, x, axis=None):
+        self.calls.append("amin")
+        return super().amin(x, axis=axis)
+
+    def maximum(self, x1, x2):
+        self.calls.append("maximum")
+        return super().maximum(x1, x2)
+
+    def sqrt(self, x):
+        self.calls.append("sqrt")
+        return super().sqrt(x)
+
+
+def _singularity_results(sing):
+    """Evaluate the scalar SVD hot paths with fixed deterministic joint angles."""
+    theta = np.array([0.2, -0.3])
+    return {
+        "singularity": sing.singularity_analysis(theta),
+        "condition_number": sing.condition_number(theta),
+        "near_singularity": sing.near_singularity_detection(theta),
+    }
+
+
+def test_singularity_default_backend_numeric_and_return_contract():
+    """Default NumPy keeps singularity values and the exact return-type contract."""
+    robot = _two_joint_manipulator()
+    sing = Singularity(robot)
+    results = _singularity_results(sing)
+
+    # Return-type contract mirrors tests/data/api_contract_golden.json.
+    assert type(results["singularity"]) is bool
+    assert isinstance(results["condition_number"], np.float64)
+    assert isinstance(results["near_singularity"], np.bool_)
+
+    # Numeric parity against a direct NumPy computation of the same Jacobian.
+    J = robot.jacobian(np.array([0.2, -0.3]), frame="space")
+    s = np.linalg.svd(J, compute_uv=False)
+    assert results["singularity"] == bool(s[-1] < 1e-4)
+    np.testing.assert_allclose(
+        results["condition_number"], np.linalg.cond(J), rtol=1e-12
+    )
+    assert bool(results["near_singularity"]) == bool(np.linalg.cond(J) > 1e-2)
+
+
+def test_condition_number_singular_jacobian_is_infinite():
+    """A rank-deficient (zero) Jacobian yields an infinite condition number."""
+
+    class _ZeroJacobianRobot:
+        def jacobian(self, thetalist, frame="space"):
+            return np.zeros((6, 6))
+
+    cond = Singularity(_ZeroJacobianRobot()).condition_number(np.zeros(6))
+    assert isinstance(cond, np.float64)
+    assert np.isinf(cond)
+
+
+def test_singularity_hot_paths_dispatch_through_active_backend(monkeypatch):
+    """singularity_analysis, condition_number, and near-singularity detection
+    route their SVD math through the active backend."""
+    robot = _two_joint_manipulator()
+    sing = Singularity(robot)
+    expected = _singularity_results(sing)
+
+    spy = _SingularitySpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    actual = _singularity_results(sing)
+
+    for key in expected:
+        np.testing.assert_allclose(
+            np.asarray(actual[key], dtype=float),
+            np.asarray(expected[key], dtype=float),
+            rtol=1e-12,
+            atol=1e-12,
+        )
+    # The smallest-singular-value test and condition number both go through svd;
+    # the condition number derives from the backend's amax/amin over the spectrum.
+    assert "svd" in spy.calls
+    assert "amax" in spy.calls
+    assert "amin" in spy.calls
+
+
+def test_manipulability_ellipsoid_axis_math_dispatches_through_backend(monkeypatch):
+    """The ellipsoid axis math (SVD + guarded radii) routes through the backend
+    while plotting stays host-bound."""
+    robot = _two_joint_manipulator()
+    sing = Singularity(robot)
+
+    spy = _SingularitySpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    with patch("matplotlib.pyplot.show"):
+        sing.manipulability_ellipsoid(np.array([0.2, -0.3]))
+
+    # SVD for both linear/angular parts and the guarded 1/sqrt(max(S, 1e-10)).
+    assert "svd" in spy.calls
+    assert "maximum" in spy.calls
+    assert "sqrt" in spy.calls
