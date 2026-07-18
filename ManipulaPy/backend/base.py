@@ -57,6 +57,15 @@ class ArrayBackend(ABC):
     #: host-synced value that would break trace-safety.
     is_concrete: bool
 
+    @abstractmethod
+    def cache_token(self) -> Any:
+        """Return a hashable namespace for concrete value caches.
+
+        The token must distinguish backend instances and any device context
+        that determines where cached arrays are materialized.
+        """
+        ...
+
     # -- construction ---------------------------------------------------
     @abstractmethod
     def array(self, obj: Any, dtype: Optional[Any] = None) -> Any: ...

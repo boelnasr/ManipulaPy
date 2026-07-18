@@ -66,10 +66,17 @@ class ManipulatorDynamics(SerialManipulator):
         self.Glist = Glist
         self.Mlist_per_link = Mlist_per_link  # NEW
 
-        self._mass_matrix_cache: Dict[Tuple[float, ...], NDArray[np.float64]] = {}
-        self._mass_matrix_derivative_cache: Dict[
-            Tuple[Any, ...], NDArray[np.float64]
-        ] = {}
+        self._mass_matrix_cache: Dict[Tuple[Any, ...], Any] = {}
+        self._mass_matrix_derivative_cache: Dict[Tuple[Any, ...], Any] = {}
+
+    @staticmethod
+    def _concrete_cache_key(backend: Any, thetalist: Any) -> Tuple[Any, ...]:
+        """Return a backend-scoped, host-normalized key for concrete arrays."""
+        theta_host = backend.to_numpy(
+            backend.asarray(thetalist, dtype=backend.float64)
+        )
+        theta_key = tuple(float(value) for value in theta_host)
+        return (backend.cache_token(), theta_key)
 
     def mass_matrix(
         self, thetalist: Union[NDArray[np.float64], List[float]]
@@ -93,7 +100,7 @@ class ManipulatorDynamics(SerialManipulator):
         # that breaks trace-safety, so the cache is skipped for such backends.
         use_cache = backend.is_concrete
         if use_cache:
-            thetalist_key = tuple(thetalist)
+            thetalist_key = self._concrete_cache_key(backend, thetalist)
             cached = self._mass_matrix_cache.get(thetalist_key)
             if cached is not None:
                 return cached
@@ -183,7 +190,8 @@ class ManipulatorDynamics(SerialManipulator):
             M = M + eye_n[i][:, None] * row_i
         M = 0.5 * (M + M.T)
         if use_cache:
-            self._mass_matrix_cache[tuple(thetalist)] = M
+            cache_key = self._concrete_cache_key(backend, thetalist)
+            self._mass_matrix_cache[cache_key] = M
         return M
 
     def _mass_matrix_derivatives(
@@ -197,10 +205,9 @@ class ManipulatorDynamics(SerialManipulator):
         backend = get_backend()
         use_cache = backend.is_concrete
         if use_cache:
-            theta_host = backend.to_numpy(
-                backend.asarray(thetalist, dtype=backend.float64)
+            cache_key = self._concrete_cache_key(backend, thetalist) + (
+                float(epsilon),
             )
-            cache_key = (tuple(theta_host), float(epsilon))
             cached = self._mass_matrix_derivative_cache.get(cache_key)
             if cached is not None:
                 return cached

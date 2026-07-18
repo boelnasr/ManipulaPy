@@ -42,6 +42,10 @@ class CupyBackend(ArrayBackend):
     #: CuPy arrays are concrete device values, so value-keyed caches are valid.
     is_concrete = True
 
+    def cache_token(self) -> Any:
+        """Namespace cached arrays to this backend instance and CUDA device."""
+        return (self, int(cp.cuda.runtime.getDevice()))
+
     # -- construction ---------------------------------------------------
     def array(self, obj: Any, dtype: Optional[Any] = None) -> Any:
         return cp.array(obj, dtype=dtype)

@@ -40,6 +40,10 @@ class NumpyBackend(ArrayBackend):
     #: NumPy arrays are concrete host values, so value-keyed caches are valid.
     is_concrete = True
 
+    def cache_token(self) -> Any:
+        """Namespace cached arrays to this backend instance."""
+        return self
+
     # -- construction ---------------------------------------------------
     def array(self, obj: Any, dtype: Optional[Any] = None) -> Any:
         return np.array(obj, dtype=dtype)

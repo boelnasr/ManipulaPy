@@ -37,7 +37,7 @@ ELEMENTWISE = [
 REDUCTIONS = ["sum", "amax", "amin", "mean", "argmax", "all", "any", "isfinite"]
 DEVICE = ["to_device", "to_numpy", "ascontiguous"]
 DTYPES = ["float32", "float64"]
-PREDICATE = ["is_backend_array", "is_concrete"]
+PREDICATE = ["is_backend_array", "is_concrete", "cache_token"]
 FULL_SURFACE = (
     CONSTRUCTION + LINALG + ELEMENTWISE + REDUCTIONS + DEVICE + DTYPES + PREDICATE
 )
@@ -204,6 +204,13 @@ def test_dtype_handles_usable():
     assert b.to_numpy(x).dtype == np.float32
     y = b.array([1, 2, 3], dtype=b.float64)
     assert b.to_numpy(y).dtype == np.float64
+
+
+def test_cache_tokens_are_instance_scoped():
+    """Separate backend instances cannot share materialized cache entries."""
+    first = NumpyBackend()
+    second = NumpyBackend()
+    assert first.cache_token() != second.cache_token()
 
 
 def test_import_safety_without_cupy(monkeypatch):
@@ -613,3 +620,97 @@ def test_mass_matrix_cache_bypassed_on_nonconcrete_backend(monkeypatch):
     dyn_write = _planar_2r_dynamics()
     dyn_write.mass_matrix(theta)
     assert len(dyn_write._mass_matrix_cache) == 0
+
+
+def test_dynamics_caches_are_namespaced_by_backend(monkeypatch):
+    """Switching concrete backend implementations must recompute cached values."""
+    theta = np.array([0.1, 0.2])
+    dyn = _planar_2r_dynamics()
+    first_mass = dyn.mass_matrix(theta)
+    first_derivatives = dyn._mass_matrix_derivatives(theta)
+
+    spy = _DynamicsSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    second_mass = dyn.mass_matrix(theta)
+    second_derivatives = dyn._mass_matrix_derivatives(theta)
+
+    np.testing.assert_allclose(second_mass, first_mass, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(
+        second_derivatives, first_derivatives, rtol=1e-8, atol=1e-8
+    )
+    assert second_mass is not first_mass
+    assert second_derivatives is not first_derivatives
+    assert "matmul" in spy.calls
+    assert "eye" in spy.calls
+
+
+def test_mass_matrix_derivative_cache_bypassed_on_nonconcrete_backend(monkeypatch):
+    """Traced-style backends must neither read nor populate derivative caches."""
+    theta = np.array([0.1, 0.2])
+    epsilon = 1e-6
+    expected = _planar_2r_dynamics()._mass_matrix_derivatives(theta, epsilon)
+    poison = np.full((2, 2, 2), 999.0)
+
+    nonconcrete = _NonConcreteNumpyBackend()
+    poison_key = (nonconcrete.cache_token(), tuple(theta.tolist()), epsilon)
+    dyn_read = _planar_2r_dynamics()
+    dyn_read._mass_matrix_derivative_cache[poison_key] = poison
+    monkeypatch.setattr(be, "_active", nonconcrete)
+    out = dyn_read._mass_matrix_derivatives(theta, epsilon)
+
+    assert out is not poison
+    np.testing.assert_allclose(out, expected, rtol=1e-8, atol=1e-8)
+    assert len(dyn_read._mass_matrix_derivative_cache) == 1
+    assert next(iter(dyn_read._mass_matrix_derivative_cache.values())) is poison
+
+    dyn_write = _planar_2r_dynamics()
+    dyn_write._mass_matrix_derivatives(theta, epsilon)
+    assert len(dyn_write._mass_matrix_derivative_cache) == 0
+    assert len(dyn_write._mass_matrix_cache) == 0
+
+
+def test_dynamics_native_cupy_parity_and_cache_safety():
+    """Native CuPy arrays remain device-native through dynamics and cache reuse."""
+    cp = pytest.importorskip("cupy")
+    if not isinstance(getattr(cp, "ndarray", None), type):
+        pytest.skip("CuPy test double does not provide native array types")
+    try:
+        theta = cp.asarray([0.1, 0.2], dtype=cp.float64)
+    except Exception as exc:
+        pytest.skip(f"Native CuPy runtime unavailable: {exc}")
+
+    dyn = _planar_2r_dynamics()
+    expected = _dynamics_results(dyn)
+    expected_derivatives = dyn._mass_matrix_derivatives(np.array([0.1, 0.2]))
+    with be.use_backend("cupy"):
+        dtheta = cp.asarray([0.3, -0.2], dtype=cp.float64)
+        ddtheta = cp.asarray([0.5, 0.4], dtype=cp.float64)
+        tau = cp.asarray([1.0, -0.5], dtype=cp.float64)
+        g = cp.asarray([0.0, 0.0, -9.81], dtype=cp.float64)
+        ftip = cp.zeros(6, dtype=cp.float64)
+        actual = {
+            "mass_matrix": dyn.mass_matrix(theta),
+            "gravity_forces": dyn.gravity_forces(theta, g),
+            "velocity_quadratic_forces": dyn.velocity_quadratic_forces(
+                theta, dtheta
+            ),
+            "inverse_dynamics": dyn.inverse_dynamics(
+                theta, dtheta, ddtheta, g, ftip
+            ),
+            "forward_dynamics": dyn.forward_dynamics(
+                theta, dtheta, tau, g, ftip
+            ),
+        }
+        second = dyn.mass_matrix(theta)
+        derivatives = dyn._mass_matrix_derivatives(theta)
+
+    for name, value in actual.items():
+        assert isinstance(value, cp.ndarray), f"{name} returned {type(value)!r}"
+        np.testing.assert_allclose(
+            cp.asnumpy(value), expected[name], rtol=1e-10, atol=1e-10
+        )
+    assert second is actual["mass_matrix"]
+    assert isinstance(derivatives, cp.ndarray)
+    np.testing.assert_allclose(
+        cp.asnumpy(derivatives), expected_derivatives, rtol=1e-8, atol=1e-8
+    )
