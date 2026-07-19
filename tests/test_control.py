@@ -18,6 +18,7 @@ except ImportError:
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ManipulaPy import backend as array_backend
 from ManipulaPy.control import ManipulatorController
 from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
@@ -45,15 +46,12 @@ def is_module_available(module_name) -> bool:
 class TestManipulatorController(unittest.TestCase):
     def setUp(self) -> None:
         """Select the array backend and build the controller test fixtures."""
-        # Determine backend
-        if is_module_available("cupy"):
-            self.backend = "cupy"
-            self.cp = cp
-            print("Using cupy backend for testing")
-        else:
-            self.backend = "numpy"
-            self.cp = np
-            print("Using numpy backend for testing")
+        self.backend = "numpy"
+        self.cp = np
+        backend_context = array_backend.use_backend("numpy")
+        backend_context.__enter__()
+        self.addCleanup(backend_context.__exit__, None, None, None)
+        print("Using numpy backend for testing")
 
         # Use the built-in xarm urdf file from the library
         self.urdf_path = xarm_urdf_file
@@ -867,47 +865,94 @@ class TestManipulatorController(unittest.TestCase):
     def test_control_with_cupy_arrays(self) -> None:
         """Test that control methods work with *real* CuPy arrays (skip on mocks)."""
         # Skip unless this is a real cupy.ndarray with an asnumpy()
-        if self.backend != "cupy" or not (
-            hasattr(cp, "ndarray") and callable(getattr(cp, "asnumpy", None))
+        cupy_array_type = getattr(cp, "ndarray", None)
+        if not is_module_available("cupy") or not (
+            isinstance(cupy_array_type, type)
+            and cupy_array_type.__module__.startswith("cupy")
+            and callable(getattr(cp, "asnumpy", None))
         ):
             self.skipTest("Real CuPy not found, skipping CuPy-specific tests")
 
         num_joints = len(self.thetalist)
+        desired_position_host = np.asarray([0.5] * num_joints)
+        desired_velocity_host = np.asarray([0.1] * num_joints)
+        desired_acceleration_host = np.asarray([0.0] * num_joints)
+        Kp_host = np.asarray([10.0] * num_joints)
+        Ki_host = np.asarray([0.1] * num_joints)
+        Kd_host = np.asarray([2.0] * num_joints)
+        reference = ManipulatorController(self.dynamics)
+        expected_pid = reference.pid_control(
+            desired_position_host,
+            desired_velocity_host,
+            self.thetalist,
+            self.dthetalist,
+            self.dt,
+            Kp_host,
+            Ki_host,
+            Kd_host,
+        )
+        expected_ct = reference.computed_torque_control(
+            desired_position_host,
+            desired_velocity_host,
+            desired_acceleration_host,
+            self.thetalist,
+            self.dthetalist,
+            self.g,
+            self.dt,
+            Kp_host,
+            Ki_host,
+            Kd_host,
+        )
+        expected_pd = reference.pd_control(
+            desired_position_host,
+            desired_velocity_host,
+            self.thetalist,
+            self.dthetalist,
+            Kp_host,
+            Kd_host,
+        )
+
         # use cp.asarray (no dtype kwarg) to avoid mocking dtype issues
-        thetalistd = cp.asarray([0.5] * num_joints)
-        dthetalistd = cp.asarray([0.1] * num_joints)
-        ddthetalistd = cp.asarray([0.0] * num_joints)
+        thetalistd = cp.asarray(desired_position_host)
+        dthetalistd = cp.asarray(desired_velocity_host)
+        ddthetalistd = cp.asarray(desired_acceleration_host)
         thetalist = cp.asarray(self.thetalist)
         dthetalist = cp.asarray(self.dthetalist)
-        Kp = cp.asarray([10.0] * num_joints)
-        Ki = cp.asarray([0.1] * num_joints)
-        Kd = cp.asarray([2.0] * num_joints)
+        Kp = cp.asarray(Kp_host)
+        Ki = cp.asarray(Ki_host)
+        Kd = cp.asarray(Kd_host)
         g = cp.asarray(self.g)
         Ftip = cp.asarray(self.Ftip)
 
-        tau_pid = self.controller.pid_control(
-            thetalistd, dthetalistd, thetalist, dthetalist, self.dt, Kp, Ki, Kd
-        )
-        tau_ct = self.controller.computed_torque_control(
-            thetalistd,
-            dthetalistd,
-            ddthetalistd,
-            thetalist,
-            dthetalist,
-            g,
-            self.dt,
-            Kp,
-            Ki,
-            Kd,
-        )
-        tau_pd = self.controller.pd_control(
-            thetalistd, dthetalistd, thetalist, dthetalist, Kp, Kd
-        )
+        with array_backend.use_backend("cupy"):
+            tau_pid = self.controller.pid_control(
+                thetalistd, dthetalistd, thetalist, dthetalist, self.dt, Kp, Ki, Kd
+            )
+            tau_ct = self.controller.computed_torque_control(
+                thetalistd,
+                dthetalistd,
+                ddthetalistd,
+                thetalist,
+                dthetalist,
+                g,
+                self.dt,
+                Kp,
+                Ki,
+                Kd,
+            )
+            tau_pd = self.controller.pd_control(
+                thetalistd, dthetalistd, thetalist, dthetalist, Kp, Kd
+            )
 
-        # duck‑type: just check shape
-        for tau in (tau_pid, tau_ct, tau_pd):
-            self.assertTrue(hasattr(tau, "shape"))
-            self.assertEqual(tau.shape[0], num_joints)
+        for actual, expected in (
+            (tau_pid, expected_pid),
+            (tau_ct, expected_ct),
+            (tau_pd, expected_pd),
+        ):
+            self.assertIsInstance(actual, cp.ndarray)
+            np.testing.assert_allclose(
+                cp.asnumpy(actual), expected, rtol=1e-6, atol=1e-8
+            )
 
     def test_joint_space_control(self) -> None:
         """Test joint space control using *NumPy* inputs (skip under CuPy)."""
