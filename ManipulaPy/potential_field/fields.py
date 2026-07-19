@@ -33,9 +33,17 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.spatial import ConvexHull
 
+from ..backend import get_backend
 from ..urdf import URDF  # Use native parser
 
 _logger = logging.getLogger(__name__)
+
+
+def _to_host_numpy(backend: Any, value: Any) -> NDArray[Any]:
+    """Materialize backend-native values without round-tripping host arrays."""
+    if backend.is_backend_array(value):
+        value = backend.to_numpy(value)
+    return np.asarray(value)
 
 
 def build_link_adjacency(
@@ -89,7 +97,14 @@ class PotentialField:
         """
         Compute the attractive potential.
         """
-        return 0.5 * self.attractive_gain * np.sum((q - q_goal) ** 2)
+        backend = get_backend()
+        q = backend.asarray(q)
+        q_goal = backend.asarray(q_goal)
+        diff = (q - q_goal) * 1.0
+        math_dtype = diff.dtype
+        half = backend.asarray(0.5, dtype=math_dtype)
+        attractive_gain = backend.asarray(self.attractive_gain, dtype=math_dtype)
+        return half * attractive_gain * backend.sum(diff**2)
 
     def compute_repulsive_potential(
         self, q: NDArray[np.float64], obstacles: Iterable[NDArray[np.float64]]
@@ -97,17 +112,40 @@ class PotentialField:
         """
         Compute the repulsive potential.
         """
+        backend = get_backend()
+        q = backend.asarray(q)
         repulsive_potential = 0
+        has_obstacles = False
         for obstacle in obstacles:
-            d = np.linalg.norm(q - obstacle)
-            if d <= self.influence_distance:
-                d_safe = max(d, 1e-10)
-                repulsive_potential += (
-                    2
-                    * self.repulsive_gain
-                    * (1.0 / d_safe - 1.0 / self.influence_distance) ** 2
-                )
-        return 10 * repulsive_potential
+            has_obstacles = True
+            obstacle = backend.asarray(obstacle)
+            diff = (q - obstacle) * 1.0
+            d = backend.norm(diff)
+            math_dtype = d.dtype
+            zero = backend.asarray(0.0, dtype=math_dtype)
+            one = backend.asarray(1.0, dtype=math_dtype)
+            two = backend.asarray(2.0, dtype=math_dtype)
+            epsilon = backend.asarray(1e-10, dtype=math_dtype)
+            repulsive_gain = backend.asarray(
+                self.repulsive_gain, dtype=math_dtype
+            )
+            influence_distance = backend.asarray(
+                self.influence_distance, dtype=math_dtype
+            )
+            influence_safe = backend.maximum(influence_distance, epsilon)
+            d_safe = backend.maximum(d, epsilon)
+            contribution = (
+                two
+                * repulsive_gain
+                * (one / d_safe - one / influence_safe) ** 2
+            )
+            repulsive_potential = repulsive_potential + backend.where(
+                d <= influence_distance, contribution, zero
+            )
+        if not has_obstacles:
+            return 0
+        ten = backend.asarray(10.0, dtype=repulsive_potential.dtype)
+        return ten * repulsive_potential
 
     def compute_gradient(
         self,
@@ -118,35 +156,61 @@ class PotentialField:
         """
         Compute the gradient of the potential field.
         """
+        backend = get_backend()
+        q = backend.asarray(q)
+        q_goal = backend.asarray(q_goal)
+        attractive_diff = (q - q_goal) * 1.0
+        attractive_dtype = attractive_diff.dtype
+        attractive_gain = backend.asarray(
+            self.attractive_gain, dtype=attractive_dtype
+        )
+
         # Compute attractive gradient
-        attractive_gradient = self.attractive_gain * (q - q_goal)
+        attractive_gradient = attractive_gain * attractive_diff
 
         # Compute repulsive gradient
         # Derivative of: 10 * 2 * gain * (1/d - 1/d0)^2
         # = 10 * 2 * gain * 2 * (1/d - 1/d0) * d(1/d)/dq
         # = 40 * gain * (1/d - 1/d0) * (-(q-obs)/d^3)
-        repulsive_gradient = np.zeros_like(q)
+        repulsive_gradient = backend.zeros(q.shape, dtype=attractive_dtype)
         for obstacle in obstacles:
-            diff = q - obstacle
-            d = np.linalg.norm(diff)
-            if d <= self.influence_distance:
-                d_safe = max(d, 1e-10)
-                # If q is exactly at obstacle, pick an arbitrary escape direction
-                # (otherwise robot is stuck because gradient is zero)
-                if d < 1e-10:
-                    direction = np.zeros_like(q)
-                    direction[0] = 1.0  # Escape along +x (arbitrary but consistent)
-                    repulsive_gradient += self.repulsive_gain * direction
-                    continue
-                else:
-                    direction = diff
-                repulsive_gradient += (
-                    -40
-                    * self.repulsive_gain
-                    * (1.0 / d_safe - 1.0 / self.influence_distance)
-                    * (1.0 / (d_safe**3))
-                    * direction
-                )
+            obstacle = backend.asarray(obstacle)
+            diff = (q - obstacle) * 1.0
+            d = backend.norm(diff)
+            math_dtype = d.dtype
+            d = backend.asarray(d, dtype=math_dtype)
+            zero = backend.asarray(0.0, dtype=math_dtype)
+            one = backend.asarray(1.0, dtype=math_dtype)
+            forty = backend.asarray(40.0, dtype=math_dtype)
+            epsilon = backend.asarray(1e-10, dtype=math_dtype)
+            repulsive_gain = backend.asarray(
+                self.repulsive_gain, dtype=math_dtype
+            )
+            influence_distance = backend.asarray(
+                self.influence_distance, dtype=math_dtype
+            )
+            escape_direction = backend.asarray(
+                [1.0] + [0.0] * (q.shape[0] - 1), dtype=math_dtype
+            )
+            influence_safe = backend.maximum(influence_distance, epsilon)
+            d_safe = backend.maximum(d, epsilon)
+            exact_obstacle = d < epsilon
+            regular_d = backend.where(exact_obstacle, one, d_safe)
+            regular_contribution = (
+                -forty
+                * repulsive_gain
+                * (one / regular_d - one / influence_safe)
+                * (one / (regular_d**3))
+                * diff
+            )
+            contribution = backend.where(
+                exact_obstacle,
+                repulsive_gain * escape_direction,
+                regular_contribution,
+            )
+            repulsive_gradient = repulsive_gradient + backend.where(
+                d <= influence_distance, contribution, zero
+            )
 
         # Total gradient
         total_gradient = attractive_gradient + repulsive_gradient
@@ -198,6 +262,7 @@ class CollisionChecker:
             dict: A dictionary where the keys are the names of the robot links
                   and the values are the corresponding convex hulls.
         """
+        backend = get_backend()
         convex_hulls = {}
         for link in self.robot.links:
             # Prefer collision geometry; fall back to visuals with a warning
@@ -229,7 +294,8 @@ class CollisionChecker:
 
                 if vertices is None:
                     continue
-                vertices = np.asarray(vertices, dtype=float)
+                # Mesh data feeds host-only NumPy/SciPy geometry operations.
+                vertices = np.asarray(_to_host_numpy(backend, vertices), dtype=float)
                 if vertices.ndim != 2 or vertices.shape[0] < 1:
                     continue
 
@@ -238,6 +304,8 @@ class CollisionChecker:
                 # correct relative positions (not all stacked at the link frame).
                 origin = getattr(geom_element, "origin", None)
                 T = getattr(origin, "matrix", None) if origin is not None else None
+                if T is not None:
+                    T = _to_host_numpy(backend, T)
                 if (
                     isinstance(T, np.ndarray)
                     and T.shape == (4, 4)
@@ -276,6 +344,9 @@ class CollisionChecker:
         transform cached vertices directly via matrix multiply and skip the
         ConvexHull rebuild — prefer that path for new code.
         """
+        backend = get_backend()
+        # SciPy ConvexHull is host-only: materialize the transform explicitly.
+        transform = _to_host_numpy(backend, transform)
         transformed_points = transform[:3, :3] @ convex_hull.points.T + transform[
             :3, 3
         ].reshape(-1, 1)
@@ -291,7 +362,15 @@ class CollisionChecker:
         Returns:
             bool: True if collision detected, False otherwise
         """
-        fk_results = self.robot.link_fk(cfg=thetalist, use_names=True)
+        backend = get_backend()
+        # URDF FK is host-only for array configurations; named dicts are part
+        # of its public API and must pass through unchanged.
+        configuration = (
+            thetalist
+            if isinstance(thetalist, dict)
+            else _to_host_numpy(backend, thetalist)
+        )
+        fk_results = self.robot.link_fk(cfg=configuration, use_names=True)
 
         hull_names = [n for n in self.convex_hulls if n in fk_results]
         for name_a, name_b in itertools.combinations(hull_names, 2):
@@ -299,8 +378,9 @@ class CollisionChecker:
             if frozenset({name_a, name_b}) in self._acm:
                 continue
 
-            T_a = fk_results[name_a]
-            T_b = fk_results[name_b]
+            # NumPy/SciPy collision geometry is an explicit host boundary.
+            T_a = _to_host_numpy(backend, fk_results[name_a])
+            T_b = _to_host_numpy(backend, fk_results[name_b])
             pts_a = (T_a[:3, :3] @ self.convex_hulls[name_a].points.T + T_a[:3, 3:4]).T
             pts_b = (T_b[:3, :3] @ self.convex_hulls[name_b].points.T + T_b[:3, 3:4]).T
             if self._points_intersect(pts_a, pts_b):
@@ -323,6 +403,10 @@ class CollisionChecker:
         Returns:
             bool: True if bounding boxes overlap
         """
+        backend = get_backend()
+        # Bounding-box checks are NumPy host operations for direct callers too.
+        pts_a = _to_host_numpy(backend, pts_a)
+        pts_b = _to_host_numpy(backend, pts_b)
         min_a = np.min(pts_a, axis=0)
         max_a = np.max(pts_a, axis=0)
         min_b = np.min(pts_b, axis=0)

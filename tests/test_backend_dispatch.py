@@ -14,6 +14,7 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 import builtins
 import importlib
 import importlib.util
+import inspect
 from unittest.mock import patch
 
 import numpy as np
@@ -25,6 +26,8 @@ from ManipulaPy.backend.base import ArrayBackend
 from ManipulaPy.backend.numpy_backend import NumpyBackend
 from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
+from ManipulaPy.potential_field import CollisionChecker, PotentialField
+from ManipulaPy.potential_field import fields as potential_field_fields
 from ManipulaPy.singularity import Singularity
 
 
@@ -1756,6 +1759,407 @@ def test_plan_trajectory_gradient_only_hosts_the_potential_field(monkeypatch):
     for q, g, obs in field.arg_types:
         assert q is np.ndarray and g is np.ndarray
         assert obs and all(o is np.ndarray for o in obs)
+
+
+# ---------------------------------------------------------------------------
+# Potential-field dispatch and collision host boundaries
+# ---------------------------------------------------------------------------
+
+
+class _PotentialFieldSpyBackend(NumpyBackend):
+    """NumPy delegate recording primitives used by potential-field math."""
+
+    def __init__(self):
+        self.calls = []
+
+    def asarray(self, obj, dtype=None):
+        self.calls.append("asarray")
+        return super().asarray(obj, dtype=dtype)
+
+    def zeros(self, shape, dtype=None):
+        self.calls.append("zeros")
+        return super().zeros(shape, dtype=dtype)
+
+    def norm(self, x, ord=None, axis=None):
+        self.calls.append("norm")
+        return super().norm(x, ord=ord, axis=axis)
+
+    def maximum(self, x1, x2):
+        self.calls.append("maximum")
+        return super().maximum(x1, x2)
+
+    def where(self, condition, x, y):
+        self.calls.append("where")
+        return super().where(condition, x, y)
+
+    def sum(self, x, axis=None):
+        self.calls.append("sum")
+        return super().sum(x, axis=axis)
+
+    def to_numpy(self, x):
+        self.calls.append("to_numpy")
+        return super().to_numpy(x)
+
+
+def test_attractive_potential_dispatches_with_numpy_spy_parity(monkeypatch):
+    """Attractive potential independently dispatches and preserves its value."""
+    field = PotentialField(attractive_gain=1.5)
+    spy = _PotentialFieldSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    q = np.array([0.0, 0.0])
+    goal = np.array([1.0, -1.0])
+
+    actual = field.compute_attractive_potential(q, goal)
+
+    assert actual == pytest.approx(1.5)
+    assert spy.calls.count("asarray") >= 2
+    assert "sum" in spy.calls
+
+
+def test_repulsive_potential_dispatches_with_numpy_spy_parity(monkeypatch):
+    """Repulsive potential independently dispatches and preserves its value."""
+    field = PotentialField(repulsive_gain=2.0, influence_distance=1.0)
+    spy = _PotentialFieldSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    actual = field.compute_repulsive_potential(
+        np.array([0.0, 0.0]), [np.array([0.5, 0.0])]
+    )
+
+    assert actual == pytest.approx(40.0)
+    assert spy.calls.count("asarray") >= 2
+    assert "norm" in spy.calls
+    assert "maximum" in spy.calls
+    assert "where" in spy.calls
+
+
+def test_gradient_dispatches_with_numpy_spy_parity(monkeypatch):
+    """Potential gradient independently dispatches and preserves its value."""
+    field = PotentialField(
+        attractive_gain=1.5, repulsive_gain=2.0, influence_distance=1.0
+    )
+    spy = _PotentialFieldSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    actual = field.compute_gradient(
+        np.array([0.0, 0.0]),
+        np.array([1.0, -1.0]),
+        [np.array([0.5, 0.0])],
+    )
+
+    np.testing.assert_allclose(actual, [318.5, 1.5])
+    assert spy.calls.count("asarray") >= 4
+    assert "norm" in spy.calls
+    assert "maximum" in spy.calls
+    assert "where" in spy.calls
+    assert "zeros" in spy.calls
+
+
+def test_repulsive_potential_preserves_float32_dtype_inside_influence():
+    """In-range scalar repulsion keeps the configuration's float32 dtype."""
+    field = PotentialField(repulsive_gain=2.0, influence_distance=1.0)
+    q = np.array([0.0, 0.0], dtype=np.float32)
+    obstacle = np.array([0.5, 0.0], dtype=np.float32)
+
+    actual = field.compute_repulsive_potential(q, [obstacle])
+
+    assert np.asarray(actual).dtype == np.float32
+
+
+def test_gradient_preserves_float32_dtype_inside_influence():
+    """In-range attractive and repulsive gradient math remains float32."""
+    field = PotentialField(
+        attractive_gain=1.5, repulsive_gain=2.0, influence_distance=1.0
+    )
+    q = np.array([0.0, 0.0], dtype=np.float32)
+
+    actual = field.compute_gradient(
+        q,
+        np.array([1.0, -1.0], dtype=np.float32),
+        [np.array([0.5, 0.0], dtype=np.float32)],
+    )
+
+    assert actual.dtype == np.float32
+
+
+def test_attractive_potential_preserves_fractional_math_for_integer_inputs():
+    """Integer configurations do not truncate fractional gains or constants."""
+    field = PotentialField(attractive_gain=0.5)
+
+    actual = field.compute_attractive_potential(
+        np.array([1, 2], dtype=np.int64), np.array([0, 0], dtype=np.int64)
+    )
+
+    assert actual == pytest.approx(1.25)
+    assert np.asarray(actual).dtype == np.float64
+
+
+def test_attractive_paths_preserve_mixed_goal_dtype_promotion():
+    """A float64 goal promotes float32 attractive potential and gradient."""
+    field = PotentialField(attractive_gain=1.5)
+    q = np.array([0.0, 0.0], dtype=np.float32)
+    goal = np.array([1.0, -1.0], dtype=np.float64)
+
+    potential = field.compute_attractive_potential(q, goal)
+    gradient = field.compute_gradient(q, goal, [])
+
+    assert potential == pytest.approx(1.5)
+    assert np.asarray(potential).dtype == np.float64
+    np.testing.assert_allclose(gradient, [-1.5, 1.5])
+    assert gradient.dtype == np.float64
+
+
+def test_repulsive_paths_preserve_mixed_obstacle_dtype_promotion():
+    """A float64 obstacle promotes float32 repulsive potential and gradient."""
+    field = PotentialField(
+        attractive_gain=0.0, repulsive_gain=2.0, influence_distance=1.0
+    )
+    q = np.array([0.0, 0.0], dtype=np.float32)
+    obstacle = np.array([0.5, 0.0], dtype=np.float64)
+
+    potential = field.compute_repulsive_potential(q, [obstacle])
+    gradient = field.compute_gradient(q, np.zeros(2, dtype=np.float32), [obstacle])
+
+    assert potential == pytest.approx(40.0)
+    assert np.asarray(potential).dtype == np.float64
+    np.testing.assert_allclose(gradient, [320.0, 0.0])
+    assert gradient.dtype == np.float64
+
+
+def test_exact_obstacle_float32_gradient_is_benign_under_strict_errstate():
+    """The unselected regular branch stays finite at an exact obstacle."""
+    field = PotentialField(
+        attractive_gain=0.0, repulsive_gain=3.0, influence_distance=0.5
+    )
+    q = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+
+    with np.errstate(over="raise", invalid="raise", divide="raise"):
+        gradient = field.compute_gradient(q, np.zeros(3, dtype=np.float32), [q])
+
+    np.testing.assert_array_equal(gradient, [3.0, 0.0, 0.0])
+    assert gradient.dtype == np.float32
+    assert np.all(np.isfinite(gradient))
+
+
+def test_potential_field_dtype_promotion_does_not_inspect_dtype_kind():
+    """Promotion stays backend-neutral for dtype objects without NumPy `.kind`."""
+    source = inspect.getsource(potential_field_fields)
+
+    assert 'getattr(dtype, "kind"' not in source
+    assert ".kind" not in source
+
+
+def test_repulsive_potential_empty_generator_preserves_python_zero_contract():
+    """An exhausted obstacle generator returns the established Python int zero."""
+    field = PotentialField()
+    empty_obstacles = (obstacle for obstacle in ())
+
+    actual = field.compute_repulsive_potential(np.zeros(2), empty_obstacles)
+
+    assert type(actual) is int
+    assert actual == 0
+
+
+def test_potential_field_exact_obstacle_escape_dispatches_without_host_branch(
+    monkeypatch,
+):
+    """Exact-obstacle handling stays finite and escapes along positive x."""
+    field = PotentialField(
+        attractive_gain=0.0, repulsive_gain=3.0, influence_distance=0.5
+    )
+    spy = _PotentialFieldSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    q = np.array([1.0, 1.0, 1.0])
+
+    potential = field.compute_repulsive_potential(q, [q.copy()])
+    gradient = field.compute_gradient(q, np.zeros(3), [q.copy()])
+
+    assert np.isfinite(potential)
+    np.testing.assert_array_equal(gradient, [3.0, 0.0, 0.0])
+    assert "where" in spy.calls
+
+
+def test_potential_field_native_cupy_parity_when_available():
+    """CuPy inputs stay device-native while matching NumPy results."""
+    cp = pytest.importorskip("cupy")
+    if not isinstance(getattr(cp, "ndarray", None), type):
+        pytest.skip("CuPy test double does not provide native array types")
+    try:
+        q_device = cp.asarray([0.2, 0.1], dtype=cp.float64)
+    except Exception as exc:
+        pytest.skip(f"Native CuPy runtime unavailable: {exc}")
+
+    field = PotentialField(
+        attractive_gain=1.2, repulsive_gain=0.8, influence_distance=1.0
+    )
+    q_host = np.array([0.2, 0.1])
+    goal_host = np.array([0.5, -0.1])
+    obstacles_host = [np.array([0.6, 0.1])]
+    expected = (
+        field.compute_attractive_potential(q_host, goal_host),
+        field.compute_repulsive_potential(q_host, obstacles_host),
+        field.compute_gradient(q_host, goal_host, obstacles_host),
+    )
+
+    with be.use_backend("cupy"):
+        actual = (
+            field.compute_attractive_potential(q_device, cp.asarray(goal_host)),
+            field.compute_repulsive_potential(
+                q_device, [cp.asarray(obstacles_host[0])]
+            ),
+            field.compute_gradient(
+                q_device,
+                cp.asarray(goal_host),
+                [cp.asarray(obstacles_host[0])],
+            ),
+        )
+
+    assert all(isinstance(value, cp.ndarray) for value in actual)
+    np.testing.assert_allclose(cp.asnumpy(actual[0]), expected[0])
+    np.testing.assert_allclose(cp.asnumpy(actual[1]), expected[1])
+    np.testing.assert_allclose(cp.asnumpy(actual[2]), expected[2])
+
+
+class _RecordingFkRobot:
+    def __init__(self, transforms):
+        self.transforms = transforms
+        self.configurations = []
+
+    def link_fk(self, cfg, use_names):
+        self.configurations.append(cfg)
+        return self.transforms
+
+
+def _collision_checker_without_urdf(robot, hulls):
+    checker = CollisionChecker.__new__(CollisionChecker)
+    checker.robot = robot
+    checker.convex_hulls = hulls
+    checker._acm = set()
+    return checker
+
+
+class _DeviceValue:
+    def __init__(self, value):
+        self.value = np.asarray(value)
+
+
+class _HostBoundaryBackend(NumpyBackend):
+    """Device-like backend that rejects attempts to host an existing NumPy value."""
+
+    def __init__(self):
+        self.to_numpy_calls = 0
+
+    def is_backend_array(self, value):
+        return isinstance(value, _DeviceValue)
+
+    def to_numpy(self, value):
+        if not isinstance(value, _DeviceValue):
+            raise AssertionError("ordinary host values must not call to_numpy")
+        self.to_numpy_calls += 1
+        return value.value
+
+
+def test_collision_checker_keeps_ordinary_numpy_configuration_on_host(monkeypatch):
+    """A host configuration is not routed through an active device backend."""
+    robot = _RecordingFkRobot({})
+    checker = _collision_checker_without_urdf(robot, {})
+    backend = _HostBoundaryBackend()
+    monkeypatch.setattr(be, "_active", backend)
+    configuration = np.array([0.1, -0.2])
+
+    checker.check_collision(configuration)
+
+    assert robot.configurations[0] is configuration
+    assert backend.to_numpy_calls == 0
+
+
+def test_collision_checker_hosts_backend_native_configuration(monkeypatch):
+    """A backend-native configuration explicitly crosses to host NumPy."""
+    robot = _RecordingFkRobot({})
+    checker = _collision_checker_without_urdf(robot, {})
+    backend = _HostBoundaryBackend()
+    monkeypatch.setattr(be, "_active", backend)
+    configuration = _DeviceValue([0.1, -0.2])
+
+    checker.check_collision(configuration)
+
+    np.testing.assert_array_equal(robot.configurations[0], [0.1, -0.2])
+    assert backend.to_numpy_calls == 1
+
+
+def test_collision_checker_hosts_array_configuration_but_preserves_dict(monkeypatch):
+    """Only array configurations cross the explicit URDF host boundary."""
+    robot = _RecordingFkRobot({})
+    checker = _collision_checker_without_urdf(robot, {})
+    spy = _PotentialFieldSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    array_cfg = np.array([0.1, -0.2])
+    dict_cfg = {"joint_a": 0.1}
+    checker.check_collision(array_cfg)
+    checker.check_collision(dict_cfg)
+
+    assert isinstance(robot.configurations[0], np.ndarray)
+    assert robot.configurations[1] is dict_cfg
+    assert "to_numpy" in spy.calls
+
+
+def test_collision_checker_hosts_fk_transforms_before_numpy_geometry(monkeypatch):
+    """FK transforms cross to host before NumPy/SciPy collision geometry."""
+    from types import SimpleNamespace
+
+    transforms = {"a": np.eye(4), "b": np.eye(4)}
+    robot = _RecordingFkRobot(transforms)
+    points = np.array(
+        [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    )
+    hulls = {
+        "a": SimpleNamespace(points=points),
+        "b": SimpleNamespace(points=points + 10.0),
+    }
+    checker = _collision_checker_without_urdf(robot, hulls)
+    spy = _PotentialFieldSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    assert checker.check_collision(np.zeros(1)) is False
+    # One configuration and two FK transforms cross the host boundary.
+    assert spy.calls.count("to_numpy") >= 3
+
+
+def test_collision_checker_hosts_mesh_data_before_scipy_hull(monkeypatch):
+    """Mesh vertices and origin matrices cross the SciPy host boundary."""
+    from types import SimpleNamespace
+
+    vertices = np.array(
+        [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    )
+    geometry = SimpleNamespace(mesh_data=SimpleNamespace(vertices=vertices))
+    collision = SimpleNamespace(
+        geometry=geometry, origin=SimpleNamespace(matrix=np.eye(4))
+    )
+    link = SimpleNamespace(name="link", collisions=[collision], visuals=[])
+    checker = CollisionChecker.__new__(CollisionChecker)
+    checker.robot = SimpleNamespace(links=[link])
+    checker._visual_fallback_warned = set()
+    spy = _PotentialFieldSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+
+    hulls = checker._create_convex_hulls()
+
+    assert "link" in hulls
+    assert spy.calls.count("to_numpy") >= 2
+
+
+def test_collision_checker_hosts_point_clouds_before_numpy_bounds(monkeypatch):
+    """Direct point-cloud callers cross the documented NumPy host boundary."""
+    checker = CollisionChecker.__new__(CollisionChecker)
+    spy = _PotentialFieldSpyBackend()
+    monkeypatch.setattr(be, "_active", spy)
+    pts_a = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+    pts_b = np.array([[0.5, 0.5, 0.5], [2.0, 2.0, 2.0]])
+
+    assert checker._points_intersect(pts_a, pts_b) is True
+    assert spy.calls.count("to_numpy") >= 2
 
 
 # ---------------------------------------------------------------------------
