@@ -39,6 +39,8 @@ class NumpyBackend(ArrayBackend):
     float64 = np.float64
     #: NumPy arrays are concrete host values, so value-keyed caches are valid.
     is_concrete = True
+    #: Host-CPU backend: never routes to the GPU kernel path.
+    gpu_capable = False
 
     def cache_token(self) -> Any:
         """Namespace cached arrays to this backend instance."""

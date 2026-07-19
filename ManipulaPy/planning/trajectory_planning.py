@@ -201,7 +201,7 @@ class OptimizedTrajectoryPlanning(
         # ------------------------------------------------------------
         # Auto-optimization setup
         # ------------------------------------------------------------
-        if auto_optimize and _runtime.CUDA_AVAILABLE:
+        if auto_optimize and _runtime._cuda_routing_enabled():
             _runtime.setup_cuda_environment_for_40x_speedup()
 
         # ------------------------------------------------------------
@@ -234,11 +234,16 @@ class OptimizedTrajectoryPlanning(
         # ------------------------------------------------------------
         # CUDA feature flags
         # ------------------------------------------------------------
-        detected_cuda = _runtime.check_cuda_availability()
+        # Kernel routing is owned by cuda_kernels so direct wrapper calls and
+        # planner calls cannot disagree about backend/device capability.
+        detected_cuda = _runtime._cuda_routing_enabled()
         if use_cuda is None:
             self.cuda_available = detected_cuda
         elif use_cuda and not detected_cuda:
-            raise RuntimeError("use_cuda=True requested but CUDA is not available.")
+            raise RuntimeError(
+                "use_cuda=True requested but no GPU-capable backend with CUDA "
+                "is active. Select the CuPy backend on a CUDA device."
+            )
         else:
             self.cuda_available = bool(use_cuda)
 

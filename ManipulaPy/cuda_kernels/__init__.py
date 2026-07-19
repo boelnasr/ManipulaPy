@@ -33,6 +33,8 @@ from typing import Any, Dict, NoReturn, Optional, Tuple
 import numpy as np
 from numba import config as _nb_cfg
 
+from ..backend import get_backend as _get_backend
+
 # Configure numba for optimal performance
 _nb_cfg.CUDA_CACHE_SIZE = "2048"  # Increased cache size for better compilation reuse
 _nb_cfg.CUDA_LOW_OCCUPANCY_WARNINGS = False  # Disable warnings for specialized kernels
@@ -1896,7 +1898,7 @@ if CUDA_AVAILABLE:
             return get_optimal_kernel_config(N, num_joints, "standard")
 
     # HIGH-LEVEL OPTIMIZED FUNCTIONS
-    def optimized_trajectory_generation_monitored(
+    def _optimized_trajectory_generation_monitored_cuda(
         thetastart: Any,
         thetaend: Any,
         Tf: float,
@@ -2308,7 +2310,7 @@ else:
         """Report that no CUDA kernel can be selected."""
         return "none"
 
-    def optimized_trajectory_generation_monitored(
+    def _optimized_trajectory_generation_monitored_cuda(
         *args: Any, **kwargs: Any
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Use the CPU trajectory fallback when CUDA is unavailable."""
@@ -2334,6 +2336,36 @@ else:
         """Report that CUDA benchmarking is unavailable."""
         print("CUDA benchmarking not available")
         return None
+
+
+def _cuda_routing_enabled() -> bool:
+    """Return whether the active backend may launch the Numba CUDA kernels."""
+    return bool(CUDA_AVAILABLE and getattr(_get_backend(), "gpu_capable", False))
+
+
+def optimized_trajectory_generation_monitored(
+    thetastart: Any,
+    thetaend: Any,
+    Tf: float,
+    N: int,
+    method: int,
+    use_pinned: bool = True,
+    kernel_type: str = "auto",
+    enable_monitoring: bool = True,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Generate a trajectory through the active backend's dispatch boundary."""
+    if not _cuda_routing_enabled():
+        return trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
+    return _optimized_trajectory_generation_monitored_cuda(
+        thetastart,
+        thetaend,
+        Tf,
+        N,
+        method,
+        use_pinned,
+        kernel_type,
+        enable_monitoring=enable_monitoring,
+    )
 
 
 # HIGH-LEVEL WRAPPER FUNCTIONS

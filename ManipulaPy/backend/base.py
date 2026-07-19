@@ -56,6 +56,12 @@ class ArrayBackend(ABC):
     #: caches are bypassed rather than keyed by tensor identity or a
     #: host-synced value that would break trace-safety.
     is_concrete: bool
+    #: True iff this backend routes numeric work to a GPU. This is the single
+    #: dispatch-boundary predicate for GPU acceleration: modules that can fall
+    #: back to CPU/native ops (e.g. the CUDA trajectory kernels) launch the GPU
+    #: path only when the *active* backend advertises ``gpu_capable``, rather
+    #: than probing hardware directly. NumPy is ``False``; CuPy is ``True``.
+    gpu_capable: bool
 
     @abstractmethod
     def cache_token(self) -> Any:
