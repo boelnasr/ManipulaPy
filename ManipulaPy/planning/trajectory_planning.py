@@ -35,12 +35,24 @@ from .trajectory_dynamics import _DynamicsMixin
 from .collision_host import _CollisionMixin
 from ._plotting import _PlottingMixin
 
+# CPU helpers are defined in ``trajectory`` to keep Numba compilation isolated,
+# then registered here so historical facade patches share one runtime source.
+_runtime._trajectory_cpu_fallback = _trajectory_cpu_fallback
+_runtime._traj_cpu_njit = _traj_cpu_njit
+
 
 _FORWARDED_RUNTIME_NAMES = frozenset(
     {
         "CUDA_AVAILABLE",
+        "CubicTimeScaling",
+        "MatrixExp3",
+        "MatrixLog3",
+        "QuinticTimeScaling",
+        "TransToRp",
         "_best_2d_config",
         "_h2d_pinned",
+        "_traj_cpu_njit",
+        "_trajectory_cpu_fallback",
         "auto_select_optimal_kernel",
         "batch_trajectory_kernel",
         "benchmark_kernel_performance",
@@ -62,11 +74,14 @@ _FORWARDED_RUNTIME_NAMES = frozenset(
         "optimized_batch_trajectory_generation",
         "optimized_trajectory_generation",
         "optimized_trajectory_generation_monitored",
+        "np",
+        "plt",
         "print_performance_recommendations",
         "profile_start",
         "profile_stop",
         "return_cuda_array",
         "setup_cuda_environment_for_40x_speedup",
+        "time",
         "trajectory_kernel",
         "trajectory_kernel_cache_friendly",
         "trajectory_kernel_memory_optimized",

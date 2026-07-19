@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Trajectory plotting mixin - ManipulaPy"""
 
-from ._kernels import np, plt, time
+from . import _kernels as _runtime
 
 
 class _PlottingMixin:
@@ -42,9 +42,9 @@ class _PlottingMixin:
 
         num_steps = positions.shape[0]
         num_joints = positions.shape[1]
-        time_steps = np.linspace(0, Tf, num_steps)
+        time_steps = _runtime.np.linspace(0, Tf, num_steps)
 
-        fig, axs = plt.subplots(3, num_joints, figsize=(15, 10), sharex="col")
+        fig, axs = _runtime.plt.subplots(3, num_joints, figsize=(15, 10), sharex="col")
 
         # Add performance info to title
         if performance_stats:
@@ -80,8 +80,8 @@ class _PlottingMixin:
         for ax in axs[-1]:
             ax.set_xlabel("Time (s)")
 
-        plt.tight_layout()
-        plt.show()
+        _runtime.plt.tight_layout()
+        _runtime.plt.show()
 
     def plot_tcp_trajectory(self, trajectory, dt) -> None:
         """
@@ -95,7 +95,7 @@ class _PlottingMixin:
         Returns:
             None
         """
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         tcp_trajectory = [
             self.serial_manipulator.forward_kinematics(joint_angles)
@@ -104,42 +104,46 @@ class _PlottingMixin:
         tcp_positions = [pose[:3, 3] for pose in tcp_trajectory]
 
         velocity, acceleration, jerk = self.calculate_derivatives(tcp_positions, dt)
-        time_array = np.arange(0, len(tcp_positions) * dt, dt)
+        time_array = _runtime.np.arange(0, len(tcp_positions) * dt, dt)
 
-        elapsed = time.time() - start_time
+        elapsed = _runtime.time.time() - start_time
 
-        plt.figure(figsize=(12, 8))
+        _runtime.plt.figure(figsize=(12, 8))
         title = f"TCP Trajectory (FK computed in {elapsed:.3f}s)"
-        plt.suptitle(title)
+        _runtime.plt.suptitle(title)
 
         for i, label in enumerate(["X", "Y", "Z"]):
-            plt.subplot(4, 1, 1)
-            plt.plot(
-                time_array, np.array(tcp_positions)[:, i], label=f"TCP {label} Position"
+            _runtime.plt.subplot(4, 1, 1)
+            _runtime.plt.plot(
+                time_array,
+                _runtime.np.array(tcp_positions)[:, i],
+                label=f"TCP {label} Position",
             )
-            plt.ylabel("Position")
-            plt.legend()
+            _runtime.plt.ylabel("Position")
+            _runtime.plt.legend()
 
-            plt.subplot(4, 1, 2)
-            plt.plot(time_array[:-1], velocity[:, i], label=f"TCP {label} Velocity")
-            plt.ylabel("Velocity")
-            plt.legend()
+            _runtime.plt.subplot(4, 1, 2)
+            _runtime.plt.plot(
+                time_array[:-1], velocity[:, i], label=f"TCP {label} Velocity"
+            )
+            _runtime.plt.ylabel("Velocity")
+            _runtime.plt.legend()
 
-            plt.subplot(4, 1, 3)
-            plt.plot(
+            _runtime.plt.subplot(4, 1, 3)
+            _runtime.plt.plot(
                 time_array[:-2], acceleration[:, i], label=f"TCP {label} Acceleration"
             )
-            plt.ylabel("Acceleration")
-            plt.legend()
+            _runtime.plt.ylabel("Acceleration")
+            _runtime.plt.legend()
 
-            plt.subplot(4, 1, 4)
-            plt.plot(time_array[:-3], jerk[:, i], label=f"TCP {label} Jerk")
-            plt.xlabel("Time")
-            plt.ylabel("Jerk")
-            plt.legend()
+            _runtime.plt.subplot(4, 1, 4)
+            _runtime.plt.plot(time_array[:-3], jerk[:, i], label=f"TCP {label} Jerk")
+            _runtime.plt.xlabel("Time")
+            _runtime.plt.ylabel("Jerk")
+            _runtime.plt.legend()
 
-        plt.tight_layout()
-        plt.show()
+        _runtime.plt.tight_layout()
+        _runtime.plt.show()
 
     def plot_cartesian_trajectory(
         self, trajectory_data, Tf, title="Cartesian Trajectory", performance_stats=None
@@ -161,7 +165,7 @@ class _PlottingMixin:
         accelerations = trajectory_data["accelerations"]
 
         num_steps = positions.shape[0]
-        time_steps = np.linspace(0, Tf, num_steps)
+        time_steps = _runtime.np.linspace(0, Tf, num_steps)
 
         # Add performance info to title
         if performance_stats:
@@ -171,7 +175,7 @@ class _PlottingMixin:
             else:
                 title += " (CPU execution)"
 
-        fig, axs = plt.subplots(3, 1, figsize=(10, 15), sharex="col")
+        fig, axs = _runtime.plt.subplots(3, 1, figsize=(10, 15), sharex="col")
         fig.suptitle(title)
 
         axs[0].plot(time_steps, positions[:, 0], label="X Position")
@@ -194,8 +198,8 @@ class _PlottingMixin:
 
         axs[2].set_xlabel("Time (s)")
 
-        plt.tight_layout()
-        plt.show()
+        _runtime.plt.tight_layout()
+        _runtime.plt.show()
 
     def plot_ee_trajectory(
         self, trajectory_data, Tf, title="End-Effector Trajectory"
@@ -213,23 +217,23 @@ class _PlottingMixin:
         """
         positions = trajectory_data["positions"]
         num_steps = positions.shape[0]
-        time_steps = np.linspace(0, Tf, num_steps)
+        time_steps = _runtime.np.linspace(0, Tf, num_steps)
 
         if "orientations" in trajectory_data:
             orientations = trajectory_data["orientations"]
         else:
             # Compute orientations using forward kinematics
-            start_time = time.time()
-            orientations = np.array(
+            start_time = _runtime.time.time()
+            orientations = _runtime.np.array(
                 [
                     self.serial_manipulator.forward_kinematics(pos)[:3, :3]
                     for pos in positions
                 ]
             )
-            elapsed = time.time() - start_time
+            elapsed = _runtime.time.time() - start_time
             title += f" (FK for orientations: {elapsed:.3f}s)"
 
-        fig = plt.figure(figsize=(12, 8))
+        fig = _runtime.plt.figure(figsize=(12, 8))
         ax = fig.add_subplot(111, projection="3d")
         fig.suptitle(title)
 
@@ -290,4 +294,4 @@ class _PlottingMixin:
         ax.set_ylabel("Y Position")
         ax.set_zlabel("Z Position")
         ax.legend()
-        plt.show()
+        _runtime.plt.show()

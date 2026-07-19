@@ -1,7 +1,12 @@
+# flake8: noqa: E501
 """Compatibility contracts for the planning package decomposition."""
 
+import ast
+import hashlib
 import inspect
 import pickle
+import re
+import textwrap
 
 import numpy as np
 import pytest
@@ -59,6 +64,131 @@ _BASE_CLASS_METHOD_NAMES = frozenset(
     plot_trajectory reset_performance_stats
     """.split()
 )
+_BASE_MOVED_METHOD_HASHES = {
+    "_batch_joint_trajectory_cpu": "88a5ab47b8ae9b75a8efb3c6ebe8370fb7e65aea47709b878d9c68cbeec7a976",
+    "_cartesian_trajectory_cpu": "0a346cd0c12386ecd27596ddc887c18c3136e6be83ad556dffd5d1732c66373e",
+    "_cartesian_trajectory_gpu": "1d17e3f94fe05fd056e0f566a7451d8a2b63f1362bcc191f1a03657bb56babc7",
+    "_joint_trajectory_cpu": "832e4ec5ccef73fc5145ea7b4fc367e4640e3425a10dcb9c35ae2c3d7a63a7e6",
+    "_joint_trajectory_gpu": "34e1e4d8a0abf07f856728d926a98b4733bf0ba48bf2de808abcbbdb29d05c7b",
+    "batch_joint_trajectory": "cf4297e0d9c04c7f7228814d14b81a6163362a1eee0902b1fef95b5408f94d19",
+    "cartesian_trajectory": "e043f3410343b7c6ebca7f80f0c0d452d8e14862e3aaa65e68cf16cc6d5ee973",
+    "joint_trajectory": "259ebbd8173b1165fe436d02c75c02fd0cf9c35c7d730c7371f9fd8ffad489e0",
+    "_forward_dynamics_cpu": "32566ab5bae5072327d13c619dbdc103badd2247f7767e8b9c03146e25c09c9f",
+    "_forward_dynamics_gpu": "3fafc46fcdddb78082093553336fed9fbce893e0cf224735c7744f9d0954fb32",
+    "_inverse_dynamics_cpu": "fcda3fd8b817f3ff686c5514a41faff0d0489bbe0cdee44bfe68f5e4c7ab857e",
+    "_inverse_dynamics_gpu": "0f2ba786266675c460137efe1aa9fca920c45860ec41f49eaa0c028a18e71b13",
+    "calculate_derivatives": "5850b1c775a5675e3e1d513d2348574ff2dd6cd82790084ef9ab63599b6ac516",
+    "forward_dynamics_trajectory": "8f54d3dac9ceb797b7f35324d029b4844e7650015b1ccdbbcfc48587d99b6432",
+    "inverse_dynamics_trajectory": "7e9d466f701c303a246878d4ec2ac258230b7027c8bd054d73437061ebe0bed4",
+    "_apply_collision_avoidance_cpu": "20873ee00320943622ad8c403937f104bb4db1fd4cbbe2c6660f6efafd5f739c",
+    "_apply_collision_avoidance_gpu": "636cac21eeda604736bc97ee0c0cf2d2b6d53e680884ec469986f6042d50056e",
+    "plan_trajectory": "06e799422c333ee95459449c1b1844be43249df7fbc582838f101dd34d676cc0",
+    "plot_cartesian_trajectory": "198fe815e263d618aed97a1b46840653de153177c274ca2af05b8ed22aac6783",
+    "plot_ee_trajectory": "980511a94726dca6e3921f8845283e9ffc791622a60bd243837096e5634d7976",
+    "plot_tcp_trajectory": "14336c8fed8947cc26edad80d3c7f73962f0d3d82dd8ca4e5ed691af8c76b43c",
+    "plot_trajectory": "ccbc6e3ae35d09df8498f10663a01a8db5763f4066301a773de8363f21d36be9",
+}
+
+
+class _MovedMethodNormalizer(ast.NodeTransformer):
+    """Normalize the declared structural changes from the SR6 pure move."""
+
+    def visit_FunctionDef(self, node):
+        node = self.generic_visit(node)
+        if (
+            node.body
+            and isinstance(node.body[0], ast.Expr)
+            and isinstance(node.body[0].value, ast.Constant)
+            and isinstance(node.body[0].value.value, str)
+        ):
+            node.body.pop(0)
+        return node
+
+    def visit_Attribute(self, node):
+        node = self.generic_visit(node)
+        if isinstance(node.value, ast.Name) and node.value.id == "_runtime":
+            return ast.copy_location(ast.Name(id=node.attr, ctx=node.ctx), node)
+        return node
+
+    def visit_Call(self, node):
+        node = self.generic_visit(node)
+        if not (
+            isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "logger"
+        ):
+            return node
+
+        if len(node.args) == 1 and isinstance(node.args[0], ast.JoinedStr):
+            chunks = [""]
+            expressions = []
+            for value in node.args[0].values:
+                if isinstance(value, ast.Constant):
+                    chunks[-1] += value.value
+                elif (
+                    isinstance(value, ast.FormattedValue) and value.format_spec is None
+                ):
+                    expressions.append(value.value)
+                    chunks.append("")
+                else:
+                    return node
+            node.args = [
+                ast.Tuple(
+                    elts=[
+                        ast.Tuple(
+                            elts=[ast.Constant(value=chunk) for chunk in chunks],
+                            ctx=ast.Load(),
+                        ),
+                        *expressions,
+                    ],
+                    ctx=ast.Load(),
+                )
+            ]
+        elif (
+            len(node.args) > 1
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            chunks = re.split(r"%(?:s|d)", node.args[0].value)
+            if len(chunks) == len(node.args):
+                node.args = [
+                    ast.Tuple(
+                        elts=[
+                            ast.Tuple(
+                                elts=[ast.Constant(value=chunk) for chunk in chunks],
+                                ctx=ast.Load(),
+                            ),
+                            *node.args[1:],
+                        ],
+                        ctx=ast.Load(),
+                    )
+                ]
+        return node
+
+
+def _stable_ast(node):
+    """Serialize AST structure without interpreter-specific metadata fields."""
+    if isinstance(node, ast.AST):
+        fields = tuple(
+            (name, _stable_ast(value))
+            for name, value in ast.iter_fields(node)
+            if name not in {"ctx", "type_comment", "type_params"}
+        )
+        return type(node).__name__, fields
+    if isinstance(node, list):
+        return tuple(_stable_ast(value) for value in node)
+    return node
+
+
+def _normalized_method_hash(descriptor):
+    function = (
+        descriptor.__func__ if isinstance(descriptor, staticmethod) else descriptor
+    )
+    source = textwrap.dedent(inspect.getsource(function))
+    method = ast.parse(source).body[0]
+    normalized = _MovedMethodNormalizer().visit(method)
+    payload = repr(_stable_ast(normalized)).encode()
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _expected_base_implementation_names(cuda_available):
@@ -245,6 +375,73 @@ def test_historical_logger_name_and_patch_reach_moved_method(monkeypatch):
         "CPU trajectory generation completed" in message for message in logger.messages
     )
     assert implementation.logger is runtime.logger is original_logger
+
+
+def test_historical_cpu_helper_patch_reaches_generation_methods(monkeypatch):
+    """CPU generation still resolves its helper through the old facade."""
+    expected = tuple(np.full((3, 1), value, dtype=np.float32) for value in range(3))
+    calls = []
+
+    def helper(*args):
+        calls.append(args)
+        return expected
+
+    monkeypatch.setattr(implementation, "_traj_cpu_njit", helper)
+    result = _bare_planner()._joint_trajectory_cpu(
+        np.array([0.0]), np.array([0.5]), 1.0, 3, 3
+    )
+
+    assert calls
+    assert runtime._traj_cpu_njit is helper
+    np.testing.assert_array_equal(result["positions"], expected[0])
+
+
+def test_historical_math_helper_patch_reaches_cartesian_generation(monkeypatch):
+    """Cartesian generation dynamically resolves historical math helpers."""
+    marker = RuntimeError("patched TransToRp reached")
+
+    def patched_trans_to_rp(_transform):
+        raise marker
+
+    monkeypatch.setattr(implementation, "TransToRp", patched_trans_to_rp)
+
+    with pytest.raises(RuntimeError, match="patched TransToRp reached") as exc_info:
+        _bare_planner().cartesian_trajectory(np.eye(4), np.eye(4), 1.0, 3, 3)
+
+    assert exc_info.value is marker
+    assert runtime.TransToRp is patched_trans_to_rp
+
+
+def test_historical_plotting_patch_reaches_plotting_mixin(monkeypatch):
+    """Plotting methods resolve pyplot through the historical facade."""
+
+    class PlotProbe:
+        def subplots(self, *_args, **_kwargs):
+            raise RuntimeError("patched pyplot reached")
+
+    probe = PlotProbe()
+    monkeypatch.setattr(implementation, "plt", probe)
+    data = {
+        "positions": np.zeros((2, 1)),
+        "velocities": np.zeros((2, 1)),
+        "accelerations": np.zeros((2, 1)),
+    }
+
+    with pytest.raises(RuntimeError, match="patched pyplot reached"):
+        implementation.OptimizedTrajectoryPlanning.plot_trajectory(data, 1.0)
+
+    assert runtime.plt is probe
+
+
+def test_moved_method_bodies_match_pre_sr6_normalized_ast_hashes():
+    """Every extracted method remains a pure move from base commit 8df3424."""
+    planner_class = implementation.OptimizedTrajectoryPlanning
+    actual = {
+        name: _normalized_method_hash(inspect.getattr_static(planner_class, name))
+        for name in _BASE_MOVED_METHOD_HASHES
+    }
+
+    assert actual == _BASE_MOVED_METHOD_HASHES
 
 
 def test_planning_import_paths_preserve_alias_identity_and_class_contract():

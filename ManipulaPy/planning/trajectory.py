@@ -4,17 +4,11 @@
 
 from . import _kernels as _runtime
 from ._kernels import (
-    CubicTimeScaling,
     Dict,
-    MatrixExp3,
-    MatrixLog3,
-    QuinticTimeScaling,
-    TransToRp,
     Tuple,
     njit,
     np,
     prange,
-    time,
 )
 
 
@@ -151,11 +145,11 @@ class _GenerationMixin:
         # _joint_trajectory_cpu; entering it before _should_use_gpu would feed
         # device arrays to the GPU path and force a silent CPU fallback.
         backend = _runtime.get_backend()
-        thetastart = np.array(
-            backend.to_numpy(backend.asarray(thetastart)), dtype=np.float32
+        thetastart = _runtime.np.array(
+            backend.to_numpy(backend.asarray(thetastart)), dtype=_runtime.np.float32
         )
-        thetaend = np.array(
-            backend.to_numpy(backend.asarray(thetaend)), dtype=np.float32
+        thetaend = _runtime.np.array(
+            backend.to_numpy(backend.asarray(thetaend)), dtype=_runtime.np.float32
         )
         num_joints = len(thetastart)
 
@@ -198,7 +192,7 @@ class _GenerationMixin:
             ``"velocities"`` and ``"accelerations"``, each an
             ``(N, num_joints)`` array.
         """
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         try:
             # Use the monitored high-level wrapper for maximum performance
@@ -218,7 +212,7 @@ class _GenerationMixin:
             # Apply joint limits
             num_joints = len(thetastart)
             for i in range(num_joints):
-                traj_pos_host[:, i] = np.clip(
+                traj_pos_host[:, i] = _runtime.np.clip(
                     traj_pos_host[:, i],
                     self.joint_limits[i, 0],
                     self.joint_limits[i, 1],
@@ -231,7 +225,7 @@ class _GenerationMixin:
                 )
 
             # Calculate achieved speedup
-            elapsed = time.time() - start_time
+            elapsed = _runtime.time.time() - start_time
             if hasattr(self, "_last_cpu_time") and self._last_cpu_time > 0:
                 speedup = self._last_cpu_time / elapsed
                 self.performance_stats["speedup_achieved"] = speedup
@@ -302,11 +296,11 @@ class _GenerationMixin:
             ``(N, num_joints)`` array.
         """
         backend = _runtime.get_backend()
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         # Optimized CPU fallback: the Numba kernel is a host (real-NumPy)
         # boundary, so convert at the call site and re-enter the backend.
-        traj_pos, traj_vel, traj_acc = _traj_cpu_njit(
+        traj_pos, traj_vel, traj_acc = _runtime._traj_cpu_njit(
             backend.to_numpy(thetastart), backend.to_numpy(thetaend), Tf, N, method
         )
         traj_pos = backend.asarray(traj_pos)
@@ -323,7 +317,7 @@ class _GenerationMixin:
             traj_pos = self._apply_collision_avoidance_cpu(traj_pos, thetaend)
 
         # Store CPU time for speedup calculations
-        elapsed = time.time() - start_time
+        elapsed = _runtime.time.time() - start_time
         self._last_cpu_time = elapsed
 
         # Update performance stats
@@ -377,7 +371,7 @@ class _GenerationMixin:
         if total_work >= 50000:
             _runtime.print_performance_recommendations(N * batch_size, num_joints)
 
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         try:
             # Use optimized batch trajectory generation
@@ -390,13 +384,13 @@ class _GenerationMixin:
             # Apply joint limits for all trajectories
             for batch_idx in range(batch_size):
                 for i in range(num_joints):
-                    traj_pos_host[batch_idx, :, i] = np.clip(
+                    traj_pos_host[batch_idx, :, i] = _runtime.np.clip(
                         traj_pos_host[batch_idx, :, i],
                         self.joint_limits[i, 0],
                         self.joint_limits[i, 1],
                     )
 
-            elapsed = time.time() - start_time
+            elapsed = _runtime.time.time() - start_time
             throughput = total_work / elapsed / 1e6  # Million elements per second
 
             self.performance_stats["gpu_calls"] += 1
@@ -446,7 +440,7 @@ class _GenerationMixin:
             ``(batch_size, N, num_joints)`` array.
         """
         backend = _runtime.get_backend()
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         batch_size, num_joints = thetastart_batch.shape
 
@@ -457,7 +451,7 @@ class _GenerationMixin:
         # Process each trajectory in the batch, then stack into one array
         pos_rows, vel_rows, acc_rows = [], [], []
         for i in range(batch_size):
-            traj_pos, traj_vel, traj_acc = _traj_cpu_njit(
+            traj_pos, traj_vel, traj_acc = _runtime._traj_cpu_njit(
                 start_host[i], end_host[i], Tf, N, method
             )
             pos_rows.append(backend.asarray(traj_pos))
@@ -481,7 +475,7 @@ class _GenerationMixin:
             traj_vel_batch = backend.zeros(shape, dtype=backend.float32)
             traj_acc_batch = backend.zeros(shape, dtype=backend.float32)
 
-        elapsed = time.time() - start_time
+        elapsed = _runtime.time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 
@@ -516,12 +510,13 @@ class _GenerationMixin:
         backend = _runtime.get_backend()
         N = int(N)
         timegap = Tf / (N - 1.0)
-        # Callers may pass backend-native transforms, and TransToRp only slices,
+        # Callers may pass backend-native transforms, and TransToRp only
+        # slices,
         # so force pstart/pend to host NumPy for the unchanged GPU velocity path
         # (see _cartesian_trajectory_gpu). This is a no-op for NumPy inputs. The
         # assembly below runs on the backend copies (``*_b``).
-        Rstart, pstart = TransToRp(Xstart)
-        Rend, pend = TransToRp(Xend)
+        Rstart, pstart = _runtime.TransToRp(Xstart)
+        Rend, pend = _runtime.TransToRp(Xend)
         pstart = backend.to_numpy(backend.asarray(pstart))
         pend = backend.to_numpy(backend.asarray(pend))
         Rstart_b = backend.asarray(Rstart)
@@ -536,14 +531,16 @@ class _GenerationMixin:
         position_rows = []
         for i in range(N):
             if method == 3:
-                s = CubicTimeScaling(Tf, timegap * i)
+                s = _runtime.CubicTimeScaling(Tf, timegap * i)
             else:
-                s = QuinticTimeScaling(Tf, timegap * i)
+                s = _runtime.QuinticTimeScaling(Tf, timegap * i)
 
             orientation_rows.append(
                 backend.matmul(
                     Rstart_b,
-                    MatrixExp3(MatrixLog3(backend.matmul(Rstart_b.T, Rend_b)) * s),
+                    _runtime.MatrixExp3(
+                        _runtime.MatrixLog3(backend.matmul(Rstart_b.T, Rend_b)) * s
+                    ),
                 )
             )
             position_rows.append(s * pend_b + (1 - s) * pstart_b)
@@ -605,15 +602,15 @@ class _GenerationMixin:
             ``(N, 3)`` array of linear velocity (m/s) and acceleration
             (m/s^2).
         """
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         try:
-            pstart = np.ascontiguousarray(pstart.astype(np.float32))
-            pend = np.ascontiguousarray(pend.astype(np.float32))
+            pstart = _runtime.np.ascontiguousarray(pstart.astype(_runtime.np.float32))
+            pend = _runtime.np.ascontiguousarray(pend.astype(_runtime.np.float32))
 
-            traj_vel = _runtime.get_cuda_array((N, 3), dtype=np.float32)
-            traj_acc = _runtime.get_cuda_array((N, 3), dtype=np.float32)
-            traj_pos_dummy = _runtime.get_cuda_array((N, 3), dtype=np.float32)
+            traj_vel = _runtime.get_cuda_array((N, 3), dtype=_runtime.np.float32)
+            traj_acc = _runtime.get_cuda_array((N, 3), dtype=_runtime.np.float32)
+            traj_pos_dummy = _runtime.get_cuda_array((N, 3), dtype=_runtime.np.float32)
 
             # Transfer data using pinned memory
             d_pstart = _runtime._h2d_pinned(pstart)
@@ -639,7 +636,7 @@ class _GenerationMixin:
             traj_vel_host = traj_vel.copy_to_host()
             traj_acc_host = traj_acc.copy_to_host()
 
-            elapsed = time.time() - start_time
+            elapsed = _runtime.time.time() - start_time
             self.performance_stats["gpu_calls"] += 1
             self.performance_stats["total_gpu_time"] += elapsed
             self.performance_stats["kernel_launches"] += 1
@@ -686,7 +683,7 @@ class _GenerationMixin:
             (m/s^2).
         """
         backend = _runtime.get_backend()
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         dp = backend.asarray(pend) - backend.asarray(pstart)
         vel_rows = []
@@ -719,7 +716,7 @@ class _GenerationMixin:
             traj_vel = backend.zeros((N, 3), dtype=backend.float32)
             traj_acc = backend.zeros((N, 3), dtype=backend.float32)
 
-        elapsed = time.time() - start_time
+        elapsed = _runtime.time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 

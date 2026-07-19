@@ -3,7 +3,7 @@
 """Inverse/forward dynamics trajectory mixin - ManipulaPy"""
 
 from . import _kernels as _runtime
-from ._kernels import Dict, Tuple, np, time
+from ._kernels import Dict, Tuple, np
 
 
 class _DynamicsMixin:
@@ -31,7 +31,7 @@ class _DynamicsMixin:
             np.ndarray: Array of joint torques required to follow the trajectory.
         """
         if gravity_vector is None:
-            gravity_vector = np.array([0, 0, -9.81])
+            gravity_vector = _runtime.np.array([0, 0, -9.81])
         if Ftip is None:
             Ftip = [0, 0, 0, 0, 0, 0]
 
@@ -98,7 +98,7 @@ class _DynamicsMixin:
             np.ndarray: (num_points, num_joints) array of joint torques,
             clipped to the configured torque limits.
         """
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         num_points = thetalist_trajectory.shape[0]
         num_joints = thetalist_trajectory.shape[1]
@@ -106,24 +106,26 @@ class _DynamicsMixin:
         try:
             # Use memory pool for the large torques array
             torques_trajectory = _runtime.get_cuda_array(
-                (num_points, num_joints), dtype=np.float32
+                (num_points, num_joints), dtype=_runtime.np.float32
             )
 
             # Transfer data to GPU using pinned memory - ensure proper data types
             d_thetalist_trajectory = _runtime._h2d_pinned(
-                thetalist_trajectory.astype(np.float32)
+                thetalist_trajectory.astype(_runtime.np.float32)
             )
             d_dthetalist_trajectory = _runtime._h2d_pinned(
-                dthetalist_trajectory.astype(np.float32)
+                dthetalist_trajectory.astype(_runtime.np.float32)
             )
             d_ddthetalist_trajectory = _runtime._h2d_pinned(
-                ddthetalist_trajectory.astype(np.float32)
+                ddthetalist_trajectory.astype(_runtime.np.float32)
             )
 
             d_gravity_vector = _runtime.cuda.to_device(
-                gravity_vector.astype(np.float32)
+                gravity_vector.astype(_runtime.np.float32)
             )
-            d_Ftip = _runtime.cuda.to_device(np.array(Ftip, dtype=np.float32))
+            d_Ftip = _runtime.cuda.to_device(
+                _runtime.np.array(Ftip, dtype=_runtime.np.float32)
+            )
 
             # Safely handle dynamics data conversion
             try:
@@ -131,34 +133,44 @@ class _DynamicsMixin:
                 if hasattr(self.dynamics, "Glist") and self.dynamics.Glist is not None:
                     if isinstance(self.dynamics.Glist, list):
                         # Convert list of matrices to 3D numpy array
-                        Glist_array = np.stack(self.dynamics.Glist).astype(np.float32)
+                        Glist_array = _runtime.np.stack(self.dynamics.Glist).astype(
+                            _runtime.np.float32
+                        )
                     else:
-                        Glist_array = np.array(self.dynamics.Glist, dtype=np.float32)
+                        Glist_array = _runtime.np.array(
+                            self.dynamics.Glist, dtype=_runtime.np.float32
+                        )
                 else:
                     # Create dummy Glist if not available
-                    Glist_array = np.eye(6, dtype=np.float32)[None, :, :].repeat(
-                        num_joints, axis=0
-                    )
+                    Glist_array = _runtime.np.eye(6, dtype=_runtime.np.float32)[
+                        None, :, :
+                    ].repeat(num_joints, axis=0)
 
                 # Convert S_list to proper format
                 if (
                     hasattr(self.dynamics, "S_list")
                     and self.dynamics.S_list is not None
                 ):
-                    Slist_array = np.array(self.dynamics.S_list, dtype=np.float32)
+                    Slist_array = _runtime.np.array(
+                        self.dynamics.S_list, dtype=_runtime.np.float32
+                    )
                 else:
                     # Create dummy S_list if not available
-                    Slist_array = np.random.randn(6, num_joints).astype(np.float32)
+                    Slist_array = _runtime.np.random.randn(6, num_joints).astype(
+                        _runtime.np.float32
+                    )
 
                 # Convert M_list to proper format
                 if (
                     hasattr(self.dynamics, "M_list")
                     and self.dynamics.M_list is not None
                 ):
-                    M_array = np.array(self.dynamics.M_list, dtype=np.float32)
+                    M_array = _runtime.np.array(
+                        self.dynamics.M_list, dtype=_runtime.np.float32
+                    )
                 else:
                     # Create dummy M if not available
-                    M_array = np.eye(4, dtype=np.float32)
+                    M_array = _runtime.np.eye(4, dtype=_runtime.np.float32)
 
                 d_Glist = _runtime.cuda.to_device(Glist_array)
                 d_Slist = _runtime.cuda.to_device(Slist_array)
@@ -178,7 +190,7 @@ class _DynamicsMixin:
                 )
 
             d_torque_limits = _runtime.cuda.to_device(
-                self.torque_limits.astype(np.float32)
+                self.torque_limits.astype(_runtime.np.float32)
             )
 
             # Get optimal 2D launch configuration with bounds checking
@@ -245,11 +257,11 @@ class _DynamicsMixin:
             torques_host = torques_trajectory.copy_to_host()
 
             # Apply final torque limits
-            torques_host = np.clip(
+            torques_host = _runtime.np.clip(
                 torques_host, self.torque_limits[:, 0], self.torque_limits[:, 1]
             )
 
-            elapsed = time.time() - start_time
+            elapsed = _runtime.time.time() - start_time
             self.performance_stats["gpu_calls"] += 1
             self.performance_stats["total_gpu_time"] += elapsed
             self.performance_stats["kernel_launches"] += 1
@@ -303,7 +315,7 @@ class _DynamicsMixin:
             clipped to the configured torque limits.
         """
         backend = _runtime.get_backend()
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         num_points = thetalist_trajectory.shape[0]
         num_joints = thetalist_trajectory.shape[1]
@@ -340,7 +352,7 @@ class _DynamicsMixin:
             backend.asarray(self.torque_limits[:, 1]),
         )
 
-        elapsed = time.time() - start_time
+        elapsed = _runtime.time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 
@@ -416,29 +428,35 @@ class _DynamicsMixin:
             ``"velocities"`` and ``"accelerations"``, each a
             ``(num_steps, num_joints)`` array.
         """
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         num_steps = taumat.shape[0]
         num_joints = thetalist.shape[0]
 
         try:
             # Initialize result arrays
-            thetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
-            dthetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
-            ddthetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
+            thetamat = _runtime.np.zeros(
+                (num_steps, num_joints), dtype=_runtime.np.float32
+            )
+            dthetamat = _runtime.np.zeros(
+                (num_steps, num_joints), dtype=_runtime.np.float32
+            )
+            ddthetamat = _runtime.np.zeros(
+                (num_steps, num_joints), dtype=_runtime.np.float32
+            )
 
-            thetamat[0, :] = thetalist.astype(np.float32)
-            dthetamat[0, :] = dthetalist.astype(np.float32)
+            thetamat[0, :] = thetalist.astype(_runtime.np.float32)
+            dthetamat[0, :] = dthetalist.astype(_runtime.np.float32)
 
             # Use memory pool for large arrays
             d_thetamat = _runtime.get_cuda_array(
-                (num_steps, num_joints), dtype=np.float32
+                (num_steps, num_joints), dtype=_runtime.np.float32
             )
             d_dthetamat = _runtime.get_cuda_array(
-                (num_steps, num_joints), dtype=np.float32
+                (num_steps, num_joints), dtype=_runtime.np.float32
             )
             d_ddthetamat = _runtime.get_cuda_array(
-                (num_steps, num_joints), dtype=np.float32
+                (num_steps, num_joints), dtype=_runtime.np.float32
             )
 
             # Copy initial conditions to GPU
@@ -447,22 +465,24 @@ class _DynamicsMixin:
             d_ddthetamat.copy_to_device(ddthetamat)
 
             # Transfer other data to GPU
-            d_thetalist = _runtime.cuda.to_device(thetalist.astype(np.float32))
-            d_dthetalist = _runtime.cuda.to_device(dthetalist.astype(np.float32))
-            d_taumat = _runtime.cuda.to_device(taumat.astype(np.float32))
-            d_g = _runtime.cuda.to_device(g.astype(np.float32))
-            d_Ftipmat = _runtime.cuda.to_device(Ftipmat.astype(np.float32))
+            d_thetalist = _runtime.cuda.to_device(thetalist.astype(_runtime.np.float32))
+            d_dthetalist = _runtime.cuda.to_device(
+                dthetalist.astype(_runtime.np.float32)
+            )
+            d_taumat = _runtime.cuda.to_device(taumat.astype(_runtime.np.float32))
+            d_g = _runtime.cuda.to_device(g.astype(_runtime.np.float32))
+            d_Ftipmat = _runtime.cuda.to_device(Ftipmat.astype(_runtime.np.float32))
             d_Glist = _runtime.cuda.to_device(
-                np.array(self.dynamics.Glist, dtype=np.float32)
+                _runtime.np.array(self.dynamics.Glist, dtype=_runtime.np.float32)
             )
             d_Slist = _runtime.cuda.to_device(
-                np.array(self.dynamics.S_list, dtype=np.float32)
+                _runtime.np.array(self.dynamics.S_list, dtype=_runtime.np.float32)
             )
             d_M = _runtime.cuda.to_device(
-                np.array(self.dynamics.M_list, dtype=np.float32)
+                _runtime.np.array(self.dynamics.M_list, dtype=_runtime.np.float32)
             )
             d_joint_limits = _runtime.cuda.to_device(
-                self.joint_limits.astype(np.float32)
+                self.joint_limits.astype(_runtime.np.float32)
             )
 
             # Get optimal launch configuration
@@ -503,7 +523,7 @@ class _DynamicsMixin:
             d_dthetamat.copy_to_host(dthetamat)
             d_ddthetamat.copy_to_host(ddthetamat)
 
-            elapsed = time.time() - start_time
+            elapsed = _runtime.time.time() - start_time
             throughput = (num_steps * num_joints * intRes) / elapsed / 1e6
 
             self.performance_stats["gpu_calls"] += 1
@@ -564,7 +584,7 @@ class _DynamicsMixin:
             ``(num_steps, num_joints)`` array.
         """
         backend = _runtime.get_backend()
-        start_time = time.time()
+        start_time = _runtime.time.time()
 
         num_steps = taumat.shape[0]
         num_joints = thetalist.shape[0]
@@ -607,7 +627,7 @@ class _DynamicsMixin:
                     # so an unsafe cast raises into the handler below instead of
                     # silently truncating.
                     new_dtheta = current_dtheta + ddtheta * dt_step
-                    if not np.can_cast(
+                    if not _runtime.np.can_cast(
                         new_dtheta.dtype, dtheta_dtype, casting="same_kind"
                     ):
                         raise TypeError(
@@ -617,7 +637,7 @@ class _DynamicsMixin:
                     current_dtheta = backend.asarray(new_dtheta, dtype=dtheta_dtype)
 
                     new_theta = current_theta + current_dtheta * dt_step
-                    if not np.can_cast(
+                    if not _runtime.np.can_cast(
                         new_theta.dtype, theta_dtype, casting="same_kind"
                     ):
                         raise TypeError(
@@ -650,7 +670,7 @@ class _DynamicsMixin:
         dthetamat = backend.stack(dtheta_rows)
         ddthetamat = backend.stack(ddtheta_rows)
 
-        elapsed = time.time() - start_time
+        elapsed = _runtime.time.time() - start_time
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 

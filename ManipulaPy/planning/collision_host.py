@@ -78,7 +78,7 @@ class _CollisionMixin:
                         step_host, q_goal, obstacles
                     )
                     # Adjust step size as needed (host arithmetic, row dtype)
-                    step_host = np.asarray(
+                    step_host = _runtime.np.asarray(
                         step_host - 0.01 * gradient, dtype=step_host.dtype
                     )
                     if not self.collision_checker.check_collision(step_host):
@@ -134,7 +134,7 @@ class _CollisionMixin:
                         waypoint_host, target_host, obstacles_host
                     )
                     # Host arithmetic at the waypoint dtype (no in-place writes)
-                    waypoint_host = np.asarray(
+                    waypoint_host = _runtime.np.asarray(
                         waypoint_host - 0.01 * gradient, dtype=waypoint_host.dtype
                     )
 
