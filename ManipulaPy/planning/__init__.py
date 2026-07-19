@@ -44,4 +44,14 @@ globals().update(
     }
 )
 
+# The trajectory planning implementation is split across internal helper modules
+# (_kernels, trajectory, trajectory_dynamics, collision_host, _plotting). Importing
+# trajectory_planning above pulls those submodules in and the import system binds
+# them as attributes of this package. They are implementation detail, so drop them
+# here to keep the historical public namespace unchanged.
+for _internal in ("_kernels", "trajectory", "trajectory_dynamics",
+                  "collision_host", "_plotting"):
+    globals().pop(_internal, None)
+del _internal
+
 __all__ = list(trajectory_planning.__all__)
