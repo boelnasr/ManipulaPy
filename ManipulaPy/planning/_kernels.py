@@ -3,8 +3,9 @@
 """
 Optimized Path Planning Module - ManipulaPy
 
-This module provides highly optimized trajectory planning capabilities including joint space
-and Cartesian space trajectory generation with CUDA acceleration and collision avoidance.
+This module provides highly optimized trajectory planning capabilities including
+joint and Cartesian space trajectory generation with CUDA acceleration and collision
+avoidance.
 
 Key optimizations:
 - Adaptive grid sizing for optimal GPU occupancy

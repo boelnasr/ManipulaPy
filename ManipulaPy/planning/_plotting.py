@@ -2,8 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Trajectory plotting mixin - ManipulaPy"""
 
-from ._kernels import *  # noqa: F401,F403
-
+from ._kernels import np, plt, time
 
 
 class _PlottingMixin:
@@ -89,7 +88,8 @@ class _PlottingMixin:
         Enhanced TCP trajectory plotting with performance monitoring.
 
         Args:
-            trajectory (list): A list of joint angle configurations representing the trajectory.
+            trajectory (list): Joint angle configurations representing the
+                trajectory.
             dt (float): The time step between consecutive points in the trajectory.
 
         Returns:

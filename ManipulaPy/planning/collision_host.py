@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Host-side collision avoidance and planning mixin - ManipulaPy"""
 
-from ._kernels import *  # noqa: F401,F403
-
+from . import _kernels as _runtime
+from ._kernels import List, logger, np
 
 
 class _CollisionMixin:
@@ -55,7 +55,7 @@ class _CollisionMixin:
         Returns:
             np.ndarray: The (possibly adjusted) ``(N, num_joints)`` trajectory.
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         if len(traj_pos) == 0:
             # Base iterated an empty trajectory and returned it unchanged;
             # ``stack([])`` would raise, so short-circuit the degenerate case.
@@ -102,7 +102,9 @@ class _CollisionMixin:
             list: Joint trajectory as a list of joint configurations.
         """
         logger.info(
-            f"Planning trajectory from {len(start_position)} to {len(target_position)} DOF"
+            "Planning trajectory from %d to %d DOF",
+            len(start_position),
+            len(target_position),
         )
 
         # Enhanced trajectory planning with multiple waypoints
@@ -110,7 +112,7 @@ class _CollisionMixin:
         num_waypoints = 5
         joint_trajectory = []
 
-        backend = get_backend()
+        backend = _runtime.get_backend()
         start_pos = backend.asarray(start_position)
         target_pos = backend.asarray(target_position)
         # The potential field and collision checker are host NumPy boundaries.

@@ -3,8 +3,9 @@
 """
 Optimized Path Planning Module - ManipulaPy
 
-This module provides highly optimized trajectory planning capabilities including joint space
-and Cartesian space trajectory generation with CUDA acceleration and collision avoidance.
+This module provides highly optimized trajectory planning capabilities including
+joint and Cartesian space trajectory generation with CUDA acceleration and collision
+avoidance.
 
 Key optimizations:
 - Adaptive grid sizing for optimal GPU occupancy
@@ -19,9 +20,13 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
+import sys as _sys
+from types import ModuleType as _ModuleType
+
+from . import _kernels as _runtime
 from ._kernels import *  # noqa: F401,F403
 
-from .trajectory import (
+from .trajectory import (  # noqa: F401
     _GenerationMixin,
     _trajectory_cpu_fallback,
     _traj_cpu_njit,
@@ -31,7 +36,70 @@ from .collision_host import _CollisionMixin
 from ._plotting import _PlottingMixin
 
 
-class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMixin, _PlottingMixin):
+_FORWARDED_RUNTIME_NAMES = frozenset(
+    {
+        "CUDA_AVAILABLE",
+        "_best_2d_config",
+        "_h2d_pinned",
+        "auto_select_optimal_kernel",
+        "batch_trajectory_kernel",
+        "benchmark_kernel_performance",
+        "cartesian_trajectory_kernel",
+        "check_cuda_availability",
+        "cuda",
+        "forward_dynamics_kernel",
+        "fused_potential_gradient_kernel",
+        "get_backend",
+        "get_cuda_array",
+        "get_gpu_properties",
+        "get_memory_pool_stats",
+        "get_optimal_kernel_config",
+        "inverse_dynamics_kernel",
+        "make_1d_grid",
+        "make_2d_grid",
+        "make_2d_grid_optimized",
+        "optimized_batch_trajectory_generation",
+        "optimized_trajectory_generation",
+        "optimized_trajectory_generation_monitored",
+        "print_performance_recommendations",
+        "profile_start",
+        "profile_stop",
+        "return_cuda_array",
+        "setup_cuda_environment_for_40x_speedup",
+        "trajectory_kernel",
+        "trajectory_kernel_cache_friendly",
+        "trajectory_kernel_memory_optimized",
+        "trajectory_kernel_vectorized",
+        "trajectory_kernel_warp_optimized",
+    }
+)
+
+
+class _PlanningCompatibilityModule(_ModuleType):
+    """Forward historical mutable patch points to the shared runtime module."""
+
+    def __getattribute__(self, name):
+        if name in _FORWARDED_RUNTIME_NAMES:
+            return getattr(_runtime, name)
+        return super().__getattribute__(name)
+
+    def __setattr__(self, name, value):
+        if name in _FORWARDED_RUNTIME_NAMES:
+            setattr(_runtime, name, value)
+        super().__setattr__(name, value)
+
+    def __delattr__(self, name):
+        if name in _FORWARDED_RUNTIME_NAMES and hasattr(_runtime, name):
+            delattr(_runtime, name)
+        super().__delattr__(name)
+
+
+_sys.modules[__name__].__class__ = _PlanningCompatibilityModule
+
+
+class OptimizedTrajectoryPlanning(
+    _GenerationMixin, _DynamicsMixin, _CollisionMixin, _PlottingMixin
+):
     """
     Highly optimized trajectory planning class with adaptive GPU/CPU execution,
     memory pooling, and batch processing capabilities for 40x+ speedups.
@@ -117,8 +185,8 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
         # ------------------------------------------------------------
         # Auto-optimization setup
         # ------------------------------------------------------------
-        if auto_optimize and CUDA_AVAILABLE:
-            setup_cuda_environment_for_40x_speedup()
+        if auto_optimize and _runtime.CUDA_AVAILABLE:
+            _runtime.setup_cuda_environment_for_40x_speedup()
 
         # ------------------------------------------------------------
         # basic data
@@ -150,7 +218,7 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
         # ------------------------------------------------------------
         # CUDA feature flags
         # ------------------------------------------------------------
-        detected_cuda = check_cuda_availability()
+        detected_cuda = _runtime.check_cuda_availability()
         if use_cuda is None:
             self.cuda_available = detected_cuda
         elif use_cuda and not detected_cuda:
@@ -158,7 +226,9 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
         else:
             self.cuda_available = bool(use_cuda)
 
-        self.gpu_properties = get_gpu_properties() if self.cuda_available else None
+        self.gpu_properties = (
+            _runtime.get_gpu_properties() if self.cuda_available else None
+        )
 
         # Adaptive threshold based on target speedup
         if self.cuda_available and self.gpu_properties:
@@ -195,7 +265,7 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
 
         # Enable profiling if requested (after all attributes are initialized)
         if self.enable_profiling and self.cuda_available:
-            profile_start()
+            _runtime.profile_start()
 
         # Print performance recommendations on initialization
         if self.cuda_available:
@@ -206,7 +276,8 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
             if target_speedup >= 40:
                 min_N_for_target = self.cpu_threshold // num_joints
                 logger.info(
-                    f"💡 For {target_speedup}x speedup, use N ≥ {min_N_for_target:,} trajectory points"
+                    f"💡 For {target_speedup}x speedup, use N ≥ "
+                    f"{min_N_for_target:,} trajectory points"
                 )
 
         logger.info(
@@ -247,9 +318,9 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
 
         if (arr is None) or (arr.shape != shape) or (arr.dtype != dtype):
             if arr is not None:
-                return_cuda_array(arr)
+                _runtime.return_cuda_array(arr)
 
-            arr = get_cuda_array(shape, dtype)
+            arr = _runtime.get_cuda_array(shape, dtype)
             self._gpu_arrays[array_name] = arr
 
         return arr
@@ -321,11 +392,11 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
             return self._kernel_cache[cache_key]
 
         if self.kernel_type == "auto":
-            kernel_type = auto_select_optimal_kernel(N, num_joints)
+            kernel_type = _runtime.auto_select_optimal_kernel(N, num_joints)
         else:
             kernel_type = self.kernel_type
 
-        config = get_optimal_kernel_config(N, num_joints, kernel_type)
+        config = _runtime.get_optimal_kernel_config(N, num_joints, kernel_type)
         self._kernel_cache[cache_key] = config
 
         return config
@@ -365,7 +436,7 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
 
         # Add memory pool statistics
         if self.cuda_available:
-            stats["memory_pool_stats"] = get_memory_pool_stats()
+            stats["memory_pool_stats"] = _runtime.get_memory_pool_stats()
 
         # Simple EWMA auto-tune for adaptive threshold
         if stats["avg_gpu_time"] > 0 and stats["avg_cpu_time"] > 0:
@@ -399,7 +470,7 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
             if hasattr(self, "_gpu_arrays"):
                 for array in self._gpu_arrays.values():
                     if array is not None:
-                        return_cuda_array(array)
+                        _runtime.return_cuda_array(array)
                 self._gpu_arrays.clear()
 
             # Clear kernel cache
@@ -412,7 +483,7 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
             _cuda_memory_pool.clear()
 
             # Synchronize and clean up CUDA context
-            cuda.synchronize()
+            _runtime.cuda.synchronize()
 
             logger.info("GPU memory cleaned up")
 
@@ -525,7 +596,8 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
 
             marker = "🏆" if kernel_type == best_kernel else "  "
             print(
-                f"{marker}{kernel_type:<18} {mean_ms:<12.2f} {min_ms:<12.2f} {success:<10}"
+                f"{marker}{kernel_type:<18} {mean_ms:<12.2f} "
+                f"{min_ms:<12.2f} {success:<10}"
             )
 
         return results
@@ -539,7 +611,7 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
                 and hasattr(self, "cuda_available")
                 and self.cuda_available
             ):
-                profile_stop()
+                _runtime.profile_stop()
             if hasattr(self, "cleanup_gpu_memory"):
                 self.cleanup_gpu_memory()
         except Exception:
@@ -645,7 +717,8 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
                 speedup_str = f" ({results[name]['actual_speedup']:.1f}x speedup)"
 
             print(
-                f"{gpu_indicator} {name}: {mean_time*1000:.2f}±{std_time*1000:.2f}ms{speedup_str}"
+                f"{gpu_indicator} {name}: {mean_time*1000:.2f}"
+                f"±{std_time*1000:.2f}ms{speedup_str}"
             )
 
             logger.info(
@@ -653,10 +726,11 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
             )
 
         # Print summary table
-        print(f"\n📊 Benchmark Summary:")
+        print("\n📊 Benchmark Summary:")
         print("-" * 80)
         print(
-            f"{'Test Case':<20} {'Time (ms)':<12} {'GPU':<6} {'Speedup':<10} {'Throughput':<15}"
+            f"{'Test Case':<20} {'Time (ms)':<12} {'GPU':<6} "
+            f"{'Speedup':<10} {'Throughput':<15}"
         )
         print("-" * 80)
 
@@ -671,7 +745,8 @@ class OptimizedTrajectoryPlanning(_GenerationMixin, _DynamicsMixin, _CollisionMi
             throughput = f"{result['elements_per_second']/1e6:.2f} M/s"
 
             print(
-                f"{name:<20} {time_ms:<12.2f} {gpu_used:<6} {speedup:<10} {throughput:<15}"
+                f"{name:<20} {time_ms:<12.2f} {gpu_used:<6} "
+                f"{speedup:<10} {throughput:<15}"
             )
 
         return results
@@ -722,13 +797,13 @@ def create_optimized_planner(
         OptimizedTrajectoryPlanning: Configured planner instance
     """
     # Auto-detect optimal settings
-    cuda_available = check_cuda_availability()
+    cuda_available = _runtime.check_cuda_availability()
 
     # Adaptive threshold based on target speedup and problem size
     num_joints = len(joint_limits)
 
     if cuda_available:
-        gpu_props = get_gpu_properties()
+        gpu_props = _runtime.get_gpu_properties()
         if gpu_props:
             sm_count = gpu_props["multiprocessor_count"]
             if target_speedup >= 40:
@@ -764,6 +839,7 @@ def create_optimized_planner(
     )
 
     return planner
+
 
 def compare_implementations(
     serial_manipulator,
@@ -801,7 +877,7 @@ def compare_implementations(
 
     # Create GPU planner (if available)
     gpu_planner = None
-    if check_cuda_availability():
+    if _runtime.check_cuda_availability():
         gpu_planner = OptimizedTrajectoryPlanning(
             serial_manipulator=serial_manipulator,
             urdf_path=urdf_path,
@@ -897,13 +973,15 @@ def compare_implementations(
         }
 
         # Print comprehensive results
-        print(f"\n🚀 Implementation Comparison Results:")
+        print("\n🚀 Implementation Comparison Results:")
         print("=" * 50)
         print(
-            f"CPU Time: {cpu_mean_time*1000:.2f} ± {results['cpu']['std_time']*1000:.2f} ms"
+            f"CPU Time: {cpu_mean_time*1000:.2f} ± "
+            f"{results['cpu']['std_time']*1000:.2f} ms"
         )
         print(
-            f"GPU Time: {gpu_mean_time*1000:.2f} ± {results['gpu']['std_time']*1000:.2f} ms"
+            f"GPU Time: {gpu_mean_time*1000:.2f} ± "
+            f"{results['gpu']['std_time']*1000:.2f} ms"
         )
         print(f"Speedup: {speedup:.1f}x")
         print(f"Max Position Error: {results['accuracy']['max_pos_diff']:.2e}")
@@ -925,6 +1003,7 @@ def compare_implementations(
 
     return results
 
+
 def benchmark_kernel_performance_comprehensive(
     serial_manipulator, urdf_path, dynamics, joint_limits, test_sizes=None, num_runs=5
 ) -> Dict[str, Dict[str, Any]]:
@@ -942,7 +1021,7 @@ def benchmark_kernel_performance_comprehensive(
     Returns:
         dict: Comprehensive benchmark results
     """
-    if not check_cuda_availability():
+    if not _runtime.check_cuda_availability():
         logger.warning("CUDA not available for comprehensive benchmarking")
         return {}
 

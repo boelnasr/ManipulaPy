@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Inverse/forward dynamics trajectory mixin - ManipulaPy"""
 
-from ._kernels import *  # noqa: F401,F403
-
+from . import _kernels as _runtime
+from ._kernels import Dict, Tuple, logger, np, time
 
 
 class _DynamicsMixin:
@@ -19,9 +19,11 @@ class _DynamicsMixin:
         Compute joint torques with enhanced CUDA acceleration.
 
         Args:
-            thetalist_trajectory (np.ndarray): Array of joint angles over the trajectory.
-            dthetalist_trajectory (np.ndarray): Array of joint velocities over the trajectory.
-            ddthetalist_trajectory (np.ndarray): Array of joint accelerations over the trajectory.
+            thetalist_trajectory (np.ndarray): Joint angles over the trajectory.
+            dthetalist_trajectory (np.ndarray): Joint velocities over the
+                trajectory.
+            ddthetalist_trajectory (np.ndarray): Joint accelerations over the
+                trajectory.
             gravity_vector (np.ndarray, optional): Gravity vector affecting the system.
             Ftip (list, optional): External forces applied at the end effector.
 
@@ -44,7 +46,7 @@ class _DynamicsMixin:
         if self.cuda_available:
             total_work = num_points * num_joints
             if total_work >= 10000:
-                print_performance_recommendations(num_points, num_joints)
+                _runtime.print_performance_recommendations(num_points, num_joints)
 
         # Decide on execution strategy
         use_gpu = self._should_use_gpu(num_points, num_joints)
@@ -103,23 +105,25 @@ class _DynamicsMixin:
 
         try:
             # Use memory pool for the large torques array
-            torques_trajectory = get_cuda_array(
+            torques_trajectory = _runtime.get_cuda_array(
                 (num_points, num_joints), dtype=np.float32
             )
 
             # Transfer data to GPU using pinned memory - ensure proper data types
-            d_thetalist_trajectory = _h2d_pinned(
+            d_thetalist_trajectory = _runtime._h2d_pinned(
                 thetalist_trajectory.astype(np.float32)
             )
-            d_dthetalist_trajectory = _h2d_pinned(
+            d_dthetalist_trajectory = _runtime._h2d_pinned(
                 dthetalist_trajectory.astype(np.float32)
             )
-            d_ddthetalist_trajectory = _h2d_pinned(
+            d_ddthetalist_trajectory = _runtime._h2d_pinned(
                 ddthetalist_trajectory.astype(np.float32)
             )
 
-            d_gravity_vector = cuda.to_device(gravity_vector.astype(np.float32))
-            d_Ftip = cuda.to_device(np.array(Ftip, dtype=np.float32))
+            d_gravity_vector = _runtime.cuda.to_device(
+                gravity_vector.astype(np.float32)
+            )
+            d_Ftip = _runtime.cuda.to_device(np.array(Ftip, dtype=np.float32))
 
             # Safely handle dynamics data conversion
             try:
@@ -156,9 +160,9 @@ class _DynamicsMixin:
                     # Create dummy M if not available
                     M_array = np.eye(4, dtype=np.float32)
 
-                d_Glist = cuda.to_device(Glist_array)
-                d_Slist = cuda.to_device(Slist_array)
-                d_M = cuda.to_device(M_array)
+                d_Glist = _runtime.cuda.to_device(Glist_array)
+                d_Slist = _runtime.cuda.to_device(Slist_array)
+                d_M = _runtime.cuda.to_device(M_array)
 
             except Exception as e:
                 logger.warning(
@@ -173,15 +177,19 @@ class _DynamicsMixin:
                     Ftip,
                 )
 
-            d_torque_limits = cuda.to_device(self.torque_limits.astype(np.float32))
+            d_torque_limits = _runtime.cuda.to_device(
+                self.torque_limits.astype(np.float32)
+            )
 
             # Get optimal 2D launch configuration with bounds checking
             try:
-                blocks_per_grid, threads_per_block = _best_2d_config(
+                blocks_per_grid, threads_per_block = _runtime._best_2d_config(
                     num_points, num_joints
                 )
                 logger.info(
-                    f"Inverse dynamics 2D grid: blocks={blocks_per_grid}, threads={threads_per_block}"
+                    "Inverse dynamics 2D grid: blocks=%s, threads=%s",
+                    blocks_per_grid,
+                    threads_per_block,
                 )
             except Exception as e:
                 logger.warning(f"Error in grid configuration: {e}, using fallback")
@@ -196,13 +204,14 @@ class _DynamicsMixin:
                 # Let's check the kernel signature in cuda_kernels.py:
 
                 # From cuda_kernels.py, the kernel signature is:
-                # inverse_dynamics_kernel(
-                #     thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory,
-                #     gravity_vector, Ftip, Glist, Slist, M, torques_trajectory, torque_limits, stream=0
+                # _runtime.inverse_dynamics_kernel(
+                #     thetalist_trajectory, dthetalist_trajectory,
+                #     ddthetalist_trajectory, gravity_vector, Ftip, Glist,
+                #     Slist, M, torques_trajectory, torque_limits, stream=0
                 # )
                 # That's 11 parameters total including the stream parameter
 
-                inverse_dynamics_kernel[blocks_per_grid, threads_per_block](
+                _runtime.inverse_dynamics_kernel[blocks_per_grid, threads_per_block](
                     d_thetalist_trajectory,  # 1
                     d_dthetalist_trajectory,  # 2
                     d_ddthetalist_trajectory,  # 3
@@ -213,11 +222,11 @@ class _DynamicsMixin:
                     d_M,  # 8
                     torques_trajectory,  # 9
                     d_torque_limits,  # 10
-                    # 0                             # 11 - stream parameter (was missing!)
+                    # 0  # 11 - stream parameter (was missing!)
                 )
 
                 # Synchronize to check for kernel execution errors
-                cuda.synchronize()
+                _runtime.cuda.synchronize()
 
             except Exception as kernel_error:
                 logger.warning(f"CUDA kernel execution failed: {kernel_error}")
@@ -258,7 +267,7 @@ class _DynamicsMixin:
         finally:
             # Return large array to pool
             if "torques_trajectory" in locals():
-                return_cuda_array(torques_trajectory)
+                _runtime.return_cuda_array(torques_trajectory)
 
     def _inverse_dynamics_cpu(
         self,
@@ -289,7 +298,7 @@ class _DynamicsMixin:
             np.ndarray: (num_points, num_joints) array of joint torques,
             clipped to the configured torque limits.
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         start_time = time.time()
 
         num_points = thetalist_trajectory.shape[0]
@@ -363,7 +372,7 @@ class _DynamicsMixin:
         if self.cuda_available:
             total_work = num_steps * num_joints
             if total_work >= 10000:
-                print_performance_recommendations(num_steps, num_joints)
+                _runtime.print_performance_recommendations(num_steps, num_joints)
 
         # Decide on execution strategy
         use_gpu = self._should_use_gpu(num_steps, num_joints)
@@ -418,9 +427,15 @@ class _DynamicsMixin:
             dthetamat[0, :] = dthetalist.astype(np.float32)
 
             # Use memory pool for large arrays
-            d_thetamat = get_cuda_array((num_steps, num_joints), dtype=np.float32)
-            d_dthetamat = get_cuda_array((num_steps, num_joints), dtype=np.float32)
-            d_ddthetamat = get_cuda_array((num_steps, num_joints), dtype=np.float32)
+            d_thetamat = _runtime.get_cuda_array(
+                (num_steps, num_joints), dtype=np.float32
+            )
+            d_dthetamat = _runtime.get_cuda_array(
+                (num_steps, num_joints), dtype=np.float32
+            )
+            d_ddthetamat = _runtime.get_cuda_array(
+                (num_steps, num_joints), dtype=np.float32
+            )
 
             # Copy initial conditions to GPU
             d_thetamat.copy_to_device(thetamat)
@@ -428,18 +443,26 @@ class _DynamicsMixin:
             d_ddthetamat.copy_to_device(ddthetamat)
 
             # Transfer other data to GPU
-            d_thetalist = cuda.to_device(thetalist.astype(np.float32))
-            d_dthetalist = cuda.to_device(dthetalist.astype(np.float32))
-            d_taumat = cuda.to_device(taumat.astype(np.float32))
-            d_g = cuda.to_device(g.astype(np.float32))
-            d_Ftipmat = cuda.to_device(Ftipmat.astype(np.float32))
-            d_Glist = cuda.to_device(np.array(self.dynamics.Glist, dtype=np.float32))
-            d_Slist = cuda.to_device(np.array(self.dynamics.S_list, dtype=np.float32))
-            d_M = cuda.to_device(np.array(self.dynamics.M_list, dtype=np.float32))
-            d_joint_limits = cuda.to_device(self.joint_limits.astype(np.float32))
+            d_thetalist = _runtime.cuda.to_device(thetalist.astype(np.float32))
+            d_dthetalist = _runtime.cuda.to_device(dthetalist.astype(np.float32))
+            d_taumat = _runtime.cuda.to_device(taumat.astype(np.float32))
+            d_g = _runtime.cuda.to_device(g.astype(np.float32))
+            d_Ftipmat = _runtime.cuda.to_device(Ftipmat.astype(np.float32))
+            d_Glist = _runtime.cuda.to_device(
+                np.array(self.dynamics.Glist, dtype=np.float32)
+            )
+            d_Slist = _runtime.cuda.to_device(
+                np.array(self.dynamics.S_list, dtype=np.float32)
+            )
+            d_M = _runtime.cuda.to_device(
+                np.array(self.dynamics.M_list, dtype=np.float32)
+            )
+            d_joint_limits = _runtime.cuda.to_device(
+                self.joint_limits.astype(np.float32)
+            )
 
             # Get optimal launch configuration
-            grid_config = get_optimal_kernel_config(
+            grid_config = _runtime.get_optimal_kernel_config(
                 num_steps, num_joints, "cache_friendly"
             )
             if grid_config:
@@ -447,12 +470,12 @@ class _DynamicsMixin:
                 threads_per_block = grid_config["block"]
                 logger.info(f"Using {grid_config['kernel_type']} for forward dynamics")
             else:
-                blocks_per_grid, threads_per_block = _best_2d_config(
+                blocks_per_grid, threads_per_block = _runtime._best_2d_config(
                     num_steps, num_joints
                 )
 
             # Launch forward dynamics kernel
-            forward_dynamics_kernel[blocks_per_grid, threads_per_block](
+            _runtime.forward_dynamics_kernel[blocks_per_grid, threads_per_block](
                 d_thetalist,
                 d_dthetalist,
                 d_taumat,
@@ -498,11 +521,11 @@ class _DynamicsMixin:
         finally:
             # Return large arrays to pool
             if "d_thetamat" in locals():
-                return_cuda_array(d_thetamat)
+                _runtime.return_cuda_array(d_thetamat)
             if "d_dthetamat" in locals():
-                return_cuda_array(d_dthetamat)
+                _runtime.return_cuda_array(d_dthetamat)
             if "d_ddthetamat" in locals():
-                return_cuda_array(d_ddthetamat)
+                _runtime.return_cuda_array(d_ddthetamat)
 
     def _forward_dynamics_cpu(
         self, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
@@ -530,7 +553,7 @@ class _DynamicsMixin:
             ``"velocities"`` and ``"accelerations"``, each a
             ``(num_steps, num_joints)`` array.
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         start_time = time.time()
 
         num_steps = taumat.shape[0]
@@ -642,7 +665,7 @@ class _DynamicsMixin:
             acceleration (numpy.ndarray): An array of accelerations.
             jerk (numpy.ndarray): An array of jerks.
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         positions = backend.asarray(positions)
         # First differences along the time axis (np.diff equivalent).
         velocity = (positions[1:] - positions[:-1]) / dt

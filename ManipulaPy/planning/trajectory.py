@@ -2,7 +2,21 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Joint- and Cartesian-space trajectory generation mixin - ManipulaPy"""
 
-from ._kernels import *  # noqa: F401,F403
+from . import _kernels as _runtime
+from ._kernels import (
+    CubicTimeScaling,
+    Dict,
+    MatrixExp3,
+    MatrixLog3,
+    QuinticTimeScaling,
+    TransToRp,
+    Tuple,
+    logger,
+    njit,
+    np,
+    prange,
+    time,
+)
 
 
 @njit(parallel=True, fastmath=True)
@@ -67,6 +81,7 @@ def _trajectory_cpu_fallback(
 
     return traj_pos, traj_vel, traj_acc
 
+
 @njit(fastmath=True)
 def _traj_cpu_njit(
     thetastart, thetaend, Tf, N, method
@@ -129,14 +144,14 @@ class _GenerationMixin:
         )
 
         # Keep host NumPy inputs here: the unchanged CUDA path
-        # (_joint_trajectory_gpu -> optimized_trajectory_generation_monitored,
+        # (_joint_trajectory_gpu -> _runtime.optimized_trajectory_generation_monitored,
         # np.ascontiguousarray, pinned H2D) requires real NumPy. Callers may pass
         # backend-native arrays, so force them to host through the backend before
         # the float32 cast (a no-op for NumPy inputs; np.array() alone would
         # raise on a CuPy array). The backend domain is re-entered inside
         # _joint_trajectory_cpu; entering it before _should_use_gpu would feed
         # device arrays to the GPU path and force a silent CPU fallback.
-        backend = get_backend()
+        backend = _runtime.get_backend()
         thetastart = np.array(
             backend.to_numpy(backend.asarray(thetastart)), dtype=np.float32
         )
@@ -148,7 +163,7 @@ class _GenerationMixin:
         # Print performance recommendations if beneficial
         total_work = N * num_joints
         if self.cuda_available and total_work >= 10000:
-            print_performance_recommendations(N, num_joints)
+            _runtime.print_performance_recommendations(N, num_joints)
 
         # Decide on execution strategy
         use_gpu = self._should_use_gpu(N, num_joints)
@@ -189,7 +204,7 @@ class _GenerationMixin:
         try:
             # Use the monitored high-level wrapper for maximum performance
             traj_pos_host, traj_vel_host, traj_acc_host = (
-                optimized_trajectory_generation_monitored(
+                _runtime.optimized_trajectory_generation_monitored(
                     thetastart,
                     thetaend,
                     Tf,
@@ -248,7 +263,7 @@ class _GenerationMixin:
             # backend for positions while the GPU velocities/accelerations stay
             # host NumPy, so wrap every entry with backend.asarray (a no-op under
             # the NumPy backend).
-            backend = get_backend()
+            backend = _runtime.get_backend()
             return {
                 "positions": backend.asarray(traj_pos_host),
                 "velocities": backend.asarray(traj_vel_host),
@@ -283,7 +298,7 @@ class _GenerationMixin:
             ``"velocities"`` and ``"accelerations"``, each an
             ``(N, num_joints)`` array.
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         start_time = time.time()
 
         # Optimized CPU fallback: the Numba kernel is a host (real-NumPy)
@@ -357,14 +372,14 @@ class _GenerationMixin:
         # Print performance recommendations for batch processing
         total_work = batch_size * N * num_joints
         if total_work >= 50000:
-            print_performance_recommendations(N * batch_size, num_joints)
+            _runtime.print_performance_recommendations(N * batch_size, num_joints)
 
         start_time = time.time()
 
         try:
             # Use optimized batch trajectory generation
             traj_pos_host, traj_vel_host, traj_acc_host = (
-                optimized_batch_trajectory_generation(
+                _runtime.optimized_batch_trajectory_generation(
                     thetastart_batch, thetaend_batch, Tf, N, method, use_pinned=True
                 )
             )
@@ -425,7 +440,7 @@ class _GenerationMixin:
             ``"velocities"`` and ``"accelerations"``, each a
             ``(batch_size, N, num_joints)`` array.
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         start_time = time.time()
 
         batch_size, num_joints = thetastart_batch.shape
@@ -487,11 +502,11 @@ class _GenerationMixin:
             method (int): Time-scaling method (3=cubic, 5=quintic).
 
         Returns:
-            dict: Dictionary with positions, velocities, accelerations, and orientations.
+            dict: Positions, velocities, accelerations, and orientations.
         """
         logger.info(f"Generating Cartesian trajectory: N={N}, method={method}")
 
-        backend = get_backend()
+        backend = _runtime.get_backend()
         N = int(N)
         timegap = Tf / (N - 1.0)
         # Callers may pass backend-native transforms, and TransToRp only slices,
@@ -589,16 +604,16 @@ class _GenerationMixin:
             pstart = np.ascontiguousarray(pstart.astype(np.float32))
             pend = np.ascontiguousarray(pend.astype(np.float32))
 
-            traj_vel = get_cuda_array((N, 3), dtype=np.float32)
-            traj_acc = get_cuda_array((N, 3), dtype=np.float32)
-            traj_pos_dummy = get_cuda_array((N, 3), dtype=np.float32)
+            traj_vel = _runtime.get_cuda_array((N, 3), dtype=np.float32)
+            traj_acc = _runtime.get_cuda_array((N, 3), dtype=np.float32)
+            traj_pos_dummy = _runtime.get_cuda_array((N, 3), dtype=np.float32)
 
             # Transfer data using pinned memory
-            d_pstart = _h2d_pinned(pstart)
-            d_pend = _h2d_pinned(pend)
+            d_pstart = _runtime._h2d_pinned(pstart)
+            d_pend = _runtime._h2d_pinned(pend)
 
             # Get optimal launch configuration
-            grid_config = get_optimal_kernel_config(N, 3, "warp_optimized")
+            grid_config = _runtime.get_optimal_kernel_config(N, 3, "warp_optimized")
             if grid_config:
                 blocks_per_grid = grid_config["grid"]
                 threads_per_block = grid_config["block"]
@@ -606,10 +621,10 @@ class _GenerationMixin:
                     f"Using {grid_config['kernel_type']} for Cartesian trajectory"
                 )
             else:
-                blocks_per_grid, threads_per_block = _best_2d_config(N, 3)
+                blocks_per_grid, threads_per_block = _runtime._best_2d_config(N, 3)
 
             # Launch Cartesian trajectory kernel
-            cartesian_trajectory_kernel[blocks_per_grid, threads_per_block](
+            _runtime.cartesian_trajectory_kernel[blocks_per_grid, threads_per_block](
                 d_pstart, d_pend, traj_pos_dummy, traj_vel, traj_acc, Tf, N, method
             )
 
@@ -632,11 +647,11 @@ class _GenerationMixin:
         finally:
             # Return memory to pool
             if "traj_vel" in locals():
-                return_cuda_array(traj_vel)
+                _runtime.return_cuda_array(traj_vel)
             if "traj_acc" in locals():
-                return_cuda_array(traj_acc)
+                _runtime.return_cuda_array(traj_acc)
             if "traj_pos_dummy" in locals():
-                return_cuda_array(traj_pos_dummy)
+                _runtime.return_cuda_array(traj_pos_dummy)
 
     def _cartesian_trajectory_cpu(
         self, pstart, pend, Tf, N, method
@@ -659,7 +674,7 @@ class _GenerationMixin:
             ``(N, 3)`` array of linear velocity (m/s) and acceleration
             (m/s^2).
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         start_time = time.time()
 
         dp = backend.asarray(pend) - backend.asarray(pstart)
