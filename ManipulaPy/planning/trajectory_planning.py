@@ -201,7 +201,10 @@ class OptimizedTrajectoryPlanning(
         # ------------------------------------------------------------
         # Auto-optimization setup
         # ------------------------------------------------------------
-        if auto_optimize and _runtime._cuda_routing_enabled():
+        detected_cuda = _runtime._cuda_routing_enabled(
+            _runtime.check_cuda_availability()
+        )
+        if auto_optimize and detected_cuda:
             _runtime.setup_cuda_environment_for_40x_speedup()
 
         # ------------------------------------------------------------
@@ -236,7 +239,6 @@ class OptimizedTrajectoryPlanning(
         # ------------------------------------------------------------
         # Kernel routing is owned by cuda_kernels so direct wrapper calls and
         # planner calls cannot disagree about backend/device capability.
-        detected_cuda = _runtime._cuda_routing_enabled()
         if use_cuda is None:
             self.cuda_available = detected_cuda
         elif use_cuda and not detected_cuda:

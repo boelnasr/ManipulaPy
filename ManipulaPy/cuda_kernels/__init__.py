@@ -2338,9 +2338,10 @@ else:
         return None
 
 
-def _cuda_routing_enabled() -> bool:
+def _cuda_routing_enabled(cuda_available: Optional[bool] = None) -> bool:
     """Return whether the active backend may launch the Numba CUDA kernels."""
-    return bool(CUDA_AVAILABLE and getattr(_get_backend(), "gpu_capable", False))
+    physical_cuda = CUDA_AVAILABLE if cuda_available is None else cuda_available
+    return bool(physical_cuda and getattr(_get_backend(), "gpu_capable", False))
 
 
 def optimized_trajectory_generation_monitored(

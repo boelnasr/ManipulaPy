@@ -1239,7 +1239,9 @@ def test_planner_routes_on_active_backend_not_raw_cuda(monkeypatch):
     """Planner initialization consumes the centralized routing decision."""
     routing = iter((False, True))
     monkeypatch.setattr(
-        traj_impl._runtime, "_cuda_routing_enabled", lambda: next(routing)
+        traj_impl._runtime,
+        "_cuda_routing_enabled",
+        lambda _cuda_available: next(routing),
     )
 
     # Default NumPy backend is not GPU-capable -> CPU routing despite CUDA probe.
@@ -1268,8 +1270,8 @@ def test_planner_uses_cuda_dispatch_seam_for_init_and_auto_optimize(monkeypatch)
     routing_checks = []
     setup_calls = []
 
-    def _routing_enabled():
-        routing_checks.append(True)
+    def _routing_enabled(cuda_available):
+        routing_checks.append(cuda_available)
         return True
 
     monkeypatch.setattr(traj_impl._runtime, "_cuda_routing_enabled", _routing_enabled)
@@ -1284,12 +1286,14 @@ def test_planner_uses_cuda_dispatch_seam_for_init_and_auto_optimize(monkeypatch)
 
     assert planner.cuda_available is True
     assert setup_calls == [True]
-    assert len(routing_checks) == 2
+    assert len(routing_checks) == 1
 
 
 def test_gpu_capable_backend_dispatches_joint_trajectory_to_kernel(monkeypatch):
     """A GPU-capable backend sends joint_trajectory through the kernel wrapper."""
-    monkeypatch.setattr(traj_impl._runtime, "_cuda_routing_enabled", lambda: True)
+    monkeypatch.setattr(
+        traj_impl._runtime, "_cuda_routing_enabled", lambda _cuda_available: True
+    )
     monkeypatch.setattr(be, "_active", _GpuCapableBackend())
 
     launched = []
