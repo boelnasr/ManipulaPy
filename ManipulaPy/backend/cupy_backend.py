@@ -41,6 +41,8 @@ class CupyBackend(ArrayBackend):
     float64 = cp.float64
     #: CuPy arrays are concrete device values, so value-keyed caches are valid.
     is_concrete = True
+    #: GPU backend: routes acceleration-capable work to the CUDA kernel path.
+    gpu_capable = True
 
     def cache_token(self) -> Any:
         """Namespace cached arrays to this backend instance and CUDA device."""

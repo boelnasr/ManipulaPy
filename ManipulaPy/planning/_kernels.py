@@ -28,9 +28,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numba import njit, prange
 
-from ..cuda_kernels import (
+from ..cuda_kernels import (  # noqa: F401 - facade exposes private patch point
     CUDA_AVAILABLE,
     _best_2d_config,
+    _cuda_routing_enabled,
     _h2d_pinned,
     auto_select_optimal_kernel,
     benchmark_kernel_performance,

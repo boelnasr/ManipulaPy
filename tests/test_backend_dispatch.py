@@ -28,6 +28,8 @@ from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
 from ManipulaPy.potential_field import CollisionChecker, PotentialField
 from ManipulaPy.potential_field import fields as potential_field_fields
+import ManipulaPy.planning.trajectory_planning as traj_impl
+from ManipulaPy.planning.trajectory_planning import OptimizedTrajectoryPlanning
 from ManipulaPy.singularity import Singularity
 
 
@@ -52,7 +54,7 @@ ELEMENTWISE = [
 REDUCTIONS = ["sum", "amax", "amin", "mean", "argmax", "all", "any", "isfinite"]
 DEVICE = ["to_device", "to_numpy", "ascontiguous"]
 DTYPES = ["float32", "float64"]
-PREDICATE = ["is_backend_array", "is_concrete", "cache_token"]
+PREDICATE = ["is_backend_array", "is_concrete", "cache_token", "gpu_capable"]
 FULL_SURFACE = (
     CONSTRUCTION + LINALG + ELEMENTWISE + REDUCTIONS + DEVICE + DTYPES + PREDICATE
 )
@@ -1212,7 +1214,133 @@ def test_each_scalar_method_dispatches_svd_in_isolation(monkeypatch):
 # Trajectory-generation dispatch
 # ---------------------------------------------------------------------------
 
-from ManipulaPy.planning.trajectory_planning import OptimizedTrajectoryPlanning
+
+class _GpuCapableBackend(NumpyBackend):
+    """NumPy-numeric double that advertises itself as GPU-capable.
+
+    Stands in for an active CuPy backend so the kernel-routing decision can be
+    exercised on a machine without a GPU: the numerics stay NumPy, only the
+    ``gpu_capable`` predicate flips.
+    """
+
+    gpu_capable = True
+
+
+def test_gpu_capability_attribute_reflects_active_backend(monkeypatch):
+    """The active backend advertises whether it can route numeric work to GPU."""
+    assert NumpyBackend().gpu_capable is False
+    assert be.get_backend().gpu_capable is False
+
+    monkeypatch.setattr(be, "_active", _GpuCapableBackend())
+    assert be.get_backend().gpu_capable is True
+
+
+def test_planner_routes_on_active_backend_not_raw_cuda(monkeypatch):
+    """Planner initialization consumes the centralized routing decision."""
+    routing = iter((False, True))
+    monkeypatch.setattr(
+        traj_impl._runtime, "_cuda_routing_enabled", lambda: next(routing)
+    )
+
+    # Default NumPy backend is not GPU-capable -> CPU routing despite CUDA probe.
+    numpy_planner = OptimizedTrajectoryPlanning(
+        None,
+        "nonexistent.urdf",
+        None,
+        [(-5.0, 5.0), (-5.0, 5.0)],
+        auto_optimize=False,
+    )
+    assert numpy_planner.cuda_available is False
+
+    # A GPU-capable active backend -> GPU routing.
+    gpu_planner = OptimizedTrajectoryPlanning(
+        None,
+        "nonexistent.urdf",
+        None,
+        [(-5.0, 5.0), (-5.0, 5.0)],
+        auto_optimize=False,
+    )
+    assert gpu_planner.cuda_available is True
+
+
+def test_planner_uses_cuda_dispatch_seam_for_init_and_auto_optimize(monkeypatch):
+    """Planner setup and execution capability share the kernel routing seam."""
+    routing_checks = []
+    setup_calls = []
+
+    def _routing_enabled():
+        routing_checks.append(True)
+        return True
+
+    monkeypatch.setattr(traj_impl._runtime, "_cuda_routing_enabled", _routing_enabled)
+    monkeypatch.setattr(
+        traj_impl._runtime,
+        "setup_cuda_environment_for_40x_speedup",
+        lambda: setup_calls.append(True),
+    )
+    planner = OptimizedTrajectoryPlanning(
+        None, "nonexistent.urdf", None, [(-5.0, 5.0), (-5.0, 5.0)]
+    )
+
+    assert planner.cuda_available is True
+    assert setup_calls == [True]
+    assert len(routing_checks) == 2
+
+
+def test_gpu_capable_backend_dispatches_joint_trajectory_to_kernel(monkeypatch):
+    """A GPU-capable backend sends joint_trajectory through the kernel wrapper."""
+    monkeypatch.setattr(traj_impl._runtime, "_cuda_routing_enabled", lambda: True)
+    monkeypatch.setattr(be, "_active", _GpuCapableBackend())
+
+    launched = []
+
+    def _fake_kernel(thetastart, thetaend, Tf, N, method, **kwargs):
+        launched.append(N)
+        num_joints = len(thetastart)
+        zeros = np.zeros((N, num_joints), dtype=np.float32)
+        return zeros, zeros.copy(), zeros.copy()
+
+    monkeypatch.setattr(
+        traj_impl._runtime,
+        "optimized_trajectory_generation_monitored",
+        _fake_kernel,
+    )
+
+    planner = OptimizedTrajectoryPlanning(
+        None,
+        "nonexistent.urdf",
+        None,
+        [(-5.0, 5.0), (-5.0, 5.0)],
+        cuda_threshold=0,
+        auto_optimize=False,
+    )
+    planner.joint_trajectory([0.0, 0.0], [1.0, -0.5], 1.0, 8, 5)
+
+    assert launched == [8]
+
+
+def test_numpy_backend_never_launches_joint_trajectory_kernel(monkeypatch):
+    """Under the default backend the GPU kernel wrapper is never invoked."""
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("kernel wrapper must not run under the NumPy backend")
+
+    monkeypatch.setattr(
+        traj_impl._runtime,
+        "optimized_trajectory_generation_monitored",
+        _boom,
+    )
+
+    planner = OptimizedTrajectoryPlanning(
+        None,
+        "nonexistent.urdf",
+        None,
+        [(-5.0, 5.0), (-5.0, 5.0)],
+        cuda_threshold=0,
+        auto_optimize=False,
+    )
+    traj = planner.joint_trajectory([0.0, 0.0], [1.0, -0.5], 1.0, 8, 5)
+    assert traj["positions"].shape == (8, 2)
 
 
 class _TrajectorySpyBackend(NumpyBackend):
