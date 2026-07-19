@@ -25,6 +25,12 @@ _BASE_IMPLEMENTATION_NAMES = frozenset(
     Union ad get_backend np
     """.split()
 )
+_BASE_PACKAGE_NAMES = frozenset(
+    """
+    Any Dict List ManipulatorDynamics NDArray Optional SerialManipulator Tuple
+    Union ad manipulator_dynamics np
+    """.split()
+)
 _RESTRUCTURING_IMPLEMENTATION_NAMES = frozenset(
     {
         "_CacheConcern",
@@ -124,6 +130,17 @@ def test_facade_and_class_names_are_frozen():
         _BASE_IMPLEMENTATION_NAMES | _RESTRUCTURING_IMPLEMENTATION_NAMES
     )
     assert frozenset(implementation.ManipulatorDynamics.__dict__) == _BASE_CLASS_NAMES
+
+
+def test_historical_package_namespace_and_star_import_are_frozen():
+    assert {name for name in vars(dynamics) if not name.startswith("__")} == (
+        _BASE_PACKAGE_NAMES
+    )
+    exported = {}
+    exec("from ManipulaPy.dynamics import *", {}, exported)
+    assert {name for name in exported if not name.startswith("__")} == (
+        _BASE_PACKAGE_NAMES
+    )
 
 
 def test_extracted_descriptors_are_installed_without_wrapper_drift():
