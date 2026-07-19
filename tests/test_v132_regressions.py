@@ -2136,10 +2136,6 @@ class TestCudaKernelRegressions(unittest.TestCase):
 
     def test_cuda_kernel_variants_handle_linear_method(self) -> None:
         """All trajectory kernel variants must implement linear method (method=1)."""
-        import inspect
-        from ManipulaPy import cuda_kernels
-
-        src = inspect.getsource(cuda_kernels)
         # Without GPU CI this structural guard verifies all production variants
         # have a linear branch instead of falling through to cubic for method=1.
         for kernel_name in [
@@ -2149,17 +2145,7 @@ class TestCudaKernelRegressions(unittest.TestCase):
             "trajectory_kernel_warp_optimized",
             "trajectory_kernel_cache_friendly",
         ]:
-            # Find the function source
-            pattern = f"def {kernel_name}("
-            if pattern not in src:
-                continue
-            start = src.index(pattern)
-            end = (
-                src.index("\n    @cuda.jit", start)
-                if "\n    @cuda.jit" in src[start:]
-                else len(src)
-            )
-            kernel_src = src[start:end]
+            kernel_src = self._kernel_source(kernel_name)
             # Should have a "Linear" branch or s = tau assignment with no transformation
             has_linear = (
                 "# Linear" in kernel_src
@@ -2177,16 +2163,23 @@ class TestCudaKernelRegressions(unittest.TestCase):
 
     def _kernel_source(self, name) -> str:
         """Return the source text of a single named CUDA kernel function."""
-        import inspect
+        import ast
+        from pathlib import Path
+
         from ManipulaPy import cuda_kernels
 
-        src = inspect.getsource(cuda_kernels)
-        marker = f"def {name}("
-        start = src.index(marker)
-        # Stop at the next decorator or end of file.
-        rest = src[start:]
-        end_rel = rest.find("\n    @cuda.jit")
-        return rest if end_rel < 0 else rest[:end_rel]
+        source = Path(cuda_kernels.trajectory_kernels.__file__).read_text(
+            encoding="utf-8"
+        )
+        matches = [
+            node
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.FunctionDef)
+            and node.name == name
+            and node.decorator_list
+        ]
+        self.assertEqual(len(matches), 1, f"expected exactly one raw kernel {name}")
+        return ast.get_source_segment(source, matches[0])
 
     def test_cartesian_kernel_no_shared_memory_race(self) -> None:
         """cartesian_trajectory_kernel must compute scaling per-thread, not via
@@ -2348,16 +2341,27 @@ class TestCudaKernelRegressions(unittest.TestCase):
         """Bare 'except:' swallows SystemExit/KeyboardInterrupt and trips
         flake8 E722. Narrow to 'except Exception:'."""
         import ast
-        import inspect
-
+        from pathlib import Path
         from ManipulaPy import cuda_kernels
 
-        tree = ast.parse(inspect.getsource(cuda_kernels))
-        bare_handlers = [
-            node.lineno
-            for node in ast.walk(tree)
-            if isinstance(node, ast.ExceptHandler) and node.type is None
+        paths = [
+            Path(cuda_kernels.__file__).with_name(name)
+            for name in (
+                "_runtime.py",
+                "memory.py",
+                "trajectory_kernels.py",
+                "field_kernels.py",
+                "registry.py",
+            )
         ]
+        bare_handlers = []
+        for path in paths:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            bare_handlers.extend(
+                f"{path.name}:{node.lineno}"
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ExceptHandler) and node.type is None
+            )
         self.assertEqual(
             bare_handlers, [], f"bare except handlers at lines {bare_handlers}"
         )
@@ -3120,8 +3124,11 @@ class TestCodeRabbitRoundTwo(unittest.TestCase):
         """
         from pathlib import Path
 
-        src = Path(__file__).resolve().parents[1] / "ManipulaPy" / "cuda_kernels" / "__init__.py"
-        text = src.read_text(encoding="utf-8")
+        root = Path(__file__).resolve().parents[1] / "ManipulaPy" / "cuda_kernels"
+        text = "\n".join(
+            (root / name).read_text(encoding="utf-8")
+            for name in ("trajectory_kernels.py", "field_kernels.py")
+        )
 
         # The unguarded forms must not appear anywhere.
         bad = [

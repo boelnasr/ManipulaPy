@@ -124,23 +124,25 @@ def test_raw_cuda_kernel_asts_are_unchanged() -> None:
         "trajectory_kernel_vectorized": "69eac7c3fe7c3b6fb99d95065c94cbaae255f84ea111383b15611218505422cf",  # noqa: E501
         "trajectory_kernel_warp_optimized": "32de4f1018d42d13dbdab99d201b54095d1e721015736f54971932455e51dac1",  # noqa: E501
     }
-    source = pathlib.Path(cuda_kernels.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
     actual = {}
-    for node in ast.walk(tree):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        is_cuda_kernel = any(
-            isinstance(decorator, ast.Call)
-            and isinstance(decorator.func, ast.Attribute)
-            and isinstance(decorator.func.value, ast.Name)
-            and decorator.func.value.id == "cuda"
-            and decorator.func.attr == "jit"
-            for decorator in node.decorator_list
-        )
-        if is_cuda_kernel:
-            payload = ast.dump(node, include_attributes=False).encode()
-            actual[node.name] = hashlib.sha256(payload).hexdigest()
+    for module in (cuda_kernels.trajectory_kernels, cuda_kernels.field_kernels):
+        source = pathlib.Path(module.__file__).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            is_cuda_kernel = any(
+                isinstance(decorator, ast.Call)
+                and isinstance(decorator.func, ast.Attribute)
+                and isinstance(decorator.func.value, ast.Name)
+                and decorator.func.value.id == "cuda"
+                and decorator.func.attr == "jit"
+                for decorator in node.decorator_list
+            )
+            if is_cuda_kernel:
+                payload = ast.dump(node, include_attributes=False).encode()
+                actual[node.name] = hashlib.sha256(payload).hexdigest()
+    assert actual.keys() == expected.keys()
     assert actual == expected
 
 
