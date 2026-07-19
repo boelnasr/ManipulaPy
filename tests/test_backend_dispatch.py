@@ -261,8 +261,19 @@ def test_import_safety_without_cupy(monkeypatch):
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", _blocked_import)
-    module = importlib.reload(importlib.import_module("ManipulaPy.backend"))
-    assert isinstance(module.get_backend(), NumpyBackend)
+    module = importlib.import_module("ManipulaPy.backend")
+    # importlib.reload re-executes the module body in place, minting new
+    # function objects. Modules that bound names at import time (e.g.
+    # ``from ManipulaPy.backend import get_backend``) would keep the old
+    # objects, splitting identity for every later test. Snapshot and restore
+    # the namespace so the reload leaves no trace.
+    saved_namespace = dict(module.__dict__)
+    try:
+        reloaded = importlib.reload(module)
+        assert isinstance(reloaded.get_backend(), NumpyBackend)
+    finally:
+        module.__dict__.clear()
+        module.__dict__.update(saved_namespace)
 
 
 class _SpyNumpyBackend(NumpyBackend):
@@ -2468,3 +2479,27 @@ def test_cartesian_trajectory_negative_points_raises_like_base():
 
     with pytest.raises(ValueError):
         planner.cartesian_trajectory(Xstart, Xend, 1.0, -1, 5)
+
+
+def test_forced_cpu_planner_skips_benchmark_cpu_comparison(monkeypatch):
+    """use_cuda=False must not yield a CPU-vs-CPU "speedup" on routable hardware."""
+    monkeypatch.setattr(
+        traj_impl._runtime, "_cuda_routing_enabled", lambda _cuda_available: True
+    )
+
+    planner = OptimizedTrajectoryPlanning(
+        None,
+        "nonexistent.urdf",
+        None,
+        [(-5.0, 5.0)],
+        use_cuda=False,
+        auto_optimize=False,
+    )
+    results = planner.benchmark_performance(
+        test_cases=[{"N": 8, "joints": 1, "name": "forced-cpu"}],
+        include_cpu_comparison=True,
+    )
+
+    assert "cpu_time" not in results["forced-cpu"]
+    assert "actual_speedup" not in results["forced-cpu"]
+    assert results["forced-cpu"]["used_gpu"] is False
