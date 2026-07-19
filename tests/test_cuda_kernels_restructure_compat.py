@@ -3,6 +3,7 @@
 import ast
 import hashlib
 import importlib
+import inspect
 import os
 from pathlib import Path
 import subprocess
@@ -368,14 +369,41 @@ def test_cuda_decorator_definition_order():
 
 def test_numba_initialization_order():
     source = Path(_runtime.__file__).read_text()
-    assert source.index("_nb_cfg.CUDA_CACHE_SIZE") < source.index(
-        "_detect_cuda_capability()"
-    )
-    assert source.index("_nb_cfg.CUDA_LOW_OCCUPANCY_WARNINGS") < source.index(
-        "_detect_cuda_capability()"
-    )
-    assert source.index("FAST_MATH =") < source.index("_detect_cuda_capability()")
     tree = ast.parse(source)
+
+    def assignment_target(statement):
+        if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
+            return None
+        target = (
+            statement.targets[0]
+            if isinstance(statement, ast.Assign)
+            else statement.target
+        )
+        if isinstance(target, ast.Name):
+            return target.id
+        if isinstance(target, ast.Attribute) and isinstance(target.value, ast.Name):
+            return f"{target.value.id}.{target.attr}"
+        return None
+
+    module_assignments = {
+        assignment_target(statement): index
+        for index, statement in enumerate(tree.body)
+        if assignment_target(statement) is not None
+    }
+    detection_calls = [
+        index
+        for index, statement in enumerate(tree.body)
+        if isinstance(statement, (ast.Assign, ast.AnnAssign))
+        and isinstance(statement.value, ast.Call)
+        and isinstance(statement.value.func, ast.Name)
+        and statement.value.func.id == "_detect_cuda_capability"
+    ]
+    assert len(detection_calls) == 1
+    detection_index = detection_calls[0]
+    assert module_assignments["_nb_cfg.CUDA_CACHE_SIZE"] < detection_index
+    assert module_assignments["_nb_cfg.CUDA_LOW_OCCUPANCY_WARNINGS"] < detection_index
+    assert module_assignments["FAST_MATH"] < detection_index
+
     assert not any(
         isinstance(n, ast.ImportFrom)
         and n.module == "numba"
@@ -385,8 +413,37 @@ def test_numba_initialization_order():
     for module in (trajectory_kernels, field_kernels):
         assert "from numba import cuda" not in Path(module.__file__).read_text()
 
+    facade_tree = ast.parse(Path(cuda_kernels.__file__).read_text())
+    owner_modules = {
+        "_runtime",
+        "memory",
+        "trajectory_kernels",
+        "field_kernels",
+        "registry",
+    }
+    owner_imports = []
+    for index, statement in enumerate(facade_tree.body):
+        if not isinstance(statement, ast.ImportFrom) or statement.level != 1:
+            continue
+        imported = (
+            {alias.name for alias in statement.names}
+            if statement.module is None
+            else {statement.module.split(".", 1)[0]}
+        )
+        for module_name in imported & owner_modules:
+            owner_imports.append((index, module_name))
+    assert owner_imports
+    runtime_import_index = min(
+        index for index, module_name in owner_imports if module_name == "_runtime"
+    )
+    assert all(
+        runtime_import_index < index
+        for index, module_name in owner_imports
+        if module_name != "_runtime"
+    )
 
-def test_cpu_mirror_surface():
+
+def test_cpu_mirror_surface(capsys):
     messages = {
         "trajectory_kernel": "CUDA trajectory kernel not available",
         "trajectory_kernel_vectorized": "CUDA vectorized trajectory kernel not available",
@@ -404,7 +461,33 @@ def test_cpu_mirror_surface():
             getattr(cuda_kernels, name)()
     assert cuda_kernels.get_memory_pool_stats() == {}
     assert cuda_kernels.get_optimal_kernel_config() is None
+    for function in (
+        cuda_kernels.get_cuda_array,
+        cuda_kernels.return_cuda_array,
+        cuda_kernels._best_2d_config,
+        cuda_kernels.auto_select_optimal_kernel,
+        cuda_kernels.benchmark_kernel_performance,
+    ):
+        parameters = tuple(inspect.signature(function).parameters.values())
+        assert tuple(parameter.kind for parameter in parameters) == (
+            inspect.Parameter.VAR_POSITIONAL,
+            inspect.Parameter.VAR_KEYWORD,
+        )
+    assert not inspect.signature(cuda_kernels.profile_start).parameters
+
+    for function in (cuda_kernels.get_cuda_array, cuda_kernels.return_cuda_array):
+        with pytest.raises(RuntimeError) as exc_info:
+            function("ignored", sentinel=True)
+        assert exc_info.value.args == ("CUDA memory pool not available",)
+    assert cuda_kernels._best_2d_config("ignored", sentinel=True) == (
+        (1, 1),
+        (1, 1),
+    )
+    assert cuda_kernels.auto_select_optimal_kernel("ignored", sentinel=True) == "none"
+    assert cuda_kernels.profile_start() is None
     assert cuda_kernels.profile_stop() == {}
+    assert cuda_kernels.benchmark_kernel_performance("ignored", sentinel=True) is None
+    assert capsys.readouterr() == ("CUDA benchmarking not available\n", "")
 
 
 def test_logger_name_preserved():
