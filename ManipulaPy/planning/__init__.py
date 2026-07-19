@@ -4,8 +4,9 @@
 """
 Planning Module - ManipulaPy
 
-This module provides optimized trajectory planning capabilities including joint space
-and Cartesian space trajectory generation with CUDA acceleration and collision avoidance.
+This module provides optimized trajectory planning capabilities including joint
+and Cartesian space trajectory generation with CUDA acceleration and collision
+avoidance.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -43,5 +44,25 @@ globals().update(
         if not name.startswith("__")
     }
 )
+
+# The trajectory planning implementation is split across internal helper modules
+# (_kernels, trajectory, trajectory_dynamics, collision_host, _plotting). Importing
+# trajectory_planning above pulls those submodules in and the import system binds
+# them as attributes of this package. They are implementation detail, so drop them
+# here to keep the historical public namespace unchanged.
+for _internal in (
+    "_kernels",
+    "trajectory",
+    "trajectory_dynamics",
+    "collision_host",
+    "_plotting",
+    "_runtime",
+    "_sys",
+    "_ModuleType",
+    "_FORWARDED_RUNTIME_NAMES",
+    "_PlanningCompatibilityModule",
+):
+    globals().pop(_internal, None)
+del _internal
 
 __all__ = list(trajectory_planning.__all__)
