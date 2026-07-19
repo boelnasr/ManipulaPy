@@ -52,8 +52,10 @@ needs the missing dependency is called.
 - Methods that require `pybullet` call the module-level `_check_pybullet_available()`
   helper at entry, before touching any `p.*` symbol. The helper raises
   `ImportError` with a clear install hint (`pip install 'ManipulaPy[simulation]'`).
-- `cupy` absence is handled by a `_NumpyProxy` wrapper that delegates attribute
-  access to NumPy, so import-time code that inspects `cp.*` works without a GPU.
+- `cupy` absence needs no special handling in `sim`: host conversion of any
+  possibly device-side trajectory is routed through
+  `ManipulaPy.backend.get_backend().to_numpy()`, which resolves to the NumPy
+  backend when `cupy`/GPU are unavailable.
 
 **Contributor rule:** every new method added to `ManipulaPy.sim` that calls into
 PyBullet must begin with `_check_pybullet_available()`, AND must have an

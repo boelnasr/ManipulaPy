@@ -38,37 +38,7 @@ from typing import Any, List, Optional, Sequence, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 
-try:
-    import cupy as cp  # Optional: CUDA acceleration
-
-    _CUPY_AVAILABLE = True
-except ImportError:
-
-    class _NumpyProxy:
-        """Small subset of CuPy's array interface backed by NumPy."""
-
-        # Internal fallback shim: enough of cupy's surface for sim.py's own
-        # call sites (cp.array, cp.asnumpy). Not a drop-in cupy replacement —
-        # cp.cuda.*, cp.ndarray identity (isinstance), and asnumpy keyword
-        # arguments are unsupported. Do NOT import this as ManipulaPy.sim.cp
-        # from external code; depend on cupy directly if you need GPU semantics.
-        def __getattr__(self, name: str) -> Any:
-            """Delegate attribute access to the NumPy module."""
-            return getattr(np, name)
-
-        def asnumpy(self, x: Any) -> np.ndarray:
-            """Convert fallback arrays to NumPy arrays.
-
-            Args:
-                x: Any array-like object to coerce into a NumPy array.
-
-            Returns:
-                np.ndarray: ``x`` as a NumPy array (no copy when already one).
-            """
-            return np.asarray(x)
-
-    cp = _NumpyProxy()
-    _CUPY_AVAILABLE = False
+from ManipulaPy.backend import get_backend
 
 try:
     import pybullet as p  # Required for Simulation; sim cannot run without it
@@ -761,7 +731,18 @@ class Simulation:
         self.logger.info("Running controller...")
         ee_positions = []
 
-        positions_arr = np.asarray(list(desired_positions), dtype=float)
+        # PyBullet boundary: bring a possibly device-side trajectory to the
+        # host through the active backend before feeding the native sim loop.
+        # A backend-native array is converted whole (iterating it first would
+        # yield device-side rows that cannot cross to the host); other
+        # iterables (e.g. generator waypoints) are materialized directly.
+        backend = get_backend()
+        host = (
+            backend.to_numpy(desired_positions)
+            if backend.is_backend_array(desired_positions)
+            else list(desired_positions)
+        )
+        positions_arr = np.asarray(host, dtype=float)
         if positions_arr.size == 0:
             raise ValueError("desired_positions is empty; nothing to track")
         if positions_arr.ndim != 2:

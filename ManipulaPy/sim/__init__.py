@@ -35,7 +35,6 @@ from .simulation import (
     Simulation,
     Tuple,
     _PYBULLET_AVAILABLE,
-    cp,
     logging,
     np,
     os,
