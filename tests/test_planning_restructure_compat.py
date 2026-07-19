@@ -5,7 +5,6 @@ import ast
 import hashlib
 import inspect
 import pickle
-import re
 import textwrap
 
 import numpy as np
@@ -67,22 +66,22 @@ _BASE_CLASS_METHOD_NAMES = frozenset(
 _BASE_MOVED_METHOD_HASHES = {
     "_batch_joint_trajectory_cpu": "88a5ab47b8ae9b75a8efb3c6ebe8370fb7e65aea47709b878d9c68cbeec7a976",
     "_cartesian_trajectory_cpu": "0a346cd0c12386ecd27596ddc887c18c3136e6be83ad556dffd5d1732c66373e",
-    "_cartesian_trajectory_gpu": "1d17e3f94fe05fd056e0f566a7451d8a2b63f1362bcc191f1a03657bb56babc7",
+    "_cartesian_trajectory_gpu": "cfe253ac0c567780e7de2ad2dc48f02c1af029c98ee15f1b19f2a16f2873ac6e",
     "_joint_trajectory_cpu": "832e4ec5ccef73fc5145ea7b4fc367e4640e3425a10dcb9c35ae2c3d7a63a7e6",
-    "_joint_trajectory_gpu": "34e1e4d8a0abf07f856728d926a98b4733bf0ba48bf2de808abcbbdb29d05c7b",
-    "batch_joint_trajectory": "cf4297e0d9c04c7f7228814d14b81a6163362a1eee0902b1fef95b5408f94d19",
-    "cartesian_trajectory": "e043f3410343b7c6ebca7f80f0c0d452d8e14862e3aaa65e68cf16cc6d5ee973",
-    "joint_trajectory": "259ebbd8173b1165fe436d02c75c02fd0cf9c35c7d730c7371f9fd8ffad489e0",
-    "_forward_dynamics_cpu": "32566ab5bae5072327d13c619dbdc103badd2247f7767e8b9c03146e25c09c9f",
-    "_forward_dynamics_gpu": "3fafc46fcdddb78082093553336fed9fbce893e0cf224735c7744f9d0954fb32",
-    "_inverse_dynamics_cpu": "fcda3fd8b817f3ff686c5514a41faff0d0489bbe0cdee44bfe68f5e4c7ab857e",
-    "_inverse_dynamics_gpu": "0f2ba786266675c460137efe1aa9fca920c45860ec41f49eaa0c028a18e71b13",
+    "_joint_trajectory_gpu": "70b95df213ae58820de1ccf0ea3def7a1625f0a3e723af31c3aec2012256d364",
+    "batch_joint_trajectory": "b13fa5bbd4d77ba032a2dda3d6997277121f0b56b1081c3ae2fe0ca4f0cd47f6",
+    "cartesian_trajectory": "711dc4bb4c343e779bfc0259d3b06a0cf1d464c05ea24afc3e48ef87ee28dcd8",
+    "joint_trajectory": "58b2685013876277df3c73f27a7e8167191e6219e9937c3e7233301c94163681",
+    "_forward_dynamics_cpu": "294362385566dc0a57804bb053d91b34bea838ad9be9514541cfa5dec39cb519",
+    "_forward_dynamics_gpu": "362b9aee44dd89821e036d8dd6dcbce3529d31fe8240b0af88fb4df7c069cd1e",
+    "_inverse_dynamics_cpu": "78861e7bb709b2050957c19bf9a0bb4ead009a605182074d680460bd01ef6a4b",
+    "_inverse_dynamics_gpu": "ec677c9880b260a6d593118e143503f4b04faf6903acdceebc2f325b5464e9e7",
     "calculate_derivatives": "5850b1c775a5675e3e1d513d2348574ff2dd6cd82790084ef9ab63599b6ac516",
-    "forward_dynamics_trajectory": "8f54d3dac9ceb797b7f35324d029b4844e7650015b1ccdbbcfc48587d99b6432",
-    "inverse_dynamics_trajectory": "7e9d466f701c303a246878d4ec2ac258230b7027c8bd054d73437061ebe0bed4",
+    "forward_dynamics_trajectory": "11af305bd9ef9bcff92666db3f43646492eb04a75f8f3cdb42a3c946ecb437ec",
+    "inverse_dynamics_trajectory": "b6aaaa0efc0eb1e8d2c3c51c2599e56bb275f454f5b6ec2182ab6cd83dcad31e",
     "_apply_collision_avoidance_cpu": "20873ee00320943622ad8c403937f104bb4db1fd4cbbe2c6660f6efafd5f739c",
     "_apply_collision_avoidance_gpu": "636cac21eeda604736bc97ee0c0cf2d2b6d53e680884ec469986f6042d50056e",
-    "plan_trajectory": "06e799422c333ee95459449c1b1844be43249df7fbc582838f101dd34d676cc0",
+    "plan_trajectory": "6ff8739f484e73e4ae305e28d3cb883fa9b4cebd56255dfe17a831577d48ab12",
     "plot_cartesian_trajectory": "198fe815e263d618aed97a1b46840653de153177c274ca2af05b8ed22aac6783",
     "plot_ee_trajectory": "980511a94726dca6e3921f8845283e9ffc791622a60bd243837096e5634d7976",
     "plot_tcp_trajectory": "14336c8fed8947cc26edad80d3c7f73962f0d3d82dd8ca4e5ed691af8c76b43c",
@@ -108,61 +107,6 @@ class _MovedMethodNormalizer(ast.NodeTransformer):
         node = self.generic_visit(node)
         if isinstance(node.value, ast.Name) and node.value.id == "_runtime":
             return ast.copy_location(ast.Name(id=node.attr, ctx=node.ctx), node)
-        return node
-
-    def visit_Call(self, node):
-        node = self.generic_visit(node)
-        if not (
-            isinstance(node.func, ast.Attribute)
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "logger"
-        ):
-            return node
-
-        if len(node.args) == 1 and isinstance(node.args[0], ast.JoinedStr):
-            chunks = [""]
-            expressions = []
-            for value in node.args[0].values:
-                if isinstance(value, ast.Constant):
-                    chunks[-1] += value.value
-                elif (
-                    isinstance(value, ast.FormattedValue) and value.format_spec is None
-                ):
-                    expressions.append(value.value)
-                    chunks.append("")
-                else:
-                    return node
-            node.args = [
-                ast.Tuple(
-                    elts=[
-                        ast.Tuple(
-                            elts=[ast.Constant(value=chunk) for chunk in chunks],
-                            ctx=ast.Load(),
-                        ),
-                        *expressions,
-                    ],
-                    ctx=ast.Load(),
-                )
-            ]
-        elif (
-            len(node.args) > 1
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
-            chunks = re.split(r"%(?:s|d)", node.args[0].value)
-            if len(chunks) == len(node.args):
-                node.args = [
-                    ast.Tuple(
-                        elts=[
-                            ast.Tuple(
-                                elts=[ast.Constant(value=chunk) for chunk in chunks],
-                                ctx=ast.Load(),
-                            ),
-                            *node.args[1:],
-                        ],
-                        ctx=ast.Load(),
-                    )
-                ]
         return node
 
 

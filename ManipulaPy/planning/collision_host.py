@@ -102,9 +102,8 @@ class _CollisionMixin:
             list: Joint trajectory as a list of joint configurations.
         """
         _runtime.logger.info(
-            "Planning trajectory from %d to %d DOF",
-            len(start_position),
-            len(target_position),
+            f"Planning trajectory from {len(start_position)} to "
+            f"{len(target_position)} DOF"
         )
 
         # Enhanced trajectory planning with multiple waypoints

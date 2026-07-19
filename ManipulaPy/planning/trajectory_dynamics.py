@@ -199,9 +199,8 @@ class _DynamicsMixin:
                     num_points, num_joints
                 )
                 _runtime.logger.info(
-                    "Inverse dynamics 2D grid: blocks=%s, threads=%s",
-                    blocks_per_grid,
-                    threads_per_block,
+                    f"Inverse dynamics 2D grid: blocks={blocks_per_grid}, "
+                    f"threads={threads_per_block}"
                 )
             except Exception as e:
                 _runtime.logger.warning(
