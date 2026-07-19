@@ -7,13 +7,10 @@ Control Module - ManipulaPy
 This module provides various control algorithms for robotic manipulators including
 PID, computed torque, adaptive, and robust control methods.
 
-Control inputs and guarded dynamics results are normalized with the caller-selected
-active array backend; NumPy remains the process default. Plotting, response metrics,
-validation, and tuning utilities convert only at their declared host-only boundaries.
-
-This boundary convention is the Task 8a portion of the backend migration. Persistent
-controller-state normalization, backend-switch transitions, and the complete native
-control-law matrix are intentionally deferred to Task 8b.
+Control inputs, guarded dynamics results, and persistent controller state are
+normalized with the caller-selected active array backend; NumPy remains the process
+default. Plotting and tuning utilities convert only at declared host boundaries, and
+response metrics return their public Python scalars after backend-native operations.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
