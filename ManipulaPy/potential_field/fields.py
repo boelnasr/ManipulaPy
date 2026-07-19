@@ -25,16 +25,13 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-import itertools  # noqa: F401
 import logging
-from typing import Any, Dict, Iterable, Set  # noqa: F401
+from typing import Iterable
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.spatial import ConvexHull  # noqa: F401
 
 from ..backend import get_backend
-from ..urdf import URDF  # noqa: F401
 
 _logger = logging.getLogger(__name__)
 

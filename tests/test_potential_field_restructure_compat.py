@@ -12,38 +12,27 @@ from ManipulaPy.potential_field.adjacency import build_link_adjacency
 from ManipulaPy.potential_field.collision import CollisionChecker
 
 
+# The package now exposes only its public contract: the three re-exported
+# symbols plus the submodules bound as attributes by importing them.
 _BASE_PACKAGE_NAMES = {
-    "Any",
     "CollisionChecker",
-    "ConvexHull",
-    "Dict",
-    "Iterable",
-    "NDArray",
     "PotentialField",
-    "Set",
-    "URDF",
     "build_link_adjacency",
     "fields",
-    "itertools",
-    "logging",
-    "np",
 }
 
+# ``fields`` keeps the names its own code uses (Iterable/NDArray/np in
+# annotations, logging/_logger/get_backend at runtime) plus the cross-module
+# aliases re-exported at the bottom of the module for backward compatibility.
 _BASE_FIELDS_NAMES = {
-    "Any",
     "CollisionChecker",
-    "ConvexHull",
-    "Dict",
     "Iterable",
     "NDArray",
     "PotentialField",
-    "Set",
-    "URDF",
     "_logger",
     "_to_host_numpy",
     "build_link_adjacency",
     "get_backend",
-    "itertools",
     "logging",
     "np",
 }

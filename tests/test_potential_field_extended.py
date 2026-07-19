@@ -404,7 +404,7 @@ class TestCollisionChecker(unittest.TestCase):
         self.assertTrue(hasattr(CollisionChecker, "_create_convex_hulls"))
         self.assertTrue(hasattr(CollisionChecker, "_transform_convex_hull"))
 
-    @patch("ManipulaPy.potential_field.URDF")
+    @patch("ManipulaPy.potential_field.collision.URDF")
     def test_collision_checker_with_mock_urdf(self, mock_urdf) -> None:
         """Test CollisionChecker with mocked URDF."""
         from ManipulaPy.potential_field import CollisionChecker
@@ -423,7 +423,7 @@ class TestCollisionChecker(unittest.TestCase):
             # If it fails, make sure it's not a critical error
             self.assertIn("URDF", str(e))
 
-    @patch("ManipulaPy.potential_field.URDF")
+    @patch("ManipulaPy.potential_field.collision.URDF")
     def test_collision_checker_create_convex_hulls(self, mock_urdf) -> None:
         """Test convex hull creation."""
         from ManipulaPy.potential_field import CollisionChecker
