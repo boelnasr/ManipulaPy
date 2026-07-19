@@ -33,10 +33,12 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 
 from __future__ import annotations
 
-import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+import logging  # noqa: F401
+import sys as _sys
+from types import ModuleType as _ModuleType
+from typing import Any, Dict, List, Optional, Tuple, Union  # noqa: F401
 
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt  # noqa: F401
 import numpy as np
 from numpy.typing import NDArray
 
@@ -75,4 +77,55 @@ def _validate_i_clamp(i_clamp: Optional[float]) -> Optional[float]:
     return clamp_value
 
 
-from .manipulator_controller import ManipulatorController, logger
+from . import manipulator_controller as _implementation  # noqa: E402
+from .manipulator_controller import ManipulatorController, logger  # noqa: E402,F401
+
+for _concern_module in (
+    "computed_torque",
+    "kalman",
+    "metrics",
+    "pid",
+    "robust_adaptive",
+):
+    globals().pop(_concern_module, None)
+del _concern_module
+
+
+class _ControlCompatibilityModule(_ModuleType):
+    """Forward historical mutable runtime names to the controller facade."""
+
+    _implementation = _implementation
+    _forwarded_names = frozenset(
+        {
+            "_as_backend_array",
+            "_to_host_array",
+            "_validate_i_clamp",
+            "get_backend",
+            "logger",
+            "np",
+            "plt",
+        }
+    )
+
+    def __getattribute__(self, name):
+        cls = type(self)
+        if name in cls._forwarded_names:
+            return getattr(cls._implementation, name)
+        return super().__getattribute__(name)
+
+    def __setattr__(self, name, value):
+        cls = type(self)
+        if name in cls._forwarded_names:
+            setattr(cls._implementation, name, value)
+        super().__setattr__(name, value)
+
+    def __delattr__(self, name):
+        cls = type(self)
+        if name in cls._forwarded_names and hasattr(cls._implementation, name):
+            delattr(cls._implementation, name)
+        super().__delattr__(name)
+
+
+_sys.modules[__name__].__class__ = _ControlCompatibilityModule
+
+del _ControlCompatibilityModule, _ModuleType, _implementation, _sys
