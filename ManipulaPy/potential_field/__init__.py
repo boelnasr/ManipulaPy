@@ -27,13 +27,15 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-import itertools
-import logging
-from typing import Any, Dict, Iterable, Set
+import itertools  # noqa: F401
+import logging  # noqa: F401
+from typing import Any, Dict, Iterable, Set  # noqa: F401
 
-import numpy as np
-from numpy.typing import NDArray
-from scipy.spatial import ConvexHull
+import numpy as np  # noqa: F401
+from numpy.typing import NDArray  # noqa: F401
+from scipy.spatial import ConvexHull  # noqa: F401
 
-from ..urdf import URDF
-from .fields import CollisionChecker, PotentialField, build_link_adjacency
+from ..urdf import URDF  # noqa: F401
+from .adjacency import build_link_adjacency  # noqa: F401
+from .collision import CollisionChecker  # noqa: F401
+from .fields import PotentialField  # noqa: F401
