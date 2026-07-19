@@ -928,12 +928,12 @@ class TestControlRegressions(unittest.TestCase):
                 Q=Q_wrong,
             )
 
-    def test_kalman_filters_explicitly_convert_real_cupy_like_arrays(self) -> None:
-        """Verify Kalman filters explicitly convert CuPy-like arrays via .get()."""
-        from types import SimpleNamespace
+    def test_kalman_filters_normalize_device_like_arrays_through_backend(self) -> None:
+        """Verify Kalman filters delegate device-like conversion to the backend."""
         from unittest.mock import patch
 
         import ManipulaPy.control as control
+        from ManipulaPy.backend.numpy_backend import NumpyBackend
         from ManipulaPy.control import ManipulatorController
 
         class ExplicitArray:
@@ -949,6 +949,13 @@ class TestControlRegressions(unittest.TestCase):
                 """Block implicit NumPy conversion to force explicit .get() usage."""
                 raise TypeError("Implicit conversion to a NumPy array is not allowed")
 
+        class ExplicitBackend(NumpyBackend):
+            def asarray(self, value, dtype=None) -> np.ndarray:
+                """Perform the device-to-host conversion owned by this backend."""
+                if isinstance(value, ExplicitArray):
+                    value = value.get()
+                return super().asarray(value, dtype=dtype)
+
         class Dynamics:
             def forward_dynamics(
                 self, thetalist, dthetalist, taulist, g, Ftip
@@ -957,10 +964,7 @@ class TestControlRegressions(unittest.TestCase):
                 return np.zeros_like(thetalist)
 
         ctrl = ManipulatorController(Dynamics())
-        with (
-            patch.object(control, "CUPY_AVAILABLE", True),
-            patch.object(control, "cp", SimpleNamespace(ndarray=ExplicitArray)),
-        ):
+        with patch.object(control, "get_backend", return_value=ExplicitBackend()):
             ctrl.kalman_filter_predict(
                 ExplicitArray([0.0, 0.0]),
                 ExplicitArray([0.0, 0.0]),
