@@ -56,6 +56,7 @@ for _internal in (
     "trajectory_dynamics",
     "collision_host",
     "_plotting",
+    "benchmarks",
     "_runtime",
     "_sys",
     "_ModuleType",
