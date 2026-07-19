@@ -201,9 +201,12 @@ class OptimizedTrajectoryPlanning(
         # ------------------------------------------------------------
         # Auto-optimization setup
         # ------------------------------------------------------------
-        detected_cuda = _runtime._cuda_routing_enabled(
-            _runtime.check_cuda_availability()
-        )
+        # Split the fixed physical probe from the backend-dependent routing
+        # decision: the probe result cannot change over the planner's lifetime,
+        # but the active backend can, so unfrozen decision points re-evaluate
+        # the routing predicate live against the stored probe.
+        physical_cuda = _runtime.check_cuda_availability()
+        detected_cuda = _runtime._cuda_routing_enabled(physical_cuda)
         if auto_optimize and detected_cuda:
             _runtime.setup_cuda_environment_for_40x_speedup()
 
@@ -239,6 +242,8 @@ class OptimizedTrajectoryPlanning(
         # ------------------------------------------------------------
         # Kernel routing is owned by cuda_kernels so direct wrapper calls and
         # planner calls cannot disagree about backend/device capability.
+        self._physical_cuda = physical_cuda
+        self._forced_cpu = use_cuda is False
         if use_cuda is None:
             self.cuda_available = detected_cuda
         elif use_cuda and not detected_cuda:
@@ -363,7 +368,15 @@ class OptimizedTrajectoryPlanning(
         Returns:
             bool: ``True`` if the GPU path should be used, ``False`` otherwise.
         """
-        if not self.cuda_available:
+        # Re-consult the central routing predicate so a backend switched after
+        # construction cannot leave a stale GPU decision in either direction:
+        # the physical probe is fixed at construction, the active backend is
+        # read live, and use_cuda=False stays a hard CPU pin. Bare instances
+        # built without __init__ fall back to their cuda_available flag.
+        if getattr(self, "_forced_cpu", False):
+            return False
+        physical = getattr(self, "_physical_cuda", self.cuda_available)
+        if not _runtime._cuda_routing_enabled(physical):
             return False
 
         total_work = N * num_joints
@@ -524,7 +537,11 @@ class OptimizedTrajectoryPlanning(
         Returns:
             dict: Benchmark results for all kernels
         """
-        if not self.cuda_available:
+        # Live routing check: a stale constructor flag must not let CPU
+        # timings be reported as per-kernel GPU benchmarks.
+        if getattr(self, "_forced_cpu", False) or not _runtime._cuda_routing_enabled(
+            getattr(self, "_physical_cuda", self.cuda_available)
+        ):
             _runtime.logger.warning("CUDA not available for benchmarking")
             return {}
 
@@ -711,8 +728,16 @@ class OptimizedTrajectoryPlanning(
                 "elements_per_second": (N * joints) / mean_time,
             }
 
-            # CPU comparison if requested
-            if include_cpu_comparison and self.cuda_available:
+            # CPU comparison if requested (live routing check, mirroring
+            # _should_use_gpu: a stale flag or a use_cuda=False planner must
+            # not produce a CPU-vs-CPU "speedup" comparison)
+            if (
+                include_cpu_comparison
+                and not getattr(self, "_forced_cpu", False)
+                and _runtime._cuda_routing_enabled(
+                    getattr(self, "_physical_cuda", self.cuda_available)
+                )
+            ):
                 # Force CPU execution
                 old_threshold = self.cpu_threshold
                 self.cpu_threshold = float("inf")  # Force CPU

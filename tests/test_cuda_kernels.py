@@ -72,6 +72,31 @@ else:
     CUDA_KERNELS_AVAILABLE = False
 
 
+@pytest.fixture(autouse=True)
+def _gpu_capable_backend():
+    """Route kernel launches per the central predicate: GPU tests opt into CuPy.
+
+    Kernel dispatch requires the *active* backend to be GPU-capable, not just
+    physical CUDA. On a CUDA machine the default NumPy backend would make every
+    GPU-only entry point raise, so these tests select the CuPy backend and
+    restore the default afterwards. Without CUDA this is a no-op.
+    """
+    if not CUDA_AVAILABLE:
+        yield
+        return
+    from ManipulaPy import backend as _backend
+
+    try:
+        _backend.set_backend("cupy")
+    except ImportError:
+        # Numba-CUDA can be present without CuPy (an optional extra). Kernel
+        # routing requires a GPU-capable active backend, so these tests cannot
+        # run meaningfully in that configuration.
+        pytest.skip("CuPy backend required for GPU kernel routing tests")
+    yield
+    _backend.set_backend("numpy")
+
+
 class TestCUDAAvailability:
     """Test CUDA availability detection and setup."""
 

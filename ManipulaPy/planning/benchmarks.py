@@ -45,8 +45,12 @@ def create_optimized_planner(
     Returns:
         OptimizedTrajectoryPlanning: Configured planner instance
     """
-    # Auto-detect optimal settings
-    cuda_available = _runtime.check_cuda_availability()
+    # Auto-detect optimal settings via the central routing predicate so the
+    # factory's threshold choice cannot disagree with the planner's own
+    # backend-aware dispatch decision.
+    cuda_available = _runtime._cuda_routing_enabled(
+        _runtime.check_cuda_availability()
+    )
 
     # Adaptive threshold based on target speedup and problem size
     num_joints = len(joint_limits)
@@ -124,9 +128,11 @@ def compare_implementations(
         use_cuda=False,
     )
 
-    # Create GPU planner (if available)
+    # Create GPU planner (if available). Gate on the central routing predicate:
+    # forcing use_cuda=True when the active backend is not GPU-capable would
+    # make the constructor raise, so only attempt it when routing allows it.
     gpu_planner = None
-    if _runtime.check_cuda_availability():
+    if _runtime._cuda_routing_enabled(_runtime.check_cuda_availability()):
         gpu_planner = OptimizedTrajectoryPlanning(
             serial_manipulator=serial_manipulator,
             urdf_path=urdf_path,
@@ -270,7 +276,7 @@ def benchmark_kernel_performance_comprehensive(
     Returns:
         dict: Comprehensive benchmark results
     """
-    if not _runtime.check_cuda_availability():
+    if not _runtime._cuda_routing_enabled(_runtime.check_cuda_availability()):
         _runtime.logger.warning("CUDA not available for comprehensive benchmarking")
         return {}
 

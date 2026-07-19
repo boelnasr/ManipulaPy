@@ -2146,7 +2146,7 @@ if CUDA_AVAILABLE:
             median time in seconds, raw timings, and memory pool stats), or None
             when CUDA is unavailable.
         """
-        if not CUDA_AVAILABLE:
+        if not _cuda_routing_enabled():
             print(f"Cannot benchmark {kernel_name} - CUDA not available")
             return None
 
@@ -2430,7 +2430,7 @@ def optimized_potential_field(
     Raises:
         RuntimeError: If CUDA is not available.
     """
-    if not CUDA_AVAILABLE:
+    if not _cuda_routing_enabled():
         raise RuntimeError("CUDA not available for potential field computation")
 
     N = positions.shape[0]
@@ -2510,7 +2510,7 @@ def optimized_batch_trajectory_generation(
     Raises:
         RuntimeError: If CUDA is not available.
     """
-    if not CUDA_AVAILABLE:
+    if not _cuda_routing_enabled():
         raise RuntimeError("CUDA not available for batch trajectory generation")
 
     batch_size, num_joints = thetastart_batch.shape
