@@ -3,7 +3,7 @@
 """Inverse/forward dynamics trajectory mixin - ManipulaPy"""
 
 from . import _kernels as _runtime
-from ._kernels import Dict, Tuple, logger, np, time
+from ._kernels import Dict, Tuple, np, time
 
 
 class _DynamicsMixin:
@@ -38,7 +38,7 @@ class _DynamicsMixin:
         num_points = thetalist_trajectory.shape[0]
         num_joints = thetalist_trajectory.shape[1]
 
-        logger.info(
+        _runtime.logger.info(
             f"Computing inverse dynamics: {num_points} points, {num_joints} joints"
         )
 
@@ -165,7 +165,7 @@ class _DynamicsMixin:
                 d_M = _runtime.cuda.to_device(M_array)
 
             except Exception as e:
-                logger.warning(
+                _runtime.logger.warning(
                     f"Error converting dynamics data: {e}, using simplified approach"
                 )
                 # Fallback to simplified dynamics computation on CPU
@@ -186,13 +186,15 @@ class _DynamicsMixin:
                 blocks_per_grid, threads_per_block = _runtime._best_2d_config(
                     num_points, num_joints
                 )
-                logger.info(
+                _runtime.logger.info(
                     "Inverse dynamics 2D grid: blocks=%s, threads=%s",
                     blocks_per_grid,
                     threads_per_block,
                 )
             except Exception as e:
-                logger.warning(f"Error in grid configuration: {e}, using fallback")
+                _runtime.logger.warning(
+                    f"Error in grid configuration: {e}, using fallback"
+                )
                 # Fallback to safe grid configuration
                 blocks_per_grid = ((num_points + 15) // 16, (num_joints + 15) // 16)
                 threads_per_block = (16, 16)
@@ -229,7 +231,7 @@ class _DynamicsMixin:
                 _runtime.cuda.synchronize()
 
             except Exception as kernel_error:
-                logger.warning(f"CUDA kernel execution failed: {kernel_error}")
+                _runtime.logger.warning(f"CUDA kernel execution failed: {kernel_error}")
                 # Fallback to CPU implementation
                 return self._inverse_dynamics_cpu(
                     thetalist_trajectory,
@@ -252,11 +254,13 @@ class _DynamicsMixin:
             self.performance_stats["total_gpu_time"] += elapsed
             self.performance_stats["kernel_launches"] += 1
 
-            logger.info(f"GPU inverse dynamics completed in {elapsed:.4f}s")
+            _runtime.logger.info(f"GPU inverse dynamics completed in {elapsed:.4f}s")
             return torques_host
 
         except Exception as e:
-            logger.warning(f"GPU inverse dynamics failed: {e}, falling back to CPU")
+            _runtime.logger.warning(
+                f"GPU inverse dynamics failed: {e}, falling back to CPU"
+            )
             return self._inverse_dynamics_cpu(
                 thetalist_trajectory,
                 dthetalist_trajectory,
@@ -317,7 +321,7 @@ class _DynamicsMixin:
                 )
                 torque_rows.append(backend.asarray(torques, dtype=backend.float32))
             except Exception as e:
-                logger.warning(f"Error in inverse dynamics at point {i}: {e}")
+                _runtime.logger.warning(f"Error in inverse dynamics at point {i}: {e}")
                 # Use zero torques for problematic points
                 torque_rows.append(backend.zeros((num_joints,), dtype=backend.float32))
 
@@ -340,7 +344,7 @@ class _DynamicsMixin:
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 
-        logger.info(f"CPU inverse dynamics completed in {elapsed:.4f}s")
+        _runtime.logger.info(f"CPU inverse dynamics completed in {elapsed:.4f}s")
         return torques_trajectory
 
     def forward_dynamics_trajectory(
@@ -364,7 +368,7 @@ class _DynamicsMixin:
         num_steps = taumat.shape[0]
         num_joints = thetalist.shape[0]
 
-        logger.info(
+        _runtime.logger.info(
             f"Computing forward dynamics: {num_steps} steps, {num_joints} joints"
         )
 
@@ -468,7 +472,9 @@ class _DynamicsMixin:
             if grid_config:
                 blocks_per_grid = grid_config["grid"]
                 threads_per_block = grid_config["block"]
-                logger.info(f"Using {grid_config['kernel_type']} for forward dynamics")
+                _runtime.logger.info(
+                    f"Using {grid_config['kernel_type']} for forward dynamics"
+                )
             else:
                 blocks_per_grid, threads_per_block = _runtime._best_2d_config(
                     num_steps, num_joints
@@ -504,8 +510,10 @@ class _DynamicsMixin:
             self.performance_stats["total_gpu_time"] += elapsed
             self.performance_stats["kernel_launches"] += 1
 
-            logger.info(f"GPU forward dynamics completed in {elapsed:.4f}s")
-            logger.info(f"📊 Throughput: {throughput:.1f} M integration steps/sec")
+            _runtime.logger.info(f"GPU forward dynamics completed in {elapsed:.4f}s")
+            _runtime.logger.info(
+                f"📊 Throughput: {throughput:.1f} M integration steps/sec"
+            )
 
             return {
                 "positions": thetamat,
@@ -514,7 +522,9 @@ class _DynamicsMixin:
             }
 
         except Exception as e:
-            logger.warning(f"GPU forward dynamics failed: {e}, falling back to CPU")
+            _runtime.logger.warning(
+                f"GPU forward dynamics failed: {e}, falling back to CPU"
+            )
             return self._forward_dynamics_cpu(
                 thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
             )
@@ -627,7 +637,9 @@ class _DynamicsMixin:
                     ddtheta_step = ddtheta
 
                 except Exception as e:
-                    logger.warning(f"Error in forward dynamics at step {i}: {e}")
+                    _runtime.logger.warning(
+                        f"Error in forward dynamics at step {i}: {e}"
+                    )
                     ddtheta_step = backend.zeros((num_joints,))
 
             theta_rows.append(backend.asarray(current_theta, dtype=backend.float32))
@@ -642,7 +654,7 @@ class _DynamicsMixin:
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 
-        logger.info(f"CPU forward dynamics completed in {elapsed:.4f}s")
+        _runtime.logger.info(f"CPU forward dynamics completed in {elapsed:.4f}s")
 
         return {
             "positions": thetamat,

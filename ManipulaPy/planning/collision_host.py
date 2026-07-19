@@ -3,7 +3,7 @@
 """Host-side collision avoidance and planning mixin - ManipulaPy"""
 
 from . import _kernels as _runtime
-from ._kernels import List, logger, np
+from ._kernels import List, np
 
 
 class _CollisionMixin:
@@ -101,7 +101,7 @@ class _CollisionMixin:
         Returns:
             list: Joint trajectory as a list of joint configurations.
         """
-        logger.info(
+        _runtime.logger.info(
             "Planning trajectory from %d to %d DOF",
             len(start_position),
             len(target_position),
@@ -146,5 +146,7 @@ class _CollisionMixin:
 
             joint_trajectory.append(backend.to_numpy(waypoint).tolist())
 
-        logger.info(f"Planned trajectory with {len(joint_trajectory)} waypoints")
+        _runtime.logger.info(
+            f"Planned trajectory with {len(joint_trajectory)} waypoints"
+        )
         return joint_trajectory

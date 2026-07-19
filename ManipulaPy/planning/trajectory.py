@@ -11,7 +11,6 @@ from ._kernels import (
     QuinticTimeScaling,
     TransToRp,
     Tuple,
-    logger,
     njit,
     np,
     prange,
@@ -138,7 +137,7 @@ class _GenerationMixin:
         if enable_monitoring is None:
             enable_monitoring = getattr(self, "enable_profiling", False)
 
-        logger.info(
+        _runtime.logger.info(
             f"Generating joint trajectory: N={N}, joints={len(thetastart)}, "
             f"method={method}, kernel={kernel_type}"
         )
@@ -237,11 +236,13 @@ class _GenerationMixin:
                 speedup = self._last_cpu_time / elapsed
                 self.performance_stats["speedup_achieved"] = speedup
                 if enable_monitoring:
-                    logger.info(f"🎯 Achieved {speedup:.1f}x speedup over CPU!")
+                    _runtime.logger.info(
+                        f"🎯 Achieved {speedup:.1f}x speedup over CPU!"
+                    )
             else:
                 # No previous CPU time to compare against
                 if enable_monitoring:
-                    logger.info(
+                    _runtime.logger.info(
                         "🚀 GPU execution completed (no CPU baseline for comparison)"
                     )
 
@@ -257,7 +258,9 @@ class _GenerationMixin:
                     "kernel_type", "unknown"
                 )
 
-            logger.info(f"GPU trajectory generation completed in {elapsed:.4f}s")
+            _runtime.logger.info(
+                f"GPU trajectory generation completed in {elapsed:.4f}s"
+            )
 
             # Normalize into one domain: collision avoidance re-enters the
             # backend for positions while the GPU velocities/accelerations stay
@@ -271,7 +274,7 @@ class _GenerationMixin:
             }
 
         except Exception as e:
-            logger.warning(
+            _runtime.logger.warning(
                 f"GPU trajectory generation failed: {e}, falling back to CPU"
             )
             return self._joint_trajectory_cpu(thetastart, thetaend, Tf, N, method)
@@ -327,7 +330,7 @@ class _GenerationMixin:
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 
-        logger.info(f"CPU trajectory generation completed in {elapsed:.4f}s")
+        _runtime.logger.info(f"CPU trajectory generation completed in {elapsed:.4f}s")
 
         return {
             "positions": traj_pos,
@@ -356,13 +359,13 @@ class _GenerationMixin:
             kernel_type = getattr(self, "kernel_type", "auto")
 
         batch_size, num_joints = thetastart_batch.shape
-        logger.info(
+        _runtime.logger.info(
             f"Generating batch trajectories: batch_size={batch_size}, "
             f"N={N}, joints={num_joints}, kernel={kernel_type}"
         )
 
         if not self.cuda_available:
-            logger.warning(
+            _runtime.logger.warning(
                 "Batch processing requires CUDA. Falling back to sequential processing."
             )
             return self._batch_joint_trajectory_cpu(
@@ -400,8 +403,10 @@ class _GenerationMixin:
             self.performance_stats["total_gpu_time"] += elapsed
             self.performance_stats["kernel_launches"] += 1
 
-            logger.info(f"Batch GPU trajectory generation completed in {elapsed:.4f}s")
-            logger.info(f"📊 Throughput: {throughput:.1f} M elements/sec")
+            _runtime.logger.info(
+                f"Batch GPU trajectory generation completed in {elapsed:.4f}s"
+            )
+            _runtime.logger.info(f"📊 Throughput: {throughput:.1f} M elements/sec")
 
             return {
                 "positions": traj_pos_host,
@@ -410,7 +415,7 @@ class _GenerationMixin:
             }
 
         except Exception as e:
-            logger.warning(
+            _runtime.logger.warning(
                 f"Batch GPU trajectory generation failed: {e}, falling back to CPU"
             )
             return self._batch_joint_trajectory_cpu(
@@ -480,7 +485,9 @@ class _GenerationMixin:
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 
-        logger.info(f"Batch CPU trajectory generation completed in {elapsed:.4f}s")
+        _runtime.logger.info(
+            f"Batch CPU trajectory generation completed in {elapsed:.4f}s"
+        )
 
         return {
             "positions": traj_pos_batch,
@@ -504,7 +511,7 @@ class _GenerationMixin:
         Returns:
             dict: Positions, velocities, accelerations, and orientations.
         """
-        logger.info(f"Generating Cartesian trajectory: N={N}, method={method}")
+        _runtime.logger.info(f"Generating Cartesian trajectory: N={N}, method={method}")
 
         backend = _runtime.get_backend()
         N = int(N)
@@ -617,7 +624,7 @@ class _GenerationMixin:
             if grid_config:
                 blocks_per_grid = grid_config["grid"]
                 threads_per_block = grid_config["block"]
-                logger.info(
+                _runtime.logger.info(
                     f"Using {grid_config['kernel_type']} for Cartesian trajectory"
                 )
             else:
@@ -637,12 +644,16 @@ class _GenerationMixin:
             self.performance_stats["total_gpu_time"] += elapsed
             self.performance_stats["kernel_launches"] += 1
 
-            logger.info(f"GPU Cartesian trajectory completed in {elapsed:.4f}s")
+            _runtime.logger.info(
+                f"GPU Cartesian trajectory completed in {elapsed:.4f}s"
+            )
 
             return traj_vel_host, traj_acc_host
 
         except Exception as e:
-            logger.warning(f"GPU Cartesian trajectory failed: {e}, falling back to CPU")
+            _runtime.logger.warning(
+                f"GPU Cartesian trajectory failed: {e}, falling back to CPU"
+            )
             return self._cartesian_trajectory_cpu(pstart, pend, Tf, N, method)
         finally:
             # Return memory to pool
@@ -712,6 +723,6 @@ class _GenerationMixin:
         self.performance_stats["cpu_calls"] += 1
         self.performance_stats["total_cpu_time"] += elapsed
 
-        logger.info(f"CPU Cartesian trajectory completed in {elapsed:.4f}s")
+        _runtime.logger.info(f"CPU Cartesian trajectory completed in {elapsed:.4f}s")
 
         return traj_vel, traj_acc

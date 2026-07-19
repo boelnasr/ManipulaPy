@@ -55,6 +55,7 @@ _FORWARDED_RUNTIME_NAMES = frozenset(
         "get_memory_pool_stats",
         "get_optimal_kernel_config",
         "inverse_dynamics_kernel",
+        "logger",
         "make_1d_grid",
         "make_2d_grid",
         "make_2d_grid_optimized",
@@ -211,7 +212,7 @@ class OptimizedTrajectoryPlanning(
             self.collision_checker = CollisionChecker(urdf_path)
             self.potential_field = PotentialField()
         except Exception as exc:
-            logger.warning("Could not initialise collision checker: %s", exc)
+            _runtime.logger.warning("Could not initialise collision checker: %s", exc)
             self.collision_checker = None
             self.potential_field = None
 
@@ -270,24 +271,24 @@ class OptimizedTrajectoryPlanning(
         # Print performance recommendations on initialization
         if self.cuda_available:
             num_joints = len(joint_limits)
-            logger.info(
+            _runtime.logger.info(
                 f"🚀 OptimizedTrajectoryPlanning initialized for {num_joints} joints"
             )
             if target_speedup >= 40:
                 min_N_for_target = self.cpu_threshold // num_joints
-                logger.info(
+                _runtime.logger.info(
                     f"💡 For {target_speedup}x speedup, use N ≥ "
                     f"{min_N_for_target:,} trajectory points"
                 )
 
-        logger.info(
+        _runtime.logger.info(
             "Optimised planner – CUDA enabled: %s (threshold %d, kernel: %s)",
             self.cuda_available,
             self.cpu_threshold,
             self.kernel_type,
         )
         if self.gpu_properties:
-            logger.info(
+            _runtime.logger.info(
                 "GPU: %d SMs, %d max threads/block",
                 self.gpu_properties["multiprocessor_count"],
                 self.gpu_properties["max_threads_per_block"],
@@ -355,7 +356,7 @@ class OptimizedTrajectoryPlanning(
             # Check if we can achieve target speedup
             target_speedup_value = getattr(self, "target_speedup", 40.0)
             if target_speedup_value >= 40 and elements_per_sm < 10000:
-                logger.debug(
+                _runtime.logger.debug(
                     f"Problem size may not achieve {target_speedup_value}x speedup. "
                     f"Elements per SM: {elements_per_sm:.0f}, recommended: ≥10,000"
                 )
@@ -485,7 +486,7 @@ class OptimizedTrajectoryPlanning(
             # Synchronize and clean up CUDA context
             _runtime.cuda.synchronize()
 
-            logger.info("GPU memory cleaned up")
+            _runtime.logger.info("GPU memory cleaned up")
 
     def benchmark_all_kernels(
         self, N: int = 5000, num_joints: int = 6, num_runs: int = 5
@@ -502,10 +503,10 @@ class OptimizedTrajectoryPlanning(
             dict: Benchmark results for all kernels
         """
         if not self.cuda_available:
-            logger.warning("CUDA not available for benchmarking")
+            _runtime.logger.warning("CUDA not available for benchmarking")
             return {}
 
-        logger.info(
+        _runtime.logger.info(
             f"🔬 Benchmarking all kernels: N={N}, joints={num_joints}, runs={num_runs}"
         )
 
@@ -523,7 +524,7 @@ class OptimizedTrajectoryPlanning(
         results = {}
 
         for kernel_type in kernel_types:
-            logger.info(f"📊 Testing {kernel_type} kernel...")
+            _runtime.logger.info(f"📊 Testing {kernel_type} kernel...")
 
             # Reset stats for clean measurement
             self.reset_performance_stats()
@@ -546,7 +547,7 @@ class OptimizedTrajectoryPlanning(
                     times.append(elapsed)
 
                 except Exception as e:
-                    logger.warning(f"Kernel {kernel_type} failed: {e}")
+                    _runtime.logger.warning(f"Kernel {kernel_type} failed: {e}")
                     times.append(float("inf"))
 
             if times and min(times) < float("inf"):
@@ -573,7 +574,7 @@ class OptimizedTrajectoryPlanning(
         best_kernel = min(results.keys(), key=lambda k: results[k]["mean_time"])
         best_time = results[best_kernel]["mean_time"]
 
-        logger.info(f"🏆 Best kernel: {best_kernel} ({best_time*1000:.2f}ms)")
+        _runtime.logger.info(f"🏆 Best kernel: {best_kernel} ({best_time*1000:.2f}ms)")
 
         # Print comparison table
         print("\n📋 Kernel Performance Comparison:")
@@ -650,7 +651,7 @@ class OptimizedTrajectoryPlanning(
             joints = test_case["joints"]
             name = test_case["name"]
 
-            logger.info(f"Benchmarking {name} case: N={N}, joints={joints}")
+            _runtime.logger.info(f"Benchmarking {name} case: N={N}, joints={joints}")
 
             # Generate test data
             thetastart = np.random.uniform(-1, 1, joints).astype(np.float32)
@@ -721,7 +722,7 @@ class OptimizedTrajectoryPlanning(
                 f"±{std_time*1000:.2f}ms{speedup_str}"
             )
 
-            logger.info(
+            _runtime.logger.info(
                 f"{name} benchmark: {mean_time:.4f}s, GPU: {results[name]['used_gpu']}"
             )
 
@@ -764,7 +765,9 @@ class TrajectoryPlanning(OptimizedTrajectoryPlanning):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Initialize the compatibility wrapper with the optimized planner."""
         super().__init__(*args, **kwargs)
-        logger.info("Using OptimizedTrajectoryPlanning (backward compatibility mode)")
+        _runtime.logger.info(
+            "Using OptimizedTrajectoryPlanning (backward compatibility mode)"
+        )
 
 
 # Enhanced utility functions for advanced users
@@ -833,7 +836,7 @@ def create_optimized_planner(
         target_speedup=target_speedup,
     )
 
-    logger.info(
+    _runtime.logger.info(
         f"Created optimized planner for {num_joints} joints, "
         f"target: {target_speedup}x speedup, CUDA: {cuda_available}"
     )
@@ -896,7 +899,7 @@ def compare_implementations(
     results = {"cpu": {}, "gpu": {}}
 
     # Test CPU implementation
-    logger.info("Testing CPU implementation...")
+    _runtime.logger.info("Testing CPU implementation...")
     cpu_times = []
     for run in range(test_params.get("num_runs", 3)):
         start_time = time.time()
@@ -921,7 +924,7 @@ def compare_implementations(
 
     # Test GPU implementation (if available)
     if gpu_planner is not None:
-        logger.info("Testing GPU implementation...")
+        _runtime.logger.info("Testing GPU implementation...")
 
         # Test different kernels if detailed analysis requested
         if detailed_analysis:
@@ -996,10 +999,10 @@ def compare_implementations(
         else:
             print("⚠️  Limited speedup - consider larger problem sizes")
 
-        logger.info(f"GPU speedup: {speedup:.2f}x")
+        _runtime.logger.info(f"GPU speedup: {speedup:.2f}x")
     else:
         results["gpu"] = {"available": False}
-        logger.info("GPU not available for comparison")
+        _runtime.logger.info("GPU not available for comparison")
 
     return results
 
@@ -1022,7 +1025,7 @@ def benchmark_kernel_performance_comprehensive(
         dict: Comprehensive benchmark results
     """
     if not _runtime.check_cuda_availability():
-        logger.warning("CUDA not available for comprehensive benchmarking")
+        _runtime.logger.warning("CUDA not available for comprehensive benchmarking")
         return {}
 
     if test_sizes is None:
@@ -1042,7 +1045,7 @@ def benchmark_kernel_performance_comprehensive(
     all_results = {}
 
     for N, joints in test_sizes:
-        logger.info(f"Testing N={N}, joints={joints}")
+        _runtime.logger.info(f"Testing N={N}, joints={joints}")
 
         # Create optimized planner
         planner = OptimizedTrajectoryPlanning(

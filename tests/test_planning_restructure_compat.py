@@ -12,6 +12,55 @@ import ManipulaPy.planning._kernels as runtime
 import ManipulaPy.planning.trajectory_planning as implementation
 
 
+# Captured from release/v1.4 commit 8df3424 before the SR6 decomposition.
+_BASE_IMPLEMENTATION_NAMES = frozenset(
+    """
+    Any CUDA_AVAILABLE CollisionChecker CubicTimeScaling Dict List MatrixExp3
+    MatrixLog3 MockCuda NoReturn OptimizedTrajectoryPlanning Optional
+    PotentialField QuinticTimeScaling TrajectoryPlanning TransToRp Tuple
+    _best_2d_config _h2d_pinned _traj_cpu_njit _trajectory_cpu_fallback
+    auto_select_optimal_kernel batch_trajectory_kernel
+    benchmark_kernel_performance benchmark_kernel_performance_comprehensive
+    cartesian_trajectory_kernel check_cuda_availability compare_implementations
+    create_optimized_planner cuda forward_dynamics_kernel
+    fused_potential_gradient_kernel get_backend get_cuda_array
+    get_gpu_properties get_memory_pool_stats get_optimal_kernel_config
+    inverse_dynamics_kernel logger logging make_1d_grid make_2d_grid
+    make_2d_grid_optimized njit np optimized_batch_trajectory_generation
+    optimized_trajectory_generation optimized_trajectory_generation_monitored
+    plt prange print_performance_recommendations profile_start profile_stop
+    return_cuda_array setup_cuda_environment_for_40x_speedup time
+    trajectory_kernel trajectory_kernel_cache_friendly
+    trajectory_kernel_memory_optimized trajectory_kernel_vectorized
+    trajectory_kernel_warp_optimized warnings
+    """.split()
+)
+_RESTRUCTURING_IMPLEMENTATION_NAMES = frozenset(
+    {
+        "_FORWARDED_RUNTIME_NAMES",
+        "_ModuleType",
+        "_PlanningCompatibilityModule",
+        "_runtime",
+        "_sys",
+    }
+)
+_BASE_CLASS_METHOD_NAMES = frozenset(
+    """
+    _apply_collision_avoidance_cpu _apply_collision_avoidance_gpu
+    _batch_joint_trajectory_cpu _cartesian_trajectory_cpu
+    _cartesian_trajectory_gpu _forward_dynamics_cpu _forward_dynamics_gpu
+    _get_optimal_kernel_config _get_or_resize_gpu_array _inverse_dynamics_cpu
+    _inverse_dynamics_gpu _joint_trajectory_cpu _joint_trajectory_gpu
+    _should_use_gpu batch_joint_trajectory benchmark_all_kernels
+    benchmark_performance calculate_derivatives cartesian_trajectory
+    cleanup_gpu_memory forward_dynamics_trajectory get_performance_stats
+    inverse_dynamics_trajectory joint_trajectory plan_trajectory
+    plot_cartesian_trajectory plot_ee_trajectory plot_tcp_trajectory
+    plot_trajectory reset_performance_stats
+    """.split()
+)
+
+
 class _BackendProbe:
     """Delegate to the active backend while recording runtime lookups."""
 
@@ -166,6 +215,32 @@ def test_core_constructor_observes_historical_cuda_availability_patch(monkeypatc
     assert planner.cuda_available is False
 
 
+def test_historical_logger_name_and_patch_reach_moved_method(monkeypatch):
+    """The old logger identity and implementation-module patch point survive."""
+    assert runtime.logger.name == "ManipulaPy.planning.trajectory_planning"
+    original_logger = runtime.logger
+
+    class LoggerProbe:
+        def __init__(self):
+            self.messages = []
+
+        def info(self, message, *args):
+            self.messages.append(message % args if args else message)
+
+    logger = LoggerProbe()
+    with monkeypatch.context() as patch:
+        patch.setattr(implementation, "logger", logger)
+        planner = _bare_planner()
+        planner.calculate_derivatives(np.arange(4.0)[:, None], 1.0)
+        planner._joint_trajectory_cpu(np.array([0.0]), np.array([0.5]), 1.0, 3, 3)
+        assert implementation.logger is runtime.logger is logger
+
+    assert any(
+        "CPU trajectory generation completed" in message for message in logger.messages
+    )
+    assert implementation.logger is runtime.logger is original_logger
+
+
 def test_planning_import_paths_preserve_alias_identity_and_class_contract():
     """The package split preserves historical aliases and class semantics."""
     expected_names = (
@@ -209,3 +284,48 @@ def test_planning_import_paths_preserve_alias_identity_and_class_contract():
     restored = pickle.loads(pickle.dumps(planner))
     assert isinstance(restored, planner_class)
     assert isinstance(restored, legacy_planning.OptimizedTrajectoryPlanning)
+
+
+def test_complete_pre_sr6_namespace_manifests_and_symbol_identity():
+    """All historical names remain exact; only declared internals are added."""
+    implementation_names = {
+        name for name in vars(implementation) if not name.startswith("__")
+    }
+    package_names = {name for name in vars(planning) if not name.startswith("__")}
+    legacy_names = {name for name in vars(legacy_planning) if not name.startswith("__")}
+
+    assert implementation_names == (
+        _BASE_IMPLEMENTATION_NAMES | _RESTRUCTURING_IMPLEMENTATION_NAMES
+    )
+    assert package_names == _BASE_IMPLEMENTATION_NAMES | {"trajectory_planning"}
+    assert legacy_names == package_names | {"_planning"}
+
+    for name in _BASE_IMPLEMENTATION_NAMES:
+        assert getattr(implementation, name) is getattr(planning, name)
+        assert getattr(implementation, name) is getattr(legacy_planning, name)
+    assert planning.trajectory_planning is implementation
+    assert legacy_planning.trajectory_planning is implementation
+    assert legacy_planning._planning is planning
+
+
+def test_complete_pre_sr6_class_surface_and_descriptor_kinds():
+    """The planned mixin MRO changes ownership, not the class method surface."""
+    planner_class = implementation.OptimizedTrajectoryPlanning
+    method_names = {name for name in dir(planner_class) if not name.startswith("__")}
+    assert method_names == _BASE_CLASS_METHOD_NAMES
+
+    for name in _BASE_CLASS_METHOD_NAMES:
+        descriptor = inspect.getattr_static(planner_class, name)
+        expected_kind = (
+            staticmethod if name == "plot_trajectory" else type(lambda: None)
+        )
+        assert isinstance(descriptor, expected_kind), name
+
+    assert tuple(base.__name__ for base in planner_class.__mro__) == (
+        "OptimizedTrajectoryPlanning",
+        "_GenerationMixin",
+        "_DynamicsMixin",
+        "_CollisionMixin",
+        "_PlottingMixin",
+        "object",
+    )

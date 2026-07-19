@@ -141,7 +141,7 @@ import logging
 from ..potential_field import CollisionChecker, PotentialField
 
 # Module-level logger; leave handler configuration to the host application
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("ManipulaPy.planning.trajectory_planning")
 logging.getLogger("numba.cuda.cudadrv.driver").setLevel(logging.WARNING)
 
 
