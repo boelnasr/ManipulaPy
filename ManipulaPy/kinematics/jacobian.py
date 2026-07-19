@@ -32,11 +32,10 @@ from typing import List, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from .. import utils
-from ..backend import get_backend
+from . import serial_manipulator as _runtime
 
 
-class _JacobianMixin:
+class _JacobianConcern:
     def jacobian(
         self, thetalist: Union[NDArray[np.float64], List[float]], frame: str = "space"
     ) -> NDArray[np.float64]:
@@ -51,7 +50,7 @@ class _JacobianMixin:
         Returns:
             numpy.ndarray: The Jacobian matrix of shape (6, len(thetalist)).
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         theta_input = thetalist
         thetalist = backend.asarray(theta_input)
         dtype_kind = getattr(thetalist.dtype, "kind", None)
@@ -65,9 +64,12 @@ class _JacobianMixin:
                 return backend.zeros((6, 0), dtype=thetalist.dtype)
             columns = []
             for i in range(len(thetalist)):
-                columns.append(backend.matmul(utils.adjoint_transform(T), S_list[:, i]))
+                columns.append(
+                    backend.matmul(_runtime.utils.adjoint_transform(T), S_list[:, i])
+                )
                 T = backend.matmul(
-                    T, utils.transform_from_twist(S_list[:, i], thetalist[i])
+                    T,
+                    _runtime.utils.transform_from_twist(S_list[:, i], thetalist[i]),
                 )
         elif frame == "body":
             # Modern Robotics JacobianBody: start from identity, accumulate
@@ -79,9 +81,13 @@ class _JacobianMixin:
             for i in range(n - 2, -1, -1):
                 T = backend.matmul(
                     T,
-                    utils.transform_from_twist(B_list[:, i + 1], -thetalist[i + 1]),
+                    _runtime.utils.transform_from_twist(
+                        B_list[:, i + 1], -thetalist[i + 1]
+                    ),
                 )
-                columns[i] = backend.matmul(utils.adjoint_transform(T), B_list[:, i])
+                columns[i] = backend.matmul(
+                    _runtime.utils.adjoint_transform(T), B_list[:, i]
+                )
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
         return backend.stack(columns, axis=1)

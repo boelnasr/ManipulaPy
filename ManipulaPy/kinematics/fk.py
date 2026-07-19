@@ -32,11 +32,10 @@ from typing import List, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from .. import utils
-from ..backend import get_backend
+from . import serial_manipulator as _runtime
 
 
-class _ForwardKinematicsMixin:
+class _ForwardKinematicsConcern:
     def forward_kinematics(
         self, thetalist: Union[NDArray[np.float64], List[float]], frame: str = "space"
     ) -> NDArray[np.float64]:
@@ -51,7 +50,7 @@ class _ForwardKinematicsMixin:
         Returns:
             numpy.ndarray: The 4x4 transformation matrix representing the end-effector's pose.
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         theta_input = thetalist
         thetalist = backend.asarray(theta_input)
         dtype_kind = getattr(thetalist.dtype, "kind", None)
@@ -65,7 +64,7 @@ class _ForwardKinematicsMixin:
             for i, theta in enumerate(thetalist):
                 T = backend.matmul(
                     T,
-                    utils.transform_from_twist(S_list[:, i], theta),
+                    _runtime.utils.transform_from_twist(S_list[:, i], theta),
                 )
             M = self.M_list[-1] if self._m_list_is_array_of_poses else self.M_list
             T = backend.matmul(T, backend.asarray(M))
@@ -76,7 +75,7 @@ class _ForwardKinematicsMixin:
             for i, theta in enumerate(thetalist):
                 T = backend.matmul(
                     T,
-                    utils.transform_from_twist(B_list[:, i], theta),
+                    _runtime.utils.transform_from_twist(B_list[:, i], theta),
                 )
             M = self.M_list[-1] if self._m_list_is_array_of_poses else self.M_list
             T = backend.matmul(backend.asarray(M), T)
@@ -99,6 +98,6 @@ class _ForwardKinematicsMixin:
             numpy.ndarray: A 6x1 vector representing the position and orientation (Euler angles) of the end-effector.
         """
         T = self.forward_kinematics(thetalist)
-        R, p = utils.TransToRp(T)
-        orientation = utils.rotation_matrix_to_euler_angles(R)
-        return np.concatenate((p, orientation))
+        R, p = _runtime.utils.TransToRp(T)
+        orientation = _runtime.utils.rotation_matrix_to_euler_angles(R)
+        return _runtime.np.concatenate((p, orientation))

@@ -34,18 +34,13 @@ from numpy.typing import NDArray
 
 from .. import utils
 from ..backend import get_backend
-from .fk import _ForwardKinematicsMixin
-from .ik import _InverseKinematicsMixin
-from .jacobian import _JacobianMixin
-from .velocity import _VelocityMixin
+from .fk import _ForwardKinematicsConcern
+from .ik import _InverseKinematicsConcern
+from .jacobian import _JacobianConcern
+from .velocity import _VelocityConcern
 
 
-class SerialManipulator(
-    _ForwardKinematicsMixin,
-    _JacobianMixin,
-    _VelocityMixin,
-    _InverseKinematicsMixin,
-):
+class SerialManipulator:
     """Kinematic model for serial manipulators using screw-axis operations."""
 
     def __init__(
@@ -148,33 +143,27 @@ class SerialManipulator(
                 self.joint_positions.shape, dtype=self.joint_positions.dtype
             )
 
+    forward_kinematics = _ForwardKinematicsConcern.__dict__["forward_kinematics"]
+    end_effector_pose = _ForwardKinematicsConcern.__dict__["end_effector_pose"]
+    jacobian = _JacobianConcern.__dict__["jacobian"]
+    end_effector_velocity = _VelocityConcern.__dict__["end_effector_velocity"]
+    joint_velocity = _VelocityConcern.__dict__["joint_velocity"]
+    iterative_inverse_kinematics = _InverseKinematicsConcern.__dict__[
+        "iterative_inverse_kinematics"
+    ]
+    _pose_error = _InverseKinematicsConcern.__dict__["_pose_error"]
+    smart_inverse_kinematics = _InverseKinematicsConcern.__dict__[
+        "smart_inverse_kinematics"
+    ]
+    robust_inverse_kinematics = _InverseKinematicsConcern.__dict__[
+        "robust_inverse_kinematics"
+    ]
+    trac_ik = _InverseKinematicsConcern.__dict__["trac_ik"]
 
-class _KinematicsCompatibilityModule(__import__("types").ModuleType):
-    """Keep historical runtime patches visible to extracted mixins."""
-
-    _forwarded_names = {"get_backend", "np", "utils"}
-    _concern_modules = (
-        "ManipulaPy.kinematics.fk",
-        "ManipulaPy.kinematics.jacobian",
-        "ManipulaPy.kinematics.velocity",
-        "ManipulaPy.kinematics.ik",
-    )
-
-    def __setattr__(self, name, value):
-        super().__setattr__(name, value)
-        if name in self._forwarded_names:
-            for module_name in self._concern_modules:
-                module = __import__(module_name, fromlist=["*"])
-                if name in vars(module):
-                    setattr(module, name, value)
-
-
-__import__("sys").modules[__name__].__class__ = _KinematicsCompatibilityModule
 
 del (
-    _ForwardKinematicsMixin,
-    _InverseKinematicsMixin,
-    _JacobianMixin,
-    _VelocityMixin,
-    _KinematicsCompatibilityModule,
+    _ForwardKinematicsConcern,
+    _InverseKinematicsConcern,
+    _JacobianConcern,
+    _VelocityConcern,
 )

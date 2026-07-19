@@ -32,10 +32,10 @@ from typing import Any, List, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from ..backend import get_backend
+from . import serial_manipulator as _runtime
 
 
-class _InverseKinematicsMixin:
+class _InverseKinematicsConcern:
     def iterative_inverse_kinematics(
         self,
         T_desired: NDArray[np.float64],
@@ -63,7 +63,7 @@ class _InverseKinematicsMixin:
         - Improved line search with multiple scales
         - Best solution tracking
         """
-        backend = get_backend()
+        backend = _runtime.get_backend()
         theta = backend.asarray(thetalist0, dtype=backend.float64)
         T_desired = backend.asarray(T_desired, dtype=backend.float64)
         residuals = []
@@ -111,7 +111,7 @@ class _InverseKinematicsMixin:
                     )
                     / 2
                 )
-            elif abs(angle - np.pi) < 1e-6:
+            elif abs(angle - _runtime.np.pi) < 1e-6:
                 diag = backend.diag(R_err)
                 idx = backend.argmax(diag)
                 axis = backend.zeros(3, dtype=R_err.dtype)
@@ -147,7 +147,7 @@ class _InverseKinematicsMixin:
                 return backend.matmul(Vt.T, s_damped * backend.matmul(U.T, V_err))
             except Exception as exc:
                 # CuPy exposes its own LinAlgError class rather than NumPy's.
-                if not isinstance(exc, np.linalg.LinAlgError) and (
+                if not isinstance(exc, _runtime.np.linalg.LinAlgError) and (
                     exc.__class__.__name__ != "LinAlgError"
                 ):
                     raise
@@ -189,7 +189,7 @@ class _InverseKinematicsMixin:
             # Stagnation recovery: perturb if stuck
             if stall_count > max_stall:
                 # Add small random perturbation to escape local minimum
-                perturbation = 0.1 * np.random.randn(len(theta))
+                perturbation = 0.1 * _runtime.np.random.randn(len(theta))
                 theta = clip_to_limits(best_theta + perturbation)
                 damping_local = damping  # Reset damping
                 stall_count = 0
@@ -273,7 +273,7 @@ class _InverseKinematicsMixin:
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
 
-            it = np.arange(len(residuals))
+            it = _runtime.np.arange(len(residuals))
             tr, rt = zip(
                 *(
                     (float(backend.to_numpy(t)), float(backend.to_numpy(r)))
@@ -299,12 +299,14 @@ class _InverseKinematicsMixin:
         T_curr: NDArray[np.float64], T_desired: NDArray[np.float64]
     ) -> float:
         """Compute combined position + orientation error between two poses."""
-        backend = get_backend()
+        backend = _runtime.get_backend()
         T_curr = backend.to_numpy(T_curr)
         T_desired = backend.to_numpy(T_desired)
-        pos_err = np.linalg.norm(T_curr[:3, 3] - T_desired[:3, 3])
+        pos_err = _runtime.np.linalg.norm(T_curr[:3, 3] - T_desired[:3, 3])
         R_err = T_curr[:3, :3].T @ T_desired[:3, :3]
-        rot_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
+        rot_err = _runtime.np.arccos(
+            _runtime.np.clip((_runtime.np.trace(R_err) - 1) / 2, -1, 1)
+        )
         return pos_err + rot_err
 
     def smart_inverse_kinematics(
@@ -546,17 +548,21 @@ class _InverseKinematicsMixin:
 
                 # Evaluate error for tracking best
                 T_curr = self.forward_kinematics(theta, frame="space")
-                backend = get_backend()
+                backend = _runtime.get_backend()
                 T_curr_host = backend.to_numpy(T_curr)
                 T_desired_host = backend.to_numpy(T_desired)
-                pos_err = np.linalg.norm(T_curr_host[:3, 3] - T_desired_host[:3, 3])
+                pos_err = _runtime.np.linalg.norm(
+                    T_curr_host[:3, 3] - T_desired_host[:3, 3]
+                )
                 R_err = T_curr_host[:3, :3].T @ T_desired_host[:3, :3]
-                rot_err = np.arccos(np.clip((np.trace(R_err) - 1) / 2, -1, 1))
+                rot_err = _runtime.np.arccos(
+                    _runtime.np.clip((_runtime.np.trace(R_err) - 1) / 2, -1, 1)
+                )
                 error = pos_err + rot_err
 
                 if verbose:
                     print(
-                        f"  ✗ Failed (pos_err={pos_err*1000:.2f}mm, rot_err={np.degrees(rot_err):.2f}°)"
+                        f"  ✗ Failed (pos_err={pos_err*1000:.2f}mm, rot_err={_runtime.np.degrees(rot_err):.2f}°)"
                     )
 
                 if error < best_error:
@@ -622,7 +628,7 @@ class _InverseKinematicsMixin:
         from ..trac_ik import trac_ik_solve
 
         if theta0 is not None:
-            theta0 = np.array(theta0, dtype=float)
+            theta0 = _runtime.np.array(theta0, dtype=float)
 
         return trac_ik_solve(
             self, T_desired, theta0, timeout, eomg, ev, num_restarts, use_parallel

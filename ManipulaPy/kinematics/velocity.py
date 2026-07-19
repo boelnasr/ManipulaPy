@@ -32,10 +32,10 @@ from typing import List, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from ..backend import get_backend
+from . import serial_manipulator as _runtime
 
 
-class _VelocityMixin:
+class _VelocityConcern:
     def end_effector_velocity(
         self,
         thetalist: Union[NDArray[np.float64], List[float]],
@@ -59,7 +59,7 @@ class _VelocityMixin:
             J = self.jacobian(thetalist, frame="body")
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
-        backend = get_backend()
+        backend = _runtime.get_backend()
         return backend.matmul(J, backend.asarray(dthetalist))
 
     def joint_velocity(
@@ -85,5 +85,5 @@ class _VelocityMixin:
             J = self.jacobian(thetalist, frame="body")
         else:
             raise ValueError("Invalid frame specified. Choose 'space' or 'body'.")
-        backend = get_backend()
+        backend = _runtime.get_backend()
         return backend.matmul(backend.pinv(J), backend.asarray(V_ee))
