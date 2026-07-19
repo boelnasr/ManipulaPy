@@ -13,10 +13,10 @@ import ManipulaPy.planning.trajectory_planning as implementation
 
 
 # Captured from release/v1.4 commit 8df3424 before the SR6 decomposition.
-_BASE_IMPLEMENTATION_NAMES = frozenset(
+_BASE_UNCONDITIONAL_IMPLEMENTATION_NAMES = frozenset(
     """
     Any CUDA_AVAILABLE CollisionChecker CubicTimeScaling Dict List MatrixExp3
-    MatrixLog3 MockCuda NoReturn OptimizedTrajectoryPlanning Optional
+    MatrixLog3 NoReturn OptimizedTrajectoryPlanning Optional
     PotentialField QuinticTimeScaling TrajectoryPlanning TransToRp Tuple
     _best_2d_config _h2d_pinned _traj_cpu_njit _trajectory_cpu_fallback
     auto_select_optimal_kernel batch_trajectory_kernel
@@ -59,6 +59,12 @@ _BASE_CLASS_METHOD_NAMES = frozenset(
     plot_trajectory reset_performance_stats
     """.split()
 )
+
+
+def _expected_base_implementation_names(cuda_available):
+    """Return the pre-SR6 namespace for the selected CUDA import branch."""
+    conditional_names = frozenset() if cuda_available else frozenset({"MockCuda"})
+    return _BASE_UNCONDITIONAL_IMPLEMENTATION_NAMES | conditional_names
 
 
 class _BackendProbe:
@@ -288,6 +294,9 @@ def test_planning_import_paths_preserve_alias_identity_and_class_contract():
 
 def test_complete_pre_sr6_namespace_manifests_and_symbol_identity():
     """All historical names remain exact; only declared internals are added."""
+    expected_base_names = _expected_base_implementation_names(
+        cuda_available=runtime.CUDA_AVAILABLE
+    )
     implementation_names = {
         name for name in vars(implementation) if not name.startswith("__")
     }
@@ -295,17 +304,27 @@ def test_complete_pre_sr6_namespace_manifests_and_symbol_identity():
     legacy_names = {name for name in vars(legacy_planning) if not name.startswith("__")}
 
     assert implementation_names == (
-        _BASE_IMPLEMENTATION_NAMES | _RESTRUCTURING_IMPLEMENTATION_NAMES
+        expected_base_names | _RESTRUCTURING_IMPLEMENTATION_NAMES
     )
-    assert package_names == _BASE_IMPLEMENTATION_NAMES | {"trajectory_planning"}
+    assert package_names == expected_base_names | {"trajectory_planning"}
     assert legacy_names == package_names | {"_planning"}
 
-    for name in _BASE_IMPLEMENTATION_NAMES:
+    for name in expected_base_names:
         assert getattr(implementation, name) is getattr(planning, name)
         assert getattr(implementation, name) is getattr(legacy_planning, name)
     assert planning.trajectory_planning is implementation
     assert legacy_planning.trajectory_planning is implementation
     assert legacy_planning._planning is planning
+
+
+def test_namespace_manifest_models_cuda_conditional_symbols():
+    """The baseline namespace differs only by its conditional CUDA mock."""
+    cpu_names = _expected_base_implementation_names(cuda_available=False)
+    cuda_names = _expected_base_implementation_names(cuda_available=True)
+
+    assert cpu_names == cuda_names | {"MockCuda"}
+    assert "MockCuda" in cpu_names
+    assert "MockCuda" not in cuda_names
 
 
 def test_complete_pre_sr6_class_surface_and_descriptor_kinds():
@@ -322,6 +341,32 @@ def test_complete_pre_sr6_class_surface_and_descriptor_kinds():
         assert isinstance(descriptor, expected_kind), name
 
     assert tuple(base.__name__ for base in planner_class.__mro__) == (
+        "OptimizedTrajectoryPlanning",
+        "_GenerationMixin",
+        "_DynamicsMixin",
+        "_CollisionMixin",
+        "_PlottingMixin",
+        "object",
+    )
+
+
+def test_compatibility_subclass_preserves_surface_descriptors_and_distinct_mro():
+    """TrajectoryPlanning adds only its intended compatibility subclass layer."""
+    compatibility_class = implementation.TrajectoryPlanning
+    method_names = {
+        name for name in dir(compatibility_class) if not name.startswith("__")
+    }
+    assert method_names == _BASE_CLASS_METHOD_NAMES
+
+    for name in _BASE_CLASS_METHOD_NAMES:
+        descriptor = inspect.getattr_static(compatibility_class, name)
+        expected_kind = (
+            staticmethod if name == "plot_trajectory" else type(lambda: None)
+        )
+        assert isinstance(descriptor, expected_kind), name
+
+    assert tuple(base.__name__ for base in compatibility_class.__mro__) == (
+        "TrajectoryPlanning",
         "OptimizedTrajectoryPlanning",
         "_GenerationMixin",
         "_DynamicsMixin",
