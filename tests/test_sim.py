@@ -502,6 +502,128 @@ class TestControllerIntegration:
                 np.testing.assert_array_equal(actual, expected)
 
 
+class TestBackendArrayBoundary:
+    """Task 10: sim routes incidental array conversion through the unified backend."""
+
+    def test_sim_package_namespace_has_only_intended_backend_change(self) -> None:
+        """The migration removes ``cp`` without exposing backend internals."""
+        import ManipulaPy.sim as sim_package
+
+        expected = {
+            "Any",
+            "List",
+            "ManipulatorController",
+            "Optional",
+            "Sequence",
+            "Simulation",
+            "Tuple",
+            "_PYBULLET_AVAILABLE",
+            "logging",
+            "np",
+            "os",
+            "p",
+            "plt",
+            "pybullet_data",
+            "simulation",
+            "time",
+            "tp",
+        }
+        actual = {name for name in vars(sim_package) if not name.startswith("__")}
+
+        assert actual == expected
+
+    def test_backend_dispatch_is_owned_by_implementation_module(self) -> None:
+        """Runtime patching targets the module whose methods read the binding."""
+        import ManipulaPy.sim as sim_package
+        import ManipulaPy.sim.simulation as sim_module
+        from ManipulaPy.backend import get_backend
+
+        assert "get_backend" not in vars(sim_package)
+        assert sim_module.get_backend is get_backend
+
+    def test_run_controller_ingest_routes_device_array_through_backend(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A device-side (e.g. CuPy) 2D trajectory must cross to the host via
+        the backend's ``to_numpy`` on the whole array. Iterating it first
+        would yield device-side rows that cannot cross to the host, so
+        ``to_numpy`` must receive the array itself, not a list of rows."""
+        from ManipulaPy.backend import get_backend
+
+        real_backend = get_backend()
+        calls = []
+
+        class FakeDeviceArray:
+            """Faithful stand-in for a backend-native array: implicit NumPy
+            coercion is forbidden and iteration yields device-side rows."""
+
+            def __init__(self, data):
+                self._data = np.asarray(data, dtype=float)
+
+            def __array__(self, *args, **kwargs):
+                raise TypeError("Implicit conversion to a NumPy array is not allowed")
+
+            def __iter__(self):
+                for row in self._data:
+                    yield FakeDeviceArray(row)
+
+            def get(self):
+                return self._data
+
+        class SpyBackend:
+            def __getattr__(self, name):
+                return getattr(real_backend, name)
+
+            def is_backend_array(self, x):
+                return isinstance(x, FakeDeviceArray)
+
+            def to_numpy(self, x):
+                calls.append(x)
+                if isinstance(x, FakeDeviceArray):
+                    return x.get()
+                return real_backend.to_numpy(x)
+
+        monkeypatch.setattr(
+            "ManipulaPy.sim.simulation.get_backend",
+            lambda: SpyBackend(),
+            raising=False,
+        )
+
+        sim = Simulation("test.urdf", [(-1, 1)] * 6)
+        sim.non_fixed_joints = list(range(6))
+        desired = FakeDeviceArray([[0.0] * 6, [0.5] * 6])
+
+        with patch.object(sim, "set_joint_positions"):
+            sim.run_controller(desired)
+
+        assert (
+            calls
+        ), "run_controller did not route the device trajectory through backend.to_numpy"
+        assert calls[0] is desired, (
+            "to_numpy must receive the device array itself, "
+            "not a list of host-incompatible rows"
+        )
+
+    def test_run_controller_accepts_generator_waypoints(self) -> None:
+        """Non-backend iterables (e.g. generator waypoints) remain supported:
+        they are materialized directly without needing ``to_numpy``."""
+        sim = Simulation("test.urdf", [(-1, 1)] * 6)
+        sim.non_fixed_joints = list(range(6))
+        desired = (row for row in ([0.0] * 6, [0.5] * 6))
+
+        with patch.object(sim, "set_joint_positions"):
+            # Must not raise; generator is consumed via list() on the host path.
+            sim.run_controller(desired)
+
+    def test_simulation_module_has_no_bespoke_cupy_shim(self) -> None:
+        """The internal _NumpyProxy cupy fallback shim is removed; array
+        conversion goes through ManipulaPy.backend."""
+        import ManipulaPy.sim.simulation as sim_mod
+
+        assert not hasattr(sim_mod, "_NumpyProxy")
+        assert not hasattr(sim_mod, "cp")
+
+
 class TestParameterManagement:
     """Test simulation parameter management"""
 

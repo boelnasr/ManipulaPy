@@ -1181,12 +1181,9 @@ class TestSimRegressions(unittest.TestCase):
         (notably tests/test_sim.py, which captures Simulation at import time
         and relies on a monkeypatched ManipulaPy.sim.simulation.p).
 
-        Scope is intentionally limited to pybullet/pybullet_data. Blocking
-        cupy too would crash a transitive import of ManipulaPy.control,
-        whose own optional cupy guard is tracked separately. The cupy
-        fallback in sim.py is exercised by source review (``_NumpyProxy``
-        delegates to ``np`` and exposes ``asnumpy``) rather than by this
-        end-to-end import probe.
+        CuPy is blocked as well as pybullet/pybullet_data so this permanently
+        verifies that sim no longer imports the removed optional dependency.
+        Host conversion is routed through the active backend instead.
         """
         import subprocess
         import sys
@@ -1197,7 +1194,7 @@ class TestSimRegressions(unittest.TestCase):
             import importlib
             import sys
 
-            blocked = {"pybullet", "pybullet_data"}
+            blocked = {"cupy", "pybullet", "pybullet_data"}
             real_import = builtins.__import__
 
             def fake_import(name, *args, **kwargs):
