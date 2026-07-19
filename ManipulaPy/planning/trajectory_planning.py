@@ -569,12 +569,19 @@ class OptimizedTrajectoryPlanning:
 
         # Keep host NumPy inputs here: the unchanged CUDA path
         # (_joint_trajectory_gpu -> optimized_trajectory_generation_monitored,
-        # np.ascontiguousarray, pinned H2D) requires real NumPy. The backend
-        # domain is entered inside _joint_trajectory_cpu, which converts at its
-        # njit boundary. Entering the backend before _should_use_gpu would feed
+        # np.ascontiguousarray, pinned H2D) requires real NumPy. Callers may pass
+        # backend-native arrays, so force them to host through the backend before
+        # the float32 cast (a no-op for NumPy inputs; np.array() alone would
+        # raise on a CuPy array). The backend domain is re-entered inside
+        # _joint_trajectory_cpu; entering it before _should_use_gpu would feed
         # device arrays to the GPU path and force a silent CPU fallback.
-        thetastart = np.array(thetastart, dtype=np.float32)
-        thetaend = np.array(thetaend, dtype=np.float32)
+        backend = get_backend()
+        thetastart = np.array(
+            backend.to_numpy(backend.asarray(thetastart)), dtype=np.float32
+        )
+        thetaend = np.array(
+            backend.to_numpy(backend.asarray(thetaend)), dtype=np.float32
+        )
         num_joints = len(thetastart)
 
         # Print performance recommendations if beneficial
@@ -676,10 +683,15 @@ class OptimizedTrajectoryPlanning:
 
             logger.info(f"GPU trajectory generation completed in {elapsed:.4f}s")
 
+            # Normalize into one domain: collision avoidance re-enters the
+            # backend for positions while the GPU velocities/accelerations stay
+            # host NumPy, so wrap every entry with backend.asarray (a no-op under
+            # the NumPy backend).
+            backend = get_backend()
             return {
-                "positions": traj_pos_host,
-                "velocities": traj_vel_host,
-                "accelerations": traj_acc_host,
+                "positions": backend.asarray(traj_pos_host),
+                "velocities": backend.asarray(traj_vel_host),
+                "accelerations": backend.asarray(traj_acc_host),
             }
 
         except Exception as e:
@@ -1566,8 +1578,13 @@ class OptimizedTrajectoryPlanning:
                         )
                     current_theta = backend.asarray(new_theta, dtype=theta_dtype)
 
-                    # Apply joint limits
+                    # Apply joint limits. The original ``np.clip`` against the
+                    # float32 limits promoted the state dtype (e.g. float16 ->
+                    # float32) and later updates accumulated in that promoted
+                    # dtype, so track the live post-clip dtype rather than the
+                    # initial one.
                     current_theta = backend.clip(current_theta, lower, upper)
+                    theta_dtype = current_theta.dtype
 
                     ddtheta_step = ddtheta
 
@@ -1616,11 +1633,14 @@ class OptimizedTrajectoryPlanning:
         backend = get_backend()
         N = int(N)
         timegap = Tf / (N - 1.0)
-        # TransToRp returns host NumPy. Keep pstart/pend as host arrays for the
-        # unchanged GPU velocity path (see _cartesian_trajectory_gpu); enter the
-        # backend domain only through the local copies used for the assembly.
+        # Callers may pass backend-native transforms, and TransToRp only slices,
+        # so force pstart/pend to host NumPy for the unchanged GPU velocity path
+        # (see _cartesian_trajectory_gpu). This is a no-op for NumPy inputs. The
+        # assembly below runs on the backend copies (``*_b``).
         Rstart, pstart = TransToRp(Xstart)
         Rend, pend = TransToRp(Xend)
+        pstart = backend.to_numpy(backend.asarray(pstart))
+        pend = backend.to_numpy(backend.asarray(pend))
         Rstart_b = backend.asarray(Rstart)
         Rend_b = backend.asarray(Rend)
         pstart_b = backend.asarray(pstart)
@@ -1653,9 +1673,10 @@ class OptimizedTrajectoryPlanning:
                 backend.stack(position_rows), dtype=backend.float32
             )
         else:
-            # Base returned zero-length orientations (0, 3, 3) and a 1-D empty
-            # position array (np.array([]) -> shape (0,)) for N == 0.
-            orientations = backend.zeros((0, 3, 3), dtype=backend.float32)
+            # N <= 0: base built np.zeros((N, 3, 3)) and np.array([]) (shape
+            # (0,)). Route N through the orientation preallocation so N == 0
+            # yields (0, 3, 3) while N < 0 raises ValueError exactly as base did.
+            orientations = backend.zeros((N, 3, 3), dtype=backend.float32)
             traj_pos = backend.zeros((0,), dtype=backend.float32)
 
         # Use GPU for position/velocity/acceleration computation if beneficial
@@ -1670,11 +1691,14 @@ class OptimizedTrajectoryPlanning:
                 pstart, pend, Tf, N, method
             )
 
+        # Normalize into one domain: the assembled positions/orientations are
+        # backend-native, but the GPU velocity path returns host NumPy, so wrap
+        # every entry with backend.asarray (a no-op under the NumPy backend).
         return {
-            "positions": traj_pos,
-            "velocities": traj_vel,
-            "accelerations": traj_acc,
-            "orientations": orientations,
+            "positions": backend.asarray(traj_pos),
+            "velocities": backend.asarray(traj_vel),
+            "accelerations": backend.asarray(traj_acc),
+            "orientations": backend.asarray(orientations),
         }
 
     def _cartesian_trajectory_gpu(
@@ -1803,9 +1827,10 @@ class OptimizedTrajectoryPlanning:
             traj_vel = backend.asarray(backend.stack(vel_rows), dtype=backend.float32)
             traj_acc = backend.asarray(backend.stack(acc_rows), dtype=backend.float32)
         else:
-            # Base preallocated (0, 3) zeros for N == 0.
-            traj_vel = backend.zeros((0, 3), dtype=backend.float32)
-            traj_acc = backend.zeros((0, 3), dtype=backend.float32)
+            # N <= 0: base preallocated np.zeros((N, 3)); route N through the
+            # shape so N == 0 yields (0, 3) and N < 0 raises ValueError.
+            traj_vel = backend.zeros((N, 3), dtype=backend.float32)
+            traj_acc = backend.zeros((N, 3), dtype=backend.float32)
 
         elapsed = time.time() - start_time
         self.performance_stats["cpu_calls"] += 1

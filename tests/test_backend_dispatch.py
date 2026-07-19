@@ -1851,3 +1851,84 @@ def test_forward_dynamics_cpu_integer_state_freezes_like_base():
     np.testing.assert_array_equal(
         result["accelerations"], np.zeros((3, 2), dtype=np.float32)
     )
+
+
+def _base_forward_dynamics_inplace(
+    planner, thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes
+):
+    """Faithful reimplementation of the pre-migration in-place CPU Euler loop.
+
+    Mirrors ``np.zeros`` float32 outputs plus in-place ``+=`` accumulation and
+    ``np.clip`` against the float32 joint limits, whose promotion changes the
+    live state dtype exactly as the original code did.
+    """
+    num_steps = taumat.shape[0]
+    num_joints = thetalist.shape[0]
+    thetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
+    dthetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
+    ddthetamat = np.zeros((num_steps, num_joints), dtype=np.float32)
+    current_theta = thetalist.copy()
+    current_dtheta = dthetalist.copy()
+    thetamat[0, :] = current_theta
+    dthetamat[0, :] = current_dtheta
+    dt_step = dt / intRes
+    for i in range(1, num_steps):
+        for _ in range(intRes):
+            try:
+                ddtheta = planner.dynamics.forward_dynamics(
+                    current_theta, current_dtheta, taumat[i], g, Ftipmat[i]
+                )
+                current_dtheta += ddtheta * dt_step
+                current_theta += current_dtheta * dt_step
+                current_theta = np.clip(
+                    current_theta,
+                    planner.joint_limits[:, 0],
+                    planner.joint_limits[:, 1],
+                )
+                ddthetamat[i] = ddtheta
+            except Exception:
+                ddthetamat[i] = np.zeros(num_joints)
+        thetamat[i, :] = current_theta
+        dthetamat[i, :] = current_dtheta
+    return thetamat, dthetamat, ddthetamat
+
+
+def test_forward_dynamics_cpu_float16_state_matches_base_inplace_loop():
+    """A float16 initial state must track base's clip-promoted live dtype.
+
+    Base's first ``np.clip`` against the float32 joint limits promoted the state
+    to float32, so later updates accumulated in float32; casting every update
+    back to the initial float16 dtype rounds repeatedly and diverges.
+    """
+    planner = _dynamics_planner(_TauForwardDynamics(), [(-5.0, 5.0), (-5.0, 5.0)], None)
+    thetalist = np.array([0.1, 0.2], dtype=np.float16)
+    dthetalist = np.array([0.0, 0.0], dtype=np.float16)
+    taumat = np.full((4, 2), 0.3, dtype=np.float64)
+    g = np.zeros(3)
+    Ftipmat = np.zeros((4, 6))
+
+    result = planner.forward_dynamics_trajectory(
+        thetalist, dthetalist, taumat, g, Ftipmat, 0.5, 2
+    )
+    exp_pos, exp_vel, exp_acc = _base_forward_dynamics_inplace(
+        planner, thetalist, dthetalist, taumat, g, Ftipmat, 0.5, 2
+    )
+
+    np.testing.assert_array_equal(result["positions"], exp_pos)
+    np.testing.assert_array_equal(result["velocities"], exp_vel)
+    np.testing.assert_array_equal(result["accelerations"], exp_acc)
+
+
+def test_cartesian_trajectory_negative_points_raises_like_base():
+    """N < 0 must raise ValueError from the (N, ...) preallocation as base did.
+
+    The empty guard keys on N == 0; a negative N must fall through to
+    ``zeros((N, 3, 3))`` and raise, not silently return empty arrays.
+    """
+    planner = _cpu_trajectory_planner()
+    Xstart = np.eye(4)
+    Xend = np.eye(4)
+    Xend[:3, 3] = [1.0, 2.0, 3.0]
+
+    with pytest.raises(ValueError):
+        planner.cartesian_trajectory(Xstart, Xend, 1.0, -1, 5)
