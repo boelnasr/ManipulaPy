@@ -55,3 +55,9 @@ __all__ = [
     "IKInitialGuessCache",
     "adaptive_multi_start_ik",
 ]
+
+# The concern modules are implementation details, not additions to the historical
+# package namespace. Importing serial_manipulator registers them on this package.
+for _concern_module in ("fk", "jacobian", "velocity", "ik"):
+    globals().pop(_concern_module, None)
+del _concern_module
