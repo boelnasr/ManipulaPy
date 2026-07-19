@@ -27,6 +27,7 @@ along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
 from .simulation import (
+    _PYBULLET_AVAILABLE,
     Any,
     List,
     ManipulatorController,
@@ -34,7 +35,6 @@ from .simulation import (
     Sequence,
     Simulation,
     Tuple,
-    _PYBULLET_AVAILABLE,
     logging,
     np,
     os,
@@ -44,3 +44,7 @@ from .simulation import (
     time,
     tp,
 )
+
+for _internal_module in ("_runtime", "rendering", "controllers"):
+    globals().pop(_internal_module, None)
+del _internal_module
