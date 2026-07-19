@@ -4,9 +4,9 @@
 """
 Kinematics Module - ManipulaPy
 
-This module provides classes and functions for performing kinematic analysis and computations
-for serial manipulators, including forward and inverse kinematics, Jacobian calculations,
-and end-effector velocity calculations.
+This module provides classes and functions for performing kinematic analysis
+and computations for serial manipulators, including forward and inverse
+kinematics, Jacobian calculations, and end-effector velocity calculations.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -43,12 +43,12 @@ class _VelocityConcern:
         frame: str = "space",
     ) -> NDArray[np.float64]:
         """
-        Calculate the end effector velocity given the joint angles and joint velocities.
+        Calculate end-effector velocity from joint angles and velocities.
 
         Parameters:
             thetalist (list): A list of joint angles.
             dthetalist (list): A list of joint velocities.
-            frame (str): The frame in which the Jacobian is calculated. Valid values are 'space' and 'body'.
+            frame (str): Jacobian frame, either ``space`` or ``body``.
 
         Returns:
             numpy.ndarray: The end effector velocity.
@@ -69,7 +69,7 @@ class _VelocityConcern:
         frame: str = "space",
     ) -> NDArray[np.float64]:
         """
-        Calculates the joint velocity given the joint positions, end-effector velocity, and frame type.
+        Calculate joint velocity from joint positions and end-effector velocity.
 
         Parameters:
             thetalist (list): A list of joint positions.

@@ -65,29 +65,29 @@ METHOD_OWNERS = {
 
 EXPECTED_AST_HASHES = {
     "forward_kinematics": (
-        "e5a2837f29756621caf6e223b66432d55bdb798d608e717cb092278b1188d4cd"
+        "754de6e616da952ebfdc5dc5c0f6125e0d02cc959fdbe1528490686d454a660a"
     ),
     "end_effector_pose": (
-        "f244d1266ededa51f3239df6eaca6e2fd5ee491e16cb1cb509b4ca1df6315a26"
+        "10ee7b444f410812f247b1a88f92c180cd09b0ed2d3bff8a7035e56d2e55363b"
     ),
-    "jacobian": "f03a1e32f082cb73779c0ee9e22ef242c6042eba12ff06407f38491ca4d990dd",
+    "jacobian": "f1528668ce0432c30b2edcea360c9976ad959ca15d60e042151dddf246a22a4f",
     "end_effector_velocity": (
-        "d25510c9a016fbf7fb99dcb867a03712b9c6a02f68ff19e23c7777ab42926ead"
+        "972d2c8f2bd6fc20fce033bc1fb57718bdf241bab82ad4e1bd9e881a93755add"
     ),
     "joint_velocity": (
-        "713eaa78e4829cf5c2f359aa89ab33e3a9b498f0bfe5c83490a68113c3da6bea"
+        "d7b8b9cd907dd83950f2794f61b044395e42b74212e5b8a3c9cded64cdbdcdc1"
     ),
     "iterative_inverse_kinematics": (
-        "0311d10380fbaf86b90f4c3e8bccffed9a4363fe7e1e0f42428daf13298f0934"
+        "a5cd1e32476021f2861df11bae3980864095cd6c0a2fe738941946da6536e3a5"
     ),
-    "_pose_error": "209d7ce9c8b5e6e88d6d32c3e875f0b2800e5d2ed7856e21b7e0d64c09d2b4aa",
+    "_pose_error": "579cfe7d41fa2bc2f725381405db17abd08d28d3f38e9e2b6ab48eeeabb232de",
     "smart_inverse_kinematics": (
-        "a12bfcb9389750dba2e136f407e0e954d29628979a6e63c83839fa151498bbb1"
+        "bd78766d3babbd5594fcb5efd289a546ccff113aa231689ffbefb871b5a519ff"
     ),
     "robust_inverse_kinematics": (
-        "861cee333ea89aebed86103e49c0c64e59b5bce4682bc658ab04460809426d31"
+        "00fcc728cd485a813ee1168838a7298c8295dd51a67f1a6f865e369e3ae917c1"
     ),
-    "trac_ik": "07ba10d5968beb1afb41b37dcd44eb9f6ca944c583bbe02cd4cf9d6d8b91be36",
+    "trac_ik": "39a36e601420af2a8fe8f52daee6f6b97d75f372e61ec94bc53acb333119cef4",
 }
 
 EXPECTED_SIGNATURE_HASHES = {
@@ -142,6 +142,17 @@ def _public_namespace(module):
 
 
 class _RuntimeLookupNormalizer(ast.NodeTransformer):
+    def visit_FunctionDef(self, node):
+        node = self.generic_visit(node)
+        if (
+            node.body
+            and isinstance(node.body[0], ast.Expr)
+            and isinstance(node.body[0].value, ast.Constant)
+            and isinstance(node.body[0].value.value, str)
+        ):
+            node.body.pop(0)
+        return node
+
     def visit_Attribute(self, node):
         node = self.generic_visit(node)
         if isinstance(node.value, ast.Name) and node.value.id == "_runtime":

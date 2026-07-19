@@ -4,9 +4,9 @@
 """
 Kinematics Module - ManipulaPy
 
-This module provides classes and functions for performing kinematic analysis and computations
-for serial manipulators, including forward and inverse kinematics, Jacobian calculations,
-and end-effector velocity calculations.
+This module provides classes and functions for performing kinematic analysis
+and computations for serial manipulators, including forward and inverse
+kinematics, Jacobian calculations, and end-effector velocity calculations.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -40,15 +40,15 @@ class _ForwardKinematicsConcern:
         self, thetalist: Union[NDArray[np.float64], List[float]], frame: str = "space"
     ) -> NDArray[np.float64]:
         """
-        Compute the forward kinematics of a robotic arm using the product of exponentials method.
+        Compute forward kinematics using the product of exponentials method.
 
         Args:
             thetalist (numpy.ndarray): A 1D array of joint angles in radians.
-            frame (str, optional): The frame in which to compute the forward kinematics.
+            frame (str, optional): Frame in which to compute forward kinematics.
                 Either 'space' or 'body'.
 
         Returns:
-            numpy.ndarray: The 4x4 transformation matrix representing the end-effector's pose.
+            numpy.ndarray: The 4x4 end-effector pose transformation.
         """
         backend = _runtime.get_backend()
         theta_input = thetalist
@@ -95,7 +95,7 @@ class _ForwardKinematicsConcern:
             thetalist (numpy.ndarray): A 1D array of joint angles in radians.
 
         Returns:
-            numpy.ndarray: A 6x1 vector representing the position and orientation (Euler angles) of the end-effector.
+            numpy.ndarray: A 6x1 position and Euler-orientation vector.
         """
         T = self.forward_kinematics(thetalist)
         R, p = _runtime.utils.TransToRp(T)

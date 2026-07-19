@@ -4,9 +4,9 @@
 """
 Kinematics Module - ManipulaPy
 
-This module provides classes and functions for performing kinematic analysis and computations
-for serial manipulators, including forward and inverse kinematics, Jacobian calculations,
-and end-effector velocity calculations.
+This module provides classes and functions for performing kinematic analysis
+and computations for serial manipulators, including forward and inverse
+kinematics, Jacobian calculations, and end-effector velocity calculations.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -27,7 +27,7 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union  # noqa: F401
 
 import numpy as np
 from numpy.typing import NDArray
@@ -132,7 +132,8 @@ class SerialManipulator:
 
         Args:
             joint_positions (np.ndarray): Current joint positions.
-            joint_velocities (np.ndarray, optional): Current joint velocities. Default is None.
+            joint_velocities (np.ndarray, optional): Current joint velocities.
+                Default is None.
         """
         backend = get_backend()
         self.joint_positions = backend.asarray(joint_positions)

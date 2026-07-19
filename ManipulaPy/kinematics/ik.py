@@ -4,9 +4,9 @@
 """
 Kinematics Module - ManipulaPy
 
-This module provides classes and functions for performing kinematic analysis and computations
-for serial manipulators, including forward and inverse kinematics, Jacobian calculations,
-and end-effector velocity calculations.
+This module provides classes and functions for performing kinematic analysis
+and computations for serial manipulators, including forward and inverse
+kinematics, Jacobian calculations, and end-effector velocity calculations.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -44,8 +44,10 @@ class _InverseKinematicsConcern:
         ev: float = 1e-6,
         max_iterations: int = 10000,
         plot_residuals: bool = False,
-        damping: float = 2e-2,  # lambda for damped least-squares (optimized: 2e-2 for 6-DOF, 1e-2 for 2-DOF)
-        step_cap: float = 0.3,  # max norm(delta_theta) per iteration (rad). Optimized: 0.3 for 6-DOF stability, 0.1 for 2-DOF
+        # DLS lambda: 2e-2 for 6-DOF, 1e-2 for 2-DOF.
+        damping: float = 2e-2,
+        # Max step norm (rad): 0.3 for 6-DOF, 0.1 for 2-DOF.
+        step_cap: float = 0.3,
         png_name: str = "ik_residuals.png",
         weight_orientation: float = 1.0,  # scale for rotational error in solve step
         weight_position: float = 1.0,  # scale for translational error in solve step
@@ -346,7 +348,7 @@ class _InverseKinematicsConcern:
             theta_current: Current joint angles (required for 'extrapolate')
             T_current: Current end-effector pose (required for 'extrapolate')
             cache: IKInitialGuessCache instance (required for 'cached')
-            auto_fallback: If True, try other strategies if primary fails (default: True)
+            auto_fallback: Try other strategies if the primary strategy fails.
             Other args same as iterative_inverse_kinematics()
 
         Returns:
@@ -562,7 +564,8 @@ class _InverseKinematicsConcern:
 
                 if verbose:
                     print(
-                        f"  ✗ Failed (pos_err={pos_err*1000:.2f}mm, rot_err={_runtime.np.degrees(rot_err):.2f}°)"
+                        f"  ✗ Failed (pos_err={pos_err*1000:.2f}mm, "
+                        f"rot_err={_runtime.np.degrees(rot_err):.2f}°)"
                     )
 
                 if error < best_error:

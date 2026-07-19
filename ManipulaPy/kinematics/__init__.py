@@ -4,9 +4,9 @@
 """
 Kinematics Module - ManipulaPy
 
-This module provides classes and functions for performing kinematic analysis and computations
-for serial manipulators, including forward and inverse kinematics, Jacobian calculations,
-and end-effector velocity calculations.
+This module provides classes and functions for performing kinematic analysis
+and computations for serial manipulators, including forward and inverse
+kinematics, Jacobian calculations, and end-effector velocity calculations.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
@@ -27,12 +27,12 @@ You should have received a copy of the GNU Affero General Public License
 along with ManipulaPy. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union  # noqa: F401
 
-import numpy as np
-from numpy.typing import NDArray
+import numpy as np  # noqa: F401
+from numpy.typing import NDArray  # noqa: F401
 
-from .. import utils
+from .. import utils  # noqa: F401
 from .serial_manipulator import SerialManipulator
 from .trac_ik import TracIKSolver, trac_ik_solve
 from .ik_helpers import (
