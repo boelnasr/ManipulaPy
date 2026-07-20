@@ -75,37 +75,32 @@ METHOD_OWNERS = {
     "update_simulation_parameters": "controllers",
     "save_joint_states": "controllers",
 }
+# Computed from the pre-split Simulation methods at commit 8883728 with the
+# normalizer above (docstrings included; only ``_runtime.<name>`` reads unwrapped).
 AST_HASHES = {
-    "set_robot_models": "394d5423b656cdcd5bade81acd1174d61b47794522f44c122908f27fc18cde39",
-    "initialize_planner_and_controller": "f76b23aae28e4496f2bf66fa5f6122f6db6cefd6f9eabcc269396b60a557b85a",
-    "add_joint_parameters": "112feedcb1984635f6532c2cbb6a1f65ed1b2caef512946b0a58da654c17cf94",
-    "add_reset_button": "e2a77cce8f2cbbeda5c5b3b53bd849f7ed359639fc42442ab23256db3d85a382",
-    "set_joint_positions": "60c4f7ce9985ca9dcaed41c1a14c4e45a5ffd292e31489a2cabcac43ab9d8767",
-    "get_joint_positions": "1abfcaf1c4b157edaa74a670b64fd934955fc86b2bf060f52908dbc4afbfbe9b",
-    "_capsule_line": "28132ae6f8c8f354ce952f5d4b76742e7ade987c0e0e78b3967a5db3443ddb1f",
-    "plot_trajectory": "d9fbe12e336593419b9076f5c1f2d0fc0a99e63af9f699106e69bcfe0c9eedcf",
-    "_add_trajectory_markers": "7ce392dec13d9840a185835884bdc44fd784e92ab3f0771096c298623e8cf392",
-    "clear_trajectory_visualization": "296d5b0f7d7183fdede450d39b70095159b0a58af7d662897dfbabc193144614",
-    "get_joint_parameters": "eb5bf4d488a9fa07a80fa90be24dea68269d0952e3f3d7660f00f9b2bce98895",
-    "add_additional_parameters": "2f9aa60e05bd8c30337d45a7dcc2cf43d6db7e2c9f10bb65b18b147aee67d5ad",
-    "update_simulation_parameters": "13b400b2bab0a02e40c5eef8ed2f9e599968037cf575f3b16c812b52919cdccc",
-    "save_joint_states": "52befa70e5b734f3da9a5dae4f675f3af21b3cde2ad998261c694a2e4a4d311e",
-    "plot_trajectory_in_scene": "677344b4df3230b0362fd8d8dd638eace5d797c7bf0f906a09f3a919b5e7054a",
+    "set_robot_models": "8d38282263747804a56f4f3171c76e893c9f666f1ced5b6718e3f8eba2d7515d",
+    "initialize_planner_and_controller": "f72c9e238ca1b0a36b7a99c88f5bf2719b0fca5dddfc5ee01494da345c084ae2",
+    "add_joint_parameters": "f2f823b0ca73d0cc8d8f9dd139cd539e9e2dc99bc9d4fd5f02d9bdaed5056c38",
+    "add_reset_button": "d23102d91232c061583586e86aa40bd34f6f13f924cba5fa96c76d1c2cef31f2",
+    "set_joint_positions": "5b20965bebb15fe3b9748f1dfc9a2f81af5ddc99dd3f590b49536d4fc668d1e3",
+    "get_joint_positions": "a1f679e1dd2ab1f127457aa59f1ff243543b8a797dc90255b0bf9d1239fea698",
+    "_capsule_line": "cf21479ee87e554d939067b5b2f3e5ba3d686b51f52f6dc52c8b4a343ad2720b",
+    "plot_trajectory": "0f2ecf33eac917bc7ce1b05153fd129687546b56a9f9f07b1b58304951d0228f",
+    "_add_trajectory_markers": "f03acc71907fdda6c37e5eb2ae001e6563b02fa0bb0ac5aeddcfc3ffed457ea8",
+    "clear_trajectory_visualization": "69cd20579e0a612795128e6cde83150e8cdfb886af9e84203473e934539eac2c",
+    "get_joint_parameters": "0758c8f00aa10d74af6e5ab170c840b8d492a1b82a5ff840888aecc29cca2fd0",
+    "add_additional_parameters": "9c485580865cc64465dee0a8590364a6fe54b15725291aa92a53022a2ba33fdc",
+    "update_simulation_parameters": "8159c1193671409325f0ed4de3075e334152d854e1c239b8635e2a659cb94f9b",
+    "save_joint_states": "364d87751984c01593d6d66fe2c5494f67046a9104df58caa81ae0f74f21bf43",
+    "plot_trajectory_in_scene": "a9e658c9c129957ba600639238cafd9ed95b3a5f9f3d7669de26e85f1fe5eea7",
 }
 
 
 class _RuntimeNormalizer(ast.NodeTransformer):
-    def visit_FunctionDef(self, node):
-        node = self.generic_visit(node)
-        if (
-            node.body
-            and isinstance(node.body[0], ast.Expr)
-            and isinstance(node.body[0].value, ast.Constant)
-            and isinstance(node.body[0].value.value, str)
-        ):
-            node.body.pop(0)
-        return node
-
+    # Docstrings are intentionally NOT stripped: a pure relocation moves the
+    # docstring verbatim too, so the hash must guard it. Only the historical
+    # ``p``/``pybullet_data``/... reads rewritten to ``_runtime.<name>`` in the
+    # moved methods are normalized back, so the hash matches the pre-split body.
     def visit_Attribute(self, node):
         node = self.generic_visit(node)
         if (
