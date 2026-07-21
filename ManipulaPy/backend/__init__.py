@@ -96,18 +96,43 @@ def _ensure_cupy_registered() -> None:
         _REGISTRY["cupy"] = CupyBackend()
 
 
+def _ensure_torch_registered() -> None:
+    """Register the Torch backend on first request, if Torch is importable.
+
+    Raises:
+        ImportError: if PyTorch is not installed. Kept out of the eager import
+            path so NumPy-only machines can import ManipulaPy.
+    """
+    with _LOCK:
+        if "torch" in _REGISTRY:
+            return
+        if importlib.util.find_spec("torch") is None:
+            raise ImportError(
+                "The 'torch' backend was requested but PyTorch is not installed. "
+                "Install PyTorch, e.g. `pip install torch`, "
+                "or select another backend such as 'numpy'."
+            )
+        from .torch_backend import TorchBackend
+
+        _REGISTRY["torch"] = TorchBackend()
+
+
 def get_registered(name: str) -> ArrayBackend:
     """Return the backend registered under ``name``.
 
-    Triggers lazy CuPy registration for ``name == "cupy"``.
+    Triggers lazy CuPy registration for ``name == "cupy"`` and lazy Torch
+    registration for ``name == "torch"``.
 
     Raises:
         ValueError: if ``name`` is not registered (message lists the
             registered names).
-        ImportError: if ``name == "cupy"`` but CuPy is not installed.
+        ImportError: if ``name == "cupy"`` but CuPy is not installed, or
+            ``name == "torch"`` but PyTorch is not installed.
     """
     if name == "cupy":
         _ensure_cupy_registered()
+    elif name == "torch":
+        _ensure_torch_registered()
     with _LOCK:
         if name not in _REGISTRY:
             known = ", ".join(sorted(_REGISTRY)) or "<none>"
