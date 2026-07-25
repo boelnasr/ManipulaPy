@@ -68,7 +68,7 @@ EXPECTED_AST_HASHES = {
         "754de6e616da952ebfdc5dc5c0f6125e0d02cc959fdbe1528490686d454a660a"
     ),
     "end_effector_pose": (
-        "10ee7b444f410812f247b1a88f92c180cd09b0ed2d3bff8a7035e56d2e55363b"
+        "49f705605179ff6e4f41261e45d2169b2b7b7e42fa67c3e63fb3129b122fd4a0"
     ),
     "jacobian": "f1528668ce0432c30b2edcea360c9976ad959ca15d60e042151dddf246a22a4f",
     "end_effector_velocity": (
@@ -321,13 +321,14 @@ def test_runtime_utils_supports_set_restore_and_delete():
 def test_runtime_numpy_supports_set_restore_and_delete():
     robot = _robot()
     original = implementation.np
+    identity = np.eye(4)
 
     class TrackingNumpy:
         calls = 0
 
         def __getattr__(self, name):
             value = getattr(original, name)
-            if name == "concatenate":
+            if name == "trace":
 
                 def tracked(*args, **kwargs):
                     self.calls += 1
@@ -339,13 +340,13 @@ def test_runtime_numpy_supports_set_restore_and_delete():
     tracking = TrackingNumpy()
     try:
         implementation.np = tracking
-        robot.end_effector_pose([0.0])
+        robot._pose_error(identity, identity)
         assert tracking.calls == 1
         implementation.np = original
-        robot.end_effector_pose([0.0])
+        robot._pose_error(identity, identity)
         assert tracking.calls == 1
         del implementation.np
         with np.testing.assert_raises(AttributeError):
-            robot.end_effector_pose([0.0])
+            robot._pose_error(identity, identity)
     finally:
         implementation.np = original

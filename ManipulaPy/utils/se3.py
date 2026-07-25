@@ -104,6 +104,29 @@ def MatrixLog6(T) -> NDArray:
     return b.where(theta < 1e-6, translation, rotational)
 
 
+def _exp6_trans_coeffs(b: Any, theta_sq: Any) -> Tuple[Any, Any]:
+    """Return the SE(3) translation coefficients ``((1-cos th)/th^2, (th-sin th)/th^3)``.
+
+    Both are even functions of ``theta`` (smooth in ``theta^2``, so no ``sqrt``
+    feeds the graph near zero) and therefore have a finite gradient through
+    ``theta = 0``. Near the identity (``theta^2 < 1e-4``, i.e. ``theta < 1e-2``)
+    the Taylor series is used; elsewhere the exact form with ``theta`` clamped
+    away from zero so the inactive branch's gradient stays finite. The band is set
+    by where the exact forms' *backward* pass stops cancelling catastrophically
+    (the ``(th - sin th)/th^3`` gradient error is ~128 at ``theta = 1e-6`` and only
+    falls below ~1e-10 near ``theta ~ 1e-2``), not merely where the primal is
+    finite; the too-small ``1e-12`` cutoff left the exact backward corrupt just
+    above it.
+    """
+    near_zero = theta_sq < 1e-4
+    theta_safe = b.sqrt(b.maximum(theta_sq, b.asarray(1e-12)))
+    c1_exact = (1 - b.cos(theta_safe)) / (theta_safe * theta_safe)
+    c2_exact = (theta_safe - b.sin(theta_safe)) / (theta_safe * theta_safe * theta_safe)
+    c1_taylor = 0.5 - theta_sq / 24.0 + theta_sq * theta_sq / 720.0
+    c2_taylor = 1.0 / 6.0 - theta_sq / 120.0 + theta_sq * theta_sq / 5040.0
+    return b.where(near_zero, c1_taylor, c1_exact), b.where(near_zero, c2_taylor, c2_exact)
+
+
 def MatrixExp6(se3mat) -> NDArray:
     """Compute the SE(3) exponential of an se(3) matrix."""
     b = get_backend()
@@ -112,14 +135,20 @@ def MatrixExp6(se3mat) -> NDArray:
         raise ValueError("Input matrix must be of shape (4, 4)")
     omega_theta = b.stack((se3mat[2, 1], se3mat[0, 2], se3mat[1, 0]))
     v = se3mat[:3, 3]
-    theta = b.norm(omega_theta)
-    safe_theta = b.maximum(theta, b.asarray(1e-12))
-    omega_hat = se3mat[:3, :3] / safe_theta
-    G = (b.eye(3) * theta + (1 - b.cos(theta)) * omega_hat
-         + (theta - b.sin(theta)) * b.matmul(omega_hat, omega_hat))
-    general = _homogeneous(MatrixExp3(se3mat[:3, :3]), b.matmul(G, v) / safe_theta)
-    translation = _homogeneous(b.eye(3), v)
-    return b.where(theta < 1e-6, translation, general)
+    K = se3mat[:3, :3]
+    theta_sq = (
+        omega_theta[0] * omega_theta[0]
+        + omega_theta[1] * omega_theta[1]
+        + omega_theta[2] * omega_theta[2]
+    )
+    # Rotational part reuses the (locally smooth) SO(3) exponential; translation
+    # is p = [I + C1*K + C2*K^2] v with C1 = (1-cos th)/th^2, C2 = (th-sin th)/th^3.
+    # Folding the small-angle branch into the Taylor-safe coefficients (instead of
+    # a where onto a constant) keeps dT/dtheta correct and finite at theta = 0.
+    coeff_c1, coeff_c2 = _exp6_trans_coeffs(b, theta_sq)
+    k_v = b.matmul(K, v)
+    p = v + coeff_c1 * k_v + coeff_c2 * b.matmul(K, k_v)
+    return _homogeneous(MatrixExp3(K), p)
 
 
 def VecTose3(V) -> NDArray:
