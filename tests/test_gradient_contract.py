@@ -687,3 +687,243 @@ class TestProductionGradientContract:
 
         assert np.all(np.isfinite(actual))
         np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+
+def _requires_jax():
+    """Import JAX with x64 enabled, or skip.
+
+    The backend enables x64 itself when it is registered, but these tests build
+    JAX arrays directly, so the flag is set here too: without it JAX silently
+    computes in float32 and the finite-difference comparisons below would be
+    measuring float32 noise rather than the gradient contract.
+    """
+    jax = pytest.importorskip("jax", exc_type=ImportError)
+    jax.config.update("jax_enable_x64", True)
+    return jax, pytest.importorskip("jax.numpy", exc_type=ImportError)
+
+
+class TestJaxProductionGradientContract:
+    """jax.grad/jacrev through production dispatch matches finite differences.
+
+    The mirror of :class:`TestProductionGradientContract`. The JAX tests
+    earlier in this file differentiate test-local prototypes; these go through
+    ``use_backend("jax")`` and the real ManipulaPy entry points, so they pin the
+    differentiable contract on the shipped code rather than on a re-derivation
+    of it.
+    """
+
+    @pytest.mark.parametrize("configuration", FK_CONFIGS)
+    def test_forward_kinematics_jacobian_matches_finite_difference(self, configuration):
+        jax, jnp = _requires_jax()
+
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            actual = np.asarray(
+                jax.jacrev(lambda v: dyn.forward_kinematics(v).reshape(-1))(q)
+            )
+
+            def fk_flat(x):
+                return np.asarray(dyn.forward_kinematics(jnp.asarray(x))).reshape(-1)
+
+            expected = _central_jacobian(fk_flat, configuration)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    @pytest.mark.parametrize("configuration", FK_CONFIGS)
+    def test_inverse_dynamics_jacobian_zero_velocity(self, configuration):
+        jax, jnp = _requires_jax()
+
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            dq = jnp.zeros(2, dtype=jnp.float64)
+            ddq = jnp.asarray([0.05, 0.1], dtype=jnp.float64)
+            g = jnp.asarray([0.0, -9.81, 0.0], dtype=jnp.float64)
+            Ftip = jnp.asarray([0.0, 0.0, 0.3, 1.0, -0.5, 0.0], dtype=jnp.float64)
+
+            def idf(v):
+                return dyn.inverse_dynamics(v, dq, ddq, g, Ftip)
+
+            actual = np.asarray(jax.jacrev(idf)(q))
+            expected = _central_jacobian(
+                lambda x: np.asarray(idf(jnp.asarray(x))), configuration
+            )
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    def test_inverse_dynamics_jacobian_nonzero_velocity(self):
+        jax, jnp = _requires_jax()
+
+        configuration = np.array([0.31, -1.17])
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            dq = jnp.asarray([0.1, 0.2], dtype=jnp.float64)
+            ddq = jnp.asarray([0.05, 0.1], dtype=jnp.float64)
+            g = jnp.asarray([0.0, -9.81, 0.0], dtype=jnp.float64)
+            Ftip = jnp.asarray([0.0, 0.0, 0.3, 1.0, -0.5, 0.0], dtype=jnp.float64)
+
+            def idf(v):
+                return dyn.inverse_dynamics(v, dq, ddq, g, Ftip)
+
+            actual = np.asarray(jax.jacrev(idf)(q))
+            expected = _central_jacobian(
+                lambda x: np.asarray(idf(jnp.asarray(x))), configuration
+            )
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    def test_mass_matrix_cache_is_bypassed_under_jax(self):
+        """A traced mass matrix must not be served from the value-keyed cache.
+
+        ``JaxBackend.is_concrete`` is False precisely so this cache is skipped:
+        a tracer has no host-readable value to key on, and a cached NumPy
+        matrix would silently sever the gradient.
+        """
+        jax, jnp = _requires_jax()
+
+        configuration = np.array([0.31, -1.17])
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            grad = np.asarray(jax.grad(lambda v: dyn.mass_matrix(v).sum())(q))
+
+        assert np.all(np.isfinite(grad))
+        assert np.any(grad != 0.0), "mass matrix gradient was severed by the cache"
+
+    def test_matrix_exp3_gradient_is_correct_at_exactly_zero_angle(self):
+        """d/dtheta of a z-rotation at theta=0 is 1 for the [1, 0] entry.
+
+        The Taylor branch must carry a gradient here; a naive ``sin(t)/t``
+        yields 0/0 and a ``where`` over it leaks NaN into the backward pass.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            axis = jnp.asarray([0.0, 0.0, 1.0], dtype=jnp.float64)
+
+            def entry(t):
+                return utils.MatrixExp3(utils.VecToso3(axis * t))[1, 0]
+
+            grad = float(jax.grad(entry)(jnp.asarray(0.0, dtype=jnp.float64)))
+
+        np.testing.assert_allclose(grad, 1.0, rtol=1e-10, atol=1e-12)
+
+    @pytest.mark.parametrize("axis", TestProductionGradientContract._PI_AXES)
+    def test_matrix_log3_gradient_is_finite_at_exactly_pi(self, axis):
+        """theta=pi is a branch point; the gradient must still be finite.
+
+        Coordinate axes are kept in the parametrisation because only they make
+        cos_theta land on exactly -1.0, which is what turns an unclamped
+        arccos in the inactive branch into 0 * inf = NaN.
+        """
+        jax, jnp = _requires_jax()
+
+        axis_np = np.asarray(axis, dtype=float)
+        with use_backend("jax"):
+            def rotvec(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.skew_symmetric_to_vector(utils.MatrixLog3(R))
+
+            actual = np.asarray(jax.jacrev(rotvec)(jnp.asarray(np.pi)))
+
+        assert np.all(np.isfinite(actual)), f"non-finite gradient at pi: {actual}"
+
+    @pytest.mark.parametrize("axis", TestProductionGradientContract._PI_AXES)
+    def test_rotation_logm_gradient_is_finite_at_exactly_pi(self, axis):
+        """``rotation_logm`` is the form the angle IK differentiates."""
+        jax, jnp = _requires_jax()
+
+        axis_np = np.asarray(axis, dtype=float)
+        with use_backend("jax"):
+            def axis_sum(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.rotation_logm(R)[0].sum()
+
+            def angle_out(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.rotation_logm(R)[1]
+
+            pi = jnp.asarray(np.pi)
+            ax_grad = np.asarray(jax.grad(axis_sum)(pi))
+            th_grad = np.asarray(jax.grad(angle_out)(pi))
+
+        assert np.all(np.isfinite(ax_grad))
+        assert np.all(np.isfinite(th_grad))
+
+    @pytest.mark.parametrize("gap", [1e-7, 1e-5, 1e-3])
+    def test_matrix_log3_gradient_near_pi_matches_finite_difference(self, gap):
+        """Near pi the recovered angle must be accurate, not merely finite.
+
+        ``arccos(cos theta)`` is ill-conditioned here because cos theta is
+        *quadratic* in the gap; the shipped ``atan2`` form is linear in it and
+        so keeps full precision. A regression shows up as a gradient error
+        proportional to the value error, not as a NaN.
+        """
+        jax, jnp = _requires_jax()
+
+        axis_np = np.asarray(TestProductionGradientContract._LOG3_PI_AXIS, dtype=float)
+        theta_val = np.pi - gap
+        with use_backend("jax"):
+            def rotvec(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.skew_symmetric_to_vector(utils.MatrixLog3(R))
+
+            actual = np.asarray(jax.jacrev(rotvec)(jnp.asarray(theta_val)))
+
+        # d/dtheta log(exp(n * theta)) = n for theta in (0, pi).
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, axis_np, rtol=1e-5, atol=1e-6)
+
+    @pytest.mark.parametrize("theta_val", TestProductionGradientContract._EXP_THETAS)
+    def test_matrix_exp3_gradient_sweep_matches_finite_difference(self, theta_val):
+        jax, jnp = _requires_jax()
+
+        axis = np.array([0.0, 0.0, 1.0])
+        with use_backend("jax"):
+            def rotation(t):
+                return utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis, dtype=jnp.float64) * t)
+                ).reshape(-1)
+
+            actual = np.asarray(jax.jacrev(rotation)(jnp.asarray(theta_val)))
+
+            step = 1e-6
+            expected = (
+                np.asarray(rotation(jnp.asarray(theta_val + step)))
+                - np.asarray(rotation(jnp.asarray(theta_val - step)))
+            ) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    @pytest.mark.parametrize("configuration", FK_CONFIGS)
+    def test_forward_kinematics_jacobian_survives_jit(self, configuration):
+        """The FK jacobian is unchanged when the whole thing is jit-compiled.
+
+        Eager JAX tolerates host-side control flow that ``jit`` rejects, so
+        compiling is the stricter check that no tracer leaks to the host on the
+        core-math path.
+        """
+        jax, jnp = _requires_jax()
+
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            jac = jax.jacrev(lambda v: dyn.forward_kinematics(v).reshape(-1))
+            eager = np.asarray(jac(q))
+            compiled = np.asarray(jax.jit(jac)(q))
+
+        np.testing.assert_allclose(compiled, eager, rtol=1e-12, atol=1e-14)
