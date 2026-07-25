@@ -51,7 +51,7 @@ def _pi_axis(R: Any) -> Any:
     locally constant multiplier, so it does not perturb the gradient.
     """
     b = get_backend()
-    eps = b.asarray(1e-12)
+    eps_sq = b.asarray(1e-24)
     cos_theta = b.clip((b.trace(R) - 1) / 2, -1.0, 1.0)
     sym = 0.5 * (R + R.T) - cos_theta * b.eye(3)
     vee = b.stack((R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]))
@@ -61,7 +61,14 @@ def _pi_axis(R: Any) -> Any:
     use2 = sym[2, 2] >= 1e-6
     use1 = (sym[1, 1] >= 1e-6) & ~use2
     candidate = b.where(use2, c2, b.where(use1, c1, c0))
-    axis = candidate / b.maximum(b.norm(candidate), eps)
+    # The floor is applied to the SQUARED norm, before the square root. Near the
+    # identity ``sym`` -- and hence ``candidate`` -- vanishes, and clamping after
+    # ``norm`` would guard only the value: ``d|c|/dc = c/|c|`` is already 0/0 at
+    # that point, so the clamp turns NaN into 0 * NaN and poisons the backward
+    # pass for every theta below ~1e-2. Flooring the argument keeps the sqrt
+    # derivative finite while ``d(c.c)/dc = 2c`` vanishes honestly. Same
+    # masking trap, and the same remedy, as ``_log_angle``.
+    axis = candidate / b.sqrt(b.maximum(b.sum(candidate * candidate), eps_sq))
     sign_ref = b.where(use2, vee[2], b.where(use1, vee[1], vee[0]))
     sign = b.where(sign_ref >= 0, b.asarray(1.0), b.asarray(-1.0))
     return sign * axis

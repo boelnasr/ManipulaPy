@@ -267,10 +267,19 @@ class Singularity:
         # Host public boundary: NaN ratio (0/0, or an inf-input spectrum) is
         # reported as an infinite condition number, preserving the input dtype
         # exactly as np.linalg.cond does.
-        value = backend.to_numpy(ratio)[()]
-        if np.isnan(value):
-            value = type(value)(np.inf)
-        return value
+        if backend.is_concrete:
+            value = backend.to_numpy(ratio)[()]
+            if np.isnan(value):
+                value = type(value)(np.inf)
+            return value
+        # A traced backend has no host-readable value, so reading one here would
+        # raise (JAX) or silently detach the graph (Torch). The ratio stays
+        # backend-native and the NaN -> inf substitution is expressed with
+        # backend ops, which keeps this metric differentiable -- singularity is
+        # inside the differentiable contract. ``ratio != ratio`` is the NaN test
+        # because the protocol exposes ``isfinite``, which cannot separate NaN
+        # from the infinity being substituted in.
+        return backend.where(ratio != ratio, backend.asarray(float("inf")), ratio)
 
     def near_singularity_detection(
         self,

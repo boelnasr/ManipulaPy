@@ -437,9 +437,13 @@ def _clip_to_limits(
         if mx is not None:
             upper[i] = mx
 
+    # The +/-inf bounds are float64, so the comparison would widen a float32 or
+    # integer vector. Casting back reproduces what assigning into the
+    # preallocated copy did, including the truncation an integer vector saw.
     if backend.is_backend_array(theta):
-        return backend.minimum(backend.maximum(theta, lower), upper)
-    return np.minimum(np.maximum(theta, lower), upper)
+        clipped = backend.minimum(backend.maximum(theta, lower), upper)
+        return backend.asarray(clipped, dtype=theta.dtype)
+    return np.minimum(np.maximum(theta, lower), upper).astype(theta.dtype)
 
 
 def adaptive_multi_start_ik(

@@ -29,9 +29,11 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 
 import threading
 import types
+from unittest import mock
 
 import numpy as np
 import pytest
+import scipy.optimize
 
 from ManipulaPy.backend import use_backend
 from ManipulaPy.control import ManipulatorController
@@ -224,6 +226,54 @@ def test_clip_to_limits_keeps_a_host_numpy_seed_on_the_host():
 
 
 @requires_jax
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, np.int64])
+def test_clip_to_limits_preserves_the_input_dtype(dtype):
+    """Clipping does not widen the vector it was given.
+
+    The replaced code assigned into a copy of ``theta``, so the result kept
+    ``theta``'s dtype and an integer vector truncated the bound. The +/-inf
+    bound arrays are float64 and would otherwise widen both, which is reachable
+    through float32 TRAC-IK seeds and ``IKInitialGuessCache.get_nearest``.
+    """
+    import jax.numpy as jnp
+
+    limits = [(-1.25, 1.25), (None, None)]
+    expected = np.array([1.25, 3.0]).astype(dtype)
+
+    with use_backend("jax"):
+        backend_out = _clip_to_limits(jnp.asarray(np.array([2, 3], dtype=dtype)), limits)
+        host_out = _clip_to_limits(np.array([2, 3], dtype=dtype), limits)
+
+    assert np.asarray(backend_out).dtype == dtype
+    assert host_out.dtype == dtype
+    np.testing.assert_array_equal(np.asarray(backend_out), expected)
+    np.testing.assert_array_equal(host_out, expected)
+
+
+@requires_jax
+def test_pinv_float32_cutoff_matches_numpy():
+    """A float32 singular value on NumPy's rcond cutoff is kept, not zeroed.
+
+    NumPy evaluates ``s > rcond * max(s)`` in float64 even for float32 input;
+    JAX compares in the input precision, so a value landing exactly on the
+    cutoff was dropped where NumPy retains it.
+    """
+    import jax.numpy as jnp
+
+    from ManipulaPy.backend import get_registered
+
+    matrix = np.zeros((6, 2), dtype=np.float32)
+    matrix[3, 0] = 1.0
+    matrix[4, 1] = np.float32(1e-15)
+    probe = np.array([0, 0, 0, 0, 1, 0], dtype=np.float32)
+
+    expected = np.asarray(get_registered("numpy").pinv(matrix)) @ probe
+    observed = np.asarray(get_registered("jax").pinv(jnp.asarray(matrix))) @ probe
+
+    np.testing.assert_allclose(observed, expected, rtol=1e-6)
+
+
+@requires_jax
 def test_clip_to_limits_ignores_limits_beyond_the_vector():
     """Extra ``joint_limits`` entries and absent bounds leave values untouched.
 
@@ -346,31 +396,81 @@ def test_trac_ik_solve_runs_through_the_slsqp_boundary_under_jax():
     T_desired = robot.forward_kinematics(_THETA, frame="space")
     seed = np.array([0.15, -0.25, 0.35])
 
-    with use_backend("jax"):
-        theta, success, _ = solver.solve(T_desired, seed, timeout=_JAX_SOLVE_TIMEOUT)
+    captured = {}
+    real_minimize = scipy.optimize.minimize
 
-    theta = np.asarray(theta)
-    assert success, "TRAC-IK did not converge under JAX"
-    assert not np.allclose(theta, seed), "solver returned the seed untouched"
-    reached = np.asarray(robot.forward_kinematics(theta, frame="space"))
-    np.testing.assert_allclose(reached, np.asarray(T_desired), atol=1e-3)
+    def spy(fun, x0, *args, **kwargs):
+        captured["x0"] = x0
+        jac = kwargs.get("jac")
+        if jac is not None:
+            captured["grad"] = jac(x0)
+        return real_minimize(fun, x0, *args, **kwargs)
+
+    # `solve` races DLS against SQP and DLS wins on this fixture, so calling it
+    # would never touch SciPy. The SQP path is invoked directly instead.
+    with use_backend("jax"):
+        with mock.patch.object(scipy.optimize, "minimize", spy):
+            theta, success, err = solver._sqp_solver(
+                T_desired, seed, 1e-4, 1e-4, _JAX_SOLVE_TIMEOUT, threading.Event()
+            )
+
+    assert "x0" in captured, "SLSQP was never reached"
+    # SciPy must receive host arrays, never a JAX array.
+    assert type(captured["x0"]) is np.ndarray, f"leaked {type(captured['x0'])} as x0"
+    assert type(captured["grad"]) is np.ndarray, f"leaked {type(captured['grad'])}"
+
+    # The SQP fallback does not converge on this fixture -- it stalls at the
+    # seed under NumPy too, identically -- so what is pinned here is the
+    # boundary contract and backend agreement, not convergence. Asserting
+    # success would be asserting a pre-existing solver weakness.
+    theta_np, success_np, err_np = solver._sqp_solver(
+        T_desired, seed, 1e-4, 1e-4, _JAX_SOLVE_TIMEOUT, threading.Event()
+    )
+    assert success is success_np
+    np.testing.assert_allclose(np.asarray(theta), np.asarray(theta_np), atol=1e-5)
+    np.testing.assert_allclose(err, err_np, rtol=1e-5)
+
+
+# Half-turn axes driving each possible ``argmax`` of the rotation-error
+# diagonal. The coordinate axes alone are NOT sufficient: for them every
+# off-diagonal numerator R_err[k, j] is zero, so a rewrite that simply zeroed
+# the non-k components would reproduce them exactly. The oblique axes give
+# non-zero numerators, so the quotient itself is under test. Each is a unit
+# vector whose largest component sits at a different index.
+_OBLIQUE = (0.8, 0.5, 0.331662479)
+_HALF_TURN_AXES = [
+    ([1.0, 0.0, 0.0], "x"),
+    ([0.0, 1.0, 0.0], "y"),
+    ([0.0, 0.0, 1.0], "z"),
+    ([_OBLIQUE[0], _OBLIQUE[1], _OBLIQUE[2]], "oblique-k0"),
+    ([_OBLIQUE[1], _OBLIQUE[0], _OBLIQUE[2]], "oblique-k1"),
+    ([_OBLIQUE[1], _OBLIQUE[2], _OBLIQUE[0]], "oblique-k2"),
+]
 
 
 @requires_jax
-@pytest.mark.parametrize("axis", [0, 1, 2])
+@pytest.mark.parametrize(
+    "axis", [pytest.param(a, id=i) for a, i in _HALF_TURN_AXES]
+)
 def test_trac_ik_half_turn_axis_matches_numpy(axis):
     """The rewritten near-pi axis reconstruction is numerically unchanged.
 
-    The three former ``k == 0/1/2`` branches collapsed to one rule. Feeding the
-    error function an *exact* half turn about each coordinate axis lands on
-    that branch deterministically (a full solve cannot be steered onto it,
-    since it needs the rotation error within 1e-6 of pi), and drives a
-    different ``k`` each time so all three former branches are covered.
+    The three former ``k == 0/1/2`` branches collapsed to one rule: component
+    ``k`` is 1 and each other component ``j`` is
+    ``R_err[k, j] / (1 + R_err[k, k])``. Feeding the error function an *exact*
+    half turn lands on that branch deterministically (a full solve cannot be
+    steered onto it, since it needs the rotation error within 1e-6 of pi), and
+    the axes chosen drive every possible ``k``.
+
+    The recovered rotation vector is checked against ``pi * n`` rather than
+    against the other backend alone, so a rewrite that was wrong the same way
+    everywhere still fails.
     """
     solver = _trac_ik(_robot())
 
-    R = -np.eye(3)
-    R[axis, axis] = 1.0  # pi rotation about `axis`
+    n = np.asarray(axis, dtype=float)
+    n /= np.linalg.norm(n)
+    R = 2.0 * np.outer(n, n) - np.eye(3)  # pi rotation about n
     T_current = np.eye(4)
     T_desired = np.eye(4)
     T_desired[:3, :3] = R
@@ -380,12 +480,13 @@ def test_trac_ik_half_turn_axis_matches_numpy(axis):
         V_jax, rot_jax, trans_jax = solver._default_error_func(T_current, T_desired)
 
     # The half turn puts the rotation error on the branch under test...
-    np.testing.assert_allclose(float(rot_np), np.pi, rtol=1e-12)
-    # ...and the recovered axis is the pure one-hot rotation vector.
-    expected_omega = np.zeros(3)
-    expected_omega[axis] = np.pi
+    np.testing.assert_allclose(float(rot_np), np.pi, rtol=1e-9)
+    # ...and the recovered rotation vector is pi * n, up to the branch's sign
+    # convention (the axis is fixed only up to sign at a half turn).
+    omega_np = np.asarray(V_np)[:3]
+    sign = np.sign(np.dot(omega_np, n)) or 1.0
+    np.testing.assert_allclose(omega_np, sign * np.pi * n, atol=1e-7)
 
-    np.testing.assert_allclose(np.asarray(V_np)[:3], expected_omega, atol=1e-9)
     np.testing.assert_allclose(np.asarray(V_jax), np.asarray(V_np), atol=1e-9)
     np.testing.assert_allclose(float(rot_jax), float(rot_np), rtol=1e-12)
     np.testing.assert_allclose(float(trans_jax), float(trans_np), atol=1e-12)

@@ -813,6 +813,80 @@ class TestJaxProductionGradientContract:
 
         np.testing.assert_allclose(grad, 1.0, rtol=1e-10, atol=1e-12)
 
+    @pytest.mark.parametrize("theta_val", [0.0, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2])
+    def test_matrix_log3_gradient_is_correct_near_the_identity(self, theta_val):
+        """``d/dtheta vee(log(exp(n theta)))`` is exactly ``n``, including at 0.
+
+        The mirror of the Torch zero-angle test, widened into a sweep because
+        the defect it guards was not confined to exactly zero. ``_pi_axis``
+        normalised by ``maximum(norm(candidate), eps)``; near the identity
+        ``candidate`` vanishes, so ``d|c|/dc = c/|c|`` was already 0/0 and the
+        clamp turned it into ``0 * NaN``. Values stayed correct throughout,
+        which is why only a gradient assertion catches it -- and it produced
+        NaN for every theta up to ~1e-2, not just at the endpoint.
+        """
+        jax, jnp = _requires_jax()
+
+        axis_np = np.array([0.0, 0.0, 1.0])
+        with use_backend("jax"):
+            def rotvec(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.skew_symmetric_to_vector(utils.MatrixLog3(R))
+
+            actual = np.asarray(jax.jacrev(rotvec)(jnp.asarray(theta_val)))
+
+        assert np.all(np.isfinite(actual)), f"non-finite gradient: {actual}"
+        np.testing.assert_allclose(actual, axis_np, rtol=1e-9, atol=1e-9)
+
+    def test_condition_number_gradient_matches_finite_difference(self):
+        """``condition_number`` stays differentiable under a traced backend.
+
+        Singularity is inside the differentiable contract, but the metric ended
+        with an unconditional host conversion for the NaN -> inf substitution,
+        which raises ``TracerArrayConversionError`` under ``jax.grad``. The
+        conversion is now gated on ``is_concrete``.
+        """
+        jax, jnp = _requires_jax()
+
+        from ManipulaPy.kinematics import SerialManipulator
+        from ManipulaPy.singularity import Singularity
+
+        screws = np.array(
+            [
+                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, -0.3, 0.0, 0.2],
+                [1.0, 0.0, 0.0, 0.0, 0.4, -0.1],
+            ],
+            dtype=np.float64,
+        ).T
+        home = np.eye(4)
+        home[:3, 3] = [0.7, 0.2, 0.5]
+        robot = SerialManipulator(
+            M_list=home,
+            omega_list=screws[:3, :],
+            S_list=screws,
+            B_list=screws.copy(),
+            joint_limits=[(-3.0, 3.0)] * 3,
+        )
+        analysis = Singularity(robot)
+        configuration = np.array([0.2, -0.3, 0.4])
+
+        with use_backend("jax"):
+            actual = np.asarray(
+                jax.grad(lambda q: analysis.condition_number(q))(
+                    jnp.asarray(configuration, dtype=jnp.float64)
+                )
+            )
+
+        expected = _central_jacobian(
+            lambda x: np.atleast_1d(float(analysis.condition_number(x))), configuration
+        ).reshape(-1)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
     @pytest.mark.parametrize("axis", TestProductionGradientContract._PI_AXES)
     def test_matrix_log3_gradient_is_finite_at_exactly_pi(self, axis):
         """theta=pi is a branch point; the gradient must still be finite.

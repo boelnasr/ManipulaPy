@@ -195,7 +195,16 @@ class JaxBackend(ArrayBackend):
         # default rcond of 1e-15. jnp.linalg.pinv's default rtol is larger
         # (max(M, N) * eps), so a small sv NumPy keeps would be zeroed instead;
         # pass the NumPy-compatible relative cutoff as rtol to match.
-        return jnp.linalg.pinv(self._promote_float(a), rtol=1e-15)
+        a = self._promote_float(a)
+        rtol = 1e-15
+        if a.dtype == jnp.float32:
+            # NumPy evaluates ``s > rcond * max(s)`` in float64 even for float32
+            # input, while JAX compares in the input precision. A float32
+            # singular value landing exactly on the cutoff is therefore dropped
+            # here but kept by NumPy; stepping the tolerance one ulp toward zero
+            # restores the strict inequality NumPy effectively applies.
+            rtol = float(np.nextafter(np.float32(1e-15), np.float32(0)))
+        return jnp.linalg.pinv(a, rtol=rtol)
 
     def solve(self, a: Any, b: Any) -> Any:
         # Mixed precisions promote jointly by np.result_type (so e.g.
