@@ -97,7 +97,8 @@ class _ForwardKinematicsConcern:
         Returns:
             numpy.ndarray: A 6x1 position and Euler-orientation vector.
         """
+        backend = _runtime.get_backend()
         T = self.forward_kinematics(thetalist)
         R, p = _runtime.utils.TransToRp(T)
         orientation = _runtime.utils.rotation_matrix_to_euler_angles(R)
-        return _runtime.np.concatenate((p, orientation))
+        return backend.concatenate((p, orientation))

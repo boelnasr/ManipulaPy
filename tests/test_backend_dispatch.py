@@ -15,6 +15,7 @@ import builtins
 import importlib
 import importlib.util
 import inspect
+import types
 from unittest.mock import patch
 
 import numpy as np
@@ -22,7 +23,6 @@ import pytest
 
 from ManipulaPy import backend as be
 from ManipulaPy import utils
-from ManipulaPy.backend.base import ArrayBackend
 from ManipulaPy.backend.numpy_backend import NumpyBackend
 from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
@@ -31,6 +31,29 @@ from ManipulaPy.potential_field import fields as potential_field_fields
 import ManipulaPy.planning.trajectory_planning as traj_impl
 from ManipulaPy.planning.trajectory_planning import OptimizedTrajectoryPlanning
 from ManipulaPy.singularity import Singularity
+
+
+def _real_torch_available() -> bool:
+    """True only when the *real* PyTorch package is importable.
+
+    ``importlib.util.find_spec("torch")`` cannot be trusted here: this suite's
+    conftest installs a lightweight ``torch`` stand-in in ``sys.modules`` when
+    PyTorch is absent (so unrelated modules stay importable), and that stand-in
+    makes ``find_spec`` report availability on a base install -- which would run
+    the Torch-only tests against the mock and fail instead of skipping. The
+    stand-in is a plain object rather than a real module, so an import plus a
+    module-type check distinguishes it from genuine PyTorch, matching the
+    availability signal conftest computes for its own markers.
+    """
+    try:
+        import torch
+    except Exception:
+        return False
+    return isinstance(torch, types.ModuleType)
+
+
+_HAS_TORCH = _real_torch_available()
+requires_torch = pytest.mark.skipif(not _HAS_TORCH, reason="PyTorch is not installed")
 
 
 # The full protocol surface, mirrored from the call-site audit. Kept here so
@@ -168,6 +191,959 @@ def test_round_trip_to_numpy(name):
     backend = be.get_registered(name)
     result = backend.to_numpy(backend.array([1, 2, 3]))
     np.testing.assert_array_equal(result, np.array([1, 2, 3]))
+
+
+# ---------------------------------------------------------------------------
+# Torch backend (lazily registered; skipped when PyTorch is absent)
+# ---------------------------------------------------------------------------
+
+
+@requires_torch
+def test_torch_selection():
+    """Torch selects and round-trips values when PyTorch is present."""
+    be.set_backend("torch")
+    backend = be.get_backend()
+    result = backend.to_numpy(backend.array([1, 2, 3]))
+    np.testing.assert_array_equal(result, np.array([1, 2, 3]))
+
+
+def test_torch_registration_raises_when_torch_absent():
+    """set_backend('torch') raises an actionable ImportError when PyTorch is not
+    installed. ``find_spec`` is forced to report torch absent and the registry is
+    isolated from any prior torch registration, so the error path is exercised
+    deterministically regardless of whether PyTorch is installed here."""
+    real_find_spec = importlib.util.find_spec
+
+    def _torch_absent(name, *args, **kwargs):
+        if name == "torch":
+            return None
+        return real_find_spec(name, *args, **kwargs)
+
+    registry_without_torch = {k: v for k, v in be._REGISTRY.items() if k != "torch"}
+    with patch.object(be, "_REGISTRY", registry_without_torch), patch(
+        "importlib.util.find_spec", side_effect=_torch_absent
+    ):
+        with pytest.raises(ImportError) as exc:
+            be.set_backend("torch")
+    assert "torch" in str(exc.value).lower()
+
+
+@requires_torch
+@pytest.mark.parametrize("switch", ["set_backend", "use_backend"])
+def test_torch_round_trip(switch):
+    """to_numpy(array([...])) reproduces the source values under torch, via both
+    set_backend and the use_backend context manager."""
+    source = [[1.0, 2.0], [3.0, 4.0]]
+    if switch == "set_backend":
+        be.set_backend("torch")
+        backend = be.get_backend()
+        result = backend.to_numpy(backend.array(source))
+    else:
+        with be.use_backend("torch") as backend:
+            result = backend.to_numpy(backend.array(source))
+    np.testing.assert_allclose(result, np.array(source), rtol=1e-12, atol=1e-12)
+
+
+@requires_torch
+def test_torch_backend_flags_gate_cache_and_gpu_routing():
+    """Torch reports non-concrete (cache bypass) and CPU-default (no GPU routing)."""
+    backend = be.get_registered("torch")
+    assert backend.is_concrete is False
+    assert backend.gpu_capable is False
+
+
+@requires_torch
+def test_torch_default_float_dtype_matches_numpy():
+    """Python-float construction forces float64 on CPU to match NumPy numerics,
+    while explicit dtype handles are honoured."""
+    backend = be.get_registered("torch")
+    # Python floats default to float64 (not torch's float32 default).
+    assert backend.to_numpy(backend.array([1.0, 2.0])).dtype == np.float64
+    assert backend.to_numpy(backend.zeros((2, 2))).dtype == np.float64
+    assert backend.to_numpy(backend.eye(3)).dtype == np.float64
+    # Integer input keeps integer dtype (matching NumPy).
+    assert backend.to_numpy(backend.array([1, 2, 3])).dtype == np.int64
+    # Explicit dtype handles round-trip.
+    assert backend.to_numpy(backend.array([1, 2, 3], dtype=backend.float32)).dtype == (
+        np.float32
+    )
+    assert backend.to_numpy(backend.array([1, 2, 3], dtype=backend.float64)).dtype == (
+        np.float64
+    )
+
+
+@requires_torch
+def test_torch_integer_input_matches_numpy_semantics():
+    """Integer input to float-producing ops promotes to float64 like NumPy.
+
+    NumPy returns float64 for integer input to the transcendental, ``mean``, and
+    linalg operations; Torch would otherwise raise (``mean``/``norm``/linalg) or
+    silently return float32 (``sin``/``cos``/``sqrt``/...). Preserving ops
+    (``sum``/``abs``/``trace``) must keep the integer dtype.
+    """
+    backend = be.get_registered("torch")
+    vec = [1, 2]
+    mat = [[4, 1], [1, 3]]
+
+    # Elementwise transcendental: float64 values matching NumPy.
+    for name in ("sin", "cos", "sqrt", "arccos"):
+        out = getattr(backend, name)(backend.array([0, 1]))
+        assert backend.to_numpy(out).dtype == np.float64, name
+        np.testing.assert_allclose(
+            backend.to_numpy(out), getattr(np, name)(np.array([0, 1])), rtol=1e-7
+        )
+    at = backend.arctan2(backend.array(vec), backend.array(vec))
+    assert backend.to_numpy(at).dtype == np.float64
+    np.testing.assert_allclose(
+        backend.to_numpy(at), np.arctan2(np.array(vec), np.array(vec)), rtol=1e-7
+    )
+
+    # Reductions / linalg that NumPy floats: value + float64 parity.
+    mean_out = backend.mean(backend.array(vec))
+    assert backend.to_numpy(mean_out).dtype == np.float64
+    assert np.isclose(float(mean_out), np.mean(np.array(vec)))
+    norm_out = backend.norm(backend.array(vec))
+    assert backend.to_numpy(norm_out).dtype == np.float64
+    assert np.isclose(float(norm_out), np.linalg.norm(np.array(vec)))
+    for name, npfn in (
+        ("inv", np.linalg.inv),
+        ("pinv", np.linalg.pinv),
+        ("svdvals", lambda m: np.linalg.svd(m, compute_uv=False)),
+    ):
+        out = getattr(backend, name)(backend.array(mat))
+        assert backend.to_numpy(out).dtype == np.float64, name
+        np.testing.assert_allclose(
+            backend.to_numpy(out), npfn(np.array(mat)), rtol=1e-7
+        )
+    solve_out = backend.solve(backend.array(mat), backend.array(vec))
+    assert backend.to_numpy(solve_out).dtype == np.float64
+    np.testing.assert_allclose(
+        backend.to_numpy(solve_out),
+        np.linalg.solve(np.array(mat), np.array(vec)),
+        rtol=1e-7,
+    )
+
+    # Preserving ops keep integer dtype, matching NumPy.
+    assert backend.to_numpy(backend.sum(backend.array(vec))).dtype == np.int64
+    assert backend.to_numpy(backend.abs(backend.array([-1, 2]))).dtype == np.int64
+    assert backend.to_numpy(backend.trace(backend.array(mat))).dtype == np.int64
+
+
+@requires_torch
+def test_torch_linalg_matches_numpy():
+    """The linalg surface (svd/pinv/inv/solve/norm/trace) matches NumPy values."""
+    backend = be.get_registered("torch")
+    a = np.array([[4.0, 1.0], [1.0, 3.0]])
+    b_vec = np.array([1.0, 2.0])
+
+    ta = backend.array(a)
+    # svd: shapes and reconstruction.
+    u, s, vt = backend.svd(ta)
+    assert tuple(u.shape) == (2, 2) and tuple(s.shape) == (2,)
+    np.testing.assert_allclose(
+        backend.to_numpy(s), np.linalg.svd(a, compute_uv=False), rtol=1e-10
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.svdvals(ta)), s.detach().numpy(), rtol=1e-10
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.inv(ta)), np.linalg.inv(a), rtol=1e-10
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.pinv(ta)), np.linalg.pinv(a), rtol=1e-10
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.solve(ta, backend.array(b_vec))),
+        np.linalg.solve(a, b_vec),
+        rtol=1e-10,
+    )
+    assert np.isclose(float(backend.norm(backend.array([3.0, 4.0]))), 5.0)
+    assert np.isclose(float(backend.trace(backend.eye(3))), 3.0)
+
+
+@requires_torch
+def test_torch_use_backend_restores_previous_backend():
+    """use_backend('torch') restores the previously active backend on exit."""
+    be.set_backend("numpy")
+    original = be.get_backend()
+    with be.use_backend("torch") as backend:
+        assert backend.is_backend_array(backend.array([1.0, 2.0]))
+        assert be.get_backend() is not original
+    assert be.get_backend() is original
+
+
+@requires_torch
+def test_torch_use_backend_restores_on_exception():
+    """The previous backend is restored even when the torch-scoped body raises."""
+    be.set_backend("numpy")
+    original = be.get_backend()
+    with pytest.raises(ValueError):
+        with be.use_backend("torch"):
+            raise ValueError("boom")
+    assert be.get_backend() is original
+
+
+@requires_torch
+def test_torch_preserves_autograd_graph():
+    """Backend ops on a grad-tracking tensor keep the graph attached, so the
+    non-concrete cache-bypass contract can protect gradients (Task 12)."""
+    import torch
+
+    theta = torch.tensor([0.1, 0.2, 0.3], dtype=torch.float64, requires_grad=True)
+    backend = be.get_registered("torch")
+    out = backend.sum(backend.sin(backend.matmul(backend.eye(3), theta)))
+    assert out.requires_grad
+    out.backward()
+    assert theta.grad is not None
+    np.testing.assert_allclose(
+        theta.grad.detach().numpy(), np.cos(theta.detach().numpy()), rtol=1e-10
+    )
+
+
+@requires_torch
+def test_torch_exotic_scalar_reduction_keeps_0d_shape():
+    """A NumPy-fallback scalar reduction on an exotic dtype returns a 0-D
+    result like NumPy, not shape ``(1,)`` (the fallback must not upgrade a
+    0-D scalar via ``np.ascontiguousarray``)."""
+    backend = be.get_registered("torch")
+    npb = be.get_registered("numpy")
+    for arr in (np.array([True, False, True]), np.array([[1, 2], [3, 4]], np.uint8)):
+        got = backend.sum(backend.asarray(arr))
+        exp = npb.sum(npb.asarray(arr))
+        assert tuple(got.shape) == np.shape(exp) == ()
+        assert backend.to_numpy(got).item() == np.asarray(exp).item()
+
+
+@requires_torch
+def test_torch_int_index_ops_stay_native_and_trace_safe():
+    """In-range Python int scalars paired with int64 index arrays must stay on
+    the native Torch path (not the value-baking NumPy fallback), so realistic
+    index ops like ``maximum(idx, 0)``/``clip(idx, 0, limit)`` remain trace-safe;
+    an actually out-of-range scalar still matches NumPy's overflow raise."""
+    import torch
+
+    backend = be.get_registered("torch")
+    npb = be.get_registered("numpy")
+
+    # Each op must trace WITHOUT baking in the sample values (the NumPy fallback
+    # would freeze them), so replaying on new data recomputes correctly.
+    traced_max = torch.jit.trace(
+        lambda x: backend.maximum(x, 0), torch.tensor([-1, 1, 3]), check_trace=True
+    )
+    assert traced_max(torch.tensor([-4, 5, 1])).tolist() == [0, 5, 1]
+    traced_clip = torch.jit.trace(
+        lambda x: backend.clip(x, 0, 7), torch.tensor([-1, 5, 9]), check_trace=True
+    )
+    assert traced_clip(torch.tensor([-4, 6, 1])).tolist() == [0, 6, 1]
+    traced_where = torch.jit.trace(
+        lambda x: backend.where(x > 0, x, 0), torch.tensor([-1, 2, -3]), check_trace=True
+    )
+    assert traced_where(torch.tensor([4, -5, 6])).tolist() == [4, 0, 6]
+
+    # Out-of-range weak int still matches NumPy's overflow behavior.
+    int8 = np.array([1, 2], dtype=np.int8)
+    with pytest.raises(OverflowError):
+        npb.maximum(npb.asarray(int8), 128)
+    with pytest.raises(OverflowError):
+        backend.maximum(backend.asarray(int8), 128)
+
+
+@requires_torch
+def test_torch_arctan2_float_weak_scalar_stays_native_and_grads():
+    """arctan2 of a grad-tracking float tensor and a weak Python scalar stays
+    on the native Torch path (autograd preserved) and matches NumPy in value."""
+    import torch
+
+    backend = be.get_registered("torch")
+    npb = be.get_registered("numpy")
+    y = torch.tensor([1.0, 2.0], dtype=torch.float64, requires_grad=True)
+    out = backend.arctan2(y, 1)
+    assert out.requires_grad
+    out.sum().backward()
+    assert y.grad is not None
+    np.testing.assert_allclose(
+        out.detach().numpy(),
+        npb.arctan2(npb.asarray([1.0, 2.0]), 1),
+        rtol=1e-12,
+    )
+
+
+@requires_torch
+def test_torch_tensor_sequence_stack_on_device_preserves_autograd():
+    """Building a matrix from a tensor leaf + Python scalar stacks on the
+    backend device and keeps autograd attached (Finding 1).
+
+    On a CUDA-device backend the CUDA tensor leaf and the CPU-built Python
+    scalar leaf must be co-located before ``torch.stack`` or Torch raises a
+    mixed-device error. Requires a CUDA-capable install; skips otherwise.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA-capable PyTorch is not available")
+    from ManipulaPy.backend.torch_backend import TorchBackend
+
+    backend = TorchBackend(device="cuda")
+    theta = torch.tensor(
+        0.3, dtype=torch.float64, device="cuda", requires_grad=True
+    )
+    mat = backend.array([[torch.cos(theta), 0.0], [0.0, torch.sin(theta)]])
+    assert mat.device.type == "cuda"
+    assert mat.requires_grad
+    mat.sum().backward()
+    assert theta.grad is not None
+
+
+@requires_torch
+def test_torch_negative_stride_ndarray_input():
+    """A negative-stride ndarray constructs without error and preserves values."""
+    backend = be.get_registered("torch")
+    arr = np.arange(6.0)[::-1]
+    out = backend.array(arr)
+    np.testing.assert_allclose(backend.to_numpy(out), arr)
+
+
+@requires_torch
+def test_torch_clip_matches_numpy_dtype_and_bounds():
+    """clip mirrors np.clip dtype and accepts list/tuple bounds (Finding 2)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+
+    # Integer input with scalar float bounds promotes to float64 like NumPy.
+    out = backend.clip(backend.array([0, 2, 4]), 1.5, 3.5)
+    ref = numpy_be.clip(np.array([0, 2, 4]), 1.5, 3.5)
+    assert backend.to_numpy(out).dtype == ref.dtype == np.float64
+    np.testing.assert_allclose(backend.to_numpy(out), ref)
+
+    # Integer input with integer bounds stays integer.
+    out_i = backend.clip(backend.array([0, 2, 4]), 1, 3)
+    assert backend.to_numpy(out_i).dtype == np.int64
+
+    # Float input keeps its dtype.
+    out_f = backend.clip(backend.array([0.0, 2.0, 4.0]), 1.5, 3.5)
+    assert backend.to_numpy(out_f).dtype == np.float64
+
+    # List/tuple bounds are accepted like np.clip.
+    x = np.array([0.0, 5.0, 2.0])
+    out_l = backend.clip(backend.array(x), [1.0, 1.0, 1.0], (3.0, 3.0, 3.0))
+    np.testing.assert_allclose(
+        backend.to_numpy(out_l), np.clip(x, [1.0, 1.0, 1.0], [3.0, 3.0, 3.0])
+    )
+
+
+@requires_torch
+def test_torch_where_accepts_numeric_mask():
+    """where accepts a numeric (non-bool) condition like np.where."""
+    backend = be.get_registered("torch")
+    mask = backend.array([1, 0, 1])
+    out = backend.where(
+        mask, backend.array([1.0, 2.0, 3.0]), backend.array([-1.0, -2.0, -3.0])
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(out),
+        np.where(np.array([1, 0, 1]), [1.0, 2.0, 3.0], [-1.0, -2.0, -3.0]),
+    )
+
+
+@requires_torch
+def test_torch_all_any_return_bool():
+    """all/any return a NumPy-bool result even for uint8 input (Finding 3)."""
+    backend = be.get_registered("torch")
+    for data in ([1, 1, 0], [1, 1, 1]):
+        mask = backend.array(np.array(data, dtype=np.uint8))
+        a = backend.all(mask)
+        assert backend.to_numpy(a).dtype == np.bool_
+        assert bool(a) == bool(np.all(np.array(data)))
+        o = backend.any(mask)
+        assert backend.to_numpy(o).dtype == np.bool_
+        assert bool(o) == bool(np.any(np.array(data)))
+
+
+@requires_torch
+def test_torch_to_numpy_detaches_grad_tensor():
+    """to_numpy detaches and moves to CPU so a grad tensor round-trips."""
+    import torch
+
+    backend = be.get_registered("torch")
+    t = torch.tensor([1.0, 2.0, 3.0], dtype=torch.float64, requires_grad=True)
+    out = backend.to_numpy(t)
+    assert isinstance(out, np.ndarray)
+    np.testing.assert_allclose(out, [1.0, 2.0, 3.0])
+
+
+@requires_torch
+def test_torch_trace_batched_matches_numpy():
+    """trace handles batched (>2D) input like np.trace (Finding 4)."""
+    backend = be.get_registered("torch")
+    batched = np.arange(2 * 3 * 3).reshape(2, 3, 3).astype(float)
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.trace(backend.array(batched))),
+        np.trace(batched),
+    )
+    # The 2D fast path still returns the scalar trace, dtype preserved.
+    mat = np.array([[4, 1], [1, 3]])
+    assert np.isclose(float(backend.trace(backend.array(mat))), np.trace(mat))
+    assert backend.to_numpy(backend.trace(backend.array(mat))).dtype == np.int64
+
+
+@requires_torch
+def test_torch_cross_two_component_matches_numpy():
+    """cross accepts 2-component vectors (scalar z-cross) like np.cross
+    while keeping the 3-vector fast path (Finding 4)."""
+    backend = be.get_registered("torch")
+    a2, b2 = np.array([1.0, 2.0]), np.array([3.0, 4.0])
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.cross(backend.array(a2), backend.array(b2))),
+        np.cross(a2, b2),
+    )
+    a3, b3 = np.array([1.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0])
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.cross(backend.array(a3), backend.array(b3))),
+        np.cross(a3, b3),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Full NumPy dtype-promotion parity (compared against the NumPy backend)
+# ---------------------------------------------------------------------------
+
+
+@requires_torch
+def test_torch_clip_dtype_matrix_matches_numpy():
+    """clip promotes by np.result_type(x, *bounds) across the dtype matrix."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    cases = [
+        # int input + numpy-float32 bounds -> float32 (not float64).
+        (np.array([0, 2, 4], dtype=np.int8), np.float32(1.5), np.float32(3.5)),
+        # int64 + python-float bounds -> float64.
+        (np.array([0, 2, 4], dtype=np.int64), 1.5, 3.5),
+        # float32 input + numpy-float64 bound -> float64.
+        (np.array([0.0, 2.0, 4.0], dtype=np.float32), np.float64(1.5), None),
+        # all-integer bounds keep the integer dtype.
+        (np.array([0, 2, 4], dtype=np.int8), 1, 3),
+        (np.array([0, 2, 4], dtype=np.int32), None, 3),
+        # array bounds of differing precision promote jointly.
+        (
+            np.array([0.0, 5.0, 2.0], dtype=np.float32),
+            np.array([1.0, 1.0, 1.0], dtype=np.float64),
+            (3.0, 3.0, 3.0),
+        ),
+    ]
+    for x, lo, hi in cases:
+        ref = numpy_be.clip(x, lo, hi)
+        out = backend.clip(backend.array(x), lo, hi)
+        assert backend.to_numpy(out).dtype == ref.dtype, (x.dtype, lo, hi)
+        np.testing.assert_allclose(backend.to_numpy(out), ref)
+
+
+@requires_torch
+def test_torch_trace_dtype_matches_numpy():
+    """trace mirrors np.trace's accumulator upcast for every dtype it takes."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    for dt in (np.bool_, np.uint8, np.int32, np.int64, np.float32, np.float64):
+        m = (np.eye(3) * np.arange(1, 4)).astype(dt)
+        ref = numpy_be.trace(m)
+        out = backend.trace(backend.array(m))
+        assert backend.to_numpy(out).dtype == ref.dtype, np.dtype(dt).name
+        np.testing.assert_array_equal(
+            backend.to_numpy(out).astype(np.float64),
+            np.asarray(ref).astype(np.float64),
+        )
+    # Batched (>2D) input follows np.trace (axis1=0, axis2=1) with its dtype.
+    batched = np.arange(2 * 3 * 3).reshape(2, 3, 3).astype(np.int32)
+    ref_b = numpy_be.trace(batched)
+    out_b = backend.trace(backend.array(batched))
+    assert backend.to_numpy(out_b).dtype == ref_b.dtype
+    np.testing.assert_array_equal(backend.to_numpy(out_b), ref_b)
+
+
+@requires_torch
+def test_torch_cross_shapes_and_dtype_match_numpy():
+    """cross matches np.cross value/shape/dtype for 2x2, 3x3, 2x3, 3x2 and
+    heterogeneous operand dtypes."""
+    import warnings
+
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    cases = [
+        (np.array([1.0, 2.0]), np.array([3.0, 4.0])),  # 2x2 -> scalar z
+        (np.array([1.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0])),  # 3x3
+        (np.array([1.0, 2.0]), np.array([3.0, 4.0, 5.0])),  # 2x3
+        (np.array([1.0, 2.0, 3.0]), np.array([4.0, 5.0])),  # 3x2
+        (
+            np.array([1, 2], dtype=np.int32),
+            np.array([3.0, 4.0, 5.0], dtype=np.float32),
+        ),  # 2x3 mixed dtype
+        (
+            np.array([1, 0, 0], dtype=np.int64),
+            np.array([0.0, 1.0, 0.0], dtype=np.float32),
+        ),  # 3x3 mixed dtype
+    ]
+    for a, b in cases:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            ref = numpy_be.cross(a, b)
+        out = backend.cross(backend.array(a), backend.array(b))
+        got = backend.to_numpy(out)
+        assert got.shape == np.asarray(ref).shape, (a.dtype, b.dtype)
+        assert got.dtype == np.asarray(ref).dtype, (a.dtype, b.dtype)
+        np.testing.assert_allclose(got, ref)
+
+
+@requires_torch
+def test_torch_binary_ops_promote_like_numpy():
+    """solve/matmul/maximum/minimum promote both operands via np.result_type."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    a32 = np.array([[4.0, 1.0], [1.0, 3.0]], dtype=np.float32)
+    i64 = np.array([1, 2], dtype=np.int64)
+    v32 = np.array([1.0, 2.0], dtype=np.float32)
+
+    ref_solve = numpy_be.solve(a32, i64)
+    out_solve = backend.solve(backend.array(a32), backend.array(i64))
+    assert backend.to_numpy(out_solve).dtype == ref_solve.dtype
+    np.testing.assert_allclose(backend.to_numpy(out_solve), ref_solve, rtol=1e-6)
+
+    ref_mm = numpy_be.matmul(a32, i64)
+    out_mm = backend.matmul(backend.array(a32), backend.array(i64))
+    assert backend.to_numpy(out_mm).dtype == ref_mm.dtype
+    np.testing.assert_allclose(backend.to_numpy(out_mm), ref_mm, rtol=1e-6)
+
+    for name in ("maximum", "minimum"):
+        ref = getattr(numpy_be, name)(i64, v32)
+        out = getattr(backend, name)(backend.array(i64), backend.array(v32))
+        assert backend.to_numpy(out).dtype == ref.dtype, name
+        np.testing.assert_allclose(backend.to_numpy(out), ref)
+
+
+@requires_torch
+def test_torch_reductions_empty_axis_match_numpy():
+    """axis=() is no-reduction for all six reductions, matching np dtype rules."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    xi8 = np.array([1, 2, 3], dtype=np.int8)
+    xf32 = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    xu8 = np.array([1, 0, 1], dtype=np.uint8)
+    checks = [
+        ("sum", xi8),
+        ("amax", xi8),
+        ("amin", xi8),
+        ("mean", xi8),
+        ("mean", xf32),
+        ("all", xu8),
+        ("any", xu8),
+    ]
+    for name, x in checks:
+        ref = getattr(numpy_be, name)(x, axis=())
+        out = getattr(backend, name)(backend.array(x), axis=())
+        assert backend.to_numpy(out).dtype == ref.dtype, (name, x.dtype)
+        np.testing.assert_array_equal(backend.to_numpy(out), ref)
+
+
+@requires_torch
+def test_torch_argmax_accepts_bool_like_numpy():
+    """argmax accepts a boolean mask; torch.argmax raises on Bool (Finding 1)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    mask = np.array([False, False, True, True])
+    ref = numpy_be.argmax(mask)
+    out = backend.argmax(backend.array(mask))
+    assert int(backend.to_numpy(out)) == int(ref)
+    # 2D boolean input with an axis mirrors np.argmax(axis=...).
+    m = np.array([[False, True], [True, False]])
+    ref2 = numpy_be.argmax(m, axis=1)
+    out2 = backend.argmax(backend.array(m), axis=1)
+    np.testing.assert_array_equal(backend.to_numpy(out2), ref2)
+    # Non-bool dtypes torch already accepts stay correct.
+    xi = np.array([1, 5, 2], dtype=np.int32)
+    assert int(backend.to_numpy(backend.argmax(backend.array(xi)))) == int(
+        numpy_be.argmax(xi)
+    )
+
+
+@requires_torch
+def test_torch_metrics_rise_time_runs_under_torch_backend():
+    """The control.metrics rise-time path (argmax on a bool mask) runs on torch."""
+    from ManipulaPy.control.metrics import _MetricsConcern
+
+    time = np.linspace(0.0, 1.0, 11)
+    response = np.linspace(0.0, 1.0, 11)
+    set_point = 1.0
+    with be.use_backend("numpy"):
+        ref = _MetricsConcern.calculate_rise_time(
+            _MetricsConcern(), time, response, set_point
+        )
+    with be.use_backend("torch"):
+        out = _MetricsConcern.calculate_rise_time(
+            _MetricsConcern(), time, response, set_point
+        )
+    assert np.isclose(out, ref)
+
+
+@requires_torch
+def test_torch_pinv_near_singular_matches_numpy():
+    """pinv zeroes tiny singular values like np.linalg.pinv's rcond (Finding 2)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    # diag([1, 9e-16]): NumPy zeroes the tiny sv; torch's default cutoff inverts
+    # it to ~1e15. The tiny entry must map to ~0, not ~1e15.
+    d = np.diag([1.0, 9e-16])
+    ref = numpy_be.pinv(d)
+    out = backend.to_numpy(backend.pinv(backend.array(d)))
+    np.testing.assert_allclose(out, ref, atol=1e-6)
+    assert abs(out[1, 1]) < 1.0
+    # A realistic near-singular Jacobian (one collapsing singular value).
+    J = np.array([[1.0, 0.0, 0.0], [0.0, 1e-16, 0.0]])
+    ref_j = numpy_be.pinv(J)
+    out_j = backend.to_numpy(backend.pinv(backend.array(J)))
+    np.testing.assert_allclose(out_j, ref_j, atol=1e-6)
+
+
+@requires_torch
+def test_torch_clip_mixed_array_scalar_bounds_match_numpy():
+    """clip accepts one array bound and one scalar bound like np.clip (Finding 3)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    x = np.array([0.0, 5.0, 2.0], dtype=np.float32)
+    amin = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+    amax = np.array([3.0, 3.0, 3.0], dtype=np.float32)
+    # Array min + scalar max.
+    ref1 = numpy_be.clip(x, amin, 3.0)
+    out1 = backend.clip(backend.array(x), backend.array(amin), 3.0)
+    assert backend.to_numpy(out1).dtype == ref1.dtype
+    np.testing.assert_allclose(backend.to_numpy(out1), ref1)
+    # Scalar min + array max.
+    ref2 = numpy_be.clip(x, 1.0, amax)
+    out2 = backend.clip(backend.array(x), 1.0, backend.array(amax))
+    assert backend.to_numpy(out2).dtype == ref2.dtype
+    np.testing.assert_allclose(backend.to_numpy(out2), ref2)
+
+
+@requires_torch
+def test_torch_maximum_minimum_weak_scalar_dtype_matches_numpy():
+    """maximum/minimum keep NEP-50 weak-scalar dtype: float32 array + python
+    float stays float32; array+array promotes strongly (Finding 4)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    xf32 = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    i64 = np.array([1, 2, 3], dtype=np.int64)
+    for name in ("maximum", "minimum"):
+        ref = getattr(numpy_be, name)(xf32, 1.5)
+        out = getattr(backend, name)(backend.array(xf32), 1.5)
+        assert backend.to_numpy(out).dtype == ref.dtype == np.float32, name
+        np.testing.assert_allclose(backend.to_numpy(out), ref)
+        # Strong (array+array) promotion still follows np.result_type.
+        ref2 = getattr(numpy_be, name)(i64, xf32)
+        out2 = getattr(backend, name)(backend.array(i64), backend.array(xf32))
+        assert backend.to_numpy(out2).dtype == ref2.dtype, name
+        np.testing.assert_allclose(backend.to_numpy(out2), ref2)
+
+
+@requires_torch
+def test_torch_sum_unsigned_accumulator_matches_numpy_all_axes():
+    """sum applies NumPy's accumulator upcast (uint -> uint64) on every axis
+    path, not only axis=() (Finding 5)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    cases = [
+        np.array([1, 2, 3], dtype=np.uint8),
+        np.array([1, 2, 3], dtype=np.uint16),
+        np.array([1, 2, 3], dtype=np.uint32),
+        np.array([1, 2, 3], dtype=np.int8),
+        np.array([1, 0, 1], dtype=np.bool_),
+    ]
+    for x in cases:
+        for axis in (None, 0, ()):
+            ref = numpy_be.sum(x, axis=axis)
+            out = backend.sum(backend.array(x), axis=axis)
+            assert backend.to_numpy(out).dtype == np.asarray(ref).dtype, (
+                x.dtype,
+                axis,
+            )
+            np.testing.assert_array_equal(backend.to_numpy(out), ref)
+
+
+@requires_torch
+def test_torch_stack_concat_where_mixed_dtype_match_numpy():
+    """stack/concatenate/where promote combined operands via np.result_type so
+    mixed int64/float32 inputs stay float64, not float32 (Finding 6)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    i64 = np.array([1, 2, 3], dtype=np.int64)
+    f32 = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    cond = np.array([True, False, True])
+
+    ref_s = numpy_be.stack([i64, f32])
+    out_s = backend.stack([backend.array(i64), backend.array(f32)])
+    assert backend.to_numpy(out_s).dtype == ref_s.dtype
+    np.testing.assert_allclose(backend.to_numpy(out_s), ref_s)
+
+    ref_c = numpy_be.concatenate([i64, f32])
+    out_c = backend.concatenate([backend.array(i64), backend.array(f32)])
+    assert backend.to_numpy(out_c).dtype == ref_c.dtype
+    np.testing.assert_allclose(backend.to_numpy(out_c), ref_c)
+
+    ref_w = numpy_be.where(cond, i64, f32)
+    out_w = backend.where(
+        backend.array(cond), backend.array(i64), backend.array(f32)
+    )
+    assert backend.to_numpy(out_w).dtype == ref_w.dtype
+    np.testing.assert_allclose(backend.to_numpy(out_w), ref_w)
+
+
+# ---------------------------------------------------------------------------
+# Exhaustive NumPy dtype-parity matrix (Torch backend vs NumPy backend)
+#
+# The Torch backend keeps a native path for the float / int64 autograd dtypes
+# and delegates the exotic dtypes (bool, uint8/16/32/64, complex64/128) and
+# value-based integer-overflow cases to NumPy, so parity holds by construction.
+# ---------------------------------------------------------------------------
+
+_MATRIX_DTYPES = [
+    np.bool_,
+    np.uint8,
+    np.uint16,
+    np.uint32,
+    np.uint64,
+    np.int8,
+    np.int16,
+    np.int32,
+    np.int64,
+    np.float16,
+    np.float32,
+    np.float64,
+    np.complex64,
+    np.complex128,
+]
+
+
+def _assert_op_parity(backend, numpy_be, opname, np_args, be_args, **kwargs):
+    """Assert backend.<op> matches numpy_be.<op> in dtype+value, or both raise.
+
+    NumPy is the reference: when it raises (e.g. int8 overflow, arctan2 on
+    complex) the Torch backend must raise the same exception type; otherwise
+    the results must agree in dtype and value.
+    """
+    import warnings
+
+    ref_exc = out_exc = None
+    ref = out = None
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            ref = getattr(numpy_be, opname)(*np_args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 - parity check on the type
+            ref_exc = exc
+        try:
+            out = getattr(backend, opname)(*be_args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 - parity check on the type
+            out_exc = exc
+    if ref_exc is not None:
+        assert out_exc is not None, f"{opname}: numpy raised {ref_exc!r}, torch did not"
+        assert type(out_exc) is type(ref_exc), (
+            opname,
+            type(ref_exc),
+            type(out_exc),
+        )
+        return
+    assert out_exc is None, f"{opname}: torch raised {out_exc!r}, numpy did not"
+    got = backend.to_numpy(out)
+    ref_arr = np.asarray(ref)
+    assert got.dtype == ref_arr.dtype, (opname, ref_arr.dtype, got.dtype)
+    np.testing.assert_allclose(
+        got.astype(np.complex128), ref_arr.astype(np.complex128), rtol=1e-5, atol=1e-6
+    )
+
+
+@requires_torch
+@pytest.mark.parametrize("dt", _MATRIX_DTYPES)
+def test_torch_construction_dtype_matrix_matches_numpy(dt):
+    """array/asarray/zeros/eye match NumPy dtype+value for every dtype, including
+    the exotic dtypes whose torch construction kernels (eye) would otherwise
+    raise (Findings 1, 2)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    src = np.array([[1, 0], [0, 1]], dtype=dt)
+
+    for opname in ("array", "asarray"):
+        _assert_op_parity(backend, numpy_be, opname, (src,), (src,))
+    _assert_op_parity(backend, numpy_be, "zeros", ((2, 2),), ((2, 2),), dtype=dt)
+    _assert_op_parity(backend, numpy_be, "eye", (3,), (3,), dtype=dt)
+
+
+@requires_torch
+@pytest.mark.parametrize("dt", _MATRIX_DTYPES)
+def test_torch_op_dtype_matrix_matches_numpy(dt):
+    """The reduction / linalg / elementwise / binary surface matches the NumPy
+    backend in dtype and value across the full dtype matrix (Finding 1)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    vec = np.array([0, 1, 1], dtype=dt)
+    mat = np.array([[1, 1], [1, 1]], dtype=dt)
+    a3 = np.array([1, 0, 0], dtype=dt)
+    b3 = np.array([0, 1, 0], dtype=dt)
+
+    def be_arr(x):
+        return backend.array(x)
+
+    # reductions
+    for opname in ("sum", "amax", "amin", "mean", "argmax", "all", "any"):
+        _assert_op_parity(backend, numpy_be, opname, (vec,), (be_arr(vec),))
+        _assert_op_parity(
+            backend, numpy_be, opname, (vec,), (be_arr(vec),), axis=()
+        )
+    # sum over an explicit axis exercises the accumulator upcast path.
+    _assert_op_parity(backend, numpy_be, "sum", (vec,), (be_arr(vec),), axis=0)
+
+    # linalg / construction-adjacent
+    _assert_op_parity(backend, numpy_be, "trace", (mat,), (be_arr(mat),))
+    _assert_op_parity(backend, numpy_be, "diag", (vec,), (be_arr(vec),))
+
+    # unary elementwise (transcendental promotion is width-dependent in NumPy)
+    for opname in ("sin", "cos", "sqrt", "arccos", "abs"):
+        _assert_op_parity(backend, numpy_be, opname, (vec,), (be_arr(vec),))
+
+    # binary elementwise
+    _assert_op_parity(backend, numpy_be, "matmul", (mat, mat), (be_arr(mat), be_arr(mat)))
+    _assert_op_parity(backend, numpy_be, "cross", (a3, b3), (be_arr(a3), be_arr(b3)))
+    _assert_op_parity(
+        backend, numpy_be, "arctan2", (vec, vec), (be_arr(vec), be_arr(vec))
+    )
+    for opname in ("maximum", "minimum"):
+        _assert_op_parity(
+            backend, numpy_be, opname, (vec, vec), (be_arr(vec), be_arr(vec))
+        )
+    cond = np.array([True, False, True])
+    _assert_op_parity(
+        backend, numpy_be, "where", (cond, vec, vec), (cond, be_arr(vec), be_arr(vec))
+    )
+    _assert_op_parity(backend, numpy_be, "clip", (vec, 0, 1), (be_arr(vec), 0, 1))
+
+
+@requires_torch
+def test_torch_dtype_arg_accepts_numpy_dtype_forms():
+    """array/asarray/zeros/eye accept np.float32 / 'float32' / np.dtype forms as
+    the dtype argument, matching NumpyBackend (Finding 2)."""
+    backend = be.get_registered("torch")
+    for dtype_arg in (np.float32, "float32", np.dtype("float32")):
+        assert backend.to_numpy(backend.array([1, 2, 3], dtype=dtype_arg)).dtype == (
+            np.float32
+        )
+        assert backend.to_numpy(backend.asarray([1, 2, 3], dtype=dtype_arg)).dtype == (
+            np.float32
+        )
+        assert backend.to_numpy(backend.zeros((2,), dtype=dtype_arg)).dtype == (
+            np.float32
+        )
+        assert backend.to_numpy(backend.eye(2, dtype=dtype_arg)).dtype == np.float32
+    # An exotic-dtype string still round-trips through the numpy-construction path.
+    assert backend.to_numpy(backend.eye(2, dtype="uint16")).dtype == np.uint16
+
+
+@requires_torch
+def test_torch_weak_scalar_sequence_stack_matches_numpy():
+    """A tensor-containing sequence promotes with weak Python scalars: a python
+    int keeps the tensor's integer dtype and a float32 tensor + int64 tensor
+    promote to float64, matching np.array (Finding 3)."""
+    import torch
+
+    backend = be.get_registered("torch")
+    i64 = torch.tensor(1, dtype=torch.int64)
+    f32 = torch.tensor(3.0, dtype=torch.float32)
+
+    # int64 tensor + weak python int -> int64 (not float64).
+    out = backend.array([i64, 2])
+    assert backend.to_numpy(out).dtype == np.int64
+    np.testing.assert_array_equal(
+        backend.to_numpy(out), np.array([1, 2], dtype=np.int64)
+    )
+    # int64 tensor + float32 tensor -> float64 (strong joint promotion).
+    out2 = backend.array([i64, f32])
+    assert backend.to_numpy(out2).dtype == np.float64
+    np.testing.assert_allclose(backend.to_numpy(out2), np.array([1.0, 3.0]))
+
+
+@requires_torch
+def test_torch_weak_scalar_sequence_stack_preserves_autograd():
+    """The float trig-matrix sequence path stays native and autograd-attached
+    after the weak-scalar promotion change (Finding 3 must not regress autograd)."""
+    import torch
+
+    backend = be.get_registered("torch")
+    theta = torch.tensor(0.3, dtype=torch.float64, requires_grad=True)
+    mat = backend.array([[torch.cos(theta), 0.0], [0.0, torch.sin(theta)]])
+    assert mat.dtype == torch.float64
+    assert mat.requires_grad
+    mat.sum().backward()
+    assert theta.grad is not None
+
+
+@requires_torch
+def test_torch_arctan2_joint_promotion_matches_numpy():
+    """arctan2 promotes both operands jointly (weak/strong) like np.arctan2:
+    float32 array + np.float64 scalar -> float64; np.float32 scalar + python
+    float -> float32 (Finding 4)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+
+    xf32 = np.array([1.0, 2.0], dtype=np.float32)
+    ref1 = numpy_be.arctan2(xf32, np.float64(1.5))
+    out1 = backend.arctan2(backend.array(xf32), np.float64(1.5))
+    assert backend.to_numpy(out1).dtype == ref1.dtype == np.float64
+    np.testing.assert_allclose(backend.to_numpy(out1), ref1)
+
+    ref2 = numpy_be.arctan2(np.float32(1.0), 1.5)
+    out2 = backend.arctan2(np.float32(1.0), 1.5)
+    assert backend.to_numpy(out2).dtype == ref2.dtype == np.float32
+    np.testing.assert_allclose(backend.to_numpy(out2), ref2)
+
+
+@requires_torch
+def test_torch_integer_scalar_overflow_matches_numpy():
+    """Weak integer scalars follow NumPy's range handling: maximum(int8, 128)
+    raises OverflowError like NumPy; clip(int8, None, 128) succeeds (Finding 5)."""
+    backend = be.get_registered("torch")
+    numpy_be = NumpyBackend()
+    x = np.array([1, 2, 3], dtype=np.int8)
+
+    with pytest.raises(OverflowError):
+        numpy_be.maximum(x, 128)
+    with pytest.raises(OverflowError):
+        backend.maximum(backend.array(x), 128)
+
+    ref = numpy_be.clip(x, None, 128)
+    out = backend.clip(backend.array(x), None, 128)
+    assert backend.to_numpy(out).dtype == ref.dtype == np.int8
+    np.testing.assert_array_equal(backend.to_numpy(out), ref)
+
+
+@requires_torch
+def test_torch_non_native_byteorder_construction_matches_numpy():
+    """array/asarray accept a non-native-byte-order ndarray, which torch's
+    from_numpy rejects directly (Finding 6)."""
+    backend = be.get_registered("torch")
+    big = np.arange(6.0, dtype=">f8")
+    little = np.arange(6.0, dtype="<f8")
+    for arr in (big, little):
+        out = backend.array(arr)
+        np.testing.assert_allclose(backend.to_numpy(out), np.asarray(arr))
+        out2 = backend.asarray(arr)
+        np.testing.assert_allclose(backend.to_numpy(out2), np.asarray(arr))
+    # Non-native byte order combined with a negative stride still constructs.
+    rev = np.arange(6, dtype=">i4")[::-1]
+    np.testing.assert_array_equal(
+        backend.to_numpy(backend.array(rev)), np.asarray(rev)
+    )
+
+
+@requires_torch
+@pytest.mark.parametrize("member", FULL_SURFACE)
+def test_torch_protocol_completeness(member):
+    """Every declared surface member exists on the Torch backend."""
+    backend = be.get_registered("torch")
+    assert hasattr(backend, member), f"TorchBackend missing {member!r}"
 
 
 def test_math_surface_numpy():

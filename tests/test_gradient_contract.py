@@ -7,11 +7,35 @@ claim that ManipulaPy's production backend dispatch supports either framework.
 """
 
 import math
+import types
 
 import numpy as np
 import pytest
 
 from ManipulaPy import utils
+from ManipulaPy.backend import use_backend
+from ManipulaPy.dynamics import ManipulatorDynamics
+
+
+def _real_torch_available() -> bool:
+    """True only when the *real* PyTorch package is importable.
+
+    The suite's conftest installs a lightweight ``torch`` stand-in in
+    ``sys.modules`` when PyTorch is absent, so ``importorskip`` would wrongly
+    succeed on a base install and then fail the autograd calls. The stand-in is
+    a plain object rather than a real module, so an import plus a module-type
+    check distinguishes it from genuine PyTorch (matching the predicate in
+    ``tests/test_backend_dispatch.py``).
+    """
+    try:
+        import torch
+    except Exception:
+        return False
+    return isinstance(torch, types.ModuleType)
+
+
+_HAS_TORCH = _real_torch_available()
+requires_torch = pytest.mark.skipif(not _HAS_TORCH, reason="PyTorch is not installed")
 
 
 SCREWS = np.array(
@@ -297,3 +321,369 @@ def test_jax_log_gradient_matches_finite_difference_in_smooth_interior(axis, ang
     step = 1e-6
     expected = np.asarray((rotvec(angle + step) - rotvec(angle - step)) / (2 * step))
     np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+
+# --------------------------------------------------------------------------- #
+# Production-dispatch gradient contract (Torch backend, is_concrete=False).
+#
+# Unlike the feasibility spikes above (which differentiate test-local
+# prototypes), these tests drive the *real* SerialManipulator /
+# ManipulatorDynamics methods under ``use_backend("torch")`` and check that
+# torch.autograd matches central finite differences -- i.e. the core math is
+# trace-safe (correct gradients), including at the zero-angle configuration.
+# --------------------------------------------------------------------------- #
+
+_RNG = np.random.default_rng(0)
+FK_CONFIGS = (
+    pytest.param(np.zeros(2), id="zero"),
+    pytest.param(np.array([np.pi / 2, np.pi / 2]), id="pi-over-two"),
+    pytest.param(_RNG.uniform(-np.pi, np.pi, size=2), id="random-a"),
+    pytest.param(_RNG.uniform(-np.pi, np.pi, size=2), id="random-b"),
+    pytest.param(_RNG.uniform(-np.pi, np.pi, size=2), id="random-c"),
+)
+
+
+def _planar_2r_dynamics():
+    """2R planar arm rig (matches test_v132_regressions mass-matrix test)."""
+    L1 = L2 = 1.0
+    omega_list = np.array([[0, 0, 1], [0, 0, 1]]).T
+    r_list = np.array([[0, 0, 0], [L1, 0, 0]]).T
+    M_list = np.eye(4)
+    M_list[0, 3] = L1 + L2
+    M_link1 = np.eye(4)
+    M_link1[0, 3] = L1
+    M_link2 = np.eye(4)
+    M_link2[0, 3] = L1 + L2
+    Glist = np.array(
+        [np.diag([0.0, 0.0, 0.0, m, m, m]) for m in (1.0, 1.0)]
+    )
+    return ManipulatorDynamics(
+        M_list=M_list,
+        omega_list=omega_list,
+        r_list=r_list,
+        b_list=None,
+        S_list=None,
+        B_list=None,
+        Glist=Glist,
+        Mlist_per_link=[M_link1, M_link2],
+    )
+
+
+@requires_torch
+class TestProductionGradientContract:
+    """torch.autograd through production dispatch matches finite differences."""
+
+    @pytest.mark.parametrize("configuration", FK_CONFIGS)
+    def test_forward_kinematics_jacobian_matches_finite_difference(self, configuration):
+        import torch
+
+        dyn = _planar_2r_dynamics()
+        with use_backend("torch"):
+            q = torch.tensor(configuration, dtype=torch.float64, requires_grad=True)
+            actual = torch.autograd.functional.jacobian(
+                lambda v: dyn.forward_kinematics(v).reshape(-1), q
+            ).detach().numpy()
+
+            def fk_flat(x):
+                t = torch.tensor(x, dtype=torch.float64)
+                return dyn.forward_kinematics(t).detach().numpy().reshape(-1)
+
+            expected = _central_jacobian(fk_flat, configuration)
+        max_err = np.max(np.abs(actual - expected))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+        assert np.isfinite(max_err)
+
+    @pytest.mark.parametrize("configuration", FK_CONFIGS)
+    def test_inverse_dynamics_jacobian_zero_velocity(self, configuration):
+        import torch
+
+        dyn = _planar_2r_dynamics()
+        with use_backend("torch"):
+            q = torch.tensor(configuration, dtype=torch.float64, requires_grad=True)
+            dq = torch.zeros(2, dtype=torch.float64)
+            ddq = torch.tensor([0.05, 0.1], dtype=torch.float64)
+            g = torch.tensor([0.0, -9.81, 0.0], dtype=torch.float64)
+            Ftip = torch.tensor([0.0, 0.0, 0.3, 1.0, -0.5, 0.0], dtype=torch.float64)
+
+            def idf(v):
+                return dyn.inverse_dynamics(v, dq, ddq, g, Ftip)
+
+            actual = torch.autograd.functional.jacobian(idf, q).detach().numpy()
+
+            def idf_np(x):
+                t = torch.tensor(x, dtype=torch.float64)
+                return idf(t).detach().numpy()
+
+            expected = _central_jacobian(idf_np, configuration)
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    def test_inverse_dynamics_jacobian_nonzero_velocity(self):
+        import torch
+
+        configuration = np.array([0.31, -1.17])
+        dyn = _planar_2r_dynamics()
+        with use_backend("torch"):
+            q = torch.tensor(configuration, dtype=torch.float64, requires_grad=True)
+            dq = torch.tensor([0.1, 0.2], dtype=torch.float64)
+            ddq = torch.tensor([0.05, 0.1], dtype=torch.float64)
+            g = torch.tensor([0.0, -9.81, 0.0], dtype=torch.float64)
+            Ftip = torch.tensor([0.0, 0.0, 0.3, 1.0, -0.5, 0.0], dtype=torch.float64)
+
+            def idf(v):
+                return dyn.inverse_dynamics(v, dq, ddq, g, Ftip)
+
+            actual = torch.autograd.functional.jacobian(idf, q).detach().numpy()
+
+            def idf_np(x):
+                t = torch.tensor(x, dtype=torch.float64)
+                return idf(t).detach().numpy()
+
+            expected = _central_jacobian(idf_np, configuration)
+        np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-4)
+
+    def test_mass_matrix_cache_is_bypassed_under_torch(self):
+        import torch
+
+        dyn = _planar_2r_dynamics()
+        assert dyn._mass_matrix_cache == {}
+        assert dyn._mass_matrix_derivative_cache == {}
+
+        with use_backend("torch"):
+            q = torch.tensor([0.31, -1.17], dtype=torch.float64, requires_grad=True)
+            M = dyn.mass_matrix(q)
+            dyn._mass_matrix_derivatives(q)
+            # is_concrete=False: neither cache is read nor populated.
+            assert dyn._mass_matrix_cache == {}
+            assert dyn._mass_matrix_derivative_cache == {}
+            assert M.requires_grad
+            M.sum().backward()
+            assert q.grad is not None
+            assert torch.isfinite(q.grad).all()
+
+        # Pin the is_concrete gate the other way: NumPy DOES populate the cache.
+        with use_backend("numpy"):
+            dyn.mass_matrix(np.array([0.31, -1.17]))
+            assert len(dyn._mass_matrix_cache) == 1
+
+    def test_matrix_exp3_gradient_is_correct_at_exactly_zero_angle(self):
+        import torch
+
+        with use_backend("torch"):
+            theta = torch.tensor(0.0, dtype=torch.float64, requires_grad=True)
+            zero = theta * 0
+            so3 = utils.VecToso3(torch.stack((zero, zero, theta)))
+            (grad,) = torch.autograd.grad(utils.MatrixExp3(so3)[1, 0], theta)
+        assert torch.isfinite(grad)
+        np.testing.assert_allclose(float(grad), 1.0, rtol=0, atol=1e-9)
+
+    def test_matrix_log3_gradient_is_correct_at_exactly_zero_angle(self):
+        import torch
+
+        def rz(angle):
+            zero = angle * 0
+            one = angle * 0 + 1
+            return torch.stack(
+                (
+                    torch.stack((torch.cos(angle), -torch.sin(angle), zero)),
+                    torch.stack((torch.sin(angle), torch.cos(angle), zero)),
+                    torch.stack((zero, zero, one)),
+                )
+            )
+
+        with use_backend("torch"):
+            theta = torch.tensor(0.0, dtype=torch.float64, requires_grad=True)
+            (grad,) = torch.autograd.grad(utils.MatrixLog3(rz(theta))[1, 0], theta)
+        assert torch.isfinite(grad)
+        np.testing.assert_allclose(float(grad), 1.0, rtol=0, atol=1e-9)
+
+    # -- Finding 1: MatrixLog3 gradient must be correct across the near-pi band -- #
+    # The SO(3) log is smooth on theta in (0, pi); only theta = pi exactly is a
+    # branch point. For a fixed axis n and R = exp(theta*[n]x), the rotation vector
+    # is theta*n, so d(rotvec)/dtheta is exactly the (constant) axis n.
+    _LOG3_PI_AXIS = np.array([0.3, -0.4, 0.8660254])
+    _LOG3_PI_AXIS = _LOG3_PI_AXIS / np.linalg.norm(_LOG3_PI_AXIS)
+
+    @staticmethod
+    def _log3_rotvec(torch, axis_np, theta_tensor):
+        axis = torch.as_tensor(axis_np, dtype=torch.float64)
+        R = utils.MatrixExp3(utils.VecToso3(axis * theta_tensor))
+        m = utils.MatrixLog3(R)
+        return torch.stack((m[2, 1], m[0, 2], m[1, 0]))
+
+    @pytest.mark.parametrize("gap", [1e-3, 1e-5, 1e-7])
+    def test_matrix_log3_gradient_near_pi_matches_finite_difference(self, gap):
+        import torch
+
+        axis = self._LOG3_PI_AXIS
+        theta_val = np.pi - gap
+        with use_backend("torch"):
+            actual = torch.autograd.functional.jacobian(
+                lambda t: self._log3_rotvec(torch, axis, t),
+                torch.tensor(theta_val, dtype=torch.float64),
+            ).detach().numpy()
+
+            # Central FD on a detached reference; step kept below the gap so the
+            # stencil never straddles the theta = pi branch point.
+            step = min(1e-6, gap / 10.0)
+
+            def rotvec_np(t):
+                return self._log3_rotvec(
+                    torch, axis, torch.tensor(t, dtype=torch.float64)
+                ).detach().numpy()
+
+            expected = (rotvec_np(theta_val + step) - rotvec_np(theta_val - step)) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        # The exact derivative is the constant axis; verify against both the true
+        # value and the finite-difference reference.
+        np.testing.assert_allclose(actual, axis, rtol=1e-5, atol=1e-7)
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    @pytest.mark.parametrize("gap", [1e-3, 1e-5, 1e-7])
+    def test_rotation_logm_angle_gradient_near_pi_matches_finite_difference(self, gap):
+        """``rotation_logm`` recovers the angle with an exact derivative near pi.
+
+        It shares ``MatrixLog3``'s conditioning hazard -- recovering theta from
+        the trace via ``arccos`` loses half its digits near a half turn (d theta /
+        d cos theta = 1 / sin theta blows up), which showed up as d theta / d theta
+        = 1.061 at gap 1e-7 instead of 1.0. This is the angle IK differentiates,
+        so it is pinned separately from the ``MatrixLog3`` rotation vector.
+        """
+        import torch
+
+        axis = self._LOG3_PI_AXIS
+        theta_val = np.pi - gap
+        with use_backend("torch"):
+            t = torch.tensor(theta_val, dtype=torch.float64, requires_grad=True)
+            axis_t = torch.as_tensor(axis, dtype=torch.float64)
+            R = utils.MatrixExp3(utils.VecToso3(axis_t * t))
+            _, theta_out = utils.rotation_logm(R)
+            grad = torch.autograd.grad(theta_out, t)[0].detach().numpy()
+
+        assert np.all(np.isfinite(grad))
+        # theta_out IS the input angle here, so d(theta_out)/d(theta) == 1 exactly.
+        np.testing.assert_allclose(grad, 1.0, rtol=1e-5, atol=1e-7)
+
+    # Coordinate axes matter here: a half turn about x/y/z (the joint axes of
+    # virtually every URDF) makes cos_theta land on EXACTLY -1.0, whereas a
+    # general axis rounds an ulp above it. Only the exact -1.0 case exposes an
+    # unclamped arccos in the inactive generic branch, whose infinite derivative
+    # ``where`` turns into 0 * inf = NaN in the selected branch.
+    _PI_AXES = (
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [2.0**-0.5, 2.0**-0.5, 0.0],
+        list(_LOG3_PI_AXIS),
+    )
+
+    @pytest.mark.parametrize("axis", _PI_AXES)
+    def test_matrix_log3_gradient_is_finite_at_exactly_pi(self, axis):
+        import torch
+
+        axis = np.asarray(axis, dtype=float)
+        with use_backend("torch"):
+            actual = torch.autograd.functional.jacobian(
+                lambda t: self._log3_rotvec(torch, axis, t),
+                torch.tensor(np.pi, dtype=torch.float64),
+            ).detach().numpy()
+        # theta = pi is a genuine branch point; only require a finite gradient.
+        assert np.all(np.isfinite(actual))
+
+    @pytest.mark.parametrize("axis", _PI_AXES)
+    def test_rotation_logm_gradient_is_finite_at_exactly_pi(self, axis):
+        import torch
+
+        axis_np = np.asarray(axis, dtype=float)
+        with use_backend("torch"):
+            t = torch.tensor(np.pi, dtype=torch.float64, requires_grad=True)
+            axis_t = torch.as_tensor(axis_np, dtype=torch.float64)
+            R = utils.MatrixExp3(utils.VecToso3(axis_t * t))
+            ax, theta_out = utils.rotation_logm(R)
+            ax_grad = torch.autograd.grad(ax.sum(), t, retain_graph=True)[0]
+            th_grad = torch.autograd.grad(theta_out, t)[0]
+        assert np.isfinite(ax_grad.detach().numpy()).all()
+        assert np.isfinite(th_grad.detach().numpy()).all()
+
+    @pytest.mark.parametrize("gap", [2e-6, 1e-5, 1e-3])
+    def test_rotation_logm_axis_gradient_near_pi_is_stationary(self, gap):
+        """The axis is mathematically constant in theta, so its derivative is 0.
+
+        ``vee/(2 sin theta)`` is a vanishing/vanishing cancellation as theta -> pi
+        and its derivative degrades well before the singularity (~1e-5 error at
+        pi - 2e-6), so the stable ``_pi_axis`` form must cover this band.
+        """
+        import torch
+
+        axis_np = np.asarray(self._LOG3_PI_AXIS, dtype=float)
+        with use_backend("torch"):
+            t = torch.tensor(np.pi - gap, dtype=torch.float64, requires_grad=True)
+            axis_t = torch.as_tensor(axis_np, dtype=torch.float64)
+            R = utils.MatrixExp3(utils.VecToso3(axis_t * t))
+            ax, _ = utils.rotation_logm(R)
+            grad = np.stack([
+                torch.autograd.grad(ax[i], t, retain_graph=True)[0].detach().numpy()
+                for i in range(3)
+            ])
+        assert np.all(np.isfinite(grad))
+        np.testing.assert_allclose(grad, 0.0, atol=1e-9)
+
+    # -- Finding 2: exp Taylor cutoff must cover the region where the exact -- #
+    # backward is unstable. Sweep spans [1e-8, 1e-2] incl. the old 1e-6 cutoff.
+    _EXP_THETAS = (1e-8, 1e-6, 1.001e-6, 1e-5, 1e-4, 1e-3, 1e-2)
+
+    @pytest.mark.parametrize("theta_val", _EXP_THETAS)
+    def test_matrix_exp6_translation_gradient_sweep_matches_finite_difference(self, theta_val):
+        import torch
+
+        z = np.array([0.0, 0.0, 1.0])
+        v = np.array([1.0, 2.0, 3.0])
+
+        def translation(torch, t):
+            K = utils.VecToso3(torch.as_tensor(z, dtype=torch.float64) * t)
+            top = torch.cat((K, torch.as_tensor(v, dtype=torch.float64).reshape(3, 1)), dim=1)
+            se3 = torch.cat((top, torch.zeros((1, 4), dtype=torch.float64)), dim=0)
+            return utils.MatrixExp6(se3)[:3, 3]
+
+        with use_backend("torch"):
+            actual = torch.autograd.functional.jacobian(
+                lambda t: translation(torch, t),
+                torch.tensor(theta_val, dtype=torch.float64),
+            ).detach().numpy()
+
+            step = 1e-6
+
+            def trans_np(t):
+                return translation(torch, torch.tensor(t, dtype=torch.float64)).detach().numpy()
+
+            expected = (trans_np(theta_val + step) - trans_np(theta_val - step)) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    @pytest.mark.parametrize("theta_val", _EXP_THETAS)
+    def test_matrix_exp3_gradient_sweep_matches_finite_difference(self, theta_val):
+        import torch
+
+        axis = np.array([0.0, 0.0, 1.0])
+
+        def rotation(torch, t):
+            return utils.MatrixExp3(
+                utils.VecToso3(torch.as_tensor(axis, dtype=torch.float64) * t)
+            ).reshape(-1)
+
+        with use_backend("torch"):
+            actual = torch.autograd.functional.jacobian(
+                lambda t: rotation(torch, t),
+                torch.tensor(theta_val, dtype=torch.float64),
+            ).detach().numpy()
+
+            step = 1e-6
+
+            def rot_np(t):
+                return rotation(torch, torch.tensor(t, dtype=torch.float64)).detach().numpy()
+
+            expected = (rot_np(theta_val + step) - rot_np(theta_val - step)) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)

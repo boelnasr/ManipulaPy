@@ -103,7 +103,9 @@ class _RobustAdaptiveConcern:
 
         backend = _runtime.get_backend()
         self._normalize_state("parameter_estimate")
-        n = thetalist.size
+        # Element count via ``reshape``: ``.size`` is an int attribute on NumPy
+        # but a *method* on Torch tensors, which would silently bind here.
+        n = thetalist.reshape(-1).shape[0]
         if self.parameter_estimate is None:
             self._set_state(
                 "parameter_estimate", backend.zeros((n,), dtype=thetalist.dtype)

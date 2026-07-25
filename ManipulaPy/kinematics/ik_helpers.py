@@ -407,7 +407,14 @@ def _clip_to_limits(
     Returns:
         Clipped joint angles
     """
-    theta_clipped = theta.copy()
+    # Copy without changing the array type: TRAC-IK passes backend-native
+    # vectors (whose ``.copy()`` is NumPy-only -- Torch has ``.clone()``),
+    # while the host-boundary cache lookup passes plain NumPy that must stay
+    # NumPy. ``backend.array`` copies on every backend.
+    backend = get_backend()
+    theta_clipped = (
+        backend.array(theta) if backend.is_backend_array(theta) else theta.copy()
+    )
     for i, (mn, mx) in enumerate(joint_limits):
         if i < len(theta_clipped):
             if mn is not None:

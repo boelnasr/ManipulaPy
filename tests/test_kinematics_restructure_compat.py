@@ -68,7 +68,7 @@ EXPECTED_AST_HASHES = {
         "754de6e616da952ebfdc5dc5c0f6125e0d02cc959fdbe1528490686d454a660a"
     ),
     "end_effector_pose": (
-        "10ee7b444f410812f247b1a88f92c180cd09b0ed2d3bff8a7035e56d2e55363b"
+        "49f705605179ff6e4f41261e45d2169b2b7b7e42fa67c3e63fb3129b122fd4a0"
     ),
     "jacobian": "f1528668ce0432c30b2edcea360c9976ad959ca15d60e042151dddf246a22a4f",
     "end_effector_velocity": (
@@ -78,14 +78,14 @@ EXPECTED_AST_HASHES = {
         "d7b8b9cd907dd83950f2794f61b044395e42b74212e5b8a3c9cded64cdbdcdc1"
     ),
     "iterative_inverse_kinematics": (
-        "a5cd1e32476021f2861df11bae3980864095cd6c0a2fe738941946da6536e3a5"
+        "41ea5e79f547e92fc12fdd4b37b94017efcb11db667d5f14bef638a7294530b7"
     ),
     "_pose_error": "579cfe7d41fa2bc2f725381405db17abd08d28d3f38e9e2b6ab48eeeabb232de",
     "smart_inverse_kinematics": (
         "bd78766d3babbd5594fcb5efd289a546ccff113aa231689ffbefb871b5a519ff"
     ),
     "robust_inverse_kinematics": (
-        "00fcc728cd485a813ee1168838a7298c8295dd51a67f1a6f865e369e3ae917c1"
+        "0385f099ea3f1aabf856d3d0d058b04498548f6cb84ec0dfe8d239951717e4e0"
     ),
     "trac_ik": "39a36e601420af2a8fe8f52daee6f6b97d75f372e61ec94bc53acb333119cef4",
 }
@@ -321,13 +321,14 @@ def test_runtime_utils_supports_set_restore_and_delete():
 def test_runtime_numpy_supports_set_restore_and_delete():
     robot = _robot()
     original = implementation.np
+    identity = np.eye(4)
 
     class TrackingNumpy:
         calls = 0
 
         def __getattr__(self, name):
             value = getattr(original, name)
-            if name == "concatenate":
+            if name == "trace":
 
                 def tracked(*args, **kwargs):
                     self.calls += 1
@@ -339,13 +340,13 @@ def test_runtime_numpy_supports_set_restore_and_delete():
     tracking = TrackingNumpy()
     try:
         implementation.np = tracking
-        robot.end_effector_pose([0.0])
+        robot._pose_error(identity, identity)
         assert tracking.calls == 1
         implementation.np = original
-        robot.end_effector_pose([0.0])
+        robot._pose_error(identity, identity)
         assert tracking.calls == 1
         del implementation.np
         with np.testing.assert_raises(AttributeError):
-            robot.end_effector_pose([0.0])
+            robot._pose_error(identity, identity)
     finally:
         implementation.np = original
