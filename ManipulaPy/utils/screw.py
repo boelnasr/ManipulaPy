@@ -5,6 +5,7 @@
 Copyright (c) 2025 Mohamed Aboelnasr. Licensed under AGPL-3.0-or-later.
 """
 
+import math
 from typing import Optional
 
 from numpy.typing import NDArray
@@ -37,6 +38,16 @@ def _repeat_columns(array, count: int):
     return b.concatenate(tuple(array for _ in range(count)), axis=1)
 
 
+def _num_elements(array) -> int:
+    """Element count of a backend array.
+
+    NumPy exposes this as the ``.size`` attribute, but on a Torch tensor
+    ``.size`` is a *method*, so reading it yields a bound method instead of an
+    int. Deriving the count from ``.shape`` is backend-neutral.
+    """
+    return math.prod(array.shape)
+
+
 def extract_screw_list(omega_list, r_list) -> Optional[NDArray]:
     """Build a 6xn screw-axis matrix from angular velocities and positions."""
     if omega_list is None or r_list is None:
@@ -44,20 +55,22 @@ def extract_screw_list(omega_list, r_list) -> Optional[NDArray]:
     b = get_backend()
     omega_list, r_list = b.asarray(omega_list), b.asarray(r_list)
 
-    if r_list.size == 0:
+    r_size = _num_elements(r_list)
+    if r_size == 0:
         n_joints = omega_list.shape[1] if omega_list.ndim == 2 else omega_list.shape[0] // 3
         r_list = b.zeros((3, n_joints))
     elif r_list.ndim == 1:
-        if r_list.size % 3:
-            raise ValueError(f"Cannot reshape r_list of size {r_list.size} into (3, n) format")
-        r_list = r_list.reshape(3, r_list.size // 3)
+        if r_size % 3:
+            raise ValueError(f"Cannot reshape r_list of size {r_size} into (3, n) format")
+        r_list = r_list.reshape(3, r_size // 3)
 
     if omega_list.ndim == 1:
-        if omega_list.size % 3:
+        omega_size = _num_elements(omega_list)
+        if omega_size % 3:
             raise ValueError(
-                f"Cannot reshape omega_list of size {omega_list.size} into (3, n) format"
+                f"Cannot reshape omega_list of size {omega_size} into (3, n) format"
             )
-        omega_list = omega_list.reshape(3, omega_list.size // 3)
+        omega_list = omega_list.reshape(3, omega_size // 3)
 
     w_rows, w_cols = omega_list.shape
     r_rows, r_cols = r_list.shape

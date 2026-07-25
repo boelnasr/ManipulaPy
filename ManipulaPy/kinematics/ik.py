@@ -76,8 +76,9 @@ class _InverseKinematicsConcern:
         min_step_cap = 0.01
         nu = 2.0  # LM damping adjustment factor
 
-        # Best solution tracking
-        best_theta = theta.copy()
+        # Best solution tracking. ``backend.array`` copies on every backend;
+        # ``.copy()`` is NumPy-only (Torch tensors expose ``.clone()``).
+        best_theta = backend.array(theta)
         best_error = float("inf")
 
         # Stagnation detection
@@ -160,7 +161,7 @@ class _InverseKinematicsConcern:
 
         def clip_to_limits(th: NDArray[np.float64]) -> NDArray[np.float64]:
             """Clip joint angles to limits."""
-            th_clipped = th.copy()
+            th_clipped = backend.array(th)
             for i, (mn, mx) in enumerate(self.joint_limits):
                 if mn is not None:
                     th_clipped[i] = max(th_clipped[i], mn)
@@ -183,7 +184,7 @@ class _InverseKinematicsConcern:
             # Track best solution
             if current_error < best_error:
                 best_error = current_error
-                best_theta = theta.copy()
+                best_theta = backend.array(theta)
                 stall_count = 0
             else:
                 stall_count += 1
@@ -218,7 +219,7 @@ class _InverseKinematicsConcern:
 
             # Compute Jacobian and weighted error
             J_space = self.jacobian(theta, frame="space")
-            V_weighted = V_err.copy()
+            V_weighted = backend.array(V_err)
             V_weighted[:3] *= weight_orientation
             V_weighted[3:] *= weight_position
 
@@ -570,7 +571,7 @@ class _InverseKinematicsConcern:
 
                 if error < best_error:
                     best_error = error
-                    best_theta = theta.copy()
+                    best_theta = backend.array(theta)
                     winning_strategy = strategy_name
 
             except Exception as e:

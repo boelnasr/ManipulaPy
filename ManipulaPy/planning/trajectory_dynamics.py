@@ -6,6 +6,27 @@ from . import _kernels as _runtime
 from ._kernels import Dict, Tuple, np
 
 
+def _as_numpy_dtype(backend, dtype):
+    """NumPy dtype equivalent of a backend-native dtype handle.
+
+    ``np.can_cast`` only understands NumPy dtypes and raises ``TypeError`` on a
+    backend-native handle such as ``torch.float64``. Round-tripping a zero-size
+    array through the backend maps any backend dtype onto its NumPy equivalent
+    without copying data.
+    """
+    return backend.to_numpy(backend.zeros((0,), dtype=dtype)).dtype
+
+
+def _can_cast_same_kind(backend, source_dtype, target_dtype) -> bool:
+    """True iff ``source_dtype`` casts to ``target_dtype`` under NumPy's
+    ``same_kind`` rule, for dtypes of any backend."""
+    return _runtime.np.can_cast(
+        _as_numpy_dtype(backend, source_dtype),
+        _as_numpy_dtype(backend, target_dtype),
+        casting="same_kind",
+    )
+
+
 class _DynamicsMixin:
     def inverse_dynamics_trajectory(
         self,
@@ -613,53 +634,58 @@ class _DynamicsMixin:
         for i in range(1, num_steps):
             ddtheta_step = backend.zeros((num_joints,), dtype=backend.float32)
             for _ in range(intRes):
+                # Only the dynamics call is tolerated: a failure in the loop's
+                # own integration bookkeeping must surface rather than be
+                # masked into a silently zero-acceleration trajectory.
                 try:
                     # Compute forward dynamics
                     ddtheta = self.dynamics.forward_dynamics(
                         current_theta, current_dtheta, taumat[i], g, Ftipmat[i]
                     )
-
-                    # Integrate (functional; cast back to the state dtype so the
-                    # numerics match the original in-place accumulation). The
-                    # original ``+=`` used same-kind casting, which refuses e.g.
-                    # a float update into an integer state; reproduce that refusal
-                    # so an unsafe cast raises into the handler below instead of
-                    # silently truncating.
-                    new_dtheta = current_dtheta + ddtheta * dt_step
-                    if not _runtime.np.can_cast(
-                        new_dtheta.dtype, dtheta_dtype, casting="same_kind"
-                    ):
-                        raise TypeError(
-                            f"Cannot cast ufunc 'add' output from {new_dtheta.dtype!r} "
-                            f"to {dtheta_dtype!r} with casting rule 'same_kind'"
-                        )
-                    current_dtheta = backend.asarray(new_dtheta, dtype=dtheta_dtype)
-
-                    new_theta = current_theta + current_dtheta * dt_step
-                    if not _runtime.np.can_cast(
-                        new_theta.dtype, theta_dtype, casting="same_kind"
-                    ):
-                        raise TypeError(
-                            f"Cannot cast ufunc 'add' output from {new_theta.dtype!r} "
-                            f"to {theta_dtype!r} with casting rule 'same_kind'"
-                        )
-                    current_theta = backend.asarray(new_theta, dtype=theta_dtype)
-
-                    # Apply joint limits. The original ``np.clip`` against the
-                    # float32 limits promoted the state dtype (e.g. float16 ->
-                    # float32) and later updates accumulated in that promoted
-                    # dtype, so track the live post-clip dtype rather than the
-                    # initial one.
-                    current_theta = backend.clip(current_theta, lower, upper)
-                    theta_dtype = current_theta.dtype
-
-                    ddtheta_step = ddtheta
-
                 except Exception as e:
                     _runtime.logger.warning(
                         f"Error in forward dynamics at step {i}: {e}"
                     )
                     ddtheta_step = backend.zeros((num_joints,))
+                    continue
+
+                # Integrate (functional; cast back to the state dtype so the
+                # numerics match the original in-place accumulation). The
+                # original ``+=`` used same-kind casting, which refuses e.g.
+                # a float update into an integer state; reproduce that refusal
+                # as explicit control flow so it stays distinguishable from a
+                # genuine error in the dtype check itself.
+                new_dtheta = current_dtheta + ddtheta * dt_step
+                if not _can_cast_same_kind(backend, new_dtheta.dtype, dtheta_dtype):
+                    _runtime.logger.warning(
+                        f"Error in forward dynamics at step {i}: Cannot cast "
+                        f"ufunc 'add' output from {new_dtheta.dtype!r} to "
+                        f"{dtheta_dtype!r} with casting rule 'same_kind'"
+                    )
+                    ddtheta_step = backend.zeros((num_joints,))
+                    continue
+                current_dtheta = backend.asarray(new_dtheta, dtype=dtheta_dtype)
+
+                new_theta = current_theta + current_dtheta * dt_step
+                if not _can_cast_same_kind(backend, new_theta.dtype, theta_dtype):
+                    _runtime.logger.warning(
+                        f"Error in forward dynamics at step {i}: Cannot cast "
+                        f"ufunc 'add' output from {new_theta.dtype!r} to "
+                        f"{theta_dtype!r} with casting rule 'same_kind'"
+                    )
+                    ddtheta_step = backend.zeros((num_joints,))
+                    continue
+                current_theta = backend.asarray(new_theta, dtype=theta_dtype)
+
+                # Apply joint limits. The original ``np.clip`` against the
+                # float32 limits promoted the state dtype (e.g. float16 ->
+                # float32) and later updates accumulated in that promoted
+                # dtype, so track the live post-clip dtype rather than the
+                # initial one.
+                current_theta = backend.clip(current_theta, lower, upper)
+                theta_dtype = current_theta.dtype
+
+                ddtheta_step = ddtheta
 
             theta_rows.append(backend.asarray(current_theta, dtype=backend.float32))
             dtheta_rows.append(backend.asarray(current_dtheta, dtype=backend.float32))

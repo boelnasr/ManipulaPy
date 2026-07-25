@@ -72,7 +72,7 @@ _BASE_MOVED_METHOD_HASHES = {
     "batch_joint_trajectory": "b13fa5bbd4d77ba032a2dda3d6997277121f0b56b1081c3ae2fe0ca4f0cd47f6",
     "cartesian_trajectory": "711dc4bb4c343e779bfc0259d3b06a0cf1d464c05ea24afc3e48ef87ee28dcd8",
     "joint_trajectory": "58b2685013876277df3c73f27a7e8167191e6219e9937c3e7233301c94163681",
-    "_forward_dynamics_cpu": "294362385566dc0a57804bb053d91b34bea838ad9be9514541cfa5dec39cb519",
+    "_forward_dynamics_cpu": "003c4a60f2fa408cea21f3a0c6a4261c5d9082641b362ea34cafd9c7c1aab45a",
     "_forward_dynamics_gpu": "362b9aee44dd89821e036d8dd6dcbce3529d31fe8240b0af88fb4df7c069cd1e",
     "_inverse_dynamics_cpu": "78861e7bb709b2050957c19bf9a0bb4ead009a605182074d680460bd01ef6a4b",
     "_inverse_dynamics_gpu": "ec677c9880b260a6d593118e143503f4b04faf6903acdceebc2f325b5464e9e7",

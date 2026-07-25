@@ -67,7 +67,7 @@ AST_HASHES = {
     "pd_control": "5d19525d4e6f9b66c74624148c0ee84aadd4ca26db9b765aaad9dbf7731bd8c7",
     "pid_control": "ed9c1d933c9bb156c351f8e076652d4d647c0139f0f0c7afdebb5922b66b3cb5",
     "robust_control": "3dd850d4e095f3167acdc124a696f40c623dd72fc7404380bcbd79709a9cb047",  # noqa: E501
-    "adaptive_control": "40264600bbde12d5a7db48774cb903872db73305d6ea19a4dd8c395595cdedab",  # noqa: E501
+    "adaptive_control": "c2ee8da5c8eb1b7becc34967f8067d94eb76cdc10ca7ac1e9b12a61762f4f1b4",  # noqa: E501
     "kalman_filter_predict": "c7b40249d8026cfc9e92d08bda8c1bb5a00d6c31e260f7e06475617bfb31eb94",  # noqa: E501
     "kalman_filter_update": "e29bce5a960fb03b5a4bd6fed7eba14e5434244c65b5c1ffeda7fcd36f3acc27",  # noqa: E501
     "kalman_filter_control": "90d5e71315c2e9084a62a4b5f219411f5ea2825bac896a12fc5cf3889e3dac96",  # noqa: E501

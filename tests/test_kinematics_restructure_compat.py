@@ -78,14 +78,14 @@ EXPECTED_AST_HASHES = {
         "d7b8b9cd907dd83950f2794f61b044395e42b74212e5b8a3c9cded64cdbdcdc1"
     ),
     "iterative_inverse_kinematics": (
-        "a5cd1e32476021f2861df11bae3980864095cd6c0a2fe738941946da6536e3a5"
+        "41ea5e79f547e92fc12fdd4b37b94017efcb11db667d5f14bef638a7294530b7"
     ),
     "_pose_error": "579cfe7d41fa2bc2f725381405db17abd08d28d3f38e9e2b6ab48eeeabb232de",
     "smart_inverse_kinematics": (
         "bd78766d3babbd5594fcb5efd289a546ccff113aa231689ffbefb871b5a519ff"
     ),
     "robust_inverse_kinematics": (
-        "00fcc728cd485a813ee1168838a7298c8295dd51a67f1a6f865e369e3ae917c1"
+        "0385f099ea3f1aabf856d3d0d058b04498548f6cb84ec0dfe8d239951717e4e0"
     ),
     "trac_ik": "39a36e601420af2a8fe8f52daee6f6b97d75f372e61ec94bc53acb333119cef4",
 }

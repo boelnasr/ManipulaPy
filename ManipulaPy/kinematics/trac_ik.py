@@ -291,7 +291,7 @@ class TracIKSolver:
 
         # 1. User-provided or workspace heuristic
         if theta0 is not None:
-            guesses.append(theta0.copy())
+            guesses.append(backend.array(theta0))
         else:
             guesses.append(self._workspace_heuristic(T_desired))
 
@@ -341,7 +341,7 @@ class TracIKSolver:
         dtype_kind = getattr(theta.dtype, "kind", None)
         if not backend.is_backend_array(theta0) or dtype_kind in ("b", "i", "u"):
             theta = backend.asarray(theta0, dtype=backend.float64)
-        theta = theta.copy()
+        theta = backend.array(theta)
 
         # Adaptive damping parameters (LM-style) — match kinematics.py
         damping = 0.02  # Initial damping
@@ -358,7 +358,7 @@ class TracIKSolver:
         start_time = time.perf_counter()
 
         # State tracking
-        best_theta = theta.copy()
+        best_theta = backend.array(theta)
         best_error = float("inf")
         error_history = deque(maxlen=10)
         prev_error = float("inf")
@@ -394,7 +394,7 @@ class TracIKSolver:
             # Track best solution
             if current_error < best_error:
                 best_error = current_error
-                best_theta = theta.copy()
+                best_theta = backend.array(theta)
                 stall_count = 0
             else:
                 stall_count += 1
