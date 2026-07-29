@@ -15,7 +15,6 @@ from .so3 import (
     MatrixExp3,
     MatrixLog3,
     VecToso3,
-    rotation_logm,
     skew_symmetric,
     skew_symmetric_to_vector,
 )
@@ -53,37 +52,62 @@ def adjoint_transform(T) -> NDArray:
                           b.concatenate((b.matmul(skew_symmetric(p), R), R), axis=1)), axis=0)
 
 
-def _log6_wsq_coeff(b: Any, theta_sq: Any) -> Any:
-    """Return ``1 - (theta/2) cot(theta/2)``, the ``w_hat^2`` coefficient.
+def _log6_phi_sq_coeff(b: Any, theta_sq: Any) -> Any:
+    """Return ``a = (1 - (theta/2) cot(theta/2)) / theta^2``, with ``a(0) = 1/12``.
 
-    Written as an even function of ``theta`` (smooth in ``theta^2``, so no
-    ``sqrt`` feeds the graph near zero). The exact form is a vanishing/vanishing
-    ratio as ``theta -> 0``; below ``theta^2 < 1e-4`` (``theta < 1e-2``) the
-    series ``theta^2/12 + theta^4/720 + theta^6/30240`` is used instead. The
-    band matches ``_exp6_trans_coeffs`` and is set by where the exact form's
-    *backward* pass stops cancelling, not by where its value is still finite.
-    ``theta_sq`` is clamped inside the exact branch so the inactive branch
-    cannot contribute a non-finite gradient through the ``where``.
+    This is the ``Phi^2`` coefficient of ``theta * G^-1`` when the rotational
+    logarithm is carried as the matrix ``Phi = theta * w_hat`` rather than as a
+    separate unit axis and angle. Written as an even function of ``theta``
+    (smooth in ``theta^2``, so no ``sqrt`` feeds the graph near zero); the exact
+    form is a vanishing/vanishing ratio as ``theta -> 0``, so below
+    ``theta^2 < 1e-4`` (``theta < 1e-2``) the series ``1/12 + theta^2/720 +
+    theta^4/30240`` is used instead. The band matches ``_exp6_trans_coeffs``.
+
+    The switch sits at ``theta = 0.1``, not at ``theta = 1e-2``. The exact form
+    is a double cancellation: ``1 - cos theta`` loses about five digits at
+    ``theta = 1e-2``, and the numerator ``1 - theta sin theta / (2 (1 - cos
+    theta))`` is itself ``theta^2/12`` recovered by subtracting two nearly equal
+    quantities. Its *derivative* is degraded well before its value is, so
+    switching at ``1e-2`` handed the coefficient's gradient to a branch that had
+    already lost roughly four percent of it. Four series terms hold the Taylor
+    side to ~1e-13 relative accuracy out to ``theta = 0.1``, by which point the
+    exact form has recovered.
+
+    The clamp inside the exact branch sits strictly BELOW the switch point:
+    clamping at the switch value makes ``maximum`` tie exactly where the exact
+    branch becomes active, and autodiff splits a tie's derivative in half.
     """
-    small = theta_sq / 12 + theta_sq**2 / 720 + theta_sq**3 / 30240
-    theta = b.sqrt(b.maximum(theta_sq, b.asarray(1e-4)))
-    exact = 1 - theta * b.sin(theta) / b.maximum(
-        2 * (1 - b.cos(theta)), b.asarray(1e-300)
+    small = (
+        1 / 12
+        + theta_sq / 720
+        + theta_sq**2 / 30240
+        + theta_sq**3 / 1209600
     )
-    return b.where(theta_sq < 1e-4, small, exact)
+    theta = b.sqrt(b.maximum(theta_sq, b.asarray(5e-3)))
+    exact = (
+        1 - theta * b.sin(theta) / b.maximum(2 * (1 - b.cos(theta)), b.asarray(1e-300))
+    ) / (theta * theta)
+    return b.where(theta_sq < 1e-2, small, exact)
 
 
-def _theta_g_inverse(b: Any, omega: Any, theta: Any) -> Any:
-    """Return ``theta * G^-1(omega, theta)``, smooth and finite through zero.
+def _theta_g_inverse(b: Any, phi: Any) -> Any:
+    """Return ``theta * G^-1``, smooth and finite through zero.
 
     ``G^-1`` alone diverges like ``1/theta``, but the product both logarithms
-    actually need does not: it is ``I - (theta/2) w_hat + c(theta) w_hat^2`` and
-    tends to the identity, which is why the pure-translation result falls out of
-    the general formula rather than needing a separate branch.
+    actually need does not: it is ``I - Phi/2 + a(theta^2) Phi^2`` and tends to
+    the identity, which is why the pure-translation result falls out of the
+    general formula rather than needing a separate branch.
+
+    Everything is derived from ``Phi = MatrixLog3(R)``, including
+    ``theta^2 = |Phi|_F^2 / 2``. Taking the axis and angle from
+    ``rotation_logm`` instead would reintroduce its thresholded axis, which is
+    zeroed below theta = 1e-6 and would flatten this whole expression to the
+    identity there -- losing the ``-Phi/2`` term that carries the translational
+    correction and its derivative.
     """
-    w_hat = skew_symmetric(omega)
-    coeff = _log6_wsq_coeff(b, theta * theta)
-    return b.eye(3) - 0.5 * theta * w_hat + coeff * b.matmul(w_hat, w_hat)
+    theta_sq = b.sum(phi * phi) / 2
+    coeff = _log6_phi_sq_coeff(b, theta_sq)
+    return b.eye(3) - 0.5 * phi + coeff * b.matmul(phi, phi)
 
 
 def logm(T) -> NDArray:
@@ -91,19 +115,19 @@ def logm(T) -> NDArray:
     b = get_backend()
     T = b.asarray(T)
     p = T[:3, 3]
-    omega, theta = rotation_logm(T[:3, :3])
-    # The rotation vector comes from MatrixLog3, not from ``omega * theta``.
+    # Everything derives from Phi = MatrixLog3(R), for both blocks.
     # ``rotation_logm`` zeroes its axis below theta = 1e-6 (the axis is genuinely
-    # undefined at the identity), so rebuilding the vector from the axis
-    # discarded a small-but-real rotation and its derivative at the origin.
-    # MatrixLog3 evaluates 0.5 (theta/sin theta) (R - R.T) through a Taylor-safe
-    # coefficient, which is smooth in both value and gradient there.
+    # undefined at the identity), so any expression built from that axis loses a
+    # small-but-real rotation and its derivative at the origin. MatrixLog3
+    # evaluates 0.5 (theta/sin theta) (R - R.T) through a Taylor-safe
+    # coefficient and is smooth in value and gradient there.
     #
     # No small-angle branch on the translation either: ``theta * G^-1`` -> I as
     # theta -> 0, so the general formula already yields the pure-translation
     # result that the removed ``where`` used to select.
-    rotvec = skew_symmetric_to_vector(MatrixLog3(T[:3, :3]))
-    return b.concatenate((rotvec, b.matmul(_theta_g_inverse(b, omega, theta), p)))
+    phi = MatrixLog3(T[:3, :3])
+    rotvec = skew_symmetric_to_vector(phi)
+    return b.concatenate((rotvec, b.matmul(_theta_g_inverse(b, phi), p)))
 
 
 def se3ToVec(se3_matrix) -> NDArray:
@@ -135,13 +159,13 @@ def MatrixLog6(T) -> NDArray:
     b = get_backend()
     T = b.asarray(T)
     R, p = TransToRp(T)
-    omega, theta = rotation_logm(R)
-    # See ``logm``: the rotational block is MatrixLog3 itself (smooth through the
-    # identity), and the general translation formula already degenerates to the
-    # pure-translation result at theta = 0, so branching on a small angle only
-    # served to discard the rotation and its gradient.
-    v = b.matmul(_theta_g_inverse(b, omega, theta), p)
-    return _homogeneous(MatrixLog3(R), v, last=0.0)
+    # See ``logm``: both blocks derive from Phi = MatrixLog3(R), which is smooth
+    # through the identity, and the general translation formula already
+    # degenerates to the pure-translation result at theta = 0, so branching on a
+    # small angle only served to discard the rotation and its gradient.
+    phi = MatrixLog3(R)
+    v = b.matmul(_theta_g_inverse(b, phi), p)
+    return _homogeneous(phi, v, last=0.0)
 
 
 def _exp6_trans_coeffs(b: Any, theta_sq: Any) -> Tuple[Any, Any]:

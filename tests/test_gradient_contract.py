@@ -689,6 +689,56 @@ class TestProductionGradientContract:
         np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
 
 
+# A transform whose translation does NOT scale with the rotation angle. The
+# round-trip family below multiplies a screw by t, so its translation shrinks
+# with theta and the translational error shrinks as theta^2 -- which hid a real
+# defect under a 1e-12 tolerance. Holding p at O(1) while theta -> 0 keeps the
+# error first order and therefore visible.
+_FIXED_P = np.array([0.4, -1.2, 2.3])
+_LOG6_AXIS = np.array([0.0, 0.0, 1.0])
+
+
+def _fixed_translation_transform(theta_val):
+    """4x4 transform: rotation of ``theta_val`` about z, translation ``_FIXED_P``."""
+    cos_t, sin_t = np.cos(theta_val), np.sin(theta_val)
+    transform = np.eye(4)
+    transform[:3, :3] = np.array(
+        [[cos_t, -sin_t, 0.0], [sin_t, cos_t, 0.0], [0.0, 0.0, 1.0]]
+    )
+    transform[:3, 3] = _FIXED_P
+    return transform
+
+
+@pytest.mark.parametrize("backend_name", ["numpy", "torch", "jax"])
+@pytest.mark.parametrize(
+    "theta_val", [0.0, 5e-7, 9.99e-7, 1e-6, 1.01e-6, 1e-3, 0.01, 0.0999, 0.1, 0.1001]
+)
+def test_matrix_log6_translation_matches_scipy_with_fixed_translation(
+    backend_name, theta_val
+):
+    """The translational log is correct when p does not shrink with theta.
+
+    ``theta * G^-1`` was built from ``rotation_logm``'s axis, which is zeroed
+    below theta = 1e-6, flattening the whole expression to the identity there
+    and returning ``p`` unchanged instead of ``p - (theta/2) w_hat p + ...``.
+    The angles bracket both the old 1e-6 axis threshold and the Taylor switch.
+    """
+    scipy_linalg = pytest.importorskip("scipy.linalg")
+    if backend_name == "torch":
+        pytest.importorskip("torch", exc_type=ImportError)
+    if backend_name == "jax":
+        jax = pytest.importorskip("jax", exc_type=ImportError)
+        jax.config.update("jax_enable_x64", True)
+
+    transform = _fixed_translation_transform(theta_val)
+    expected = np.real(scipy_linalg.logm(transform))
+
+    with use_backend(backend_name):
+        observed = np.asarray(utils.MatrixLog6(transform))
+
+    np.testing.assert_allclose(observed, expected, rtol=1e-9, atol=1e-12)
+
+
 @pytest.mark.parametrize("backend_name", ["numpy", "torch", "jax"])
 @pytest.mark.parametrize("theta_val", [0.0, 5e-7, 1e-6, 1e-5, 1e-3, 1.0])
 def test_matrix_log6_round_trip_is_exact_at_small_angles(backend_name, theta_val):
@@ -902,6 +952,84 @@ class TestJaxProductionGradientContract:
         np.testing.assert_allclose(value, screw * theta_val, atol=1e-12)
         assert np.all(np.isfinite(grad))
         np.testing.assert_allclose(grad, screw, rtol=1e-6, atol=1e-7)
+
+    @pytest.mark.parametrize(
+        "theta_val", [0.0, 5e-7, 9.99e-7, 1e-6, 1.01e-6, 1e-3, 0.01, 0.0999, 0.1]
+    )
+    def test_matrix_log6_translational_gradient_with_fixed_translation(self, theta_val):
+        """The translational derivative is right when p does not shrink with theta.
+
+        Two defects hid behind a translation that scaled with theta: the
+        thresholded axis flattened ``theta * G^-1`` to the identity below
+        theta = 1e-6 (derivative [0, 0, 0] instead of -0.5 w_hat p), and the
+        Taylor switch sat where the exact branch's own gradient had already lost
+        about four percent. The angles bracket both loci.
+
+        Finite differences are compared at h = 1e-4: this quotient is roundoff
+        dominated, and its error grows as 1/h (5.9e-9 at 1e-4 up to 5.6e-6 at
+        1e-7), so a smaller step measures the reference, not the gradient.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            def log6_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            actual = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(theta_val)))
+            step = 1e-4
+            expected = (
+                np.asarray(log6_vec(jnp.asarray(theta_val + step)))
+                - np.asarray(log6_vec(jnp.asarray(theta_val - step)))
+            ) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    def test_matrix_log6_translational_gradient_at_zero_is_exact(self):
+        """At theta = 0 the translational derivative is exactly ``-0.5 w_hat p``.
+
+        Pinned against the closed form rather than finite differences so the
+        origin -- where the thresholded axis previously produced [0, 0, 0] -- is
+        checked without any reference noise.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            def log6_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            actual = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(0.0)))
+
+        # d/dtheta (theta G^-1 p) at 0 = -0.5 * (w_hat p); w_hat is z-skew here.
+        w_hat = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+        np.testing.assert_allclose(actual[:3], _LOG6_AXIS, rtol=1e-9, atol=1e-12)
+        np.testing.assert_allclose(
+            actual[3:], -0.5 * (w_hat @ _FIXED_P), rtol=1e-9, atol=1e-12
+        )
 
     def test_extrapolate_from_current_gradient_keeps_the_angular_part(self):
         """The reachable IK helper inherits the recovered rotational gradient.
