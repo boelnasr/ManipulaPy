@@ -580,6 +580,30 @@ def test_adaptive_control_runs_under_jax():
 
 
 @requires_jax
+def test_condition_number_keeps_a_host_seed_on_the_host():
+    """A host seed returns a host scalar even while JAX is the active backend.
+
+    ``condition_number`` is documented as returning ``float`` and performs a
+    NaN -> inf substitution that mirrors ``np.linalg.cond``. Only a caller
+    passing a backend-native seed can be differentiating through it, so only
+    that case stays native. Gating on ``is_concrete`` alone would hand a
+    backend array back to every Torch and JAX caller passing plain NumPy, and
+    would turn ``near_singularity_detection`` into a non-``bool``.
+    """
+    analysis = Singularity(_robot())
+
+    with use_backend("jax"):
+        value = analysis.condition_number(_THETA)
+        flag = analysis.near_singularity_detection(_THETA)
+
+    assert isinstance(value, np.floating), f"host seed returned {type(value)}"
+    assert isinstance(flag, (bool, np.bool_)), f"host seed returned {type(flag)}"
+    np.testing.assert_allclose(
+        float(value), float(Singularity(_robot()).condition_number(_THETA)), rtol=1e-12
+    )
+
+
+@requires_jax
 @pytest.mark.parametrize(
     "method", ["condition_number", "near_singularity_detection"]
 )
