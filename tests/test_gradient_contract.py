@@ -689,6 +689,37 @@ class TestProductionGradientContract:
         np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
 
 
+@pytest.mark.parametrize("backend_name", ["numpy", "torch", "jax"])
+@pytest.mark.parametrize("theta_val", [0.0, 5e-7, 1e-6, 1e-5, 1e-3, 1.0])
+def test_matrix_log6_round_trip_is_exact_at_small_angles(backend_name, theta_val):
+    """``log6(exp6(S t))`` returns ``S t`` on every backend, including tiny t.
+
+    This is a value regression, not a gradient one, and it was never
+    JAX-specific: ``MatrixLog6`` selected a pure-translation result whenever the
+    angle fell below 1e-6, so a screw with a real 5e-7 rotation came back with
+    its angular part zeroed on NumPy, Torch and JAX alike.
+    """
+    if backend_name == "torch":
+        pytest.importorskip("torch", exc_type=ImportError)
+    if backend_name == "jax":
+        jax = pytest.importorskip("jax", exc_type=ImportError)
+        jax.config.update("jax_enable_x64", True)
+
+    screw = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 3.0])
+    with use_backend(backend_name):
+        observed = np.asarray(
+            utils.se3ToVec(
+                utils.MatrixLog6(utils.MatrixExp6(utils.VecTose3(screw * theta_val)))
+            )
+        )
+        via_logm = np.asarray(
+            utils.logm(utils.MatrixExp6(utils.VecTose3(screw * theta_val)))
+        )
+
+    np.testing.assert_allclose(observed, screw * theta_val, atol=1e-12)
+    np.testing.assert_allclose(via_logm, screw * theta_val, atol=1e-12)
+
+
 def _requires_jax():
     """Import JAX with x64 enabled, or skip.
 
@@ -839,6 +870,70 @@ class TestJaxProductionGradientContract:
 
         assert np.all(np.isfinite(actual)), f"non-finite gradient: {actual}"
         np.testing.assert_allclose(actual, axis_np, rtol=1e-9, atol=1e-9)
+
+    @pytest.mark.parametrize("theta_val", [0.0, 5e-7, 1e-6, 1e-3, 0.5])
+    def test_matrix_log6_gradient_recovers_the_screw(self, theta_val):
+        """``d/dt vee6(log6(exp6(S t)))`` is the screw ``S`` at every t.
+
+        ``MatrixLog6`` rebuilt its rotational block as ``omega * theta``, but
+        ``rotation_logm`` zeroes its axis below theta = 1e-6 because the axis is
+        genuinely undefined at the identity. That discarded a small-but-real
+        rotation outright: the derivative of the angular part was 0 instead of
+        the screw's angular component, and at t = 5e-7 even the primal rotation
+        came back as 0. The block is now ``MatrixLog3`` itself, whose
+        Taylor-safe coefficient is smooth in both value and gradient there.
+        """
+        jax, jnp = _requires_jax()
+
+        screw = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 3.0])
+        with use_backend("jax"):
+            def log6_vec(t):
+                return utils.se3ToVec(
+                    utils.MatrixLog6(
+                        utils.MatrixExp6(
+                            utils.VecTose3(jnp.asarray(screw, dtype=jnp.float64) * t)
+                        )
+                    )
+                )
+
+            value = np.asarray(log6_vec(jnp.asarray(theta_val)))
+            grad = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(theta_val)))
+
+        np.testing.assert_allclose(value, screw * theta_val, atol=1e-12)
+        assert np.all(np.isfinite(grad))
+        np.testing.assert_allclose(grad, screw, rtol=1e-6, atol=1e-7)
+
+    def test_extrapolate_from_current_gradient_keeps_the_angular_part(self):
+        """The reachable IK helper inherits the recovered rotational gradient.
+
+        ``extrapolate_from_current`` differentiates a pose error through
+        ``MatrixLog6``; with the rotational block discarded its angular
+        derivative was 0 rather than ``alpha`` times the screw's angular part.
+        """
+        jax, jnp = _requires_jax()
+
+        from ManipulaPy.kinematics.ik_helpers import extrapolate_from_current
+
+        screw = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 3.0])
+        alpha = 0.5
+        with use_backend("jax"):
+            def guess(t):
+                target = utils.MatrixExp6(
+                    utils.VecTose3(jnp.asarray(screw, dtype=jnp.float64) * t)
+                )
+                return extrapolate_from_current(
+                    jnp.zeros(6, dtype=jnp.float64),
+                    jnp.eye(4, dtype=jnp.float64),
+                    target,
+                    lambda q: jnp.eye(6, dtype=jnp.float64),
+                    [(None, None)] * 6,
+                    alpha=alpha,
+                )
+
+            grad = np.asarray(jax.jacrev(guess)(jnp.asarray(0.0)))
+
+        assert np.all(np.isfinite(grad))
+        np.testing.assert_allclose(grad, alpha * screw, rtol=1e-6, atol=1e-7)
 
     def test_condition_number_gradient_matches_finite_difference(self):
         """``condition_number`` stays differentiable under a traced backend.

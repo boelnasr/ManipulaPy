@@ -11,7 +11,14 @@ from numpy.typing import NDArray
 
 from ManipulaPy.backend import get_backend
 
-from .so3 import MatrixExp3, VecToso3, rotation_logm, skew_symmetric
+from .so3 import (
+    MatrixExp3,
+    MatrixLog3,
+    VecToso3,
+    rotation_logm,
+    skew_symmetric,
+    skew_symmetric_to_vector,
+)
 
 
 def _row(*values: Any) -> Any:
@@ -46,13 +53,37 @@ def adjoint_transform(T) -> NDArray:
                           b.concatenate((b.matmul(skew_symmetric(p), R), R), axis=1)), axis=0)
 
 
-def _g_inverse(omega: Any, theta: Any) -> Any:
-    b = get_backend()
-    safe_theta = b.maximum(theta, b.asarray(1e-12))
+def _log6_wsq_coeff(b: Any, theta_sq: Any) -> Any:
+    """Return ``1 - (theta/2) cot(theta/2)``, the ``w_hat^2`` coefficient.
+
+    Written as an even function of ``theta`` (smooth in ``theta^2``, so no
+    ``sqrt`` feeds the graph near zero). The exact form is a vanishing/vanishing
+    ratio as ``theta -> 0``; below ``theta^2 < 1e-4`` (``theta < 1e-2``) the
+    series ``theta^2/12 + theta^4/720 + theta^6/30240`` is used instead. The
+    band matches ``_exp6_trans_coeffs`` and is set by where the exact form's
+    *backward* pass stops cancelling, not by where its value is still finite.
+    ``theta_sq`` is clamped inside the exact branch so the inactive branch
+    cannot contribute a non-finite gradient through the ``where``.
+    """
+    small = theta_sq / 12 + theta_sq**2 / 720 + theta_sq**3 / 30240
+    theta = b.sqrt(b.maximum(theta_sq, b.asarray(1e-4)))
+    exact = 1 - theta * b.sin(theta) / b.maximum(
+        2 * (1 - b.cos(theta)), b.asarray(1e-300)
+    )
+    return b.where(theta_sq < 1e-4, small, exact)
+
+
+def _theta_g_inverse(b: Any, omega: Any, theta: Any) -> Any:
+    """Return ``theta * G^-1(omega, theta)``, smooth and finite through zero.
+
+    ``G^-1`` alone diverges like ``1/theta``, but the product both logarithms
+    actually need does not: it is ``I - (theta/2) w_hat + c(theta) w_hat^2`` and
+    tends to the identity, which is why the pure-translation result falls out of
+    the general formula rather than needing a separate branch.
+    """
     w_hat = skew_symmetric(omega)
-    half_cot = b.sin(theta) / b.maximum(2 * (1 - b.cos(theta)), b.asarray(1e-12))
-    return (b.eye(3) / safe_theta - 0.5 * w_hat
-            + (1 / safe_theta - half_cot) * b.matmul(w_hat, w_hat))
+    coeff = _log6_wsq_coeff(b, theta * theta)
+    return b.eye(3) - 0.5 * theta * w_hat + coeff * b.matmul(w_hat, w_hat)
 
 
 def logm(T) -> NDArray:
@@ -61,10 +92,18 @@ def logm(T) -> NDArray:
     T = b.asarray(T)
     p = T[:3, 3]
     omega, theta = rotation_logm(T[:3, :3])
-    v = theta * b.matmul(_g_inverse(omega, theta), p)
-    rotational = b.concatenate((omega * theta, v))
-    translation = b.concatenate((b.zeros(3, dtype=p.dtype), p))
-    return b.where(theta < 1e-6, translation, rotational)
+    # The rotation vector comes from MatrixLog3, not from ``omega * theta``.
+    # ``rotation_logm`` zeroes its axis below theta = 1e-6 (the axis is genuinely
+    # undefined at the identity), so rebuilding the vector from the axis
+    # discarded a small-but-real rotation and its derivative at the origin.
+    # MatrixLog3 evaluates 0.5 (theta/sin theta) (R - R.T) through a Taylor-safe
+    # coefficient, which is smooth in both value and gradient there.
+    #
+    # No small-angle branch on the translation either: ``theta * G^-1`` -> I as
+    # theta -> 0, so the general formula already yields the pure-translation
+    # result that the removed ``where`` used to select.
+    rotvec = skew_symmetric_to_vector(MatrixLog3(T[:3, :3]))
+    return b.concatenate((rotvec, b.matmul(_theta_g_inverse(b, omega, theta), p)))
 
 
 def se3ToVec(se3_matrix) -> NDArray:
@@ -97,11 +136,12 @@ def MatrixLog6(T) -> NDArray:
     T = b.asarray(T)
     R, p = TransToRp(T)
     omega, theta = rotation_logm(R)
-    w_hat = skew_symmetric(omega)
-    v = theta * b.matmul(_g_inverse(omega, theta), p)
-    rotational = _homogeneous(theta * w_hat, v, last=0.0)
-    translation = _homogeneous(b.zeros((3, 3), dtype=T.dtype), p, last=0.0)
-    return b.where(theta < 1e-6, translation, rotational)
+    # See ``logm``: the rotational block is MatrixLog3 itself (smooth through the
+    # identity), and the general translation formula already degenerates to the
+    # pure-translation result at theta = 0, so branching on a small angle only
+    # served to discard the rotation and its gradient.
+    v = b.matmul(_theta_g_inverse(b, omega, theta), p)
+    return _homogeneous(MatrixLog3(R), v, last=0.0)
 
 
 def _exp6_trans_coeffs(b: Any, theta_sq: Any) -> Tuple[Any, Any]:
