@@ -60,11 +60,12 @@ def _log6_phi_sq_coeff(b: Any, theta_sq: Any) -> Any:
     separate unit axis and angle. Written as an even function of ``theta``
     (smooth in ``theta^2``, so no ``sqrt`` feeds the graph near zero); the exact
     form is a vanishing/vanishing ratio as ``theta -> 0``, so below
-    ``theta^2 < 1e-4`` (``theta < 1e-2``) the series ``1/12 + theta^2/720 +
-    theta^4/30240`` is used instead. The band matches ``_exp6_trans_coeffs``.
+    ``theta^2 < 1e-2`` (``theta < 0.1``) the four-term series
+    ``1/12 + theta^2/720 + theta^4/30240 + theta^6/1209600`` is used instead.
 
-    The switch sits at ``theta = 0.1``, not at ``theta = 1e-2``. The exact form
-    is a double cancellation: ``1 - cos theta`` loses about five digits at
+    That band is deliberately WIDER than the ``theta^2 < 1e-4`` one
+    ``_exp6_trans_coeffs`` uses, because this coefficient's exact form is a
+    double cancellation: ``1 - cos theta`` loses about five digits at
     ``theta = 1e-2``, and the numerator ``1 - theta sin theta / (2 (1 - cos
     theta))`` is itself ``theta^2/12`` recovered by subtracting two nearly equal
     quantities. Its *derivative* is degraded well before its value is, so
