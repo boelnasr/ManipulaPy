@@ -79,6 +79,12 @@ def _np_result_dtype(*operands: Any) -> "np.dtype":
     return np.result_type(*np_args)
 
 
+def _is_complex(operand: Any) -> bool:
+    """True if ``operand`` carries a complex dtype."""
+    dtype = getattr(operand, "dtype", None)
+    return dtype is not None and np.issubdtype(np.dtype(dtype), np.complexfloating)
+
+
 def _np_inexact_dtype(*operands: Any) -> "np.dtype":
     """Dtype NumPy's transcendental ufuncs produce for ``operands``.
 
@@ -134,6 +140,24 @@ class JaxBackend(ArrayBackend):
         """Return ``operands`` as arrays of their joint ``np.result_type``."""
         target = _np_result_dtype(*operands)
         return [self.asarray(op, dtype=target) for op in operands]
+
+    def _numpy_fallback(self, np_func: Any, *operands: Any, **kwargs: Any) -> Any:
+        """Run ``np_func`` on the host and convert the result back.
+
+        JAX declines the handful of complex operations NumPy defines by
+        lexicographic ``(real, imag)`` ordering: it truth-tests a complex value
+        on its real part alone, and refuses to order complex values at all.
+        Delegating those to NumPy gives parity by construction rather than by
+        reimplementation, which is the same strategy the Torch backend uses for
+        the dtypes Torch handles differently.
+
+        Complex values bake into a trace and are never differentiated anywhere
+        in ManipulaPy, so nothing is lost by leaving the accelerator here.
+        """
+        host = [
+            np.asarray(op) if hasattr(op, "dtype") else op for op in operands
+        ]
+        return self.asarray(np_func(*host, **kwargs))
 
     def _promote_float(self, x: Any) -> Any:
         """Promote integer/boolean input to ``float64`` to match NumPy.
@@ -247,6 +271,9 @@ class JaxBackend(ArrayBackend):
         return jnp.abs(self.asarray(x))
 
     def clip(self, x: Any, a_min: Any, a_max: Any) -> Any:
+        # JAX refuses to order complex values; NumPy clips them lexicographically.
+        if _is_complex(x) or _is_complex(a_min) or _is_complex(a_max):
+            return self._numpy_fallback(np.clip, x, a_min, a_max)
         # np.clip promotes by np.result_type(x, a_min, a_max): e.g. an int array
         # with a float32 bound -> float32, int64 with a Python float -> float64,
         # all-integer bounds keep the integer dtype. Python scalar bounds stay
@@ -293,12 +320,22 @@ class JaxBackend(ArrayBackend):
         return jnp.mean(self._promote_float(x), axis=axis)
 
     def argmax(self, x: Any, axis: Optional[Any] = None) -> Any:
+        # NumPy orders complex values lexicographically by (real, imag); JAX
+        # raises rather than ordering them at all.
+        if _is_complex(x):
+            return self._numpy_fallback(np.argmax, x, axis=axis)
         return jnp.argmax(self.asarray(x), axis=axis)
 
     def all(self, x: Any, axis: Optional[Any] = None) -> Any:
+        # A complex value is truthy in NumPy when EITHER part is non-zero; JAX
+        # tests the real part alone, so 1j would read as False.
+        if _is_complex(x):
+            return self._numpy_fallback(np.all, x, axis=axis)
         return jnp.all(self.asarray(x), axis=axis)
 
     def any(self, x: Any, axis: Optional[Any] = None) -> Any:
+        if _is_complex(x):
+            return self._numpy_fallback(np.any, x, axis=axis)
         return jnp.any(self.asarray(x), axis=axis)
 
     def isfinite(self, x: Any) -> Any:

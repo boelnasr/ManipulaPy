@@ -620,3 +620,41 @@ def test_singularity_metrics_match_numpy_under_jax(method):
         np.asarray(expected, dtype=np.float64),
         rtol=1e-8,
     )
+
+
+@requires_jax
+@pytest.mark.parametrize(
+    "axis", [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+)
+def test_iterative_inverse_kinematics_exact_half_turn_branch(axis):
+    """The exact-half-turn branch of the IK error runs and agrees across backends.
+
+    ``iterative_inverse_kinematics`` takes its one-hot axis branch only when the
+    rotation error is within 1e-6 of pi, which a randomly seeded solve never
+    reaches. Posing the target as exactly a half turn from the seed's own pose
+    puts the very first iteration on that branch. Convergence is not asserted --
+    the point is that the rewritten one-hot construction executes, stays finite,
+    and produces the same step on every backend.
+    """
+    import jax.numpy as jnp  # noqa: F401  (ensures the backend is importable)
+
+    robot = _robot()
+    seed = np.array([0.1, -0.2, 0.15])
+    pose = np.asarray(robot.forward_kinematics(seed, frame="space"))
+
+    half_turn = np.eye(4)
+    half_turn[:3, :3] = 2.0 * np.outer(axis, axis) - np.eye(3)
+    T_desired = pose @ half_turn
+
+    theta_np, _, _ = robot.iterative_inverse_kinematics(
+        T_desired, seed, max_iterations=3
+    )
+    with use_backend("jax"):
+        theta_jax, _, _ = robot.iterative_inverse_kinematics(
+            T_desired, seed, max_iterations=3
+        )
+
+    theta_np = np.asarray(theta_np)
+    theta_jax = np.asarray(theta_jax)
+    assert np.isfinite(theta_np).all() and np.isfinite(theta_jax).all()
+    np.testing.assert_allclose(theta_jax, theta_np, rtol=1e-9, atol=1e-12)

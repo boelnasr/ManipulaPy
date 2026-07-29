@@ -766,13 +766,17 @@ def test_se3_log_translation_matches_scipy_with_fixed_translation(
 @pytest.mark.parametrize("api", ["MatrixLog6", "logm"])
 @pytest.mark.parametrize("gap", [1e-8, 1e-4, 0.0])
 def test_se3_log_is_exact_near_pi_with_fixed_translation(backend_name, api, gap):
-    """Near and at pi the log is checked against an exact construction.
+    """Near and at pi the log is checked by SciPy's exponential, not its log.
 
     ``scipy.linalg.logm`` loses roughly seven digits at the branch point, so it
-    cannot arbitrate here. Building the transform as ``exp6`` of a known screw
-    makes the expected logarithm exact by construction instead. The translation
-    is held at O(1) by solving for the screw's linear part.
+    cannot arbitrate here. Round-tripping through ManipulaPy's own ``MatrixExp6``
+    would not either: a pair of mutually inverse but wrongly scaled conventions
+    (exp writing ``2 rho`` while log returns ``p / 2``) satisfies it. Feeding the
+    result to ``scipy.linalg.expm`` breaks that pairing, since the check no
+    longer shares any code with what it is checking, and ``expm`` stays
+    well conditioned exactly where ``logm`` does not.
     """
+    scipy_linalg = pytest.importorskip("scipy.linalg")
     if backend_name == "torch":
         pytest.importorskip("torch", exc_type=ImportError)
     if backend_name == "jax":
@@ -785,15 +789,34 @@ def test_se3_log_is_exact_near_pi_with_fixed_translation(backend_name, api, gap)
 
     with use_backend(backend_name):
         observed = np.asarray(getattr(utils, api)(transform))
-    observed_vec = (
+    observed_matrix = (
         observed
-        if api == "logm"
-        else np.concatenate(
-            ([observed[2, 1], observed[0, 2], observed[1, 0]], observed[:3, 3])
+        if api == "MatrixLog6"
+        else np.block(
+            [
+                [
+                    np.array(
+                        [
+                            [0.0, -observed[2], observed[1]],
+                            [observed[2], 0.0, -observed[0]],
+                            [-observed[1], observed[0], 0.0],
+                        ]
+                    ),
+                    observed[3:].reshape(3, 1),
+                ],
+                [np.zeros((1, 4))],
+            ]
         )
     )
 
-    np.testing.assert_allclose(observed_vec, screw, rtol=1e-9, atol=1e-9)
+    # Independent oracle: exponentiating the log must reproduce the transform.
+    np.testing.assert_allclose(
+        scipy_linalg.expm(observed_matrix), transform, rtol=1e-10, atol=1e-12
+    )
+    # ...and the result must be the PRINCIPAL branch, which pins the scale.
+    rotation_norm = np.linalg.norm([observed_matrix[2, 1], observed_matrix[0, 2],
+                                    observed_matrix[1, 0]])
+    assert rotation_norm <= np.pi + 1e-9, f"not the principal branch: {rotation_norm}"
 
 
 @pytest.mark.parametrize("backend_name", ["numpy", "torch", "jax"])
@@ -1094,15 +1117,58 @@ class TestJaxProductionGradientContract:
         assert np.all(np.isfinite(actual))
         np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-6)
 
-    @pytest.mark.parametrize("gap", [1e-8, 1e-4, 1e-2, 0.0])
-    def test_matrix_log6_gradient_is_finite_near_and_at_pi(self, gap):
-        """At the half turn only finiteness is required, not a value.
+    @pytest.mark.parametrize(
+        "gap, step", [(1e-2, 1e-4), (1e-4, 1e-6)]
+    )
+    def test_matrix_log6_gradient_has_the_right_value_near_pi(self, gap, step):
+        """Near pi the gradient must be RIGHT, not merely finite.
+
+        A unique derivative exists at every gap > 0, so finiteness alone is too
+        weak: an implementation returning the correct primal but a zero gradient
+        in this region would satisfy it. The step is chosen well inside the gap
+        so the central difference never straddles the branch cut at pi.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            def log6_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            theta_val = np.pi - gap
+            actual = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(theta_val)))
+            expected = (
+                np.asarray(log6_vec(jnp.asarray(theta_val + step)))
+                - np.asarray(log6_vec(jnp.asarray(theta_val - step)))
+            ) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        # A zero-gradient implementation must not survive this.
+        assert np.abs(actual).max() > 1e-3, "gradient collapsed to zero near pi"
+        np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-5)
+
+    @pytest.mark.parametrize("gap", [1e-8, 0.0])
+    def test_matrix_log6_gradient_is_finite_at_the_half_turn(self, gap):
+        """At and adjacent to pi only finiteness is required.
 
         The principal logarithm is genuinely non-differentiable at pi, so no
-        unique correct gradient exists there; what must hold is that the
-        half-turn branch of MatrixLog3 and the exact branch of the coefficient
-        do not leak ``0 * inf`` into the backward pass, which is the failure
-        mode this whole file exists to catch.
+        unique correct gradient exists there, and a central difference cannot
+        reach inside a 1e-8 gap without straddling the cut. What must hold is
+        that the half-turn branch of MatrixLog3 and the exact branch of the
+        coefficient do not leak ``0 * inf`` into the backward pass, which is the
+        failure mode this whole file exists to catch. Gaps where a unique
+        derivative does exist are value-checked above.
         """
         jax, jnp = _requires_jax()
 

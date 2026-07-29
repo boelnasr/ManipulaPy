@@ -3802,3 +3802,72 @@ def test_forced_cpu_planner_skips_benchmark_cpu_comparison(monkeypatch):
     assert "cpu_time" not in results["forced-cpu"]
     assert "actual_speedup" not in results["forced-cpu"]
     assert results["forced-cpu"]["used_gpu"] is False
+
+
+# --- JAX dtype matrix and construction edge paths ---------------------------
+@requires_jax
+@pytest.mark.parametrize(
+    "operation",
+    [
+        pytest.param(lambda b, x: b.all(x), id="all"),
+        pytest.param(lambda b, x: b.any(x), id="any"),
+        pytest.param(lambda b, x: b.argmax(x), id="argmax"),
+        pytest.param(lambda b, x: b.clip(x, -0.5, 0.5), id="clip"),
+    ],
+)
+def test_jax_complex_operations_match_numpy(operation):
+    """Complex input follows NumPy semantics, not JAX's stricter ones.
+
+    NumPy truth-tests a complex value on BOTH parts and orders complex values
+    lexicographically by ``(real, imag)``. JAX tests the real part alone -- so
+    ``1j`` reads as False -- and refuses to order complex values at all, raising
+    from ``argmax`` and ``clip``. The Torch backend already delegates these to
+    NumPy; the JAX backend must agree with both.
+    """
+    backend = be.get_registered("jax")
+    numpy_be = NumpyBackend()
+    values = np.array([1j, 2 + 0j, 0j])
+
+    expected = numpy_be.to_numpy(operation(numpy_be, numpy_be.asarray(values)))
+    observed = backend.to_numpy(operation(backend, backend.asarray(values)))
+
+    np.testing.assert_array_equal(np.asarray(observed), np.asarray(expected))
+
+
+@requires_jax
+def test_jax_construction_edge_paths():
+    """Construction paths that no production call site currently exercises.
+
+    ``None`` bounds, Python-list operands, byte-swapped NumPy input (which JAX
+    rejects outright) and empty sequences all reach the backend through the
+    protocol, so they are pinned even though ManipulaPy does not produce them
+    today.
+    """
+    backend = be.get_registered("jax")
+
+    # A ``None`` clip bound means "unbounded on that side".
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.clip(backend.asarray([-2.0, 2.0]), None, 1.0)),
+        [-2.0, 1.0],
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.clip(backend.asarray([-2.0, 2.0]), -1.0, None)),
+        [-1.0, 2.0],
+    )
+
+    # Python lists infer their dtype exactly as NumPy does.
+    assert backend.to_numpy(backend.asarray([1, 2, 3])).dtype == np.int64
+    assert backend.to_numpy(backend.asarray([1.0, 2.0])).dtype == np.float64
+
+    # Byte-swapped input is converted rather than rejected.
+    swapped = np.array([1.0, 2.0]).astype(">f8")
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.asarray(swapped)), [1.0, 2.0]
+    )
+
+    # Empty sequences raise JAX's own error rather than an IndexError from the
+    # promotion helper reaching into an empty list.
+    with pytest.raises(Exception):
+        backend.stack([])
+    with pytest.raises(Exception):
+        backend.concatenate([])
