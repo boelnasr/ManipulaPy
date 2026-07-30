@@ -56,6 +56,27 @@ _HAS_TORCH = _real_torch_available()
 requires_torch = pytest.mark.skipif(not _HAS_TORCH, reason="PyTorch is not installed")
 
 
+def _real_jax_available() -> bool:
+    """True only when the *real* JAX package is importable.
+
+    Written as an import plus a module-type check for the same reason as
+    :func:`_real_torch_available`: conftest installs stand-ins for absent
+    optional dependencies, and a stand-in would make ``find_spec`` report
+    availability and run the JAX-only tests against the mock instead of
+    skipping. JAX is not in conftest's stand-in list today, so the import alone
+    decides; the module-type check keeps this honest if it ever is added.
+    """
+    try:
+        import jax
+    except Exception:
+        return False
+    return isinstance(jax, types.ModuleType)
+
+
+_HAS_JAX = _real_jax_available()
+requires_jax = pytest.mark.skipif(not _HAS_JAX, reason="JAX is not installed")
+
+
 # The full protocol surface, mirrored from the call-site audit. Kept here so
 # the completeness test fails loudly if base.py and the impls drift apart.
 CONSTRUCTION = ["array", "asarray", "zeros", "eye", "stack", "concatenate", "diag"]
@@ -1144,6 +1165,308 @@ def test_torch_protocol_completeness(member):
     """Every declared surface member exists on the Torch backend."""
     backend = be.get_registered("torch")
     assert hasattr(backend, member), f"TorchBackend missing {member!r}"
+
+
+# ---------------------------------------------------------------------------
+# JAX backend (lazily registered; skipped when JAX is absent)
+# ---------------------------------------------------------------------------
+
+
+def test_jax_selection():
+    """JAX: actionable error when absent (base-install path), round-trip when
+    present. ``_HAS_JAX`` rather than ``find_spec`` decides the branch, so a
+    conftest stand-in can never route this into the present-path assertions."""
+    if not _HAS_JAX:
+        with pytest.raises((ImportError, RuntimeError)) as exc:
+            be.set_backend("jax")
+        assert "jax" in str(exc.value).lower()
+    else:
+        be.set_backend("jax")
+        backend = be.get_backend()
+        result = backend.to_numpy(backend.array([1, 2, 3]))
+        np.testing.assert_array_equal(result, np.array([1, 2, 3]))
+
+
+def test_jax_registration_raises_when_jax_absent():
+    """set_backend('jax') raises an actionable ImportError when JAX is not
+    installed. ``find_spec`` is forced to report jax absent and the registry is
+    isolated from any prior jax registration, so the error path is exercised
+    deterministically regardless of whether JAX is installed here."""
+    real_find_spec = importlib.util.find_spec
+
+    def _jax_absent(name, *args, **kwargs):
+        if name == "jax":
+            return None
+        return real_find_spec(name, *args, **kwargs)
+
+    registry_without_jax = {k: v for k, v in be._REGISTRY.items() if k != "jax"}
+    with patch.object(be, "_REGISTRY", registry_without_jax), patch(
+        "importlib.util.find_spec", side_effect=_jax_absent
+    ):
+        with pytest.raises(ImportError) as exc:
+            be.set_backend("jax")
+    assert "jax" in str(exc.value).lower()
+
+
+@requires_jax
+@pytest.mark.parametrize("switch", ["set_backend", "use_backend"])
+def test_jax_round_trip(switch):
+    """to_numpy(array([...])) reproduces the source values under jax, via both
+    set_backend and the use_backend context manager."""
+    source = [[1.0, 2.0], [3.0, 4.0]]
+    if switch == "set_backend":
+        be.set_backend("jax")
+        backend = be.get_backend()
+        result = backend.to_numpy(backend.array(source))
+    else:
+        with be.use_backend("jax") as backend:
+            result = backend.to_numpy(backend.array(source))
+    np.testing.assert_allclose(result, np.array(source), rtol=1e-12, atol=1e-12)
+
+
+@requires_jax
+def test_jax_backend_flags_gate_cache_and_gpu_routing():
+    """JAX reports non-concrete (cache bypass) and no GPU routing: values may be
+    jit/grad tracers, and the Numba CUDA kernel path is a separate route."""
+    backend = be.get_registered("jax")
+    assert backend.is_concrete is False
+    assert backend.gpu_capable is False
+
+
+@requires_jax
+def test_jax_default_float_dtype_matches_numpy():
+    """Python-float construction yields float64 to match NumPy numerics, not
+    JAX's float32 default.
+
+    This is the guard on the ``jax_enable_x64`` update the backend module makes
+    at import: without it JAX silently narrows every construction below to
+    float32 (and integers to int32), which would break float64 parity with the
+    NumPy backend everywhere. Dtypes are asserted against the NumPy backend
+    rather than hard-coded so the reference cannot drift.
+    """
+    backend = be.get_registered("jax")
+    numpy_be = NumpyBackend()
+
+    # Python floats default to float64 (not jax's float32 default).
+    assert (
+        backend.to_numpy(backend.array([1.0, 2.0])).dtype
+        == numpy_be.array([1.0, 2.0]).dtype
+        == np.float64
+    )
+    assert (
+        backend.to_numpy(backend.zeros((2, 2))).dtype
+        == numpy_be.zeros((2, 2)).dtype
+        == np.float64
+    )
+    assert (
+        backend.to_numpy(backend.eye(3)).dtype == numpy_be.eye(3).dtype == np.float64
+    )
+    # Integer input keeps 64-bit integer dtype (matching NumPy, not jax's int32).
+    assert (
+        backend.to_numpy(backend.array([1, 2, 3])).dtype
+        == numpy_be.array([1, 2, 3]).dtype
+        == np.int64
+    )
+    # Explicit dtype handles round-trip.
+    assert backend.to_numpy(backend.array([1, 2, 3], dtype=backend.float32)).dtype == (
+        np.float32
+    )
+    assert backend.to_numpy(backend.array([1, 2, 3], dtype=backend.float64)).dtype == (
+        np.float64
+    )
+
+
+@requires_jax
+def test_jax_integer_input_matches_numpy_semantics():
+    """Integer input to float-producing ops promotes to float64 like NumPy.
+
+    NumPy returns float64 for integer input to the transcendental, ``mean``, and
+    linalg operations; JAX's own promotion lattice deliberately avoids widening
+    and would return float32 instead. Preserving ops (``sum``/``abs``/``trace``)
+    must keep the integer dtype.
+    """
+    backend = be.get_registered("jax")
+    vec = [1, 2]
+    mat = [[4, 1], [1, 3]]
+
+    # Elementwise transcendental: float64 values matching NumPy.
+    for name in ("sin", "cos", "sqrt", "arccos"):
+        out = getattr(backend, name)(backend.array([0, 1]))
+        assert backend.to_numpy(out).dtype == np.float64, name
+        np.testing.assert_allclose(
+            backend.to_numpy(out), getattr(np, name)(np.array([0, 1])), rtol=1e-7
+        )
+    at = backend.arctan2(backend.array(vec), backend.array(vec))
+    assert backend.to_numpy(at).dtype == np.float64
+    np.testing.assert_allclose(
+        backend.to_numpy(at), np.arctan2(np.array(vec), np.array(vec)), rtol=1e-7
+    )
+
+    # Reductions / linalg that NumPy floats: value + float64 parity.
+    mean_out = backend.mean(backend.array(vec))
+    assert backend.to_numpy(mean_out).dtype == np.float64
+    assert np.isclose(float(mean_out), np.mean(np.array(vec)))
+    norm_out = backend.norm(backend.array(vec))
+    assert backend.to_numpy(norm_out).dtype == np.float64
+    assert np.isclose(float(norm_out), np.linalg.norm(np.array(vec)))
+    for name, npfn in (
+        ("inv", np.linalg.inv),
+        ("pinv", np.linalg.pinv),
+        ("svdvals", lambda m: np.linalg.svd(m, compute_uv=False)),
+    ):
+        out = getattr(backend, name)(backend.array(mat))
+        assert backend.to_numpy(out).dtype == np.float64, name
+        np.testing.assert_allclose(
+            backend.to_numpy(out), npfn(np.array(mat)), rtol=1e-7
+        )
+    solve_out = backend.solve(backend.array(mat), backend.array(vec))
+    assert backend.to_numpy(solve_out).dtype == np.float64
+    np.testing.assert_allclose(
+        backend.to_numpy(solve_out),
+        np.linalg.solve(np.array(mat), np.array(vec)),
+        rtol=1e-7,
+    )
+
+    # Preserving ops keep integer dtype, matching NumPy.
+    assert backend.to_numpy(backend.sum(backend.array(vec))).dtype == np.int64
+    assert backend.to_numpy(backend.abs(backend.array([-1, 2]))).dtype == np.int64
+    assert backend.to_numpy(backend.trace(backend.array(mat))).dtype == np.int64
+
+
+@requires_jax
+def test_jax_linalg_matches_numpy():
+    """The linalg surface (svd/pinv/inv/solve/norm/trace) matches NumPy values.
+
+    ``pinv`` is the load-bearing one: jnp.linalg.pinv's default rtol is far
+    looser than np.linalg.pinv's 1e-15 rcond, so a small singular value NumPy
+    keeps would be zeroed without the explicit rtol the backend passes.
+    """
+    backend = be.get_registered("jax")
+    a = np.array([[4.0, 1.0], [1.0, 3.0]])
+    b_vec = np.array([1.0, 2.0])
+
+    ta = backend.array(a)
+    # svd: shapes and reconstruction.
+    u, s, vt = backend.svd(ta)
+    assert tuple(u.shape) == (2, 2) and tuple(s.shape) == (2,)
+    np.testing.assert_allclose(
+        backend.to_numpy(s), np.linalg.svd(a, compute_uv=False), rtol=1e-10
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.svdvals(ta)), backend.to_numpy(s), rtol=1e-10
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.inv(ta)), np.linalg.inv(a), rtol=1e-10
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.pinv(ta)), np.linalg.pinv(a), rtol=1e-10
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.solve(ta, backend.array(b_vec))),
+        np.linalg.solve(a, b_vec),
+        rtol=1e-10,
+    )
+    assert np.isclose(float(backend.norm(backend.array([3.0, 4.0]))), 5.0)
+    assert np.isclose(float(backend.trace(backend.eye(3))), 3.0)
+    # A tiny singular value is zeroed like np.linalg.pinv's rcond, not inverted.
+    d = np.diag([1.0, 9e-16])
+    out_d = backend.to_numpy(backend.pinv(backend.array(d)))
+    np.testing.assert_allclose(out_d, np.linalg.pinv(d), atol=1e-6)
+    assert abs(out_d[1, 1]) < 1.0
+
+
+@requires_jax
+def test_jax_use_backend_restores_previous_backend():
+    """use_backend('jax') restores the previously active backend on exit."""
+    be.set_backend("numpy")
+    original = be.get_backend()
+    with be.use_backend("jax") as backend:
+        assert backend.is_backend_array(backend.array([1.0, 2.0]))
+        assert be.get_backend() is not original
+    assert be.get_backend() is original
+
+
+@requires_jax
+def test_jax_is_backend_array_accepts_jit_tracer():
+    """is_backend_array recognises a ``jax.jit`` tracer, not just a concrete
+    array.
+
+    Under ``jax.jit`` every value reaching backend code is a tracer with no
+    host-readable value, which is exactly what ``is_concrete = False`` encodes;
+    a predicate that only accepted materialized arrays would send traced values
+    down host-only branches. Asserting the tracer is genuinely non-concrete
+    (``np.asarray`` raises on it) keeps the test from passing on a concrete
+    array that merely happened to flow through jit.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    backend = be.get_registered("jax")
+    source = np.array([0.1, 0.2, 0.3])
+    seen = {}
+
+    @jax.jit
+    def _traced(x):
+        seen["is_backend_array"] = backend.is_backend_array(x)
+        seen["is_tracer"] = isinstance(x, jax.core.Tracer)
+        return backend.sum(backend.sin(x))
+
+    out = _traced(jnp.asarray(source))
+    assert seen["is_tracer"] is True
+    assert seen["is_backend_array"] is True
+    # The traced value carried no host value, so this was not a concrete array.
+    with pytest.raises(jax.errors.TracerArrayConversionError):
+        jax.jit(lambda x: np.asarray(x))(jnp.asarray(source))
+    # Concrete results still satisfy the predicate, and the trace computed.
+    assert backend.is_backend_array(out) is True
+    assert np.isclose(float(out), np.sin(source).sum())
+
+
+@requires_jax
+def test_jax_ops_do_not_mutate_their_input():
+    """No backend method writes into its input.
+
+    JAX arrays are immutable, so the backend allocates a new array per
+    operation and never updates in place; this pins that contract down for the
+    whole surface (an in-place write would raise on a JAX array but could still
+    slip through a NumPy-valued fallback path).
+    """
+    backend = be.get_registered("jax")
+    source = np.array([1.0, -2.0, 3.0])
+    vec = backend.array(source)
+    mat = backend.array(np.array([[4.0, 1.0], [1.0, 3.0]]))
+    vec_before = backend.to_numpy(vec).copy()
+    mat_before = backend.to_numpy(mat).copy()
+
+    unary = [
+        "sin", "cos", "sqrt", "abs", "asarray", "diag", "isfinite",
+        "sum", "mean", "amax", "amin", "argmax", "all", "any", "norm",
+        "to_device", "ascontiguous", "to_numpy",
+    ]
+    for name in unary:
+        getattr(backend, name)(vec)
+        np.testing.assert_array_equal(backend.to_numpy(vec), vec_before, name)
+    for name in ("svd", "svdvals", "inv", "pinv", "trace"):
+        getattr(backend, name)(mat)
+        np.testing.assert_array_equal(backend.to_numpy(mat), mat_before, name)
+
+    backend.arccos(backend.clip(vec, -1.0, 1.0))
+    backend.arctan2(vec, vec)
+    backend.cross(vec, vec)
+    backend.maximum(vec, 0.0)
+    backend.minimum(vec, 0.0)
+    backend.where(vec > 0, vec, 0.0)
+    backend.stack([vec, vec])
+    backend.concatenate([vec, vec])
+    backend.matmul(backend.eye(3), vec)
+    backend.solve(mat, backend.array([1.0, 2.0]))
+    np.testing.assert_array_equal(backend.to_numpy(vec), vec_before)
+    np.testing.assert_array_equal(backend.to_numpy(mat), mat_before)
+    # The host ndarray the array was built from is untouched too.
+    np.testing.assert_array_equal(source, np.array([1.0, -2.0, 3.0]))
+    # And the immutability the backend relies on is real, not assumed.
+    with pytest.raises(TypeError):
+        vec[0] = 99.0
 
 
 def test_math_surface_numpy():
@@ -3479,3 +3802,72 @@ def test_forced_cpu_planner_skips_benchmark_cpu_comparison(monkeypatch):
     assert "cpu_time" not in results["forced-cpu"]
     assert "actual_speedup" not in results["forced-cpu"]
     assert results["forced-cpu"]["used_gpu"] is False
+
+
+# --- JAX dtype matrix and construction edge paths ---------------------------
+@requires_jax
+@pytest.mark.parametrize(
+    "operation",
+    [
+        pytest.param(lambda b, x: b.all(x), id="all"),
+        pytest.param(lambda b, x: b.any(x), id="any"),
+        pytest.param(lambda b, x: b.argmax(x), id="argmax"),
+        pytest.param(lambda b, x: b.clip(x, -0.5, 0.5), id="clip"),
+    ],
+)
+def test_jax_complex_operations_match_numpy(operation):
+    """Complex input follows NumPy semantics, not JAX's stricter ones.
+
+    NumPy truth-tests a complex value on BOTH parts and orders complex values
+    lexicographically by ``(real, imag)``. JAX tests the real part alone -- so
+    ``1j`` reads as False -- and refuses to order complex values at all, raising
+    from ``argmax`` and ``clip``. The Torch backend already delegates these to
+    NumPy; the JAX backend must agree with both.
+    """
+    backend = be.get_registered("jax")
+    numpy_be = NumpyBackend()
+    values = np.array([1j, 2 + 0j, 0j])
+
+    expected = numpy_be.to_numpy(operation(numpy_be, numpy_be.asarray(values)))
+    observed = backend.to_numpy(operation(backend, backend.asarray(values)))
+
+    np.testing.assert_array_equal(np.asarray(observed), np.asarray(expected))
+
+
+@requires_jax
+def test_jax_construction_edge_paths():
+    """Construction paths that no production call site currently exercises.
+
+    ``None`` bounds, Python-list operands, byte-swapped NumPy input (which JAX
+    rejects outright) and empty sequences all reach the backend through the
+    protocol, so they are pinned even though ManipulaPy does not produce them
+    today.
+    """
+    backend = be.get_registered("jax")
+
+    # A ``None`` clip bound means "unbounded on that side".
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.clip(backend.asarray([-2.0, 2.0]), None, 1.0)),
+        [-2.0, 1.0],
+    )
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.clip(backend.asarray([-2.0, 2.0]), -1.0, None)),
+        [-1.0, 2.0],
+    )
+
+    # Python lists infer their dtype exactly as NumPy does.
+    assert backend.to_numpy(backend.asarray([1, 2, 3])).dtype == np.int64
+    assert backend.to_numpy(backend.asarray([1.0, 2.0])).dtype == np.float64
+
+    # Byte-swapped input is converted rather than rejected.
+    swapped = np.array([1.0, 2.0]).astype(">f8")
+    np.testing.assert_allclose(
+        backend.to_numpy(backend.asarray(swapped)), [1.0, 2.0]
+    )
+
+    # Empty sequences raise JAX's own error rather than an IndexError from the
+    # promotion helper reaching into an empty list.
+    with pytest.raises(Exception):
+        backend.stack([])
+    with pytest.raises(Exception):
+        backend.concatenate([])

@@ -78,7 +78,7 @@ EXPECTED_AST_HASHES = {
         "d7b8b9cd907dd83950f2794f61b044395e42b74212e5b8a3c9cded64cdbdcdc1"
     ),
     "iterative_inverse_kinematics": (
-        "41ea5e79f547e92fc12fdd4b37b94017efcb11db667d5f14bef638a7294530b7"
+        "c85cc69c3d262561c9c3412e02d937e9a60384e555d95e74952d1ccc0159b346"
     ),
     "_pose_error": "579cfe7d41fa2bc2f725381405db17abd08d28d3f38e9e2b6ab48eeeabb232de",
     "smart_inverse_kinematics": (

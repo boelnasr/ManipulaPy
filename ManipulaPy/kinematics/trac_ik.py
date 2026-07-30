@@ -677,42 +677,25 @@ class TracIKSolver:
             )
         elif abs(angle - np.pi) < 1e-6:  # np.pi: host constant
             diag = backend.diag(R_err)
-            k = backend.argmax(diag)
-            axis = backend.zeros(3, dtype=R_err.dtype)
-            axis[k] = 1.0
-            if k == 0:
-                axis[1] = (
-                    R_err[0, 1] / (1 + R_err[0, 0])
-                    if abs(1 + R_err[0, 0]) > 1e-6
-                    else 0
-                )
-                axis[2] = (
-                    R_err[0, 2] / (1 + R_err[0, 0])
-                    if abs(1 + R_err[0, 0]) > 1e-6
-                    else 0
-                )
-            elif k == 1:
-                axis[0] = (
-                    R_err[1, 0] / (1 + R_err[1, 1])
-                    if abs(1 + R_err[1, 1]) > 1e-6
-                    else 0
-                )
-                axis[2] = (
-                    R_err[1, 2] / (1 + R_err[1, 1])
-                    if abs(1 + R_err[1, 1]) > 1e-6
-                    else 0
-                )
-            else:
-                axis[0] = (
-                    R_err[2, 0] / (1 + R_err[2, 2])
-                    if abs(1 + R_err[2, 2]) > 1e-6
-                    else 0
-                )
-                axis[1] = (
-                    R_err[2, 1] / (1 + R_err[2, 2])
-                    if abs(1 + R_err[2, 2]) > 1e-6
-                    else 0
-                )
+            k = int(backend.argmax(diag))
+            # All three former branches follow one rule: component ``k`` is 1
+            # and every other component ``j`` is R_err[k, j] / (1 + R_err[k, k]),
+            # falling back to 0 when that denominator is degenerate. Assembled
+            # as a sequence because JAX's immutable arrays reject the
+            # element-wise assignment this replaces.
+            denom = 1 + R_err[k, k]
+            usable = bool(backend.abs(denom) > 1e-6)
+            axis = backend.asarray(
+                backend.stack(
+                    tuple(
+                        1.0
+                        if j == k
+                        else (R_err[k, j] / denom if usable else 0.0)
+                        for j in range(3)
+                    )
+                ),
+                dtype=R_err.dtype,
+            )
             axis = axis / (backend.norm(axis) + 1e-10)
             omega_err = angle * axis
         else:

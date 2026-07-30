@@ -56,24 +56,27 @@ def workspace_heuristic_guess(
         >>> theta, success, iters = robot.iterative_inverse_kinematics(T_target, theta0)
     """
     backend = get_backend()
-    theta = backend.zeros(n_joints, dtype=backend.float64)
+    # Angles accumulate in a host list and the vector is assembled once at the
+    # end: backend arrays are immutable under JAX, so there is no indexed
+    # assignment to write each joint into a preallocated vector.
+    angles = [0.0] * n_joints
 
     # Extract desired position
     p = T_desired[:3, 3]
 
     # Joint 1: Rotation in XY plane
     if n_joints >= 1:
-        theta[0] = backend.arctan2(p[1], p[0])
+        angles[0] = backend.arctan2(p[1], p[0])
 
     # Joint 2: Elevation angle (rough approximation)
     if n_joints >= 2:
         r_xy = backend.sqrt(p[0] ** 2 + p[1] ** 2)
-        theta[1] = backend.arctan2(p[2], r_xy) if r_xy > 1e-6 else 0.0
+        angles[1] = backend.arctan2(p[2], r_xy) if r_xy > 1e-6 else 0.0
 
     # Joint 3: Elbow configuration (neutral position)
     if n_joints >= 3:
         # Use 45° as a neutral elbow angle
-        theta[2] = np.pi / 4  # host constant
+        angles[2] = np.pi / 4  # host constant
 
     # Joints 4-6: Wrist orientation (if present)
     if n_joints > 3:
@@ -82,19 +85,27 @@ def workspace_heuristic_guess(
         if backend.abs(R[2, 2]) < 0.9999:
             # Normal case
             if n_joints >= 5:
-                theta[4] = backend.arccos(backend.clip(R[2, 2], -1, 1))
+                angles[4] = backend.arccos(backend.clip(R[2, 2], -1, 1))
             if n_joints >= 4:
-                theta[3] = backend.arctan2(R[1, 2], R[0, 2])
+                angles[3] = backend.arctan2(R[1, 2], R[0, 2])
             if n_joints >= 6:
-                theta[5] = backend.arctan2(R[2, 1], -R[2, 0])
+                angles[5] = backend.arctan2(R[2, 1], -R[2, 0])
         else:
             # Gimbal lock case
             if n_joints >= 4:
-                theta[3] = backend.arctan2(R[1, 0], R[0, 0])
+                angles[3] = backend.arctan2(R[1, 0], R[0, 0])
             if n_joints >= 5:
-                theta[4] = 0.0
+                angles[4] = 0.0
             if n_joints >= 6:
-                theta[5] = 0.0
+                angles[5] = 0.0
+
+    # float64 is reasserted after the stack: a float32 pose would otherwise
+    # narrow the guess, where writing into a float64 vector kept it wide.
+    theta = (
+        backend.asarray(backend.stack(angles), dtype=backend.float64)
+        if n_joints
+        else backend.zeros(0, dtype=backend.float64)
+    )
 
     # Clip to joint limits
     theta = _clip_to_limits(theta, joint_limits)
@@ -183,22 +194,22 @@ def random_in_limits(
         >>> theta_random = random_in_limits(robot.joint_limits)
     """
     backend = get_backend()
-    n_joints = len(joint_limits)
-    theta = backend.zeros(n_joints, dtype=backend.float64)
 
     # np.random / np.pi are the host RNG boundary: seeds are drawn on the host
-    # and written into the backend-native array (no backend RNG primitive).
-    for i, (mn, mx) in enumerate(joint_limits):
+    # and the vector is converted once, since backend arrays are immutable
+    # under JAX and cannot be filled in by indexed assignment.
+    angles = []
+    for mn, mx in joint_limits:
         if mn is not None and mx is not None:
-            theta[i] = np.random.uniform(mn, mx)
+            angles.append(np.random.uniform(mn, mx))
         elif mn is not None:
-            theta[i] = mn + np.random.uniform(0, np.pi)
+            angles.append(mn + np.random.uniform(0, np.pi))
         elif mx is not None:
-            theta[i] = mx - np.random.uniform(0, np.pi)
+            angles.append(mx - np.random.uniform(0, np.pi))
         else:
-            theta[i] = np.random.uniform(-np.pi, np.pi)
+            angles.append(np.random.uniform(-np.pi, np.pi))
 
-    return theta
+    return backend.asarray(angles, dtype=backend.float64)
 
 
 def midpoint_of_limits(
@@ -224,15 +235,15 @@ def midpoint_of_limits(
         >>> theta0 = midpoint_of_limits(robot.joint_limits)
     """
     backend = get_backend()
-    n_joints = len(joint_limits)
-    theta = backend.zeros(n_joints, dtype=backend.float64)
 
-    for i, (mn, mx) in enumerate(joint_limits):
-        if mn is not None and mx is not None:
-            theta[i] = (mn + mx) / 2.0
-        # else: stays at 0
+    # Midpoints are host arithmetic, so the vector is built as a list and
+    # converted once: backend arrays are immutable under JAX.
+    angles = [
+        (mn + mx) / 2.0 if mn is not None and mx is not None else 0.0
+        for mn, mx in joint_limits
+    ]
 
-    return theta
+    return backend.asarray(angles, dtype=backend.float64)
 
 
 class IKInitialGuessCache:
@@ -407,21 +418,32 @@ def _clip_to_limits(
     Returns:
         Clipped joint angles
     """
-    # Copy without changing the array type: TRAC-IK passes backend-native
-    # vectors (whose ``.copy()`` is NumPy-only -- Torch has ``.clone()``),
-    # while the host-boundary cache lookup passes plain NumPy that must stay
-    # NumPy. ``backend.array`` copies on every backend.
+    # Clipping is vectorised rather than written element by element: backend
+    # arrays are immutable under JAX, so there is no indexed assignment. The
+    # bounds are host arrays padded with +/-inf, which leaves both an absent
+    # limit and a joint beyond ``joint_limits`` untouched, matching the
+    # per-element loop this replaces.
+    #
+    # The array type is preserved either way: TRAC-IK passes backend-native
+    # vectors while the host-boundary cache lookup passes plain NumPy that must
+    # stay NumPy, so the host path never routes through the backend.
     backend = get_backend()
-    theta_clipped = (
-        backend.array(theta) if backend.is_backend_array(theta) else theta.copy()
-    )
-    for i, (mn, mx) in enumerate(joint_limits):
-        if i < len(theta_clipped):
-            if mn is not None:
-                theta_clipped[i] = max(theta_clipped[i], mn)
-            if mx is not None:
-                theta_clipped[i] = min(theta_clipped[i], mx)
-    return theta_clipped
+    n = theta.shape[0]
+    lower = np.full(n, -np.inf)
+    upper = np.full(n, np.inf)
+    for i, (mn, mx) in enumerate(joint_limits[:n]):
+        if mn is not None:
+            lower[i] = mn
+        if mx is not None:
+            upper[i] = mx
+
+    # The +/-inf bounds are float64, so the comparison would widen a float32 or
+    # integer vector. Casting back reproduces what assigning into the
+    # preallocated copy did, including the truncation an integer vector saw.
+    if backend.is_backend_array(theta):
+        clipped = backend.minimum(backend.maximum(theta, lower), upper)
+        return backend.asarray(clipped, dtype=theta.dtype)
+    return np.minimum(np.maximum(theta, lower), upper).astype(theta.dtype)
 
 
 def adaptive_multi_start_ik(

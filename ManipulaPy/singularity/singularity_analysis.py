@@ -267,10 +267,23 @@ class Singularity:
         # Host public boundary: NaN ratio (0/0, or an inf-input spectrum) is
         # reported as an infinite condition number, preserving the input dtype
         # exactly as np.linalg.cond does.
-        value = backend.to_numpy(ratio)[()]
-        if np.isnan(value):
-            value = type(value)(np.inf)
-        return value
+        # Only a caller who passed a backend-native ``thetalist`` can be
+        # differentiating through this metric, and only then must the result
+        # stay native: reading a traced value onto the host raises under JAX and
+        # silently detaches the graph under Torch. A host seed keeps the host
+        # return on every backend, so the documented float contract (and the
+        # np.linalg.cond parity above) is unchanged for existing callers.
+        # Gating on ``is_concrete`` alone would be wrong here -- it is a
+        # property of the backend, not of this value, and would hand a Tensor
+        # back to every Torch caller passing plain NumPy.
+        if backend.is_concrete or not backend.is_backend_array(thetalist):
+            value = backend.to_numpy(ratio)[()]
+            if np.isnan(value):
+                value = type(value)(np.inf)
+            return value
+        # ``ratio != ratio`` is the NaN test because the protocol exposes
+        # ``isfinite``, which cannot separate NaN from the infinity replacing it.
+        return backend.where(ratio != ratio, backend.asarray(float("inf")), ratio)
 
     def near_singularity_detection(
         self,

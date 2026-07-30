@@ -117,22 +117,47 @@ def _ensure_torch_registered() -> None:
         _REGISTRY["torch"] = TorchBackend()
 
 
+def _ensure_jax_registered() -> None:
+    """Register the JAX backend on first request, if JAX is importable.
+
+    Raises:
+        ImportError: if JAX is not installed. Kept out of the eager import
+            path so NumPy-only machines can import ManipulaPy.
+    """
+    with _LOCK:
+        if "jax" in _REGISTRY:
+            return
+        if importlib.util.find_spec("jax") is None:
+            raise ImportError(
+                "The 'jax' backend was requested but JAX is not installed. "
+                "Install JAX, e.g. `pip install jax`, "
+                "or select another backend such as 'numpy'."
+            )
+        from .jax_backend import JaxBackend
+
+        _REGISTRY["jax"] = JaxBackend()
+
+
 def get_registered(name: str) -> ArrayBackend:
     """Return the backend registered under ``name``.
 
-    Triggers lazy CuPy registration for ``name == "cupy"`` and lazy Torch
-    registration for ``name == "torch"``.
+    Triggers lazy CuPy registration for ``name == "cupy"``, lazy Torch
+    registration for ``name == "torch"``, and lazy JAX registration for
+    ``name == "jax"``.
 
     Raises:
         ValueError: if ``name`` is not registered (message lists the
             registered names).
-        ImportError: if ``name == "cupy"`` but CuPy is not installed, or
-            ``name == "torch"`` but PyTorch is not installed.
+        ImportError: if ``name == "cupy"`` but CuPy is not installed,
+            ``name == "torch"`` but PyTorch is not installed, or
+            ``name == "jax"`` but JAX is not installed.
     """
     if name == "cupy":
         _ensure_cupy_registered()
     elif name == "torch":
         _ensure_torch_registered()
+    elif name == "jax":
+        _ensure_jax_registered()
     with _LOCK:
         if name not in _REGISTRY:
             known = ", ".join(sorted(_REGISTRY)) or "<none>"

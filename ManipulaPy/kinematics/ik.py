@@ -117,8 +117,10 @@ class _InverseKinematicsConcern:
             elif abs(angle - _runtime.np.pi) < 1e-6:
                 diag = backend.diag(R_err)
                 idx = backend.argmax(diag)
-                axis = backend.zeros(3, dtype=R_err.dtype)
-                axis[idx] = 1.0
+                # Row ``idx`` of the identity is the one-hot axis; selecting it
+                # avoids the indexed assignment that JAX's immutable arrays
+                # reject.
+                axis = backend.eye(3, dtype=R_err.dtype)[idx]
                 omega_err = angle * axis
             else:
                 axis = backend.stack(
@@ -160,14 +162,20 @@ class _InverseKinematicsConcern:
                 return backend.solve(JTJ + lambda_I, backend.matmul(J.T, V_err))
 
         def clip_to_limits(th: NDArray[np.float64]) -> NDArray[np.float64]:
-            """Clip joint angles to limits."""
-            th_clipped = backend.array(th)
-            for i, (mn, mx) in enumerate(self.joint_limits):
+            """Clip joint angles to limits.
+
+            Vectorised against +/-inf-padded bounds so no element is written in
+            place, which JAX's immutable arrays reject.
+            """
+            n = th.shape[0]
+            lower = _runtime.np.full(n, -_runtime.np.inf)
+            upper = _runtime.np.full(n, _runtime.np.inf)
+            for i, (mn, mx) in enumerate(self.joint_limits[:n]):
                 if mn is not None:
-                    th_clipped[i] = max(th_clipped[i], mn)
+                    lower[i] = mn
                 if mx is not None:
-                    th_clipped[i] = min(th_clipped[i], mx)
-            return th_clipped
+                    upper[i] = mx
+            return backend.minimum(backend.maximum(th, lower), upper)
 
         for k in range(max_iterations):
             # Current pose & geometric error
@@ -219,9 +227,13 @@ class _InverseKinematicsConcern:
 
             # Compute Jacobian and weighted error
             J_space = self.jacobian(theta, frame="space")
-            V_weighted = backend.array(V_err)
-            V_weighted[:3] *= weight_orientation
-            V_weighted[3:] *= weight_position
+            # Scaled by a weight vector rather than two in-place slice updates,
+            # which JAX's immutable arrays reject.
+            V_weighted = V_err * backend.asarray(
+                [weight_orientation] * 3
+                + [weight_position] * (V_err.shape[0] - 3),
+                dtype=V_err.dtype,
+            )
 
             # SVD-robust solve
             delta_theta = svd_robust_solve(J_space, V_weighted, damping_local)

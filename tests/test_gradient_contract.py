@@ -687,3 +687,790 @@ class TestProductionGradientContract:
 
         assert np.all(np.isfinite(actual))
         np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+
+# A transform whose translation does NOT scale with the rotation angle. The
+# round-trip family below multiplies a screw by t, so its translation shrinks
+# with theta and the translational error shrinks as theta^2 -- which hid a real
+# defect under a 1e-12 tolerance. Holding p at O(1) while theta -> 0 keeps the
+# error first order and therefore visible.
+_FIXED_P = np.array([0.4, -1.2, 2.3])
+_LOG6_AXIS = np.array([0.0, 0.0, 1.0])
+
+
+def _fixed_translation_transform(theta_val):
+    """4x4 transform: rotation of ``theta_val`` about z, translation ``_FIXED_P``."""
+    cos_t, sin_t = np.cos(theta_val), np.sin(theta_val)
+    transform = np.eye(4)
+    transform[:3, :3] = np.array(
+        [[cos_t, -sin_t, 0.0], [sin_t, cos_t, 0.0], [0.0, 0.0, 1.0]]
+    )
+    transform[:3, 3] = _FIXED_P
+    return transform
+
+
+@pytest.mark.parametrize("backend_name", ["numpy", "torch", "jax"])
+@pytest.mark.parametrize("api", ["MatrixLog6", "logm"])
+@pytest.mark.parametrize(
+    "theta_val",
+    [
+        0.0, 5e-7, 9.99e-7, 1e-6, 1.01e-6, 1e-3, 0.01, 0.0999, 0.1, 0.1001,
+        1.0, 2.0, 3.0,
+    ],
+)
+def test_se3_log_translation_matches_scipy_with_fixed_translation(
+    backend_name, api, theta_val
+):
+    """The translational log is correct when p does not shrink with theta.
+
+    ``theta * G^-1`` was built from ``rotation_logm``'s axis, which is zeroed
+    below theta = 1e-6, flattening the whole expression to the identity there
+    and returning ``p`` unchanged instead of ``p - (theta/2) w_hat p + ...``.
+    The angles bracket the old 1e-6 axis threshold and the Taylor switch at 0.1,
+    and continue into the exact branch.
+
+    Both public entry points are covered: they wire the same helpers
+    independently, so testing only one leaves the other free to regress.
+    ``theta`` stops short of pi because ``scipy.linalg.logm`` is itself
+    inaccurate at the branch point (~1e-8 error at pi - 1e-8); near-pi accuracy
+    is pinned against an exact construction in
+    :func:`test_se3_log_is_exact_near_pi_with_fixed_translation`.
+    """
+    scipy_linalg = pytest.importorskip("scipy.linalg")
+    if backend_name == "torch":
+        pytest.importorskip("torch", exc_type=ImportError)
+    if backend_name == "jax":
+        jax = pytest.importorskip("jax", exc_type=ImportError)
+        jax.config.update("jax_enable_x64", True)
+
+    transform = _fixed_translation_transform(theta_val)
+    expected_matrix = np.real(scipy_linalg.logm(transform))
+    expected = (
+        expected_matrix
+        if api == "MatrixLog6"
+        else np.concatenate(
+            (
+                [expected_matrix[2, 1], expected_matrix[0, 2], expected_matrix[1, 0]],
+                expected_matrix[:3, 3],
+            )
+        )
+    )
+
+    with use_backend(backend_name):
+        observed = np.asarray(getattr(utils, api)(transform))
+
+    np.testing.assert_allclose(observed, expected, rtol=1e-9, atol=1e-12)
+
+
+@pytest.mark.parametrize("backend_name", ["numpy", "torch", "jax"])
+@pytest.mark.parametrize("api", ["MatrixLog6", "logm"])
+@pytest.mark.parametrize("gap", [1e-8, 1e-4, 0.0])
+def test_se3_log_is_exact_near_pi_with_fixed_translation(backend_name, api, gap):
+    """Near and at pi the log is checked by SciPy's exponential, not its log.
+
+    ``scipy.linalg.logm`` loses roughly seven digits at the branch point, so it
+    cannot arbitrate here. Round-tripping through ManipulaPy's own ``MatrixExp6``
+    would not either: a pair of mutually inverse but wrongly scaled conventions
+    (exp writing ``2 rho`` while log returns ``p / 2``) satisfies it. Feeding the
+    result to ``scipy.linalg.expm`` breaks that pairing, since the check no
+    longer shares any code with what it is checking, and ``expm`` stays
+    well conditioned exactly where ``logm`` does not.
+    """
+    scipy_linalg = pytest.importorskip("scipy.linalg")
+    if backend_name == "torch":
+        pytest.importorskip("torch", exc_type=ImportError)
+    if backend_name == "jax":
+        jax = pytest.importorskip("jax", exc_type=ImportError)
+        jax.config.update("jax_enable_x64", True)
+
+    theta_val = np.pi - gap
+    screw = np.concatenate((_LOG6_AXIS * theta_val, _FIXED_P))
+    transform = np.asarray(utils.MatrixExp6(utils.VecTose3(screw)))
+
+    with use_backend(backend_name):
+        observed = np.asarray(getattr(utils, api)(transform))
+    observed_matrix = (
+        observed
+        if api == "MatrixLog6"
+        else np.block(
+            [
+                [
+                    np.array(
+                        [
+                            [0.0, -observed[2], observed[1]],
+                            [observed[2], 0.0, -observed[0]],
+                            [-observed[1], observed[0], 0.0],
+                        ]
+                    ),
+                    observed[3:].reshape(3, 1),
+                ],
+                [np.zeros((1, 4))],
+            ]
+        )
+    )
+
+    # Independent oracle: exponentiating the log must reproduce the transform.
+    np.testing.assert_allclose(
+        scipy_linalg.expm(observed_matrix), transform, rtol=1e-10, atol=1e-12
+    )
+    # ...and the result must be the PRINCIPAL branch, which pins the scale.
+    rotation_norm = np.linalg.norm([observed_matrix[2, 1], observed_matrix[0, 2],
+                                    observed_matrix[1, 0]])
+    assert rotation_norm <= np.pi + 1e-9, f"not the principal branch: {rotation_norm}"
+
+
+@pytest.mark.parametrize("backend_name", ["numpy", "torch", "jax"])
+@pytest.mark.parametrize("theta_val", [0.0, 5e-7, 1e-6, 1e-5, 1e-3, 1.0])
+def test_matrix_log6_round_trip_is_exact_at_small_angles(backend_name, theta_val):
+    """``log6(exp6(S t))`` returns ``S t`` on every backend, including tiny t.
+
+    This is a value regression, not a gradient one, and it was never
+    JAX-specific: ``MatrixLog6`` selected a pure-translation result whenever the
+    angle fell below 1e-6, so a screw with a real 5e-7 rotation came back with
+    its angular part zeroed on NumPy, Torch and JAX alike.
+    """
+    if backend_name == "torch":
+        pytest.importorskip("torch", exc_type=ImportError)
+    if backend_name == "jax":
+        jax = pytest.importorskip("jax", exc_type=ImportError)
+        jax.config.update("jax_enable_x64", True)
+
+    screw = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 3.0])
+    with use_backend(backend_name):
+        observed = np.asarray(
+            utils.se3ToVec(
+                utils.MatrixLog6(utils.MatrixExp6(utils.VecTose3(screw * theta_val)))
+            )
+        )
+        via_logm = np.asarray(
+            utils.logm(utils.MatrixExp6(utils.VecTose3(screw * theta_val)))
+        )
+
+    np.testing.assert_allclose(observed, screw * theta_val, atol=1e-12)
+    np.testing.assert_allclose(via_logm, screw * theta_val, atol=1e-12)
+
+
+def _requires_jax():
+    """Import JAX with x64 enabled, or skip.
+
+    The backend enables x64 itself when it is registered, but these tests build
+    JAX arrays directly, so the flag is set here too: without it JAX silently
+    computes in float32 and the finite-difference comparisons below would be
+    measuring float32 noise rather than the gradient contract.
+    """
+    jax = pytest.importorskip("jax", exc_type=ImportError)
+    jax.config.update("jax_enable_x64", True)
+    return jax, pytest.importorskip("jax.numpy", exc_type=ImportError)
+
+
+class TestJaxProductionGradientContract:
+    """jax.grad/jacrev through production dispatch matches finite differences.
+
+    The mirror of :class:`TestProductionGradientContract`. The JAX tests
+    earlier in this file differentiate test-local prototypes; these go through
+    ``use_backend("jax")`` and the real ManipulaPy entry points, so they pin the
+    differentiable contract on the shipped code rather than on a re-derivation
+    of it.
+    """
+
+    @pytest.mark.parametrize("configuration", FK_CONFIGS)
+    def test_forward_kinematics_jacobian_matches_finite_difference(self, configuration):
+        jax, jnp = _requires_jax()
+
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            actual = np.asarray(
+                jax.jacrev(lambda v: dyn.forward_kinematics(v).reshape(-1))(q)
+            )
+
+            def fk_flat(x):
+                return np.asarray(dyn.forward_kinematics(jnp.asarray(x))).reshape(-1)
+
+            expected = _central_jacobian(fk_flat, configuration)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    @pytest.mark.parametrize("configuration", FK_CONFIGS)
+    def test_inverse_dynamics_jacobian_zero_velocity(self, configuration):
+        jax, jnp = _requires_jax()
+
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            dq = jnp.zeros(2, dtype=jnp.float64)
+            ddq = jnp.asarray([0.05, 0.1], dtype=jnp.float64)
+            g = jnp.asarray([0.0, -9.81, 0.0], dtype=jnp.float64)
+            Ftip = jnp.asarray([0.0, 0.0, 0.3, 1.0, -0.5, 0.0], dtype=jnp.float64)
+
+            def idf(v):
+                return dyn.inverse_dynamics(v, dq, ddq, g, Ftip)
+
+            actual = np.asarray(jax.jacrev(idf)(q))
+            expected = _central_jacobian(
+                lambda x: np.asarray(idf(jnp.asarray(x))), configuration
+            )
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    def test_inverse_dynamics_jacobian_nonzero_velocity(self):
+        jax, jnp = _requires_jax()
+
+        configuration = np.array([0.31, -1.17])
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            dq = jnp.asarray([0.1, 0.2], dtype=jnp.float64)
+            ddq = jnp.asarray([0.05, 0.1], dtype=jnp.float64)
+            g = jnp.asarray([0.0, -9.81, 0.0], dtype=jnp.float64)
+            Ftip = jnp.asarray([0.0, 0.0, 0.3, 1.0, -0.5, 0.0], dtype=jnp.float64)
+
+            def idf(v):
+                return dyn.inverse_dynamics(v, dq, ddq, g, Ftip)
+
+            actual = np.asarray(jax.jacrev(idf)(q))
+            expected = _central_jacobian(
+                lambda x: np.asarray(idf(jnp.asarray(x))), configuration
+            )
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    def test_mass_matrix_cache_is_bypassed_under_jax(self):
+        """A traced mass matrix must not be served from the value-keyed cache.
+
+        ``JaxBackend.is_concrete`` is False precisely so this cache is skipped:
+        a tracer has no host-readable value to key on, and a cached NumPy
+        matrix would silently sever the gradient.
+        """
+        jax, jnp = _requires_jax()
+
+        configuration = np.array([0.31, -1.17])
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            grad = np.asarray(jax.grad(lambda v: dyn.mass_matrix(v).sum())(q))
+
+        assert np.all(np.isfinite(grad))
+        assert np.any(grad != 0.0), "mass matrix gradient was severed by the cache"
+
+    def test_matrix_exp3_gradient_is_correct_at_exactly_zero_angle(self):
+        """d/dtheta of a z-rotation at theta=0 is 1 for the [1, 0] entry.
+
+        The Taylor branch must carry a gradient here; a naive ``sin(t)/t``
+        yields 0/0 and a ``where`` over it leaks NaN into the backward pass.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            axis = jnp.asarray([0.0, 0.0, 1.0], dtype=jnp.float64)
+
+            def entry(t):
+                return utils.MatrixExp3(utils.VecToso3(axis * t))[1, 0]
+
+            grad = float(jax.grad(entry)(jnp.asarray(0.0, dtype=jnp.float64)))
+
+        np.testing.assert_allclose(grad, 1.0, rtol=1e-10, atol=1e-12)
+
+    @pytest.mark.parametrize("theta_val", [0.0, 1e-8, 1e-6, 1e-4, 1e-3, 1e-2])
+    def test_matrix_log3_gradient_is_correct_near_the_identity(self, theta_val):
+        """``d/dtheta vee(log(exp(n theta)))`` is exactly ``n``, including at 0.
+
+        The mirror of the Torch zero-angle test, widened into a sweep because
+        the defect it guards was not confined to exactly zero. ``_pi_axis``
+        normalised by ``maximum(norm(candidate), eps)``; near the identity
+        ``candidate`` vanishes, so ``d|c|/dc = c/|c|`` was already 0/0 and the
+        clamp turned it into ``0 * NaN``. Values stayed correct throughout,
+        which is why only a gradient assertion catches it -- and it produced
+        NaN for every theta up to ~1e-2, not just at the endpoint.
+        """
+        jax, jnp = _requires_jax()
+
+        axis_np = np.array([0.0, 0.0, 1.0])
+        with use_backend("jax"):
+            def rotvec(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.skew_symmetric_to_vector(utils.MatrixLog3(R))
+
+            actual = np.asarray(jax.jacrev(rotvec)(jnp.asarray(theta_val)))
+
+        assert np.all(np.isfinite(actual)), f"non-finite gradient: {actual}"
+        np.testing.assert_allclose(actual, axis_np, rtol=1e-9, atol=1e-9)
+
+    @pytest.mark.parametrize("theta_val", [0.0, 5e-7, 1e-6, 1e-3, 0.5])
+    def test_matrix_log6_gradient_recovers_the_screw(self, theta_val):
+        """``d/dt vee6(log6(exp6(S t)))`` is the screw ``S`` at every t.
+
+        ``MatrixLog6`` rebuilt its rotational block as ``omega * theta``, but
+        ``rotation_logm`` zeroes its axis below theta = 1e-6 because the axis is
+        genuinely undefined at the identity. That discarded a small-but-real
+        rotation outright: the derivative of the angular part was 0 instead of
+        the screw's angular component, and at t = 5e-7 even the primal rotation
+        came back as 0. The block is now ``MatrixLog3`` itself, whose
+        Taylor-safe coefficient is smooth in both value and gradient there.
+        """
+        jax, jnp = _requires_jax()
+
+        screw = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 3.0])
+        with use_backend("jax"):
+            def log6_vec(t):
+                return utils.se3ToVec(
+                    utils.MatrixLog6(
+                        utils.MatrixExp6(
+                            utils.VecTose3(jnp.asarray(screw, dtype=jnp.float64) * t)
+                        )
+                    )
+                )
+
+            value = np.asarray(log6_vec(jnp.asarray(theta_val)))
+            grad = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(theta_val)))
+
+        np.testing.assert_allclose(value, screw * theta_val, atol=1e-12)
+        assert np.all(np.isfinite(grad))
+        np.testing.assert_allclose(grad, screw, rtol=1e-6, atol=1e-7)
+
+    @pytest.mark.parametrize(
+        "theta_val", [0.0, 5e-7, 9.99e-7, 1e-6, 1.01e-6, 1e-3, 0.01, 0.0999, 0.1]
+    )
+    def test_matrix_log6_translational_gradient_with_fixed_translation(self, theta_val):
+        """The translational derivative is right when p does not shrink with theta.
+
+        Two defects hid behind a translation that scaled with theta: the
+        thresholded axis flattened ``theta * G^-1`` to the identity below
+        theta = 1e-6 (derivative [0, 0, 0] instead of -0.5 w_hat p), and the
+        Taylor switch sat where the exact branch's own gradient had already lost
+        about four percent. The angles bracket both loci.
+
+        Finite differences are compared at h = 1e-4: this quotient is roundoff
+        dominated, and its error grows as 1/h (5.9e-9 at 1e-4 up to 5.6e-6 at
+        1e-7), so a smaller step measures the reference, not the gradient.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            def log6_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            actual = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(theta_val)))
+            step = 1e-4
+            expected = (
+                np.asarray(log6_vec(jnp.asarray(theta_val + step)))
+                - np.asarray(log6_vec(jnp.asarray(theta_val - step)))
+            ) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    @pytest.mark.parametrize("theta_val", [0.1001, 0.5, 1.5, 3.0])
+    def test_matrix_log6_translational_gradient_in_the_exact_branch(self, theta_val):
+        """The gradient is right ABOVE the Taylor switch.
+
+        The switch at theta = 0.1 divides two formulas; the Taylor side is
+        covered by the sweep above, and this covers the exact side. It stops at
+        3.0 because a central difference cannot reach closer to pi than its own
+        step: straddling the branch cut makes the principal log wrap, and the
+        reference blows up to ~pi/step rather than the gradient being wrong. The
+        half-turn region is covered by the finiteness test below instead, which
+        is how this file treats the pi endpoint elsewhere.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            def log6_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            actual = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(theta_val)))
+            step = 1e-5
+            expected = (
+                np.asarray(log6_vec(jnp.asarray(theta_val + step)))
+                - np.asarray(log6_vec(jnp.asarray(theta_val - step)))
+            ) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-6)
+
+    @pytest.mark.parametrize(
+        "gap, step", [(1e-2, 1e-4), (1e-4, 1e-6)]
+    )
+    def test_matrix_log6_gradient_has_the_right_value_near_pi(self, gap, step):
+        """Near pi the gradient must be RIGHT, not merely finite.
+
+        A unique derivative exists at every gap > 0, so finiteness alone is too
+        weak: an implementation returning the correct primal but a zero gradient
+        in this region would satisfy it. The step is chosen well inside the gap
+        so the central difference never straddles the branch cut at pi.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            def log6_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            theta_val = np.pi - gap
+            actual = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(theta_val)))
+            expected = (
+                np.asarray(log6_vec(jnp.asarray(theta_val + step)))
+                - np.asarray(log6_vec(jnp.asarray(theta_val - step)))
+            ) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        # A zero-gradient implementation must not survive this.
+        assert np.abs(actual).max() > 1e-3, "gradient collapsed to zero near pi"
+        np.testing.assert_allclose(actual, expected, rtol=1e-4, atol=1e-5)
+
+    @pytest.mark.parametrize("gap", [1e-8, 0.0])
+    def test_matrix_log6_gradient_is_finite_at_the_half_turn(self, gap):
+        """At and adjacent to pi only finiteness is required.
+
+        The principal logarithm is genuinely non-differentiable at pi, so no
+        unique correct gradient exists there, and a central difference cannot
+        reach inside a 1e-8 gap without straddling the cut. What must hold is
+        that the half-turn branch of MatrixLog3 and the exact branch of the
+        coefficient do not leak ``0 * inf`` into the backward pass, which is the
+        failure mode this whole file exists to catch. Gaps where a unique
+        derivative does exist are value-checked above.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            def log6_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            actual = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(np.pi - gap)))
+
+        assert np.all(np.isfinite(actual)), f"non-finite gradient at pi - {gap}"
+
+    @pytest.mark.parametrize("theta_val", [0.0, 5e-7, 1e-6, 0.01, 0.1, 0.1001, 1.5])
+    def test_matrix_log6_translational_gradient_matches_torch(self, theta_val):
+        """Torch reaches the same translational gradient as JAX.
+
+        The gradient coverage for this function was JAX-only, so a Torch-side
+        regression in the same code path would have gone unnoticed. Both
+        backends run the identical dispatch, so they must agree to round-off.
+        """
+        jax, jnp = _requires_jax()
+        torch = pytest.importorskip("torch", exc_type=ImportError)
+
+
+        with use_backend("jax"):
+            def jax_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            jax_grad = np.asarray(jax.jacrev(jax_vec)(jnp.asarray(theta_val)))
+
+        with use_backend("torch"):
+            def torch_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(
+                        torch.as_tensor(_LOG6_AXIS, dtype=torch.float64) * t
+                    )
+                )
+                bottom = torch.tensor([[0.0, 0.0, 0.0, 1.0]], dtype=torch.float64)
+                p_col = torch.as_tensor(_FIXED_P, dtype=torch.float64).reshape(3, 1)
+                transform = torch.cat(
+                    (torch.cat((rot, p_col), dim=1), bottom), dim=0
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            torch_grad = (
+                torch.autograd.functional.jacobian(
+                    torch_vec, torch.tensor(theta_val, dtype=torch.float64)
+                )
+                .detach()
+                .numpy()
+            )
+
+        assert np.all(np.isfinite(torch_grad))
+        np.testing.assert_allclose(torch_grad, jax_grad, rtol=1e-9, atol=1e-11)
+
+    def test_matrix_log6_translational_gradient_at_zero_is_exact(self):
+        """At theta = 0 the translational derivative is exactly ``-0.5 w_hat p``.
+
+        Pinned against the closed form rather than finite differences so the
+        origin -- where the thresholded axis previously produced [0, 0, 0] -- is
+        checked without any reference noise.
+        """
+        jax, jnp = _requires_jax()
+
+        with use_backend("jax"):
+            def log6_vec(t):
+                rot = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(_LOG6_AXIS, dtype=jnp.float64) * t)
+                )
+                transform = jnp.concatenate(
+                    [
+                        jnp.concatenate(
+                            [rot, jnp.asarray(_FIXED_P).reshape(3, 1)], axis=1
+                        ),
+                        jnp.asarray([[0.0, 0.0, 0.0, 1.0]]),
+                    ],
+                    axis=0,
+                )
+                return utils.se3ToVec(utils.MatrixLog6(transform))
+
+            actual = np.asarray(jax.jacrev(log6_vec)(jnp.asarray(0.0)))
+
+        # d/dtheta (theta G^-1 p) at 0 = -0.5 * (w_hat p); w_hat is z-skew here.
+        w_hat = np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+        np.testing.assert_allclose(actual[:3], _LOG6_AXIS, rtol=1e-9, atol=1e-12)
+        np.testing.assert_allclose(
+            actual[3:], -0.5 * (w_hat @ _FIXED_P), rtol=1e-9, atol=1e-12
+        )
+
+    def test_extrapolate_from_current_gradient_keeps_the_angular_part(self):
+        """The reachable IK helper inherits the recovered rotational gradient.
+
+        ``extrapolate_from_current`` differentiates a pose error through
+        ``MatrixLog6``; with the rotational block discarded its angular
+        derivative was 0 rather than ``alpha`` times the screw's angular part.
+        """
+        jax, jnp = _requires_jax()
+
+        from ManipulaPy.kinematics.ik_helpers import extrapolate_from_current
+
+        screw = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 3.0])
+        alpha = 0.5
+        with use_backend("jax"):
+            def guess(t):
+                target = utils.MatrixExp6(
+                    utils.VecTose3(jnp.asarray(screw, dtype=jnp.float64) * t)
+                )
+                return extrapolate_from_current(
+                    jnp.zeros(6, dtype=jnp.float64),
+                    jnp.eye(4, dtype=jnp.float64),
+                    target,
+                    lambda q: jnp.eye(6, dtype=jnp.float64),
+                    [(None, None)] * 6,
+                    alpha=alpha,
+                )
+
+            grad = np.asarray(jax.jacrev(guess)(jnp.asarray(0.0)))
+
+        assert np.all(np.isfinite(grad))
+        np.testing.assert_allclose(grad, alpha * screw, rtol=1e-6, atol=1e-7)
+
+    def test_condition_number_gradient_matches_finite_difference(self):
+        """``condition_number`` stays differentiable under a traced backend.
+
+        Singularity is inside the differentiable contract, but the metric ended
+        with an unconditional host conversion for the NaN -> inf substitution,
+        which raises ``TracerArrayConversionError`` under ``jax.grad``. The
+        conversion is now gated on ``is_concrete``.
+        """
+        jax, jnp = _requires_jax()
+
+        from ManipulaPy.kinematics import SerialManipulator
+        from ManipulaPy.singularity import Singularity
+
+        screws = np.array(
+            [
+                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, -0.3, 0.0, 0.2],
+                [1.0, 0.0, 0.0, 0.0, 0.4, -0.1],
+            ],
+            dtype=np.float64,
+        ).T
+        home = np.eye(4)
+        home[:3, 3] = [0.7, 0.2, 0.5]
+        robot = SerialManipulator(
+            M_list=home,
+            omega_list=screws[:3, :],
+            S_list=screws,
+            B_list=screws.copy(),
+            joint_limits=[(-3.0, 3.0)] * 3,
+        )
+        analysis = Singularity(robot)
+        configuration = np.array([0.2, -0.3, 0.4])
+
+        with use_backend("jax"):
+            actual = np.asarray(
+                jax.grad(lambda q: analysis.condition_number(q))(
+                    jnp.asarray(configuration, dtype=jnp.float64)
+                )
+            )
+
+        expected = _central_jacobian(
+            lambda x: np.atleast_1d(float(analysis.condition_number(x))), configuration
+        ).reshape(-1)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    @pytest.mark.parametrize("axis", TestProductionGradientContract._PI_AXES)
+    def test_matrix_log3_gradient_is_finite_at_exactly_pi(self, axis):
+        """theta=pi is a branch point; the gradient must still be finite.
+
+        Coordinate axes are kept in the parametrisation because only they make
+        cos_theta land on exactly -1.0, which is what turns an unclamped
+        arccos in the inactive branch into 0 * inf = NaN.
+        """
+        jax, jnp = _requires_jax()
+
+        axis_np = np.asarray(axis, dtype=float)
+        with use_backend("jax"):
+            def rotvec(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.skew_symmetric_to_vector(utils.MatrixLog3(R))
+
+            actual = np.asarray(jax.jacrev(rotvec)(jnp.asarray(np.pi)))
+
+        assert np.all(np.isfinite(actual)), f"non-finite gradient at pi: {actual}"
+
+    @pytest.mark.parametrize("axis", TestProductionGradientContract._PI_AXES)
+    def test_rotation_logm_gradient_is_finite_at_exactly_pi(self, axis):
+        """``rotation_logm`` is the form the angle IK differentiates."""
+        jax, jnp = _requires_jax()
+
+        axis_np = np.asarray(axis, dtype=float)
+        with use_backend("jax"):
+            def axis_sum(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.rotation_logm(R)[0].sum()
+
+            def angle_out(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.rotation_logm(R)[1]
+
+            pi = jnp.asarray(np.pi)
+            ax_grad = np.asarray(jax.grad(axis_sum)(pi))
+            th_grad = np.asarray(jax.grad(angle_out)(pi))
+
+        assert np.all(np.isfinite(ax_grad))
+        assert np.all(np.isfinite(th_grad))
+
+    @pytest.mark.parametrize("gap", [1e-7, 1e-5, 1e-3])
+    def test_matrix_log3_gradient_near_pi_matches_finite_difference(self, gap):
+        """Near pi the recovered angle must be accurate, not merely finite.
+
+        ``arccos(cos theta)`` is ill-conditioned here because cos theta is
+        *quadratic* in the gap; the shipped ``atan2`` form is linear in it and
+        so keeps full precision. A regression shows up as a gradient error
+        proportional to the value error, not as a NaN.
+        """
+        jax, jnp = _requires_jax()
+
+        axis_np = np.asarray(TestProductionGradientContract._LOG3_PI_AXIS, dtype=float)
+        theta_val = np.pi - gap
+        with use_backend("jax"):
+            def rotvec(t):
+                R = utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis_np, dtype=jnp.float64) * t)
+                )
+                return utils.skew_symmetric_to_vector(utils.MatrixLog3(R))
+
+            actual = np.asarray(jax.jacrev(rotvec)(jnp.asarray(theta_val)))
+
+        # d/dtheta log(exp(n * theta)) = n for theta in (0, pi).
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, axis_np, rtol=1e-5, atol=1e-6)
+
+    @pytest.mark.parametrize("theta_val", TestProductionGradientContract._EXP_THETAS)
+    def test_matrix_exp3_gradient_sweep_matches_finite_difference(self, theta_val):
+        jax, jnp = _requires_jax()
+
+        axis = np.array([0.0, 0.0, 1.0])
+        with use_backend("jax"):
+            def rotation(t):
+                return utils.MatrixExp3(
+                    utils.VecToso3(jnp.asarray(axis, dtype=jnp.float64) * t)
+                ).reshape(-1)
+
+            actual = np.asarray(jax.jacrev(rotation)(jnp.asarray(theta_val)))
+
+            step = 1e-6
+            expected = (
+                np.asarray(rotation(jnp.asarray(theta_val + step)))
+                - np.asarray(rotation(jnp.asarray(theta_val - step)))
+            ) / (2 * step)
+
+        assert np.all(np.isfinite(actual))
+        np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-7)
+
+    @pytest.mark.parametrize("configuration", FK_CONFIGS)
+    def test_forward_kinematics_jacobian_survives_jit(self, configuration):
+        """The FK jacobian is unchanged when the whole thing is jit-compiled.
+
+        Eager JAX tolerates host-side control flow that ``jit`` rejects, so
+        compiling is the stricter check that no tracer leaks to the host on the
+        core-math path.
+        """
+        jax, jnp = _requires_jax()
+
+        dyn = _planar_2r_dynamics()
+        with use_backend("jax"):
+            q = jnp.asarray(configuration, dtype=jnp.float64)
+            jac = jax.jacrev(lambda v: dyn.forward_kinematics(v).reshape(-1))
+            eager = np.asarray(jac(q))
+            compiled = np.asarray(jax.jit(jac)(q))
+
+        np.testing.assert_allclose(compiled, eager, rtol=1e-12, atol=1e-14)
