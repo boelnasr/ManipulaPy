@@ -141,3 +141,113 @@ class TestFromXmlStringGuard:
 
         assert mesh.filename == "../secret.txt"
         assert str(secret) not in mesh.filename
+
+
+class TestPackageUriContainment:
+    """``package://`` resolution must not escape the permitted roots.
+
+    The traversal guard in ``_resolve_package_uri`` only rejects a *literal*
+    ``..`` component. The ancestor heuristic walks up from ``base_path`` on the
+    resolver's own initiative, so a malicious URI needs no ``..`` at all to
+    land outside the robot-description directory.
+    """
+
+    def test_package_uri_refuses_ancestor_escape_without_dotdot(self, tmp_path):
+        """An unmatched package name must not resolve to an ancestor's file.
+
+        ``package://<name>/<path>`` where ``<name>`` matches no directory and
+        no package must not fall back to joining ``<path>`` onto an ancestor
+        of base_path -- that reaches files the description directory does not
+        own, with no ``..`` anywhere in the URI.
+        """
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        base = tmp_path / "robots" / "myrobot" / "urdf"
+        base.mkdir(parents=True)
+        loot = tmp_path / "robots" / "loot.stl"
+        loot.write_text("private")
+
+        resolver = PackageResolver(base_path=base, use_ros=False)
+        uri = "package://totally_fake_package/loot.stl"
+        result = resolver.resolve(uri)
+
+        assert result == uri, f"escaped base_path: resolved to {result!r}"
+        assert str(loot) not in result
+
+    def test_package_uri_refuses_symlink_escape(self, tmp_path):
+        """A symlink inside the tree must not launder an out-of-tree target."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        pkg = tmp_path / "ws" / "mypkg"
+        (pkg / "meshes").mkdir(parents=True)
+        outside = tmp_path / "outside.stl"
+        outside.write_text("private")
+        link = pkg / "meshes" / "link.stl"
+        link.symlink_to(outside)
+
+        base = pkg / "urdf"
+        base.mkdir()
+        resolver = PackageResolver(base_path=base, use_ros=False)
+        uri = "package://mypkg/meshes/link.stl"
+        result = resolver.resolve(uri)
+
+        assert result == uri, f"followed symlink out of tree: {result!r}"
+
+    def test_package_uri_still_resolves_standard_ros_layout(self, tmp_path):
+        """Containment must not break the ordinary ROS package layout.
+
+        ``ws/src/mypkg/{urdf,meshes}`` with the URDF in ``urdf/`` and the mesh
+        in the sibling ``meshes/`` is the layout the ancestor heuristic exists
+        to serve. It must keep working.
+        """
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        pkg = tmp_path / "ws" / "src" / "mypkg"
+        (pkg / "meshes").mkdir(parents=True)
+        mesh = pkg / "meshes" / "link.stl"
+        mesh.write_text("solid")
+        base = pkg / "urdf"
+        base.mkdir()
+
+        resolver = PackageResolver(base_path=base, use_ros=False)
+        result = resolver.resolve("package://mypkg/meshes/link.stl")
+
+        assert result == str(mesh), f"legitimate layout broke: {result!r}"
+
+    def test_package_uri_still_resolves_package_named_subdir(self, tmp_path):
+        """``<ancestor>/<package_name>/<path>`` must keep resolving."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        ws = tmp_path / "ws"
+        mesh = ws / "mypkg" / "meshes" / "link.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("solid")
+        (ws / "mypkg" / "package.xml").write_text("<package><name>mypkg</name></package>")
+        base = ws / "desc"
+        base.mkdir()
+
+        resolver = PackageResolver(base_path=base, use_ros=False)
+        result = resolver.resolve("package://mypkg/meshes/link.stl")
+
+        assert result == str(mesh), f"legitimate layout broke: {result!r}"
+
+    def test_package_uri_refuses_sibling_dir_that_is_not_a_package(self, tmp_path):
+        """A name-matched SIBLING directory is not a package root by itself.
+
+        ``~/robots/urdf/robot.urdf`` is an ordinary layout, which puts the home
+        directory two levels up. Without a package.xml requirement,
+        ``package://.ssh/id_rsa`` reads the private key.
+        """
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        home = tmp_path / "home"
+        base = home / "robots" / "urdf"
+        base.mkdir(parents=True)
+        (home / ".ssh").mkdir()
+        (home / ".ssh" / "id_rsa").write_text("PRIVATE KEY")
+
+        resolver = PackageResolver(base_path=base, use_ros=False)
+        uri = "package://.ssh/id_rsa"
+        result = resolver.resolve(uri)
+
+        assert result == uri, f"read outside the description tree: {result!r}"

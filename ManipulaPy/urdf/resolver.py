@@ -240,8 +240,9 @@ class PackageResolver:
         # pinned root, do NOT fall through to other strategies: silently
         # returning a different package would defeat the explicit override.
         if package_name in self._package_map:
-            cand = Path(self._package_map[package_name]) / relative_path
-            if cand.exists():
+            pinned_root = Path(self._package_map[package_name])
+            cand = pinned_root / relative_path
+            if cand.exists() and not _path_escapes_base(cand, pinned_root):
                 return str(cand)
             logger.warning(
                 "Explicit package mapping for %r did not contain %r under %r; "
@@ -254,49 +255,75 @@ class PackageResolver:
 
         candidates: List[Path] = []
 
+        def accept(candidate: Path, root: Path) -> None:
+            """Collect ``candidate`` only if it stays inside its own ``root``.
+
+            Containment is per-strategy: each candidate is checked against the
+            root that produced it, not against ``base_path``. ``..`` is already
+            refused above, but the ancestor heuristic walks upward on the
+            resolver's own initiative, so a URI needs no ``..`` to land outside
+            the description directory — and ``_path_escapes_base`` resolves
+            symlinks, so an in-tree link to an out-of-tree target is refused
+            too.
+            """
+            if candidate.exists() and not _path_escapes_base(candidate, root):
+                candidates.append(candidate)
+
         # Strategy 2: search paths — try both the package-rooted and the flat
         # forms (regression: prior code only tried search_path/pkg/relative).
         for search_path in self._search_paths:
-            c1 = Path(search_path) / package_name / relative_path
-            if c1.exists():
-                candidates.append(c1)
-            c2 = Path(search_path) / relative_path
-            if c2.exists():
-                candidates.append(c2)
+            root = Path(search_path)
+            accept(root / package_name / relative_path, root / package_name)
+            accept(root / relative_path, root)
 
         # Strategy 3: ROS package discovery (only when use_ros is enabled).
         if self._use_ros:
             ros_pkg_root = self._find_ros_package(package_name)
             if ros_pkg_root is not None:
-                c = ros_pkg_root / relative_path
-                if c.exists():
-                    candidates.append(c)
+                accept(ros_pkg_root / relative_path, ros_pkg_root)
             ros_paths = os.environ.get("ROS_PACKAGE_PATH", "").split(os.pathsep)
             for ros_path in ros_paths:
                 if not ros_path:
                     continue
-                c = Path(ros_path) / package_name / relative_path
-                if c.exists():
-                    candidates.append(c)
+                root = Path(ros_path) / package_name
+                accept(root / relative_path, root)
 
         # Strategy 4: base path fallback
         if self.base_path:
-            c = Path(self.base_path) / relative_path
-            if c.exists():
-                candidates.append(c)
+            accept(Path(self.base_path) / relative_path, Path(self.base_path))
 
-            # Strategy 5: ancestor heuristic
+            # Strategy 5: ancestor heuristic.
+            #
+            # Walking upward is what makes the ordinary ROS layout work — the
+            # URDF sits in <pkg>/urdf/ while its meshes sit in <pkg>/meshes/,
+            # so the mesh is only reachable from an ancestor of base_path. An
+            # ancestor is outside base_path by construction, so it may serve as
+            # a root only when the URI's own package name justifies it, and the
+            # two forms do NOT deserve the same trust:
+            #
+            #   b) <ancestor>/... where the ancestor IS the named package.
+            #      The URDF being resolved lives inside that directory, so it
+            #      is reading from its own package. A name match is enough.
+            #
+            #   a) <ancestor>/<package_name>/... — a SIBLING directory that
+            #      does not contain the URDF. A bare name match here is not
+            #      evidence of anything: `package://.ssh/id_rsa` from an
+            #      ordinary ~/robots/urdf/ layout would read the private key.
+            #      Require proof it is a real package, i.e. a package.xml.
+            #
+            # Layouts that are not ROS packages should be pinned explicitly
+            # with add_package() or add_search_path(), which are permitted
+            # roots by definition and are unaffected by this check.
             for ancestor in [
                 self.base_path,
                 self.base_path.parent,
                 self.base_path.parent.parent,
             ]:
-                cand_a = ancestor / package_name / relative_path
-                if cand_a.exists():
-                    candidates.append(cand_a)
-                cand_b = ancestor / relative_path
-                if cand_b.exists():
-                    candidates.append(cand_b)
+                pkg_root = ancestor / package_name
+                if (pkg_root / "package.xml").is_file():
+                    accept(pkg_root / relative_path, pkg_root)
+                if ancestor.name == package_name:
+                    accept(ancestor / relative_path, ancestor)
 
         # Dedup by canonical (symlink/case-resolved) path before ambiguity check.
         seen_canonical = set()
