@@ -5,6 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-08-02
+
+> **Summary:** The unified compute backend system. The same kinematics,
+> dynamics, planning and control code now runs on **NumPy, CuPy, PyTorch, or
+> JAX** behind one dispatch API, with a tested differentiable contract on the
+> core math under PyTorch and JAX. This is an internal refactor: the public API
+> is unchanged and the return contract under the default NumPy backend is
+> frozen, so existing code and the ROS wrapper are unaffected.
+>
+> **Impact:**
+> - Gradients of forward kinematics and inverse dynamics come from
+>   `torch.autograd` / `jax.grad` directly — no finite differences, and no
+>   second implementation to keep in sync.
+> - Building that contract exposed three genuine defects in the shipped
+>   SE(3)/SO(3) code that produced wrong or non-finite results on **every**
+>   backend, NumPy included. Those fixes are the most important correctness
+>   content of this release.
+> - A URDF `package://` mesh reference can no longer resolve outside the
+>   robot-description directory.
+
+### Added
+- **Unified backend system** (`ManipulaPy.backend`) — `ArrayBackend` protocol
+  with NumPy, CuPy, PyTorch, and JAX implementations, a registry, and
+  `set_backend()` / `use_backend()` / `get_backend()` selection. Backends
+  register lazily behind an import probe, so a base install never imports
+  torch or jax.
+- **Differentiable contract** on `utils`, `kinematics`, `dynamics`, and
+  `singularity`: trace-safe under `torch.jit.trace` and `jax.jit`, with
+  autodiff gradient tests against finite differences on both frameworks.
+  Every other module runs on all four backends via host-boundary conversion
+  but carries **no gradient guarantee** — see the Compute Backends user guide.
+- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, `[jax-cuda]`.
+  The base install remains NumPy-only.
+- **Compute Backends user guide** (`docs/source/user_guide/Backends.rst`)
+  covering selection, the gradient boundary, host boundaries, JAX float64
+  behavior, and performance characteristics.
+
+### Fixed
+- **`MatrixLog6` discarded small rotations.** Below θ=1e-6 the entire
+  rotational block was zeroed, so a real 5e-7 rotation came back as pure
+  translation on NumPy, CuPy, PyTorch and JAX alike. The small-angle branch
+  was unnecessary — pure translation falls out of the general formula — and
+  the rotation must be taken from `MatrixLog3(R)` rather than rebuilt from an
+  axis that is correctly undefined at the identity.
+- **Log gradients were NaN near the identity.** `_pi_axis` clamped after
+  taking a norm, so `d|c|/dc` was already 0/0 and the mask turned it into
+  `0 * NaN`. `jax.jacrev(MatrixLog3)` returned NaN for every θ below ~1e-2
+  while the values themselves looked correct.
+- **The rotation angle was ill-conditioned near π.** `arccos(cos θ)` loses
+  precision because `cos θ` is quadratic in the gap; replaced with
+  `atan2(|vee|/2, cos θ)`, which is linear in the gap.
+- **`package://` mesh resolution could escape the robot-description
+  directory.** Candidates are now contained within the root that produced
+  them, which also refuses symlinks pointing out of tree. **Behavior change:**
+  a sibling directory that is not a ROS package (no `package.xml`) is no
+  longer auto-discovered by name; pin those with `add_package()` or
+  `add_search_path()`.
+- **Silent zero acceleration in forward-dynamics trajectories** —
+  `np.can_cast()` raised a `TypeError` on torch dtypes that a broad `except`
+  swallowed, producing zero acceleration for every step.
+- **Packaging** — the sdist no longer sweeps developer tool configuration from
+  the working tree. `MANIFEST.in` names its config files explicitly instead of
+  globbing `*.yaml *.json *.xml *.cfg *.ini` across the package.
+
+### Changed
+- The mass-matrix cache is bypassed under tracing backends, where caching
+  would either detach the gradient or key on a value that does not exist yet.
+- CUDA routing moved behind the active backend: scattered `use_cuda` /
+  `CUDA_AVAILABLE` checks became a single active-backend capability decision.
+  The Numba CUDA kernels themselves are unchanged.
+
+### Notes
+- **JAX eager dispatch is roughly 40x slower than NumPy on small problems.**
+  Any time-budgeted algorithm behaves differently under JAX — notably
+  `TracIKSolver`, which does not converge within its 200 ms default budget.
+  The default is deliberately unchanged; widen `timeout` explicitly instead.
+- The JAX backend enables `jax_enable_x64` when it is imported, which is
+  process-global JAX state and is not reverted.
+- There is no `jax-tpu` extra yet. TPU float64 measures as real, on-device and
+  accurate to ~1e-13, but the full contract suite has not been demonstrated on
+  TPU hardware.
+
 ## [1.3.2] — 2026-05-31
 
 > **Status:** Final — all fixes complete and verified (full CPU test suite

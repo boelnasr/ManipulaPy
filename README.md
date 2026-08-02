@@ -26,6 +26,7 @@
 Most Python robotics packages cover one slice well — kinematics, simulation, or perception — and force you to glue the rest together. ManipulaPy ships the full stack with a consistent API:
 
 - **Unified surface** — kinematics, dynamics, control, planning, simulation, and vision share the same `SerialManipulator` / `ManipulatorDynamics` objects.
+- **Differentiable, on four backends** — the same kinematics and dynamics run on NumPy, CuPy, PyTorch, or JAX behind one dispatch API. Under PyTorch and JAX the core math is autodiff-safe, so `∂FK/∂θ` and `∂(inverse dynamics)/∂θ` come straight from `torch.autograd` or `jax.grad` — no finite differences, no second implementation to keep in sync.
 - **GPU when it pays, CPU when it doesn't** — CUDA trajectory and dynamics kernels auto-switch on problem size; the default install is lightweight (NumPy/SciPy/Matplotlib/Numba/Pillow) and heavy deps live behind optional extras.
 - **Production-ready URDF** — native NumPy 2.0–compatible parser with `package://`, `file://`, and ROS package discovery built in.
 - **25 bundled robots** — Universal Robots, Fanuc, KUKA, Kinova, Franka, UFactory, Robotiq, ABB. Load any of them by name.
@@ -406,6 +407,45 @@ python Examples/basic_examples/kinematics_basic_demo.py
 # intermediate / advanced — install the extra the script needs first
 python Examples/intermediate_examples/simulation_intermediate_demo.py   # [simulation]
 ```
+
+---
+
+## What's new in v1.4.0
+
+The full release notes are in [CHANGELOG.md](CHANGELOG.md). The headline is the
+**unified backend system**: one dispatch API over NumPy, CuPy, PyTorch, and JAX.
+
+```python
+from ManipulaPy.backend import use_backend
+
+with use_backend("jax"):
+    T = robot.forward_kinematics(theta)      # same call, JAX arrays out
+
+# gradients come from the framework, not from finite differences
+import jax
+dT_dtheta = jax.jacrev(robot.forward_kinematics)(theta)
+```
+
+- **Four backends, one API** — `set_backend(...)` / `use_backend(...)` select the
+  array library. The default stays NumPy, and the public return contract under
+  the default backend is frozen, so existing code and the ROS wrapper are
+  unaffected.
+- **A tested differentiable contract** — `utils`, `kinematics`, `dynamics`, and
+  `singularity` are trace-safe and carry autodiff gradient tests on both PyTorch
+  and JAX. Every other module *runs* on all four backends via host-boundary
+  conversion, but carries no gradient guarantee — see the backend guide for
+  exactly where that line sits.
+- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, `[jax-cuda]`. The
+  base install remains NumPy-only.
+- **Core math fixes that affect every backend** — building the gradient contract
+  exposed three real defects in the shipped SE(3)/SO(3) code: `MatrixLog6`
+  discarded small rotations, log gradients were NaN near the identity, and the
+  rotation angle was ill-conditioned near π. All three produced wrong or
+  non-finite results on NumPy too, not just on the new backends.
+- **URDF `package://` containment** — a mesh reference can no longer resolve
+  outside the robot-description directory. Non-ROS sibling directories are no
+  longer auto-discovered by name; pin those with `add_package()` or
+  `add_search_path()`.
 
 ---
 

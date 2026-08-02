@@ -9,11 +9,11 @@ build-backend = "setuptools.build_meta"
 # ------------------------------------------------------------------
 [project]
 name = "ManipulaPy"
-version = "1.3.2.post1"
+version = "1.4.0"
 authors = [
     { name = "Mohamed Aboelnasr", email = "aboelnasr1997@gmail.com" },
 ]
-description = "A comprehensive Python package for robotic manipulator analysis and control"
+description = "Differentiable, GPU-accelerated robotic manipulator analysis and control — kinematics, dynamics, planning and control on NumPy, CuPy, PyTorch, or JAX"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
 requires-python = ">=3.9"
@@ -26,8 +26,10 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: Scientific/Engineering :: Mathematics",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
@@ -36,13 +38,24 @@ classifiers = [
 keywords = [
     "robotics",
     "kinematics",
+    "inverse-kinematics",
     "dynamics",
+    "manipulator",
     "trajectory-planning",
+    "motion-planning",
     "simulation",
+    "control-systems",
+    # 1.4.0 — the unified backend system is the headline feature and the terms
+    # people actually search for. Without these the release is undiscoverable.
+    "differentiable-robotics",
+    "differentiable-simulation",
+    "autodiff",
+    "jax",
+    "pytorch",
+    "cupy",
+    "gpu",
     "cuda",
     "computer-vision",
-    "control-systems",
-    "manipulator",
 ]
 
 # ------------------------------------------------------------------
@@ -90,6 +103,25 @@ ml = ["torch>=2.7.1", "scikit-learn>=1.5.0"]
 # ultralytics. Use [gpu-cuda11] for legacy CUDA 11.x systems.
 cuda = ["cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'"]
 
+# Differentiable / alternative compute backends (1.4.0). The core math
+# dispatches through one protocol, so these select the array library rather
+# than adding features. Base install stays NumPy-only.
+#
+# Floors are set to what the backends were actually validated against, not to
+# the oldest version that might import.
+pytorch = ["torch>=2.7.1"]
+jax-cpu = ["jax[cpu]>=0.6.0"]
+# jax[cuda12] pulls its nvidia-* wheels from PyPI proper, so no extra index is
+# needed — do NOT add one with --extra-index-url, which is dependency-confusion
+# bait. Linux only: jax publishes no CUDA wheels for macOS or Windows.
+jax-cuda = ["jax[cuda12]>=0.6.0; sys_platform == 'linux'"]
+# NOTE: no `jax-tpu` extra yet. TPU float64 was measured as real, on-device and
+# accurate to ~1e-13, so the numerics look sound — but the full contract suite
+# has not been demonstrated on TPU hardware (complex device_put hangs and
+# linalg compilation exceeds a minute there), and `jax[tpu]` only installs on a
+# TPU VM. Adding the extra later is backwards compatible; advertising an
+# undemonstrated precision contract is not.
+
 # Convenience: install everything (no self-references — the resolver
 # handles direct deps more reliably than ``ManipulaPy[simulation,...]``).
 all = [
@@ -100,6 +132,9 @@ all = [
     "torch>=2.7.1",
     "scikit-learn>=1.5.0",
     "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+    # CPU JAX, not jax[cuda12]: `all` must stay installable on machines with no
+    # CUDA. GPU JAX is an explicit opt-in via [jax-cuda].
+    "jax[cpu]>=0.6.0",
 ]
 
 # Alternative GPU options for legacy CUDA versions and AMD/PyCUDA paths.
