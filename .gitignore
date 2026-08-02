@@ -227,3 +227,6 @@ docs/source/tutorials/notebooks/
 # that get swept into a careless `git add -A`.
 .venv.requirements.txt
 journey-into-*.md
+
+# Temporary Workload Identity Federation credentials emitted by google-github-actions/auth
+gha-creds-*.json

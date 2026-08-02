@@ -1,0 +1,133 @@
+name: TPU Release Contract
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: manipulapy-tpu-release
+  cancel-in-progress: false
+
+jobs:
+  gpu-release-gate:
+    name: Require live GPU evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require gpu-axes-passed for the exact commit
+        run: |
+          count="$(curl --fail --silent --show-error --location \
+            --header "Accept: application/vnd.github+json" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?per_page=100" \
+            | jq '[.check_runs[] | select(.name == "gpu-axes-passed" and .conclusion == "success")] | length')"
+          test "$count" -ge 1
+          echo "Found live gpu-axes-passed evidence for ${GITHUB_SHA}"
+
+  tpu-contract:
+    name: tpu-contract-passed
+    needs: gpu-release-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: tpu-release
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      TPU_ZONE: ${{ vars.GCP_TPU_ZONE }}
+      TPU_NAME: manipulapy-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Checkout exact release commit
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        timeout-minutes: 2
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Validate TPU release configuration
+        timeout-minutes: 1
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+          TPU_SERVICE_ACCOUNT: ${{ vars.GCP_TPU_SERVICE_ACCOUNT }}
+        run: |
+          test -n "$PROJECT_ID"
+          test -n "$TPU_ZONE"
+          test -n "$WIF_PROVIDER"
+          test -n "$TPU_SERVICE_ACCOUNT"
+          test "$TPU_ZONE" = europe-west4-b
+          echo "Testing exact commit ${GITHUB_SHA}"
+
+      - name: Authenticate to Google Cloud with GitHub OIDC
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        timeout-minutes: 3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_TPU_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3
+        timeout-minutes: 3
+
+      - name: Create one-chip TPU VM
+        timeout-minutes: 8
+        run: |
+          timeout --signal=TERM --kill-after=30s 7m \
+            gcloud compute tpus tpu-vm create "$TPU_NAME" \
+            --project="$PROJECT_ID" --zone="$TPU_ZONE" \
+            --accelerator-type=v5litepod-1 --version=v2-tpuv5-litepod
+
+      - name: Run fail-closed contracts on the exact release SHA
+        timeout-minutes: 25
+        run: |
+          timeout --signal=TERM --kill-after=30s 24m \
+            gcloud compute tpus tpu-vm ssh "$TPU_NAME" \
+            --project="$PROJECT_ID" --zone="$TPU_ZONE" \
+            --command="bash -lc 'set -euo pipefail; git clone https://github.com/boelnasr/ManipulaPy.git; cd ManipulaPy; git checkout ${GITHUB_SHA}; echo Tested commit: ${GITHUB_SHA}; python3 -m pip install -e \".[dev,jax-tpu]\"; export JAX_PLATFORMS=tpu JAX_ENABLE_X64=1 NUMBA_DISABLE_CUDA=1 MPLBACKEND=Agg; python3 -m pytest tests/test_tpu_contract.py --junitxml=tpu-contract.xml -q; python3 scripts/assert_junit_no_skips.py tpu-contract.xml; python3 -m pytest tests/test_public_api_freeze.py --junitxml=tpu-freeze.xml -q; python3 scripts/assert_junit_no_skips.py tpu-freeze.xml; python3 -m pytest tests/test_jax_call_sites.py --junitxml=tpu-callsites.xml -q; python3 scripts/assert_junit_no_skips.py tpu-callsites.xml; python3 -m pytest tests/test_gradient_contract.py -k jax --junitxml=tpu-gradients.xml -q; python3 scripts/assert_junit_no_skips.py tpu-gradients.xml'"
+
+      - name: Collect TPU JUnit evidence
+        if: always()
+        timeout-minutes: 3
+        run: |
+          mkdir -p tpu-results
+          timeout --signal=TERM --kill-after=15s 2m \
+            gcloud compute tpus tpu-vm scp \
+            "$TPU_NAME:~/ManipulaPy/tpu-*.xml" ./tpu-results/ \
+            --project="$PROJECT_ID" --zone="$TPU_ZONE"
+
+      - name: Upload TPU JUnit evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        timeout-minutes: 2
+        with:
+          name: tpu-contract-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            tpu-results/
+            !**/gha-creds-*.json
+
+      - name: Delete the exact TPU VM and verify teardown
+        if: always()
+        timeout-minutes: 10
+        run: |
+          exists=false
+          if timeout --signal=TERM 45s \
+            gcloud compute tpus tpu-vm describe "$TPU_NAME" \
+            --project="$PROJECT_ID" --zone="$TPU_ZONE"; then
+            exists=true
+          elif timeout --signal=TERM 45s \
+            gcloud compute tpus tpu-vm list \
+            --project="$PROJECT_ID" --zone="$TPU_ZONE" \
+            --filter="name=${TPU_NAME}" --format="value(name)" | grep -Fxq "$TPU_NAME"; then
+            exists=true
+          fi
+          if [ "$exists" = true ]; then
+            timeout --signal=TERM --kill-after=30s 6m \
+              gcloud compute tpus tpu-vm delete "$TPU_NAME" \
+              --project="$PROJECT_ID" --zone="$TPU_ZONE" --quiet
+          fi
+          remaining="$(timeout --signal=TERM 45s \
+            gcloud compute tpus tpu-vm list \
+            --project="$PROJECT_ID" --zone="$TPU_ZONE" \
+            --filter="name=${TPU_NAME}" --format="value(name)")"
+          test -z "$remaining"
+          echo "Confirmed teardown for ${TPU_NAME}"

@@ -59,9 +59,15 @@ python -m sphinx -b html docs/source docs/build/html
 
 ### CI/CD
 
-- **test.yml** (*CI Tests*): Python 3.9/3.10/3.11/3.12 matrix on `ubuntu-latest`, PyTorch CPU, Codecov. Env: `SKIP_CUDA_TESTS=true`, `SKIP_VISION_TESTS=true`, `SKIP_SIMULATION_TESTS=true`. Runs on push and pull request.
+- **test.yml** (*CI Tests*): hosted NumPy, Torch-CPU, and JAX-CPU contracts plus
+  CuPy, Torch-CUDA, and JAX-CUDA contracts on the self-hosted GPU runner. Every
+  axis runs the public-API freeze; Torch/JAX axes also run gradient contracts.
+- **tpu-release.yml** (*TPU Release Contract*): release-only, reviewer-approved
+  Google Cloud TPU validation for the exact commit. It requires a successful
+  `gpu-axes-passed` check for the same SHA, provisions one `v5litepod-1`, uploads
+  JUnit evidence, and always tears the TPU down.
 - **lint.yml** (*Lint with flake8 and black*): `flake8 ManipulaPy tests --max-line-length=88` + `black --check`; auto-commits formatting fixes (`contents: write`).
-- **publish.yml** (*Publish to PyPI*): triggered when a GitHub **Release** is published; builds the sdist/wheel and uploads via PyPI **Trusted Publishing** (OIDC `id-token: write`, `pypi` environment) — no API token.
+- **publish.yml** (*Publish to PyPI*): triggered when a GitHub **Release** is published; builds the sdist/wheel, waits for the GPU/TPU release workflow, and uploads via PyPI **Trusted Publishing** (OIDC `id-token: write`, `pypi` environment) — no API token.
 - **draft-pdf.yml**: builds the JOSS `paper.pdf` on `v*` tags and attaches it to the release.
 - **codeql.yml** (*CodeQL Advanced*) and **scorecard.yml** (*Scorecard supply-chain security*): security analysis on push/PR plus weekly schedules.
 
@@ -69,8 +75,12 @@ python -m sphinx -b html docs/source docs/build/html
 
 - All changes to `main` land through a pull request. Direct pushes are disabled by
   branch protection.
-- A PR is mergeable only once its status checks are green — the `test` CI matrix
-  and the `lint` workflow must both pass.
+- A PR is mergeable only once its required checks are green: `numpy-cpu`,
+  `torch-cpu`, `jax-cpu`, `non-tpu-regression (3.9)`,
+  `non-tpu-regression (3.10)`, `non-tpu-regression (3.11)`,
+  `non-tpu-regression (3.12)`, `build-check`, and the `lint` workflow. The
+  self-hosted GPU checks are day-to-day opt-in checks and become mandatory
+  exact-SHA evidence through the release gate described below.
 - This is a solo-maintainer project. External PRs receive a maintainer review
   before merge; maintainer-authored PRs rely on the CI gates above plus
   self-review. Community review on any PR is welcome and encouraged — leave a
@@ -78,6 +88,143 @@ python -m sphinx -b html docs/source docs/build/html
 
 For architecture details, class hierarchy, GPU/CPU strategy, and code conventions,
 see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+### Self-hosted GPU runner
+
+The CUDA jobs target exactly `runs-on: [self-hosted, gpu]`. Register a dedicated
+Linux x86-64 GitHub Actions runner for this repository and add the custom `gpu`
+label during `config.sh` setup. Do not attach the label to a machine without a
+working NVIDIA device: once a job is assigned, every device assertion and the
+JUnit no-skips check is fail-closed.
+
+The runner host must provide:
+
+- a supported NVIDIA driver, CUDA 12 runtime/toolkit, `nvidia-smi`, and visible
+  `/dev/nvidia*` devices;
+- Python 3.12 and the normal GitHub runner build prerequisites; and
+- enough isolated disk space for the jobs to install `.[dev,cuda]`,
+  `.[dev,pytorch]`, and `.[dev,jax-cuda]` without reusing a stale environment.
+
+Before enabling jobs, verify `nvidia-smi`, a CuPy allocation, both
+`torch.cuda.is_available()` and a CUDA tensor, and `jax.devices()` with
+`JAX_PLATFORMS=cuda`. The GPU jobs set `NUMBA_DISABLE_CUDA=0` and
+`MANIPULAPY_FORCE_CPU=0`; do not export either variable as true in the runner
+service, and do not hide the device with `CUDA_VISIBLE_DEVICES=-1`. Hosted CPU
+jobs and the TPU job deliberately use `NUMBA_DISABLE_CUDA=1`.
+
+GitHub cannot evaluate an in-job device probe until an offline self-hosted
+runner has already been assigned, so a probe cannot neutralize an unavailable
+runner. Repository variable `GPU_RUNNER_ENABLED` is the assignment precondition:
+
+1. Leave it unset or set it to `false` for ordinary PR work while the runner is
+   offline. GPU jobs and `gpu-axes-passed` are skipped at the job boundary.
+2. Set it to `true` only while the labeled runner is online. The three live
+   CUDA jobs must pass before `gpu-axes-passed` succeeds.
+3. For a release commit or `v1.4.*` tag, keep it `true` through completion. The
+   TPU release workflow looks up `gpu-axes-passed` for the exact release SHA and
+   fails closed if the check is absent, skipped, pending, cancelled, or failed.
+
+Fork pull requests never receive a self-hosted runner, even when
+`GPU_RUNNER_ENABLED=true`: every GPU job also requires the pull request head
+repository to equal `boelnasr/ManipulaPy`. Run fork contributions only on the
+hosted CPU and non-TPU regression jobs until their changes have landed on a
+trusted branch.
+
+Branch protection may treat the skipped day-to-day marker as neutral, but a
+skipped marker is never release evidence. Record the live Actions URL in the
+release checklist before starting the TPU workflow.
+
+### Google Cloud TPU release gate
+
+The maintainer performs this one-time setup in Cloud Shell. Replace the first
+two values, then run the commands with an account allowed to configure IAM and
+billing. Do not create or upload a JSON service-account key.
+
+```bash
+PROJECT_ID="your-google-cloud-project"
+BILLING_ACCOUNT_ID="000000-000000-000000"
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+SERVICE_ACCOUNT="manipulapy-tpu-ci@${PROJECT_ID}.iam.gserviceaccount.com"
+
+gcloud services enable \
+  compute.googleapis.com \
+  tpu.googleapis.com \
+  iamcredentials.googleapis.com \
+  sts.googleapis.com \
+  --project="$PROJECT_ID"
+
+gcloud iam service-accounts create manipulapy-tpu-ci \
+  --project="$PROJECT_ID" \
+  --display-name="ManipulaPy TPU release CI"
+
+for role in roles/tpu.admin roles/compute.viewer roles/iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${SERVICE_ACCOUNT}" \
+    --role="$role"
+done
+
+gcloud iam workload-identity-pools create github \
+  --project="$PROJECT_ID" --location=global \
+  --display-name="GitHub Actions"
+
+gcloud iam workload-identity-pools providers create-oidc github-manipulapy \
+  --project="$PROJECT_ID" --location=global \
+  --workload-identity-pool=github \
+  --display-name="boelnasr/ManipulaPy releases" \
+  --issuer-uri="https://token.actions.githubusercontent.com" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.ref=assertion.ref" \
+  --attribute-condition="assertion.repository == 'boelnasr/ManipulaPy' && (assertion.ref == 'refs/heads/release/v1.4' || assertion.ref.startsWith('refs/tags/v1.4'))"
+
+gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT" \
+  --project="$PROJECT_ID" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github/attribute.repository/boelnasr/ManipulaPy"
+
+gcloud billing budgets create \
+  --billing-account="$BILLING_ACCOUNT_ID" \
+  --display-name="ManipulaPy TPU release" \
+  --budget-amount=15USD \
+  --threshold-rule=percent=0.5 \
+  --threshold-rule=percent=0.9 \
+  --threshold-rule=percent=1.0
+```
+
+Confirm the service account has only `roles/tpu.admin`,
+`roles/compute.viewer`, and `roles/iam.serviceAccountUser` at the project level,
+plus `roles/iam.workloadIdentityUser` on the service account. The provider
+condition must remain exactly repository `boelnasr/ManipulaPy` and either branch
+`refs/heads/release/v1.4` or tag prefix `refs/tags/v1.4`.
+
+Create these GitHub repository variables (Settings → Secrets and variables →
+Actions → Variables):
+
+- `GCP_PROJECT_ID`: the project ID;
+- `GCP_WIF_PROVIDER`:
+  `projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github/providers/github-manipulapy`;
+- `GCP_TPU_SERVICE_ACCOUNT`: the full service-account email; and
+- `GCP_TPU_ZONE`: exactly `europe-west4-b`.
+
+Create the protected GitHub environment `tpu-release`. Require maintainer
+reviewer approval and restrict deployments to branch `release/v1.4` and tags
+matching `v1.4.*`. The workflow has concurrency group
+`manipulapy-tpu-release`, does not cancel an in-progress run, and times out after
+60 minutes.
+
+For each release, first obtain live `gpu-axes-passed` evidence on the exact SHA.
+Then dispatch **TPU Release Contract**, approve `tpu-release`, and retain its
+Actions URL plus the `tpu-contract-SHA` JUnit artifact. Confirm the real-TPU
+platform assertion, linalg/FK/dynamics/gradient contracts, exact printed commit,
+and zero-skips check are green. Finally verify teardown independently:
+
+```bash
+gcloud compute tpus tpu-vm list \
+  --project="$PROJECT_ID" --zone=europe-west4-b \
+  --filter="name~'^manipulapy-'"
+```
+
+The filtered list must be empty. TPU capacity errors, reviewer timeouts, CPU
+fallback, skipped tests, contract failures, timeouts, missing live GPU evidence,
+or teardown failures block publishing.
 
 ---
 
