@@ -91,7 +91,17 @@ def _ensure_cupy_registered() -> None:
                 "Install a matching CUDA build, e.g. `pip install ManipulaPy[cuda]`, "
                 "or select another backend such as 'numpy'."
             )
-        from .cupy_backend import CupyBackend
+        try:
+            from .cupy_backend import CupyBackend
+        except ImportError as exc:
+            raise ImportError(
+                f"The 'cupy' backend was requested and CuPy is installed, but "
+                f"importing it failed: {exc}. This usually means the CuPy build "
+                "does not match the installed NumPy (ManipulaPy requires "
+                "numpy>=2.0) or the CUDA runtime. Reinstall a matching build, "
+                "e.g. `pip install -U cupy-cuda12x`, or select another backend "
+                "such as 'numpy'."
+            ) from exc
 
         _REGISTRY["cupy"] = CupyBackend()
 
@@ -112,7 +122,17 @@ def _ensure_torch_registered() -> None:
                 "Install PyTorch, e.g. `pip install torch`, "
                 "or select another backend such as 'numpy'."
             )
-        from .torch_backend import TorchBackend
+        try:
+            from .torch_backend import TorchBackend
+        except ImportError as exc:
+            raise ImportError(
+                f"The 'torch' backend was requested and PyTorch is installed, "
+                f"but importing it failed: {exc}. This usually means the "
+                "PyTorch build does not match the installed NumPy (ManipulaPy "
+                "requires numpy>=2.0). Reinstall a matching build, e.g. "
+                "`pip install -U torch`, or select another backend such as "
+                "'numpy'."
+            ) from exc
 
         _REGISTRY["torch"] = TorchBackend()
 
@@ -133,7 +153,18 @@ def _ensure_jax_registered() -> None:
                 "Install JAX, e.g. `pip install jax`, "
                 "or select another backend such as 'numpy'."
             )
-        from .jax_backend import JaxBackend
+        try:
+            from .jax_backend import JaxBackend
+        except ImportError as exc:
+            raise ImportError(
+                f"The 'jax' backend was requested and JAX is installed, but "
+                f"importing it failed: {exc}. This usually means the JAX build "
+                "does not match the installed NumPy (ManipulaPy requires "
+                "numpy>=2.0) — a stale JAX in a user site-packages directory is "
+                "a common cause. Reinstall a matching build, e.g. "
+                "`pip install -U 'jax[cpu]'`, or select another backend such as "
+                "'numpy'."
+            ) from exc
 
         _REGISTRY["jax"] = JaxBackend()
 

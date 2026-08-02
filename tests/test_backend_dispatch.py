@@ -15,6 +15,7 @@ import builtins
 import importlib
 import importlib.util
 import inspect
+import sys
 import types
 from unittest.mock import patch
 
@@ -3871,3 +3872,47 @@ def test_jax_construction_edge_paths():
         backend.stack([])
     with pytest.raises(Exception):
         backend.concatenate([])
+
+
+class TestBrokenOptionalBackendImport:
+    """A backend that is installed but not importable must fail clearly.
+
+    ``find_spec`` only proves a module can be *located*, not that it can be
+    imported. An accelerator compiled against a different NumPy ABI resolves
+    fine and then explodes on import, so the registry must distinguish
+    "not installed" from "installed but broken" instead of surfacing a raw
+    ImportError from deep inside a third-party dependency.
+    """
+
+    @pytest.mark.parametrize(
+        "backend_name, module_name",
+        [("jax", "jax_backend"), ("torch", "torch_backend"), ("cupy", "cupy_backend")],
+    )
+    def test_broken_backend_reports_actionable_error(
+        self, backend_name, module_name, monkeypatch
+    ):
+        import importlib.util as _iu
+
+        from ManipulaPy import backend as backend_pkg
+
+        # Registry is process-global; make sure the real backend is not cached.
+        monkeypatch.delitem(backend_pkg._REGISTRY, backend_name, raising=False)
+        # Pretend the accelerator is installed...
+        monkeypatch.setattr(
+            _iu, "find_spec", lambda name, *a, **k: object(), raising=True
+        )
+        # ...but importing our adapter for it fails the way a NumPy ABI
+        # mismatch fails: an ImportError raised from inside the dependency.
+        monkeypatch.setitem(
+            sys.modules, f"ManipulaPy.backend.{module_name}", None
+        )
+
+        with pytest.raises(ImportError) as excinfo:
+            backend_pkg.get_registered(backend_name)
+
+        message = str(excinfo.value)
+        assert backend_name in message.lower()
+        # Must say it IS installed but unusable, not "not installed".
+        assert "not installed" not in message.lower(), message
+        # Must give the user somewhere to go.
+        assert "numpy" in message.lower(), message
