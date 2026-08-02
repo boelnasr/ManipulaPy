@@ -115,12 +115,9 @@ jax-cpu = ["jax[cpu]>=0.6.0"]
 # needed — do NOT add one with --extra-index-url, which is dependency-confusion
 # bait. Linux only: jax publishes no CUDA wheels for macOS or Windows.
 jax-cuda = ["jax[cuda12]>=0.6.0; sys_platform == 'linux'"]
-# NOTE: no `jax-tpu` extra yet. TPU float64 was measured as real, on-device and
-# accurate to ~1e-13, so the numerics look sound — but the full contract suite
-# has not been demonstrated on TPU hardware (complex device_put hangs and
-# linalg compilation exceeds a minute there), and `jax[tpu]` only installs on a
-# TPU VM. Adding the extra later is backwards compatible; advertising an
-# undemonstrated precision contract is not.
+# TPU wheels are meaningful only on a Google Cloud TPU VM. Packaging this extra
+# does not establish the hardware contract; Task 17 supplies the release gate.
+jax-tpu = ["jax[tpu]>=0.6.0; sys_platform == 'linux'"]
 
 # Convenience: install everything (no self-references — the resolver
 # handles direct deps more reliably than ``ManipulaPy[simulation,...]``).

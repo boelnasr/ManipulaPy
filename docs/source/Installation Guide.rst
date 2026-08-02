@@ -91,9 +91,11 @@ Optional extras
    * - ``[jax-cuda]``
      - JAX compute backend, CUDA 12 build (Linux only)
      - ``pip install "ManipulaPy[jax-cuda]"``
+   * - ``[jax-tpu]``
+     - JAX compute backend for a Google Cloud TPU VM (Linux only; release evidence pending Task 17)
+     - ``pip install "ManipulaPy[jax-tpu]"``
    * - ``[all]``
-     - Every runtime extra above (CPU + simulation + vision + ml + cuda
-       + pytorch + jax-cpu)
+     - All non-TPU runtime extras, including CPU JAX; excludes ``jax-tpu``
      - ``pip install "ManipulaPy[all]"``
    * - ``[minimal]``
      - Backwards-compatible pre-1.3.2 set (core + PyBullet)
@@ -158,13 +160,19 @@ imported until a backend is explicitly requested.
    pip install "ManipulaPy[pytorch]"     # + PyTorch >= 2.7.1
    pip install "ManipulaPy[jax-cpu]"     # + JAX >= 0.6 (CPU)
    pip install "ManipulaPy[jax-cuda]"    # + JAX >= 0.6 (CUDA 12, Linux only)
+   pip install "ManipulaPy[jax-tpu]"     # + JAX >= 0.6 (Google Cloud TPU VM, Linux only)
    pip install "ManipulaPy[cuda]"        # + CuPy 13.x (CUDA 12)
 
-.. note::
+.. warning::
 
-   There is no ``jax-tpu`` extra. ``jax[tpu]`` only installs on a TPU VM
-   and the backend contract suite has not been demonstrated on TPU
-   hardware.
+   ``[jax-tpu]`` targets a Google Cloud one-chip ``v5litepod-1`` (TPU v5e),
+   not local hardware. The planned supported domain is real ``float32``,
+   ``float64``, and ``int64``. X64 is required and can increase TPU resource
+   use and compilation cost; a linalg compilation has exceeded 60 seconds.
+   Complex TPU inputs must fail fast under Task 17. Packaging is not proof of
+   support: real release evidence remains pending the Task-17 contract gate in
+   `tests/test_tpu_contract.py <../../tests/test_tpu_contract.py>`_ and
+   `.github/workflows/tpu-release.yml <../../.github/workflows/tpu-release.yml>`_.
 
 The PyTorch and JAX backends make ``utils``, ``kinematics``, ``dynamics``
 and ``singularity`` differentiable; the remaining modules run under every

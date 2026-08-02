@@ -435,8 +435,16 @@ dT_dtheta = jax.jacrev(robot.forward_kinematics)(theta)
   and JAX. Every other module *runs* on all four backends via host-boundary
   conversion, but carries no gradient guarantee — see the backend guide for
   exactly where that line sits.
-- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, `[jax-cuda]`. The
-  base install remains NumPy-only.
+- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, `[jax-cuda]`, and
+  `[jax-tpu]`. The base install remains NumPy-only; `all` deliberately excludes
+  TPU because that wheel is meaningful only on a Google Cloud TPU VM.
+- **TPU release status** — `[jax-tpu]` targets a Google Cloud one-chip
+  `v5litepod-1` (TPU v5e). Its planned domain is real `float32`, `float64`, and
+  `int64`; X64 is required and can raise resource and compile costs (a linalg
+  compile exceeded 60 seconds). Complex TPU inputs must fail fast in Task 17.
+  Support is not yet proven: real release evidence is pending
+  [tests/test_tpu_contract.py](tests/test_tpu_contract.py) and
+  [.github/workflows/tpu-release.yml](.github/workflows/tpu-release.yml).
 - **Core math fixes that affect every backend** — building the gradient contract
   exposed three real defects in the shipped SE(3)/SO(3) code: `MatrixLog6`
   discarded small rotations, log gradients were NaN near the identity, and the

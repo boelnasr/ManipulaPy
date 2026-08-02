@@ -36,8 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   autodiff gradient tests against finite differences on both frameworks.
   Every other module runs on all four backends via host-boundary conversion
   but carries **no gradient guarantee** — see the Compute Backends user guide.
-- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, `[jax-cuda]`.
-  The base install remains NumPy-only.
+- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, `[jax-cuda]`, and
+  `[jax-tpu]`. The base install remains NumPy-only and `all` excludes TPU.
+  `[jax-tpu]` targets a Google Cloud one-chip `v5litepod-1` (TPU v5e); its
+  planned real domain is `float32`, `float64`, and `int64`. X64 is required and
+  may raise resource and compile cost (a linalg compilation exceeded 60
+  seconds). Complex TPU inputs must fail fast in Task 17. Packaging does not
+  prove support: release evidence is pending
+  [tests/test_tpu_contract.py](tests/test_tpu_contract.py) and
+  [.github/workflows/tpu-release.yml](.github/workflows/tpu-release.yml).
 - **Compute Backends user guide** (`docs/source/user_guide/Backends.rst`)
   covering selection, the gradient boundary, host boundaries, JAX float64
   behavior, and performance characteristics.
@@ -83,9 +90,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The default is deliberately unchanged; widen `timeout` explicitly instead.
 - The JAX backend enables `jax_enable_x64` when it is imported, which is
   process-global JAX state and is not reverted.
-- There is no `jax-tpu` extra yet. TPU float64 measures as real, on-device and
-  accurate to ~1e-13, but the full contract suite has not been demonstrated on
-  TPU hardware.
+- `[jax-tpu]` requires a Google Cloud TPU VM. Its real-hardware release
+  contract is pending Task 17; complex TPU inputs must fail fast, and no TPU
+  support claim is made until the planned gate passes.
 
 ## [1.3.2] — 2026-05-31
 

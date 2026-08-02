@@ -68,7 +68,7 @@ Available Backends
      - yes
      - ``torch.autograd`` and ``torch.jit.trace`` safe on core math.
    * - ``jax``
-     - ``[jax-cpu]`` / ``[jax-cuda]``
+     - ``[jax-cpu]`` / ``[jax-cuda]`` / ``[jax-tpu]``
      - no
      - yes
      - ``jax.grad`` / ``jax.jacrev`` / ``jit`` safe on core math.
@@ -204,12 +204,18 @@ Installation
    pip install ManipulaPy[pytorch]       # + PyTorch
    pip install ManipulaPy[jax-cpu]       # + JAX (CPU)
    pip install ManipulaPy[jax-cuda]      # + JAX (CUDA 12, Linux only)
+   pip install "ManipulaPy[jax-tpu]"     # + JAX (Google Cloud TPU VM, Linux only)
    pip install ManipulaPy[cuda]          # + CuPy (CUDA 12)
 
-There is no ``jax-tpu`` extra yet. TPU float64 measures as real, on-device and
-accurate, but the full contract suite has not been demonstrated on TPU
-hardware — complex ``device_put`` hangs there and linalg compilation is very
-slow — and ``jax[tpu]`` only installs on a TPU VM.
+.. warning::
+   ``[jax-tpu]`` is for a Google Cloud one-chip ``v5litepod-1`` (TPU v5e), not
+   a local accelerator. Its planned supported domain is real ``float32``,
+   ``float64``, and ``int64``. X64 is required and may increase resource use
+   and compilation cost; a linalg compilation has taken more than 60 seconds.
+   Complex TPU inputs must fail fast under Task 17. This package extra does
+   **not** prove TPU support: release evidence is pending the Task-17 contract
+   gate, `tests/test_tpu_contract.py <../../../tests/test_tpu_contract.py>`_,
+   and `.github/workflows/tpu-release.yml <../../../.github/workflows/tpu-release.yml>`_.
 
 Gotchas
 -------
