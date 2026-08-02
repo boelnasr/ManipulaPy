@@ -48,6 +48,7 @@ jobs:
     name: TPU and GPU release gates
     uses: ./.github/workflows/tpu-release.yml
     permissions:
+      checks: read
       contents: read
       id-token: write
 
