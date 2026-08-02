@@ -1,8 +1,8 @@
 .. _api-index:
 
-======================
-🔧 API Reference Guide
-======================
+===================
+API Reference Guide
+===================
 
 Welcome to the low-level API reference for **ManipulaPy**.
 
@@ -10,16 +10,16 @@ This section contains auto-generated documentation for all key modules, classes,
 
 .. note::
 
-   - This section is **not a tutorial** – it’s for precise function/class definitions.  
+   - This section is **not a tutorial** – it’s for precise function/class definitions.
 
-   - For interactive examples and walkthroughs, see :ref:`tutorial-index`.  
+   - For interactive examples and walkthroughs, see :ref:`tutorial-index`.
    - For explanations, workflows, and configuration, see the :ref:`user_guide_index`.
 
----------------------------------------------------
-📦 Module Overview
----------------------------------------------------
+---------------
+Module Overview
+---------------
 
-.. rubric:: 🔩 Core Manipulator Stack
+.. rubric:: Core Manipulator Stack
 
 .. toctree::
    :maxdepth: 2
@@ -36,7 +36,7 @@ This section contains auto-generated documentation for all key modules, classes,
    urdf
    urdf_processor
 
-.. rubric:: 🧠 Planning, Simulation & Optimization
+.. rubric:: Planning, Simulation & Optimization
 
 .. toctree::
    :maxdepth: 2
@@ -46,7 +46,7 @@ This section contains auto-generated documentation for all key modules, classes,
    potential_field
    cuda_kernels
 
-.. rubric:: 👁️ Perception & Vision
+.. rubric:: Perception & Vision
 
 .. toctree::
    :maxdepth: 2
@@ -55,7 +55,7 @@ This section contains auto-generated documentation for all key modules, classes,
    perception
    vision
 
-.. rubric:: 🧪 Advanced Analysis
+.. rubric:: Advanced Analysis
 
 .. toctree::
    :maxdepth: 2
@@ -63,24 +63,24 @@ This section contains auto-generated documentation for all key modules, classes,
 
    singularity
 
----------------------------------------------------
-📖 How to Use This Reference
----------------------------------------------------
+-------------------------
+How to Use This Reference
+-------------------------
 
-- **Module headers** show the import path: e.g., ``ManipulaPy.control.ManipulatorController``  
+- **Module headers** show the import path: e.g., ``ManipulaPy.control.ManipulatorController``
 
-- **Function signatures** are exact and include optional/default parameters  
+- **Function signatures** are exact and include optional/default parameters
 
-- **Class attributes** and properties are listed, with docstrings if provided  
+- **Class attributes** and properties are listed, with docstrings if provided
 
 - **Backend compatibility** (NumPy / CuPy / PyTorch / JAX) is noted where applicable — see :doc:`backend`
 
 - **Examples** may be included for select methods/classes
 
----------------------------------------------------
-🔍 Quick Navigation
----------------------------------------------------
+----------------
+Quick Navigation
+----------------
 
-- :ref:`genindex` – Alphabetical list of all documented symbols  
-- :ref:`modindex` – Index of Python modules  
+- :ref:`genindex` – Alphabetical list of all documented symbols
+- :ref:`modindex` – Index of Python modules
 - :ref:`search` – Full-text search across the documentation

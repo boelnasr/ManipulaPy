@@ -3,106 +3,49 @@
 ManipulaPy Documentation
 ========================
 
-A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, trajectory planning, perception and control**.
-
 .. raw:: html
 
-   <div class="hero-section">
-      <div class="hero-content">
-         <h2>🤖 Modern Robotics Made Simple</h2>
-         <p>ManipulaPy brings cutting-edge robotics algorithms to your fingertips with GPU acceleration,
-            computer vision integration, differentiable compute backends, and a clean Python API.</p>
-         
-         <!-- Project Badges -->
-         <div class="project-badges">
-            <a href="https://pypi.org/project/manipulapy/">
-               <img src="https://img.shields.io/pypi/v/manipulapy?style=for-the-badge&logo=pypi&logoColor=white&label=PyPI&color=blue" alt="PyPI Version">
-            </a>
-            <a href="https://www.python.org/downloads/">
-               <img src="https://img.shields.io/badge/python-3.9%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python Versions">
-            </a>
-            <a href="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa">
-               <img src="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg?style=for-the-badge" alt="JOSS Paper">
-            </a>
-            <a href="https://github.com/boelnasr/ManipulaPy/blob/main/LICENSE">
-               <img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg?style=for-the-badge" alt="License">
-            </a>
-            <a href="https://github.com/boelnasr/ManipulaPy/actions">
-               <img src="https://img.shields.io/github/actions/workflow/status/boelnasr/ManipulaPy/test.yml?branch=main&style=for-the-badge&logo=github&label=CI" alt="CI Status">
-            </a>
-            <a href="https://pypi.org/project/manipulapy/">
-               <img src="https://static.pepy.tech/badge/manipulapy">
-            </a>
-            <a href="https://github.com/boelnasr/ManipulaPy">
-               <img src="https://img.shields.io/github/stars/boelnasr/ManipulaPy?style=for-the-badge&logo=github&logoColor=white&label=Stars&color=yellow" alt="GitHub Stars">
-            </a>
-         </div>
-         
-         <div class="feature-grid">
-            <div class="feature">
-               <span class="feature-icon">⚡</span>
-               <strong>CUDA Accelerated</strong><br>
-               GPU-powered trajectory planning and dynamics
-            </div>
-            <div class="feature">
-               <span class="feature-icon">👁️</span>
-               <strong>Computer Vision</strong><br>
-               YOLO detection and stereo perception
-            </div>
-            <div class="feature">
-               <span class="feature-icon">🎮</span>
-               <strong>Real-time Control</strong><br>
-               PyBullet simulation and advanced controllers
-            </div>
-            <div class="feature">
-               <span class="feature-icon">🔀</span>
-               <strong>Differentiable Backends</strong><br>
-               <a href="user_guide/Backends.html">NumPy, CuPy, PyTorch or JAX</a> behind one API
-            </div>
+   <p class="mp-lede">A GPU-accelerated Python toolbox for robot kinematics, dynamics,
+   trajectory planning, perception and control — with a unified compute backend that runs
+   the same math on NumPy, CuPy, PyTorch or JAX, and returns real gradients through it.</p>
 
-         </div>
-      </div>
+   <div class="mp-badges">
+      <a href="https://pypi.org/project/manipulapy/">
+         <img src="https://img.shields.io/pypi/v/manipulapy?style=flat-square&logo=pypi&logoColor=white&label=PyPI" alt="PyPI version">
+      </a>
+      <a href="https://www.python.org/downloads/">
+         <img src="https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Supported Python versions">
+      </a>
+      <a href="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa">
+         <img src="https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg" alt="JOSS paper status">
+      </a>
+      <a href="https://github.com/boelnasr/ManipulaPy/blob/main/LICENSE">
+         <img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="AGPL-3.0 license">
+      </a>
+      <a href="https://github.com/boelnasr/ManipulaPy/actions">
+         <img src="https://img.shields.io/github/actions/workflow/status/boelnasr/ManipulaPy/test.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI status">
+      </a>
+      <a href="https://pypi.org/project/manipulapy/">
+         <img src="https://img.shields.io/pypi/dm/manipulapy?style=flat-square&label=downloads" alt="Monthly downloads">
+      </a>
    </div>
 
-.. contents:: **Quick links**
+.. contents:: On this page
    :local:
    :depth: 1
    :backlinks: none
 
-Getting Started
----------------
+Quick start
+-----------
 
-If you're in a hurry, install the package into a fresh virtual-env and try the examples below:
-
-.. raw:: html
-
-   <div class="installation-section">
-      <!-- Live Version Badge -->
-      <div class="live-version">
-         <a href="https://pypi.org/project/manipulapy/">
-            <img src="https://img.shields.io/pypi/v/manipulapy?style=flat-square&logo=pypi&logoColor=white&label=Latest%20Version&color=blue" alt="Latest Version">
-         </a>
-         <a href="https://pypi.org/project/manipulapy/">
-            <img src="https://img.shields.io/pypi/wheel/manipulapy?style=flat-square&color=brightgreen&label=Wheel" alt="Wheel Available">
-         </a>
-         <a href="https://img.shields.io/badge/tests-passing-brightgreen">
-            <img src="https://img.shields.io/badge/tests-passing-brightgreen?style=flat-square" alt="Test Status">
-         </a>
-      </div>
-   </div>
+Install the package into a fresh virtual environment:
 
 .. code-block:: bash
 
-   python -m pip install manipulapy[cuda]  # or just manipulapy
-   python -c "import ManipulaPy; print('🎉 Installation successful!')"
+   python -m pip install manipulapy          # core: kinematics, dynamics, control
+   python -m pip install "manipulapy[cuda]"  # add CUDA-accelerated planning
 
-.. note:: 
-   The docs you're reading are generated from the source in ``docs/``; feel free to improve them and send a `pull request <https://github.com/boelnasr/ManipulaPy/pull/new>`_.
-
-🚀 Quick Start Examples
-~~~~~~~~~~~~~~~~~~~~~~~
-
-**1. Your First Robot Analysis**
+Load a robot, solve forward kinematics, then invert it — the whole loop in one file:
 
 .. code-block:: python
 
@@ -110,41 +53,181 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
    from ManipulaPy.urdf_processor import URDFToSerialManipulator
    from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file
 
-   # Load the built-in xArm robot model
+   # Built-in 6-DOF xArm model — no external URDF needed
    urdf_processor = URDFToSerialManipulator(xarm_urdf_file)
    robot = urdf_processor.serial_manipulator
    dynamics = urdf_processor.dynamics
 
-   # Compute forward kinematics at home position
-   joint_angles = np.zeros(6)  # 6-DOF robot at home
-   end_effector_pose = robot.forward_kinematics(joint_angles, frame="space")
-   
-   print("🏠 Home position:", end_effector_pose[:3, 3])
-   print("📐 Home orientation:\n", end_effector_pose[:3, :3])
+   # Forward kinematics at an arbitrary configuration
+   theta = np.array([0.5, -0.3, 0.8, 0.0, 0.5, 0.0])
+   T_target = robot.forward_kinematics(theta, frame="space")
 
-**2. Inverse Kinematics in Action**
+   # ...and back again
+   solution, success, iterations = robot.iterative_inverse_kinematics(
+       T_desired=T_target,
+       thetalist0=np.zeros(6),
+       max_iterations=1000,
+   )
+
+   print(f"converged={success} in {iterations} iterations")
+   print(f"residual: {np.abs(solution - theta).max():.2e} rad")
+
+The same call runs on a different array library, and differentiates:
 
 .. code-block:: python
 
-   # Define a target pose for the end-effector
-   target_angles = np.array([0.5, -0.3, 0.8, 0.0, 0.5, 0.0])
-   T_target = robot.forward_kinematics(target_angles)
+   import jax
+   from ManipulaPy.backend import use_backend
 
-   # Solve inverse kinematics
-   initial_guess = np.zeros(6)
-   solution, success, iterations = robot.iterative_inverse_kinematics(
-       T_desired=T_target,
-       thetalist0=initial_guess,
-       max_iterations=1000
-   )
+   # Same robot, same method — JAX arrays instead of NumPy, restored on exit
+   with use_backend("jax"):
+       T = robot.forward_kinematics(theta)
 
-   if success:
-       print(f"✅ IK solved in {iterations} iterations!")
-       print(f"🎯 Solution: {np.degrees(solution):.2f} degrees")
-   else:
-       print("❌ IK solution not found")
+       # Gradients come from the framework, not finite differences
+       dT = jax.jacrev(robot.forward_kinematics)(theta)
 
-**3. CUDA-Accelerated Trajectory Planning**
+   print(f"d(pose)/d(theta) shape: {dT.shape}")
+
+.. note::
+   Backends are opt-in (``pip install "manipulapy[jax-cpu]"`` or
+   ``[pytorch]``); NumPy remains the default. Gradients are guaranteed for the
+   **core math only** — ``utils``, ``kinematics``, ``dynamics``, and
+   ``singularity``. See the :doc:`Compute Backends guide <user_guide/Backends>`
+   for the full contract.
+
+Capabilities
+------------
+
+.. raw:: html
+
+   <div class="mp-grid mp-grid--wide">
+      <div class="mp-card">
+         <span class="mp-kicker">Core robotics</span>
+         <h3 class="mp-card__title"><a href="user_guide/Kinematics.html">Kinematics &amp; dynamics</a></h3>
+         <p class="mp-card__body">Forward and inverse kinematics, space and body Jacobians,
+            mass matrices, Coriolis and gravity terms, forward and inverse dynamics.</p>
+         <div class="mp-card__tags">
+            <span class="mp-tag">screw theory</span>
+            <span class="mp-tag">cached mass matrix</span>
+         </div>
+      </div>
+
+      <div class="mp-card">
+         <span class="mp-kicker">Motion</span>
+         <h3 class="mp-card__title"><a href="user_guide/Trajectory_Planning.html">Planning &amp; control</a></h3>
+         <p class="mp-card__body">Joint and Cartesian trajectory generation, potential-field
+            obstacle avoidance, collision checking, PID, computed-torque and adaptive control.</p>
+         <div class="mp-card__tags">
+            <span class="mp-tag">CUDA kernels</span>
+            <span class="mp-tag">quintic scaling</span>
+         </div>
+      </div>
+
+      <div class="mp-card">
+         <span class="mp-kicker">New in 1.4</span>
+         <h3 class="mp-card__title"><a href="user_guide/Backends.html">Compute backends</a></h3>
+         <p class="mp-card__body">One dispatch layer over NumPy, CuPy, PyTorch and JAX.
+            Autodiff through kinematics, dynamics, singularity and utils; NumPy stays the
+            default and nothing is imported until a backend is requested.</p>
+         <div class="mp-card__tags">
+            <span class="mp-tag">jax.grad</span>
+            <span class="mp-tag">torch.autograd</span>
+         </div>
+      </div>
+
+      <div class="mp-card">
+         <span class="mp-kicker">Sensing</span>
+         <h3 class="mp-card__title"><a href="user_guide/Perception.html">Perception &amp; simulation</a></h3>
+         <p class="mp-card__body">Monocular and stereo cameras, YOLO object detection,
+            DBSCAN point-cloud clustering, and PyBullet physics with trajectory playback.</p>
+         <div class="mp-card__tags">
+            <span class="mp-tag">stereo depth</span>
+            <span class="mp-tag">PyBullet</span>
+         </div>
+      </div>
+   </div>
+
+Where to start
+--------------
+
+.. raw:: html
+
+   <table class="mp-matrix">
+      <thead>
+         <tr><th>If you want to</th><th>Start here</th><th>Then read</th></tr>
+      </thead>
+      <tbody>
+         <tr>
+            <td>Install and run something</td>
+            <td><a href="getting_started/index.html">Getting Started</a></td>
+            <td><a href="user_guide/Kinematics.html">Kinematics</a></td>
+         </tr>
+         <tr>
+            <td>Load your own robot</td>
+            <td><a href="user_guide/URDF_Processor.html">URDF Processor</a></td>
+            <td><a href="user_guide/Singularity_Analysis.html">Singularity Analysis</a></td>
+         </tr>
+         <tr>
+            <td>Plan and execute motion</td>
+            <td><a href="user_guide/Trajectory_Planning.html">Trajectory Planning</a></td>
+            <td><a href="user_guide/Simulation.html">Simulation</a></td>
+         </tr>
+         <tr>
+            <td>Design a controller</td>
+            <td><a href="user_guide/Dynamics.html">Dynamics</a></td>
+            <td><a href="user_guide/Control.html">Control</a></td>
+         </tr>
+         <tr>
+            <td>Differentiate the math</td>
+            <td><a href="user_guide/Backends.html">Compute Backends</a></td>
+            <td><a href="api/backend.html">API: backend</a></td>
+         </tr>
+         <tr>
+            <td>Run on the GPU</td>
+            <td><a href="user_guide/CUDA_Kernels.html">CUDA Kernels</a></td>
+            <td><a href="user_guide/Path_Planning.html">Path Planning</a></td>
+         </tr>
+         <tr>
+            <td>Perceive the workspace</td>
+            <td><a href="user_guide/vision.html">Vision</a></td>
+            <td><a href="user_guide/Perception.html">Perception</a></td>
+         </tr>
+      </tbody>
+   </table>
+
+Documentation map
+-----------------
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Getting Started
+
+   Installation Guide
+   getting_started/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials
+
+   tutorials/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference
+
+   api/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: User Guides
+
+   user_guide/index
+
+Worked examples
+---------------
+
+Trajectory planning
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -157,7 +240,7 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
    # Plan smooth trajectory from start to end
    start_angles = np.zeros(6)
    end_angles = np.array([0.5, -0.3, 0.8, 0.0, 0.5, 0.0])
-   
+
    trajectory = planner.joint_trajectory(
        thetastart=start_angles,
        thetaend=end_angles,
@@ -166,26 +249,26 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
        method=5         # Quintic time scaling for smoothness
    )
 
-   print(f"📈 Generated trajectory with {trajectory['positions'].shape[0]} points")
-   print(f"🎯 Start velocity: {trajectory['velocities'][0]}")
-   print(f"🏁 End velocity: {trajectory['velocities'][-1]}")
+   print(f"Generated trajectory with {trajectory['positions'].shape[0]} points")
+   print(f"Start velocity: {trajectory['velocities'][0]}")
+   print(f"End velocity: {trajectory['velocities'][-1]}")
 
    # Visualize the trajectory
    planner.plot_trajectory(trajectory, 5.0, title="Smooth Joint Trajectory")
 
-**4. Advanced Control with Dynamics**
+Computed-torque control
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
    from ManipulaPy.control import ManipulatorController
 
-   # Create intelligent controller
    controller = ManipulatorController(dynamics)
 
    # Current robot state
    current_pos = np.zeros(6)
    current_vel = np.zeros(6)
-   
+
    # Desired target state
    desired_pos = np.array([0.2, -0.1, 0.3, 0.0, 0.2, 0.0])
    desired_vel = np.zeros(6)
@@ -195,7 +278,7 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
    ultimate_period = 0.5
    Kp, Ki, Kd = controller.tune_controller(ultimate_gain, ultimate_period, kind="PID")
 
-   print(f"🎛️  Auto-tuned gains - Kp: {Kp[0]:.2f}, Ki: {Ki[0]:.2f}, Kd: {Kd[0]:.2f}")
+   print(f"Auto-tuned gains - Kp: {Kp[0]:.2f}, Ki: {Ki[0]:.2f}, Kd: {Kd[0]:.2f}")
 
    # Compute optimal control torques
    control_torques = controller.computed_torque_control(
@@ -209,9 +292,10 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
        Kp=Kp, Ki=Ki, Kd=Kd
    )
 
-   print(f"⚡ Control torques: {control_torques}")
+   print(f"Control torques: {control_torques}")
 
-**5. PyBullet Simulation**
+PyBullet simulation
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -232,12 +316,12 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
 
    # Execute the planned trajectory in simulation
    waypoints = trajectory["positions"][::10]  # Subsample for demonstration
-   
-   print("🎬 Running simulation...")
-   final_position = sim.run_trajectory(waypoints)
-   print(f"🏁 Final end-effector position: {final_position}")
 
-**6. Computer Vision & Perception**
+   final_position = sim.run_trajectory(waypoints)
+   print(f"Final end-effector position: {final_position}")
+
+Vision and perception
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -271,208 +355,11 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
    )
 
    num_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
-   print(f"👁️  Detected {len(obstacle_points)} obstacle points")
-   print(f"🔍 Found {num_clusters} distinct object clusters")
+   print(f"Detected {len(obstacle_points)} obstacle points")
+   print(f"Found {num_clusters} distinct object clusters")
 
-**7. Differentiable Kinematics on a Different Backend**
-
-.. code-block:: python
-
-   import jax
-   from ManipulaPy.backend import use_backend
-
-   # Same robot, same call — JAX arrays instead of NumPy, restored on exit
-   with use_backend("jax"):
-       T = robot.forward_kinematics(joint_angles)
-
-       # Gradients come from the framework, not finite differences
-       dT = jax.jacrev(robot.forward_kinematics)(joint_angles)
-
-   print(f"🧮 d(pose)/d(theta) shape: {dT.shape}")
-
-.. note::
-   Backends are opt-in (``pip install "manipulapy[jax-cpu]"`` or
-   ``[pytorch]``); NumPy remains the default. Gradients are guaranteed for the
-   **core math only** — ``utils``, ``kinematics``, ``dynamics``, and
-   ``singularity``. See the :doc:`Compute Backends guide <user_guide/Backends>`
-   for the full contract.
-
-.. raw:: html
-
-   <div class="getting-started-tips">
-      <h4>💡 Pro Tips for Success</h4>
-      <div class="tips-grid">
-         <div class="tip">
-            <span class="tip-icon">🎯</span>
-            <strong>Start Simple</strong><br>
-            Begin with forward kinematics before tackling complex control
-         </div>
-         <div class="tip">
-            <span class="tip-icon">🔧</span>
-            <strong>Use Built-ins</strong><br>
-            The xArm URDF model is perfect for learning and testing
-         </div>
-         <div class="tip">
-            <span class="tip-icon">📊</span>
-            <strong>Visualize Everything</strong><br>
-            Use plotting functions to understand robot behavior
-         </div>
-         <div class="tip">
-            <span class="tip-icon">⚡</span>
-            <strong>GPU Acceleration</strong><br>
-            Install CUDA for 7x faster trajectory computations
-         </div>
-      </div>
-   </div>
-
-Key Features at a Glance
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. raw:: html
-
-   <div class="features-overview">
-      <div class="feature-category">
-         <h4>🔧 Core Robotics</h4>
-         <ul>
-            <li><strong>Kinematics:</strong> Forward/inverse with neural network acceleration</li>
-            <li><strong>Dynamics:</strong> Mass matrices, inverse/forward dynamics with caching</li>
-            <li><strong>Control:</strong> PID, computed torque, adaptive controllers</li>
-            <li><strong>Planning:</strong> CUDA-accelerated trajectory generation</li>
-         </ul>
-      </div>
-      <div class="feature-category">
-         <h4>👁️ Perception & Vision</h4>
-         <ul>
-            <li><strong>Vision:</strong> Monocular/stereo camera support</li>
-            <li><strong>Detection:</strong> YOLO-based object detection</li>
-            <li><strong>3D Processing:</strong> Point cloud clustering</li>
-            <li><strong>Integration:</strong> PyBullet camera debugging</li>
-         </ul>
-      </div>
-      <div class="feature-category">
-         <h4>⚡ High Performance</h4>
-         <ul>
-            <li><strong>CUDA Kernels:</strong> GPU-accelerated computations</li>
-            <li><strong>Parallel Processing:</strong> Multi-robot trajectory planning</li>
-            <li><strong>Optimized Algorithms:</strong> Cached mass matrices</li>
-            <li><strong>Real-time:</strong> Sub-millisecond kinematics</li>
-         </ul>
-      </div>
-      <div class="feature-category">
-         <h4>🔀 Compute Backends <em>(new in 1.4)</em></h4>
-         <ul>
-            <li><strong>One API:</strong> NumPy, CuPy, PyTorch, or JAX behind a single dispatch layer</li>
-            <li><strong>Autodiff:</strong> gradients through kinematics, dynamics, singularity and utils</li>
-            <li><strong>Scoped Selection:</strong> <code>set_backend()</code> or a <code>use_backend()</code> block</li>
-            <li><strong>Opt-in:</strong> NumPy stays the default; nothing is imported until requested</li>
-         </ul>
-      </div>
-   </div>
-
-Documentation Map
------------------
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 🚀 Getting Started
-
-   Installation Guide
-   getting_started/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 📘 Tutorials
-
-   tutorials/index
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 🛠️ API Reference
-
-   api/index   
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 📚 User Guides
-
-   user_guide/index
-
-Popular Learning Paths
-----------------------
-
-.. raw:: html
-
-   <div class="learning-paths">
-      <div class="path">
-         <h4>🆕 Complete Beginner</h4>
-         <ol>
-            <li><a href="#getting-started">🚀 Quick Start Examples</a></li>
-            <li><a href="user_guide/Kinematics.html">🔧 Basic Kinematics</a></li>
-            <li><a href="user_guide/URDF_Processor.html">🤖 Robot Model Loading</a></li>
-            <li><a href="user_guide/Simulation.html">🎮 First Simulation</a></li>
-         </ol>
-      </div>
-      <div class="path">
-         <h4>🤖 Robotics Engineer</h4>
-         <ol>
-            <li><a href="user_guide/Kinematics.html">🔧 Advanced Kinematics</a></li>
-            <li><a href="user_guide/Dynamics.html">⚖️ Robot Dynamics</a></li>
-            <li><a href="user_guide/Control.html">🎛️ Control Systems</a></li>
-            <li><a href="user_guide/Trajectory_Planning.html">🛤️ Motion Planning</a></li>
-         </ol>
-      </div>
-      <div class="path">
-         <h4>💻 Performance Engineer</h4>
-         <ol>
-            <li><a href="user_guide/CUDA_Kernels.html">⚡ CUDA Setup</a></li>
-            <li><a href="user_guide/Trajectory_Planning.html">🚀 GPU Acceleration</a></li>
-            <li><a href="user_guide/Backends.html">🔀 Compute Backends</a></li>
-            <li><a href="user_guide/index.html">🔧 Optimization Tips</a></li>
-         </ol>
-      </div>
-      <div class="path">
-         <h4>👁️ Vision Engineer</h4>
-         <ol>
-            <li><a href="user_guide/Perception.html">👁️ Vision Systems</a></li>
-            <li><a href="user_guide/Perception.html">🔍 Object Detection</a></li>
-            <li><a href="user_guide/Perception.html">🌐 3D Perception</a></li>
-            <li><a href="user_guide/Control.html">🎯 Vision-Guided Control</a></li>
-         </ol>
-      </div>
-   </div>
-
-What's New
-----------
-
-.. raw:: html
-
-   <div class="whats-new">
-      <h4>🎉 Latest in v1.4.0</h4>
-      <ul>
-         <li><strong>New:</strong> Unified compute backend system — the same kinematics, dynamics, planning and control code runs on <strong>NumPy, CuPy, PyTorch or JAX</strong> behind one dispatch API (<code>ManipulaPy.backend</code>: <code>set_backend</code>, <code>use_backend</code>, <code>get_backend</code>)</li>
-         <li><strong>New:</strong> Differentiable contract for <code>utils</code>, <code>kinematics</code>, <code>dynamics</code> and <code>singularity</code> — <code>jax.grad</code>/<code>jacrev</code>, <code>jit</code>, and <code>torch.autograd</code> are safe on the core math. Every other module runs on all four backends through host-boundary conversion, with no gradient guarantee</li>
-         <li><strong>New:</strong> Optional extras <code>[pytorch]</code>, <code>[jax-cpu]</code>, <code>[jax-cuda]</code> — NumPy remains the default and nothing extra is imported until a backend is requested</li>
-         <li><strong>Fixed:</strong> SE(3)/SO(3) logarithm conditioning — <code>MatrixLog6</code> no longer discards small rotations and the translation term is derived from <code>MatrixLog3</code>, so values and gradients stay correct at θ ≈ 0 and θ ≈ π (this also corrects NumPy results)</li>
-         <li><strong>Note:</strong> JAX eager dispatch is roughly 40× slower than NumPy on single small calls, so time-budgeted solvers such as <code>TracIKSolver</code> need a wider <code>timeout</code> — see the <a href="user_guide/Backends.html">Compute Backends guide</a></li>
-      </ul>
-   </div>
-
-   <div class="whats-new">
-      <h4>📦 Previously in v1.3.2</h4>
-      <ul>
-         <li><strong>New:</strong> Modular optional extras — <code>[simulation]</code>, <code>[urdf]</code>, <code>[vision]</code>, <code>[ml]</code>, <code>[cuda]</code>, <code>[all]</code> — default install is now lightweight</li>
-         <li><strong>New:</strong> Native NumPy 2.0-compatible URDF parser (<code>ManipulaPy.urdf.URDF</code>) with <code>PackageResolver</code> for <code>package://</code> and <code>file://</code> URIs</li>
-         <li><strong>New:</strong> PEP 561 <code>py.typed</code> marker — mypy/pyright now see ManipulaPy as a typed package</li>
-         <li><strong>New:</strong> Python 3.12 added to the supported matrix</li>
-         <li><strong>Fixed:</strong> CUDA trajectory kernels — corrected quintic acceleration, removed shared-memory and forward-dynamics races, added <code>method=1</code> (linear) support, guarded N≤1 against div-zero</li>
-         <li><strong>Fixed:</strong> Repulsive-potential-gradient sign in <code>fused_potential_gradient_kernel</code> — previous versions produced an attracting field</li>
-         <li><strong>Fixed:</strong> Simulation methods now raise clear <code>ImportError</code> with <code>pip install ManipulaPy[simulation]</code> hint when PyBullet is missing</li>
-         <li><strong>Fixed:</strong> <code>Vision.detect_obstacles</code> default <code>depth_threshold</code> raised from 0.0 → 5.0 m (the old default filtered every detection)</li>
-      </ul>
-   </div>
-
-Installation Options
-~~~~~~~~~~~~~~~~~~~~
+Installation options
+--------------------
 
 .. code-block:: bash
 
@@ -507,36 +394,71 @@ Installation Options
    cd ManipulaPy
    pip install -e ".[dev]"
 
-Performance Showcase
-~~~~~~~~~~~~~~~~~~~~
+Measured performance
+--------------------
 
 .. raw:: html
 
-   <div class="performance-showcase">
-      <div class="benchmark">
-         <h5>⚡ CUDA Acceleration</h5>
-         <p><strong>7x faster</strong> trajectory planning<br>
-         GPU vs CPU for 1000-point trajectories</p>
-      </div>
-      <div class="benchmark">
-         <h5>🧠 Neural Network IK</h5>
-         <p><strong>10x faster</strong> convergence<br>
-         Hybrid approach vs traditional methods</p>
-      </div>
-      <div class="benchmark">
-         <h5>💾 Smart Caching</h5>
-         <p><strong>3x faster</strong> dynamics<br>
-         Cached mass matrices for repeated calls</p>
-      </div>
-      <div class="benchmark">
-         <h5>👁️ Real-time Vision</h5>
-         <p><strong>30 FPS</strong> object detection<br>
-         YOLO integration with 3D localization</p>
-      </div>
+   <table class="mp-matrix">
+      <thead>
+         <tr><th>Workload</th><th>Speedup</th><th>Compared against</th></tr>
+      </thead>
+      <tbody>
+         <tr>
+            <td>Trajectory planning</td>
+            <td class="mp-num">7&times;</td>
+            <td>CUDA vs. CPU, 1000-point trajectories</td>
+         </tr>
+         <tr>
+            <td>Inverse kinematics</td>
+            <td class="mp-num">10&times;</td>
+            <td>Hybrid neural + iterative approach vs. traditional methods</td>
+         </tr>
+         <tr>
+            <td>Repeated dynamics</td>
+            <td class="mp-num">3&times;</td>
+            <td>Cached vs. recomputed mass matrices</td>
+         </tr>
+         <tr>
+            <td>Object detection</td>
+            <td class="mp-num">30 FPS</td>
+            <td>YOLO detection with 3D localization</td>
+         </tr>
+      </tbody>
+   </table>
+
+Release notes
+-------------
+
+.. raw:: html
+
+   <div class="mp-rail mp-rail--current">
+      <p class="mp-rail__title">v1.4.0 — current</p>
+      <ul>
+         <li><strong>New:</strong> Unified compute backend system — the same kinematics, dynamics, planning and control code runs on <strong>NumPy, CuPy, PyTorch or JAX</strong> behind one dispatch API (<code>ManipulaPy.backend</code>: <code>set_backend</code>, <code>use_backend</code>, <code>get_backend</code>)</li>
+         <li><strong>New:</strong> Differentiable contract for <code>utils</code>, <code>kinematics</code>, <code>dynamics</code> and <code>singularity</code> — <code>jax.grad</code>/<code>jacrev</code>, <code>jit</code>, and <code>torch.autograd</code> are safe on the core math. Every other module runs on all four backends through host-boundary conversion, with no gradient guarantee</li>
+         <li><strong>New:</strong> Optional extras <code>[pytorch]</code>, <code>[jax-cpu]</code>, <code>[jax-cuda]</code> — NumPy remains the default and nothing extra is imported until a backend is requested</li>
+         <li><strong>Fixed:</strong> SE(3)/SO(3) logarithm conditioning — <code>MatrixLog6</code> no longer discards small rotations and the translation term is derived from <code>MatrixLog3</code>, so values and gradients stay correct at θ ≈ 0 and θ ≈ π (this also corrects NumPy results)</li>
+         <li><strong>Note:</strong> JAX eager dispatch is roughly 40× slower than NumPy on single small calls, so time-budgeted solvers such as <code>TracIKSolver</code> need a wider <code>timeout</code> — see the <a href="user_guide/Backends.html">Compute Backends guide</a></li>
+      </ul>
+   </div>
+
+   <div class="mp-rail">
+      <p class="mp-rail__title">v1.3.2</p>
+      <ul>
+         <li><strong>New:</strong> Modular optional extras — <code>[simulation]</code>, <code>[urdf]</code>, <code>[vision]</code>, <code>[ml]</code>, <code>[cuda]</code>, <code>[all]</code> — default install is now lightweight</li>
+         <li><strong>New:</strong> Native NumPy 2.0-compatible URDF parser (<code>ManipulaPy.urdf.URDF</code>) with <code>PackageResolver</code> for <code>package://</code> and <code>file://</code> URIs</li>
+         <li><strong>New:</strong> PEP 561 <code>py.typed</code> marker — mypy/pyright now see ManipulaPy as a typed package</li>
+         <li><strong>New:</strong> Python 3.12 added to the supported matrix</li>
+         <li><strong>Fixed:</strong> CUDA trajectory kernels — corrected quintic acceleration, removed shared-memory and forward-dynamics races, added <code>method=1</code> (linear) support, guarded N≤1 against div-zero</li>
+         <li><strong>Fixed:</strong> Repulsive-potential-gradient sign in <code>fused_potential_gradient_kernel</code> — previous versions produced an attracting field</li>
+         <li><strong>Fixed:</strong> Simulation methods now raise clear <code>ImportError</code> with <code>pip install ManipulaPy[simulation]</code> hint when PyBullet is missing</li>
+         <li><strong>Fixed:</strong> <code>Vision.detect_obstacles</code> default <code>depth_threshold</code> raised from 0.0 → 5.0 m (the old default filtered every detection)</li>
+      </ul>
    </div>
 
 Citing ManipulaPy
-~~~~~~~~~~~~~~~~~
+-----------------
 
 If you use ManipulaPy in your research, please cite:
 
@@ -553,241 +475,22 @@ If you use ManipulaPy in your research, please cite:
 License
 -------
 
-ManipulaPy is released under the **AGPL-3.0 License**:
+ManipulaPy is released under the **AGPL-3.0 License**: the source is freely
+available, derivative works must also be open source, modified network services
+must offer their source to users, and commercial use is permitted under those
+same terms. For commercial licensing options or AGPL compliance questions,
+please contact the maintainers.
 
-.. raw:: html
+Contributing to these docs
+--------------------------
 
-   <div class="license-info">
-      <div class="license-feature">
-         <span class="license-icon">✅</span>
-         <strong>Open Source</strong><br>
-         Source code freely available
-      </div>
-      <div class="license-feature">
-         <span class="license-icon">🔄</span>
-         <strong>Copyleft</strong><br>
-         Derivative works must be open source
-      </div>
-      <div class="license-feature">
-         <span class="license-icon">🌐</span>
-         <strong>Network Use</strong><br>
-         Modified network services must provide source
-      </div>
-      <div class="license-feature">
-         <span class="license-icon">💼</span>
-         <strong>Commercial Use</strong><br>
-         Permitted with AGPL compliance
-      </div>
-   </div>
-
-For commercial licensing options or AGPL compliance questions, please contact the maintainers.
+These pages are generated from the reStructuredText sources in ``docs/``.
+Corrections and additions are welcome — open a
+`pull request <https://github.com/boelnasr/ManipulaPy/pull/new>`_.
 
 Indices and tables
 ------------------
 
-* :ref:`genindex` - Complete index of all functions, classes, and methods
-* :ref:`modindex` - Module index for quick navigation
-* :ref:`search` - Search the documentation
-
-.. raw:: html
-
-   <style>
-   .hero-section {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 2rem;
-      border-radius: 10px;
-      margin: 2rem 0;
-   }
-   .hero-content h2 {
-      margin-top: 0;
-      font-size: 2rem;
-   }
-   
-   /* Enhanced Badge Styling */
-   .project-badges {
-      text-align: center;
-      margin: 1.5rem 0;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.5rem;
-   }
-   
-   .project-badges img {
-      height: 28px;
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-   }
-   
-   .project-badges img:hover {
-      transform: scale(1.05);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-   }
-   
-   .installation-section {
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 8px;
-      padding: 1rem;
-      margin: 1rem 0;
-   }
-   
-   .live-version {
-      text-align: center;
-      margin: 1rem 0;
-      display: flex;
-      justify-content: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-   }
-   
-   .live-version img {
-      height: 20px;
-   }
-   
-   /* Responsive badges */
-   @media (max-width: 768px) {
-      .project-badges {
-         flex-direction: column;
-         align-items: center;
-      }
-      
-      .project-badges img {
-         width: 100%;
-         max-width: 250px;
-      }
-      
-      .live-version {
-         flex-direction: column;
-         align-items: center;
-      }
-   }
-   
-   .feature-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-top: 1.5rem;
-   }
-   .feature {
-      background: rgba(255,255,255,0.5);
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-   }
-   .feature-icon {
-      font-size: 2rem;
-      display: block;
-      margin-bottom: 0.5rem;
-   }
-   .getting-started-tips {
-      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-      color: white;
-      padding: 1.5rem;
-      border-radius: 10px;
-      margin: 2rem 0;
-   }
-   .getting-started-tips h4 {
-      margin-top: 0;
-   }
-   .tips-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-top: 1rem;
-   }
-   .tip {
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-   }
-
-   .tip:nth-child(1) {
-      background: #059669; /* Strong blue */
-   }
-
-   .tip:nth-child(2) {
-      background: #059669; /* Strong red */
-   }
-
-   .tip:nth-child(3) {
-      background: #059669; /* Strong green */
-   }
-
-   .tip:nth-child(4) {
-      background: #059669; /* Strong purple */
-   }
-   .tip-icon {
-      font-size: 1.5rem;
-      display: block;
-      margin-bottom: 0.5rem;
-   }
-   .features-overview {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin: 1.5rem 0;
-   }
-   .feature-category {
-      border: 1px solid #e1e4e8;
-      border-radius: 8px;
-      padding: 1rem;
-   }
-   .feature-category h4 {
-      margin-top: 0;
-      color: #0366d6;
-   }
-   .learning-paths {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
-   }
-   .path {
-      border: 1px solid #e1e4e8;
-      border-radius: 8px;
-      padding: 1rem;
-      background: #f8f9fa;
-   }
-   .path h4 {
-      margin-top: 0;
-      color: #0366d6;
-   }
-   .whats-new {
-      background: #f0f8f0;
-      border-left: 4px solid #28a745;
-      padding: 1rem;
-      margin: 1.5rem 0;
-   }
-   .performance-showcase {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 1rem;
-      margin: 1.5rem 0;
-   }
-   .benchmark {
-      background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
-      color: white;
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-   }
-   .benchmark h5 {
-      margin-top: 0;
-   }
-   .license-info {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 1rem;
-      margin: 1rem 0;
-   }
-   .license-feature {
-      text-align: center;
-      padding: 0.5rem;
-   }
-   .license-icon {
-      font-size: 1.5rem;
-      display: block;
-      margin-bottom: 0.5rem;
-   }
-   </style>
+* :ref:`genindex` — complete index of all functions, classes, and methods
+* :ref:`modindex` — module index for quick navigation
+* :ref:`search` — search the documentation

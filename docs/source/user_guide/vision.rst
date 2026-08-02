@@ -29,26 +29,26 @@ The Vision module is a unified computer vision system that brings together:
 
 .. raw:: html
 
-   <div class="feature-showcase">
-      <div class="feature-card">
-         <span class="feature-icon">📷</span>
-         <h4>Multi-Camera Support</h4>
-         <p>Configure multiple cameras with individual intrinsics, extrinsics, and distortion parameters</p>
+   <div class="mp-grid">
+      <div class="mp-card">
+         <span class="mp-kicker">Multi-camera</span>
+         <p class="mp-card__body">Configure multiple cameras with individual intrinsics,
+            extrinsics, and distortion parameters.</p>
       </div>
-      <div class="feature-card">
-         <span class="feature-icon">🤖</span>
-         <h4>YOLO Integration</h4>
-         <p>Real-time object detection with YOLOv8 for robust obstacle identification</p>
+      <div class="mp-card">
+         <span class="mp-kicker">Detection</span>
+         <p class="mp-card__body">Real-time object detection with YOLOv8 for robust
+            obstacle identification.</p>
       </div>
-      <div class="feature-card">
-         <span class="feature-icon">🎮</span>
-         <h4>PyBullet Debug</h4>
-         <p>Interactive virtual cameras with real-time parameter adjustment</p>
+      <div class="mp-card">
+         <span class="mp-kicker">PyBullet debug</span>
+         <p class="mp-card__body">Interactive virtual cameras with real-time parameter
+            adjustment.</p>
       </div>
-      <div class="feature-card">
-         <span class="feature-icon">👁️</span>
-         <h4>Stereo Vision</h4>
-         <p>Complete stereo pipeline from rectification to 3D point cloud generation</p>
+      <div class="mp-card">
+         <span class="mp-kicker">Stereo</span>
+         <p class="mp-card__body">Complete stereo pipeline from rectification to 3D
+            point-cloud generation.</p>
       </div>
    </div>
 
@@ -565,43 +565,3 @@ See Also
 - :doc:`../tutorials/index` - Vision and perception tutorials
 - :doc:`Simulation` - PyBullet integration guide
 
-.. raw:: html
-
-   <style>
-   .feature-showcase {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin: 2rem 0;
-   }
-   .feature-card {
-      background: linear-gradient(135deg, #f6f9fc 0%, #ffffff 100%);
-      border: 1px solid #e1e8ed;
-      border-radius: 12px;
-      padding: 1.5rem;
-      text-align: center;
-      transition: all 0.3s ease;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-   }
-   .feature-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-      border-color: #1da1f2;
-   }
-   .feature-icon {
-      font-size: 2.5rem;
-      display: block;
-      margin-bottom: 1rem;
-   }
-   .feature-card h4 {
-      margin: 0 0 0.5rem 0;
-      color: #14171a;
-      font-weight: 600;
-   }
-   .feature-card p {
-      margin: 0;
-      color: #657786;
-      font-size: 0.9rem;
-      line-height: 1.4;
-   }
-   </style>

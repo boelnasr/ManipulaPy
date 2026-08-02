@@ -17,33 +17,22 @@ The Perception module serves as a higher-level interface that builds upon the Vi
 
 .. raw:: html
 
-   <div class="perception-hero">
-      <div class="hero-content">
-         <h3>🧠 Intelligent Scene Understanding</h3>
-         <p>Transform raw camera data into meaningful environmental information for autonomous robotic decision-making.</p>
-         
-         <div class="capability-grid">
-            <div class="capability">
-               <span class="cap-icon">🔍</span>
-               <strong>Object Detection</strong><br>
-               YOLO-powered obstacle identification
-            </div>
-            <div class="capability">
-               <span class="cap-icon">🌐</span>
-               <strong>3D Clustering</strong><br>
-               DBSCAN-based obstacle grouping
-            </div>
-            <div class="capability">
-               <span class="cap-icon">👁️</span>
-               <strong>Stereo Processing</strong><br>
-               Point cloud generation and analysis
-            </div>
-            <div class="capability">
-               <span class="cap-icon">🤖</span>
-               <strong>Robot Integration</strong><br>
-               Seamless planning and control integration
-            </div>
-         </div>
+   <div class="mp-grid">
+      <div class="mp-card">
+         <span class="mp-kicker">Detection</span>
+         <p class="mp-card__body">YOLO-powered obstacle identification from RGB frames.</p>
+      </div>
+      <div class="mp-card">
+         <span class="mp-kicker">Clustering</span>
+         <p class="mp-card__body">DBSCAN grouping of 3D points into discrete obstacles.</p>
+      </div>
+      <div class="mp-card">
+         <span class="mp-kicker">Stereo</span>
+         <p class="mp-card__body">Point-cloud generation and analysis from rectified pairs.</p>
+      </div>
+      <div class="mp-card">
+         <span class="mp-kicker">Integration</span>
+         <p class="mp-card__body">Obstacle data handed directly to planning and control.</p>
       </div>
    </div>
 
@@ -261,35 +250,26 @@ The Perception module processes data through a sophisticated pipeline that trans
 
 .. raw:: html
 
-   <div class="dataflow-diagram">
-      <div class="flow-stage">
-         <div class="stage-icon">📷</div>
-         <h4>1. Sensor Input</h4>
-         <p>RGB + Depth cameras capture raw visual data</p>
+   <div class="mp-flow">
+      <div class="mp-flow__stage">
+         <p class="mp-flow__title">Sensor input</p>
+         <p class="mp-flow__body">RGB and depth cameras capture raw visual data.</p>
       </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-stage">
-         <div class="stage-icon">🔍</div>
-         <h4>2. Object Detection</h4>
-         <p>YOLO identifies objects in RGB images</p>
+      <div class="mp-flow__stage">
+         <p class="mp-flow__title">Object detection</p>
+         <p class="mp-flow__body">YOLO identifies objects in the RGB image.</p>
       </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-stage">
-         <div class="stage-icon">🌐</div>
-         <h4>3. 3D Integration</h4>
-         <p>Depth data creates 3D obstacle points</p>
+      <div class="mp-flow__stage">
+         <p class="mp-flow__title">3D integration</p>
+         <p class="mp-flow__body">Depth data lifts detections into 3D obstacle points.</p>
       </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-stage">
-         <div class="stage-icon">🧠</div>
-         <h4>4. Clustering</h4>
-         <p>DBSCAN groups related points</p>
+      <div class="mp-flow__stage">
+         <p class="mp-flow__title">Clustering</p>
+         <p class="mp-flow__body">DBSCAN groups related points into obstacles.</p>
       </div>
-      <div class="flow-arrow">→</div>
-      <div class="flow-stage">
-         <div class="stage-icon">🤖</div>
-         <h4>5. Robot Control</h4>
-         <p>Obstacle data enables safe navigation</p>
+      <div class="mp-flow__stage">
+         <p class="mp-flow__title">Robot control</p>
+         <p class="mp-flow__body">Obstacle data feeds planning for safe navigation.</p>
       </div>
    </div>
 
@@ -1232,40 +1212,3 @@ See Also
 - :doc:`Trajectory_Planning` - Path planning integration
 - :doc:`../tutorials/index` - Perception tutorials and examples
 
-.. raw:: html
-
-   <style>
-   .perception-hero {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 2rem;
-      border-radius: 12px;
-      margin: 2rem 0;
-      text-align: center;
-   }
-   1
-   .perception-hero h3 {
-      margin-top: 0;
-      font-size: 1.8rem;
-   }
-   
-   .capability-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-top: 1.5rem;
-   }
-   
-   .capability {
-      background: rgba(255,255,255,0.1);
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-   }
-   
-   .cap-icon {
-      font-size: 2rem;
-      display: block;
-      margin-bottom: 0.5rem;
-   }
-   </style>
