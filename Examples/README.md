@@ -88,6 +88,15 @@ Perfect for newcomers to robotics and ManipulaPy. These examples demonstrate cor
   - Joint limit extraction
   - Robot visualization
 
+#### `backend_basic_demo.py`
+- **Purpose**: The v1.4 unified compute backend system
+- **Features**:
+  - Backend discovery and lazy registration
+  - Scoped `use_backend` and process-wide `set_backend`
+  - Identical forward kinematics results on NumPy, PyTorch and JAX
+  - Autodiff gradients checked against finite differences
+- **Output**: `backend_basic_demo.png`
+
 #### `visualization_basic_demo.py`
 - **Purpose**: Visualization capabilities overview
 - **Features**:

@@ -22,6 +22,14 @@ The demo is GPU-aware but never GPU-dependent: when CUDA is missing it runs
 the CPU path only, labels every result as CPU, and exits cleanly. No raw
 ``@cuda.jit`` kernel is ever invoked directly.
 
+Note on the v1.4 backend system: the Numba CUDA kernels benchmarked here are
+*not* part of array-backend dispatch. They take device pointers rather than
+backend arrays, so they run unchanged whichever backend is active and are
+outside the differentiable contract. Selecting ``cupy`` via
+``ManipulaPy.backend.set_backend`` changes where the core kinematics and
+dynamics math runs, not which trajectory kernel is used. See
+``Examples/basic_examples/backend_basic_demo.py`` for backend dispatch itself.
+
 Usage:
     python gpu_acceleration_advanced_demo.py
 
