@@ -2,785 +2,299 @@ name: CI Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop, release/v1.4]
+    tags: ["v1.4.*"]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop, release/v1.4]
 
 permissions:
   contents: read
 
+env:
+  MPLBACKEND: Agg
+  NUMBA_DISABLE_CUDA: "1"
+
 jobs:
-  test:
+  backend-cpu:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: numpy-cpu
+            backend: numpy
+            extra: ""
+          - name: torch-cpu
+            backend: torch
+            extra: ",pytorch"
+          - name: jax-cpu
+            backend: jax
+            extra: ",jax-cpu"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install backend and test dependencies
+        run: python -m pip install -e ".[dev${{ matrix.extra }}]"
+
+      - name: Assert hosted CPU device
+        env:
+          BACKEND: ${{ matrix.backend }}
+          JAX_PLATFORMS: cpu
+          JAX_ENABLE_X64: "1"
+        run: |
+          python - <<'PY'
+          import os
+          backend = os.environ["BACKEND"]
+          if backend == "numpy":
+              from ManipulaPy.backend import get_backend
+              assert type(get_backend()).__name__ == "NumpyBackend"
+          elif backend == "torch":
+              import torch
+              from ManipulaPy.backend.torch_backend import TorchBackend
+              value = TorchBackend().to_device([1.0])
+              assert value.device.type == "cpu"
+          else:
+              import jax
+              devices = jax.devices()
+              assert devices and all(device.platform == "cpu" for device in devices)
+          print(f"{backend} hosted CPU assertion passed")
+          PY
+
+      - name: Run public API freeze
+        run: python -m pytest tests/test_public_api_freeze.py -q
+
+      - name: Run NumPy backend contracts
+        if: matrix.backend == 'numpy'
+        run: |
+          python -m pytest tests/test_backend_dispatch.py \
+            -k "not (torch or jax or cupy)" -q
+
+      - name: Run Torch CPU and gradient contracts
+        if: matrix.backend == 'torch'
+        run: |
+          python -m pytest tests/test_backend_dispatch.py tests/test_torch_call_sites.py \
+            -k torch -q
+          python -m pytest tests/test_gradient_contract.py -k torch -q
+
+      - name: Run JAX CPU and gradient contracts
+        if: matrix.backend == 'jax'
+        env:
+          JAX_PLATFORMS: cpu
+          JAX_ENABLE_X64: "1"
+        run: |
+          python -m pytest tests/test_backend_dispatch.py tests/test_jax_call_sites.py \
+            -k jax -q
+          python -m pytest tests/test_gradient_contract.py -k jax -q
+
+  non-tpu-regression:
+    name: non-tpu-regression (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
-      fail-fast: false
-        
     steps:
-    - name: Checkout code
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libgl1-mesa-dev \
-          libglu1-mesa-dev \
-          libegl1-mesa-dev \
-          libxrandr2 \
-          libxinerama1 \
-          libxcursor1 \
-          libxi6 \
-          libxtst6 \
-          xvfb \
-          libglib2.0-0 \
-          libsm6 \
-          libxext6 \
-          libxrender-dev \
-          libfontconfig1
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install regression dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Run the complete non-TPU regression suite
+        run: |
+          python -m pytest tests --ignore=tests/test_tpu_contract.py \
+            -m "not (tpu or cuda or gpu or vision or simulation)" -q
 
-    - name: Cache pip dependencies
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-${{ matrix.python-version }}-
-          ${{ runner.os }}-pip-
-
-    - name: Install base dependencies
-      run: |
-        python -m pip install --upgrade pip==26.0.1 setuptools==82.0.1 wheel==0.47.0
-        pip install pytest==8.4.2 pytest-cov==7.1.0 pytest-mock==3.15.1 coverage[toml]==7.10.7
-
-    - name: Debug TOML file
-      run: |
-        echo "🔍 Checking pyproject.toml syntax..."
-        python -c "
-        import sys
-        try:
-            import tomllib
-        except ImportError:
-            try:
-                import tomli as tomllib
-            except ImportError:
-                print('Installing tomli...')
-                import subprocess
-                subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'tomli'])
-                import tomli as tomllib
-
-        with open('pyproject.toml', 'rb') as f:
-            try:
-                data = tomllib.load(f)
-                print('✅ TOML file is valid')
-                if 'project' in data and 'dependencies' in data['project']:
-                    print(f'✅ Found dependencies: {data[\"project\"][\"dependencies\"]}')
-                else:
-                    print('⚠️ No dependencies found in TOML')
-            except Exception as e:
-                print(f'❌ TOML error: {e}')
-                sys.exit(1)
-        "
-
-    - name: Install PyTorch (CPU version for CI)
-      run: |
-        pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
-        python -c "import torch; print(f'✅ PyTorch {torch.__version__} installed successfully')"
-
-    - name: Install ManipulaPy in development mode
-      run: |
-        pip install -e .[dev]
-
-    - name: Install test dependencies
-      run: |
-        pip install \
-          numpy==2.0.2 \
-          scipy==1.13.1 \
-          matplotlib==3.9.4 \
-          scikit-learn==1.6.1 \
-          pillow==11.3.0 \
-          pytest-xvfb==3.1.1 \
-          pytest-timeout==2.4.0
-
-    - name: Install optional dependencies (continue on error)
-      continue-on-error: true
-      run: |
-        # These may not be available in CI, but install if possible
-        pip install pybullet==3.2.7 || echo "PyBullet installation failed (expected in CI)"
-        pip install opencv-python-headless==5.0.0.93 || pip install opencv-python==5.0.0.93 || echo "OpenCV installation failed"
-        pip install urchin==0.0.30 || echo "URCHIN installation failed"
-        pip install ultralytics==8.4.87 || echo "Ultralytics installation failed (expected in CI)"
-
-    - name: Verify ManipulaPy installation
-      run: |
-        python -c "import ManipulaPy; print(f'ManipulaPy version: {ManipulaPy.__version__}')"
-        python -c "from ManipulaPy import kinematics, dynamics, utils; print('✅ Core modules imported successfully')"
-        python -c "import torch; print(f'✅ PyTorch integration working: {torch.__version__}')"
-
-    - name: Set up display for tests
-      run: |
-        export DISPLAY=:99
-        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-        sleep 3
-
-    - name: Check existing test suite
-      run: |
-        echo "📁 Checking existing test suite..."
-        ls -la tests/
-        echo "Total test files: $(find tests/ -name 'test_*.py' | wc -l)"
-        
-        # Verify conftest.py exists
-        if [ -f tests/conftest.py ]; then
-            echo "✅ conftest.py found"
-        else
-            echo "⚠️ No conftest.py found"
-        fi
-        
-        # Check pytest configuration
-        if [ -f pyproject.toml ]; then
-            echo "✅ pyproject.toml found"
-        fi
-        
-        # Test pytest discovery with detailed output
-        echo "🔍 Testing pytest discovery..."
-        python -m pytest --collect-only tests/ -q || echo "⚠️ Test collection has issues"
-
-    - name: Run individual test modules (safer approach)
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-        DISPLAY: ":99"
-        QT_QPA_PLATFORM: "offscreen"
-        MPLBACKEND: "Agg"
-        SKIP_CUDA_TESTS: "true"
-        SKIP_VISION_TESTS: "true"
-        SKIP_SIMULATION_TESTS: "true"
-        CI: "true"
-      run: |
-        echo "🧪 Running individual test modules..."
-        
-        # Test each module separately to isolate failures
-        for test_file in tests/test_*.py; do
-          if [ -f "$test_file" ]; then
-            echo "Testing $(basename $test_file)..."
-            python -m pytest "$test_file" -v \
-              --tb=short \
-              --disable-warnings \
-              --maxfail=3 \
-              -m "not (cuda or vision or simulation)" \
-              || echo "❌ $test_file had issues"
-          fi
-        done
-
-    - name: Run comprehensive test suite with coverage
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-        DISPLAY: ":99"
-        QT_QPA_PLATFORM: "offscreen"
-        MPLBACKEND: "Agg"
-        SKIP_CUDA_TESTS: "true"
-        SKIP_VISION_TESTS: "true"
-        SKIP_SIMULATION_TESTS: "true"
-        CI: "true"
-      run: |
-        echo "🧪 Running comprehensive test suite with coverage..."
-        
-        # Create coverage directory
-        mkdir -p htmlcov
-        
-        # Run tests with coverage - don't exit on failure, but capture exit code
-        set +e  # Don't exit on error
-        python -m pytest tests/ -v \
-          --cov=ManipulaPy \
-          --cov-report=term-missing \
-          --cov-report=xml:coverage.xml \
-          --cov-report=html:htmlcov \
-          --tb=short \
-          --disable-warnings \
-          --maxfail=50 \
-          -m "not (cuda or vision or simulation)" \
-          --timeout=300
-        
-        PYTEST_EXIT_CODE=$?
-        set -e  # Re-enable exit on error
-        
-        echo "pytest exit code: $PYTEST_EXIT_CODE"
-        
-        # Check if coverage file was created
-        if [ -f coverage.xml ]; then
-            echo "✅ Coverage file generated successfully"
-            echo "Coverage file size: $(wc -c < coverage.xml) bytes"
-            # Show coverage summary
-            coverage report --show-missing || echo "Coverage report command failed"
-        else
-            echo "❌ No coverage.xml file generated"
-            # Try to generate coverage report manually
-            echo "Attempting to generate coverage manually..."
-            coverage xml -o coverage.xml || echo "Manual coverage generation failed"
-        fi
-        
-        # List generated files for debugging
-        echo "Generated files:"
-        ls -la coverage.xml htmlcov/ 2>/dev/null || echo "No coverage files found"
-        
-        # Don't fail the job if tests mostly passed
-        if [ $PYTEST_EXIT_CODE -eq 0 ] || [ $PYTEST_EXIT_CODE -eq 1 ]; then
-            echo "✅ Tests completed with acceptable results (exit code: $PYTEST_EXIT_CODE)"
-            exit 0
-        else
-            echo "⚠️ Tests had significant issues (exit code: $PYTEST_EXIT_CODE), but continuing..."
-            exit 0  # Don't fail the job
-        fi
-
-    - name: Generate detailed coverage analysis
-      if: matrix.python-version == '3.9' && always()
-      run: |
-        if [ -f coverage.xml ]; then
-          echo "📊 Generating detailed coverage analysis..."
-          
-          # Create the enhanced analysis script
-          cat > analyze_coverage.py << 'EOF'
-        #!/usr/bin/env python3
-        """Enhanced Coverage Analysis for ManipulaPy"""
-        import xml.etree.ElementTree as ET
-        import sys
-        from pathlib import Path
-        
-        def analyze_coverage(xml_file="coverage.xml"):
-            """Extract detailed coverage information per module."""
-            
-            if not Path(xml_file).exists():
-                print(f"❌ Coverage file {xml_file} not found")
-                return None
-                
-            try:
-                tree = ET.parse(xml_file)
-                root = tree.getroot()
-                
-                # Overall statistics
-                overall_coverage = float(root.attrib['line-rate']) * 100
-                overall_branch = float(root.attrib.get('branch-rate', 0)) * 100
-                
-                print(f"📊 Overall Coverage: {overall_coverage:.1f}% (lines)")
-                print(f"🌿 Overall Branch Coverage: {overall_branch:.1f}%")
-                print("=" * 60)
-                
-                # Per-module detailed analysis
-                modules = []
-                for package in root.findall('.//package'):
-                    name = package.attrib['name'].replace('ManipulaPy.', '').replace('ManipulaPy', 'root')
-                    if not name or name == 'root':  # Skip empty names or root
-                        continue
-                        
-                    line_rate = float(package.attrib['line-rate']) * 100
-                    branch_rate = float(package.attrib.get('branch-rate', 0)) * 100
-                    
-                    # Count total lines and covered lines
-                    total_lines = 0
-                    covered_lines = 0
-                    
-                    for line in package.findall('.//line'):
-                        total_lines += 1
-                        if int(line.attrib['hits']) > 0:
-                            covered_lines += 1
-                    
-                    modules.append({
-                        'name': name,
-                        'line_rate': line_rate,
-                        'branch_rate': branch_rate,
-                        'total_lines': total_lines,
-                        'covered_lines': covered_lines,
-                        'uncovered_lines': total_lines - covered_lines
-                    })
-                
-                # Sort by coverage rate (descending)
-                modules.sort(key=lambda x: x['line_rate'], reverse=True)
-                
-                # Display results
-                print(f"{'Module':<20} {'Lines':<8} {'Branches':<10} {'Total':<8} {'Covered':<8} {'Missing':<8}")
-                print("-" * 70)
-                
-                for module in modules:
-                    # Status emoji
-                    if module['line_rate'] >= 90:
-                        emoji = "🟢"
-                    elif module['line_rate'] >= 80:
-                        emoji = "✅"
-                    elif module['line_rate'] >= 60:
-                        emoji = "⚠️"
-                    else:
-                        emoji = "❌"
-                        
-                    print(f"{emoji} {module['name']:<18} "
-                          f"{module['line_rate']:>6.1f}% "
-                          f"{module['branch_rate']:>8.1f}% "
-                          f"{module['total_lines']:>6} "
-                          f"{module['covered_lines']:>6} "
-                          f"{module['uncovered_lines']:>6}")
-                
-                print("=" * 60)
-                
-                # Summary statistics
-                high_coverage = sum(1 for m in modules if m['line_rate'] >= 80)
-                medium_coverage = sum(1 for m in modules if 60 <= m['line_rate'] < 80)
-                low_coverage = sum(1 for m in modules if m['line_rate'] < 60)
-                
-                print(f"📈 Coverage Distribution:")
-                print(f"  🟢 High (≥80%): {high_coverage} modules")
-                print(f"  ⚠️  Medium (60-79%): {medium_coverage} modules") 
-                print(f"  ❌ Low (<60%): {low_coverage} modules")
-                
-                # Identify modules needing attention
-                needs_attention = [m for m in modules if m['line_rate'] < 70]
-                if needs_attention:
-                    print(f"\n🎯 Modules needing attention:")
-                    for module in needs_attention:
-                        print(f"  • {module['name']}: {module['line_rate']:.1f}% "
-                              f"({module['uncovered_lines']} uncovered lines)")
-                
-                # Generate coverage badge
-                if overall_coverage >= 90:
-                    color = "brightgreen"
-                elif overall_coverage >= 80:
-                    color = "green" 
-                elif overall_coverage >= 70:
-                    color = "yellowgreen"
-                elif overall_coverage >= 60:
-                    color = "yellow"
-                else:
-                    color = "red"
-                    
-                badge_url = f"https://img.shields.io/badge/coverage-{overall_coverage:.1f}%25-{color}"
-                print(f"\n🏷️ Coverage Badge: {badge_url}")
-                
-                # Generate GitHub Actions summary markdown
-                with open("coverage_summary.md", "w") as f:
-                    f.write(f"# 📊 Coverage Report\n\n")
-                    f.write(f"![Coverage]({badge_url})\n\n")
-                    f.write(f"**Overall Coverage:** {overall_coverage:.1f}% | **Branch Coverage:** {overall_branch:.1f}%\n\n")
-                    f.write(f"## Module Coverage Details\n\n")
-                    f.write(f"| Module | Line Coverage | Branch Coverage | Total Lines | Covered | Missing |\n")
-                    f.write(f"|--------|---------------|-----------------|-------------|---------|----------|\n")
-                    
-                    for module in modules:
-                        emoji = "🟢" if module['line_rate'] >= 90 else "✅" if module['line_rate'] >= 80 else "⚠️" if module['line_rate'] >= 60 else "❌"
-                        f.write(f"| {emoji} **{module['name']}** | {module['line_rate']:.1f}% | {module['branch_rate']:.1f}% | "
-                               f"{module['total_lines']} | {module['covered_lines']} | {module['uncovered_lines']} |\n")
-                    
-                    f.write(f"\n## Summary\n\n")
-                    f.write(f"- 🟢 **High Coverage (≥80%):** {high_coverage} modules\n")
-                    f.write(f"- ⚠️ **Medium Coverage (60-79%):** {medium_coverage} modules\n") 
-                    f.write(f"- ❌ **Low Coverage (<60%):** {low_coverage} modules\n\n")
-                    
-                    if needs_attention:
-                        f.write(f"### 🎯 Modules Needing Attention\n\n")
-                        for module in needs_attention:
-                            f.write(f"- **{module['name']}**: {module['line_rate']:.1f}% ({module['uncovered_lines']} uncovered lines)\n")
-                
-                return {
-                    'overall_coverage': overall_coverage,
-                    'overall_branch': overall_branch,
-                    'modules': modules,
-                    'badge_url': badge_url
-                }
-                
-            except Exception as e:
-                print(f"❌ Error parsing coverage XML: {e}")
-                return None
-        
-        if __name__ == "__main__":
-            xml_file = sys.argv[1] if len(sys.argv) > 1 else "coverage.xml"
-            result = analyze_coverage(xml_file)
-            
-            if result:
-                print(f"\n📄 Detailed report saved to: coverage_summary.md")
-            else:
-                print(f"❌ Failed to generate coverage analysis")
-        EOF
-          
-          # Run the analysis
-          python analyze_coverage.py coverage.xml
-          
-        else
-          echo "⚠️ No coverage.xml file found, skipping detailed analysis"
-        fi
-
-    - name: Run basic functionality tests (fallback)
-      if: always()
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-      run: |
-        echo "🔧 Running fallback functionality tests..."
-        python -c "
-        import sys
-        import traceback
-        
-        def test_basic_functionality():
-            print('🧪 Testing ManipulaPy basic functionality...')
-            
-            try:
-                print('Testing ManipulaPy import...')
-                import ManipulaPy
-                print(f'✅ ManipulaPy {ManipulaPy.__version__} imported successfully')
-                
-                print('Testing core modules...')
-                from ManipulaPy import utils, kinematics, dynamics
-                print('✅ Core modules imported successfully')
-                
-                print('Testing PyTorch integration...')
-                import torch
-                print(f'✅ PyTorch {torch.__version__} available')
-                
-                print('Testing basic utility functions...')
-                import numpy as np
-                
-                # Test utils
-                R = np.eye(3)
-                euler = utils.rotation_matrix_to_euler_angles(R)
-                assert np.allclose(euler, [0, 0, 0]), f'Euler conversion failed: {euler}'
-                print('✅ Euler angle conversion working')
-                
-                # Test skew symmetric
-                v = np.array([1, 2, 3])
-                S = utils.skew_symmetric(v)
-                assert S.shape == (3, 3), f'Skew matrix shape wrong: {S.shape}'
-                assert S[0, 1] == -3, f'Skew matrix value wrong: {S[0, 1]}'
-                print('✅ Skew symmetric matrix working')
-                
-                # Test transform operations
-                T = np.eye(4)
-                T[:3, 3] = [1, 2, 3]
-                T_inv = utils.TransInv(T)
-                result = T @ T_inv
-                assert np.allclose(result, np.eye(4), atol=1e-10), 'Transform inversion failed'
-                print('✅ Transform operations working')
-                
-                # Test basic robot creation
-                from ManipulaPy.kinematics import SerialManipulator
-                
-                M_list = np.eye(4)
-                M_list[:3, 3] = [0, 0, 1]
-                omega_list = np.array([[0, 0, 1], [0, 0, 1], [0, 0, 1]]).T
-                r_list = np.array([[0, 0, 0], [0, 0, 0.33], [0, 0, 0.67]]).T
-                
-                robot = SerialManipulator(M_list, omega_list, r_list)
-                print('✅ SerialManipulator created successfully')
-                
-                # Test forward kinematics
-                joint_angles = np.array([0, 0, 0])
-                T = robot.forward_kinematics(joint_angles)
-                assert T.shape == (4, 4), f'FK result shape wrong: {T.shape}'
-                print('✅ Forward kinematics working')
-                
-                # Test Jacobian
-                joint_angles = np.array([0.1, 0.2, 0.3])
-                J = robot.jacobian(joint_angles)
-                assert J.shape == (6, 3), f'Jacobian shape wrong: {J.shape}'
-                print('✅ Jacobian computation working')
-                
-                # Test PyTorch tensor creation
-                tensor = torch.tensor([1.0, 2.0, 3.0])
-                assert tensor.shape == (3,), f'Tensor shape wrong: {tensor.shape}'
-                result = tensor + 1
-                expected = torch.tensor([2.0, 3.0, 4.0])
-                assert torch.allclose(result, expected), 'Tensor math failed'
-                print('✅ PyTorch tensor operations working')
-                
-                print('🎉 All basic functionality tests passed!')
-                return True
-                
-            except Exception as e:
-                print(f'❌ Test failed: {e}')
-                traceback.print_exc()
-                return False
-        
-        success = test_basic_functionality()
-        if success:
-            print('✅ Fallback tests completed successfully')
-        else:
-            print('❌ Fallback tests failed')
-            # Don't exit with error code here since this is a fallback
-        "
-
-    - name: Check test results and generate summary
-      if: always()
-      run: |
-        echo "📊 Checking test results..."
-        
-        # Check if coverage file was generated
-        if [ -f coverage.xml ]; then
-            echo "✅ Coverage report generated"
-            echo "Coverage file size: $(wc -c < coverage.xml) bytes"
-        else
-            echo "⚠️ No coverage report generated"
-        fi
-        
-        # Check if any tests passed
-        if [ -f htmlcov/index.html ]; then
-            echo "✅ HTML coverage report generated"
-        else
-            echo "⚠️ No HTML coverage report generated"
-        fi
-        
-        # Check if detailed analysis was generated
-        if [ -f coverage_summary.md ]; then
-            echo "✅ Detailed coverage analysis generated"
-        else
-            echo "⚠️ No detailed coverage analysis generated"
-        fi
-        
-        # Generate a simple test summary
-        echo "## Test Results Summary" > test_summary.md
-        echo "- Individual module tests: ✅ Completed" >> test_summary.md
-        echo "- Coverage generation: $([ -f coverage.xml ] && echo '✅ Success' || echo '❌ Failed')" >> test_summary.md
-        echo "- Detailed analysis: $([ -f coverage_summary.md ] && echo '✅ Generated' || echo '❌ Failed')" >> test_summary.md
-        echo "- Basic functionality: ✅ Verified" >> test_summary.md
-        
-        echo "ℹ️ CI completed - check individual step results"
-
-    - name: Upload coverage to Codecov
-      if: matrix.python-version == '3.9' && always()
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-        fail_ci_if_error: false
-
-    - name: Upload test results
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      if: matrix.python-version == '3.9' && always()
-      with:
-        name: test-results-${{ matrix.python-version }}
-        path: |
-          htmlcov/
-          coverage.xml
-          .pytest_cache/
-          test_summary.md
-          coverage_summary.md
-          analyze_coverage.py
-        retention-days: 30
-          
-    - name: Display coverage summary
-      if: matrix.python-version == '3.9' && always()
-      run: |
-        if [ -f coverage_summary.md ]; then
-          echo "## 📊 Detailed Coverage Report" >> $GITHUB_STEP_SUMMARY
-          cat coverage_summary.md >> $GITHUB_STEP_SUMMARY
-        elif [ -f coverage.xml ]; then
-          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
-          python -c "
-        import xml.etree.ElementTree as ET
-        import sys
-        
-        try:
-            tree = ET.parse('coverage.xml')
-            root = tree.getroot()
-            coverage = float(root.attrib['line-rate']) * 100
-            print(f'📊 Overall Coverage: {coverage:.1f}%')
-            
-            print()
-            print('### Module Coverage:')
-            for package in root.findall('.//package'):
-                name = package.attrib['name'].replace('ManipulaPy.', '')
-                if name:  # Skip empty names
-                    rate = float(package.attrib['line-rate']) * 100
-                    emoji = '✅' if rate > 80 else '⚠️' if rate > 60 else '❌'
-                    print(f'{emoji} {name}: {rate:.1f}%')
-        except Exception as e:
-            print(f'Could not parse coverage: {e}')
-            print('Raw coverage.xml first 500 chars:')
-            with open('coverage.xml', 'r') as f:
-                print(f.read()[:500])
-          " >> $GITHUB_STEP_SUMMARY
-        else
-          echo "## Test Status" >> $GITHUB_STEP_SUMMARY
-          echo "⚠️ Tests ran but no coverage data available" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Individual Test Results:" >> $GITHUB_STEP_SUMMARY
-          echo "- Control module: 18 passed, 4 skipped" >> $GITHUB_STEP_SUMMARY
-          echo "- CUDA kernels: 25 passed, 32 skipped" >> $GITHUB_STEP_SUMMARY
-          echo "- Dynamics: 4 passed" >> $GITHUB_STEP_SUMMARY
-          echo "- Kinematics: 28 passed" >> $GITHUB_STEP_SUMMARY
-          echo "- Perception: 20 passed" >> $GITHUB_SUMMARY
-          echo "- Simulation: 35 passed" >> $GITHUB_STEP_SUMMARY
-          echo "- Singularity: 4 passed" >> $GITHUB_STEP_SUMMARY
-          echo "- Trajectory planning: 32 passed, 5 skipped" >> $GITHUB_STEP_SUMMARY
-          echo "- URDF processor: 2 passed, 3 skipped" >> $GITHUB_STEP_SUMMARY
-          echo "- Vision: 29 passed, 1 skipped" >> $GITHUB_STEP_SUMMARY
-        fi
-
-        # -----------------------------
-        #  Per-module table (this is
-        #  what you asked for) 👇
-        # -----------------------------
-        if [ -f .coverage ]; then
-          echo "## 📄 Per-module Coverage" >> $GITHUB_STEP_SUMMARY
-          {
-            echo '```txt'
-            # -m  ==  show missing lines; gives columns:
-            # Name  Stmts  Miss  Branch  BrPart  Cover  Missing
-            coverage report -m
-            echo '```'
-          } >> $GITHUB_STEP_SUMMARY
-        else
-          echo "⚠️ No .coverage file – cannot render per-module table" >> $GITHUB_STEP_SUMMARY
-        fi
-  integration-test:
-    runs-on: ubuntu-latest
-    needs: test
-    if: always()  # Run even if test job has issues
+  cupy-gpu:
+    name: cupy-gpu
+    if: >-
+      vars.GPU_RUNNER_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 45
+    env:
+      NUMBA_DISABLE_CUDA: "0"
+      MANIPULAPY_FORCE_CPU: "0"
     steps:
-    - name: Checkout code
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-    
-    - name: Set up Python 3.9
-      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-      with:
-        python-version: 3.9
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install CuPy backend
+        run: python -m pip install -e ".[dev,cuda]"
+      - name: Assert a live CUDA device
+        run: |
+          python - <<'PY'
+          import cupy as cp
+          assert cp.cuda.runtime.getDeviceCount() > 0
+          value = cp.matmul(cp.eye(2), cp.ones((2, 1)))
+          value.data.mem.device.synchronize()
+          assert isinstance(value, cp.ndarray)
+          print(cp.cuda.runtime.getDeviceProperties(0)["name"])
+          PY
+      - name: Run public API freeze
+        run: python -m pytest tests/test_public_api_freeze.py -q
+      - name: Run CuPy and CUDA contracts without skips
+        run: |
+          python -m pytest tests/test_backend_dispatch.py -k cupy \
+            --junitxml=cupy-backend.xml -q
+          python scripts/assert_junit_no_skips.py cupy-backend.xml
+          python -m pytest tests/test_cuda_kernels.py --junitxml=cupy-gpu.xml -q
+          python scripts/assert_junit_no_skips.py cupy-gpu.xml
 
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libgl1-mesa-dev xvfb
-
-    - name: Install ManipulaPy
-      run: |
-        python -m pip install --upgrade pip==26.0.1
-        pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
-        pip install -e .
-        pip install numpy==2.0.2 scipy==1.13.1 matplotlib==3.9.4
-
-    - name: Run integration tests
-      env:
-        DISPLAY: ":99"
-        QT_QPA_PLATFORM: "offscreen"
-        MPLBACKEND: "Agg"
-      run: |
-        # Start virtual display
-        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-        sleep 3
-        
-        # Test end-to-end functionality
-        python -c "
-        import numpy as np
-        import torch
-        from ManipulaPy.kinematics import SerialManipulator
-        from ManipulaPy import utils
-        
-        print('🔄 Running integration tests...')
-        
-        # Test PyTorch integration
-        tensor = torch.tensor([1.0, 2.0, 3.0])
-        assert tensor.shape == (3,)
-        print('✅ PyTorch integration test passed')
-        
-        # Create a simple robot configuration
-        M_list = np.eye(4)
-        M_list[:3, 3] = [0, 0, 1.0]
-        
-        omega_list = np.array([[0, 0, 1], [0, 1, 0], [0, 0, 1], [0, 1, 0], [0, 0, 1], [0, 1, 0]]).T
-        r_list = np.array([[0, 0, 0], [0, 0, 0.1], [0, 0, 0.2], [0, 0, 0.3], [0, 0, 0.4], [0, 0, 0.5]]).T
-        
-        S_list = utils.extract_screw_list(omega_list, r_list)
-        B_list = S_list.copy()
-        
-        # Create robot
-        robot = SerialManipulator(M_list, omega_list, r_list, S_list=S_list, B_list=B_list)
-        
-        # Test forward kinematics
-        joint_angles = np.array([0.1, 0.2, -0.3, 0.1, 0.2, 0.1])
-        T = robot.forward_kinematics(joint_angles)
-        
-        print(f'✅ Forward kinematics result shape: {T.shape}')
-        assert T.shape == (4, 4), f'Expected (4,4), got {T.shape}'
-        
-        # Test Jacobian
-        J = robot.jacobian(joint_angles)
-        print(f'✅ Jacobian shape: {J.shape}')
-        assert J.shape == (6, 6), f'Expected (6,6), got {J.shape}'
-        
-        print('✅ Integration tests passed!')
-        "
-
-  lint:
-    runs-on: ubuntu-latest
+  torch-cuda:
+    name: torch-cuda
+    if: >-
+      vars.GPU_RUNNER_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 45
+    env:
+      NUMBA_DISABLE_CUDA: "0"
+      MANIPULAPY_FORCE_CPU: "0"
     steps:
-    - name: Checkout code
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-    
-    - name: Set up Python 3.9
-      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-      with:
-        python-version: 3.9
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install Torch backend
+        run: python -m pip install -e ".[dev,pytorch]"
+      - name: Assert Torch core math on a live CUDA device
+        run: |
+          python - <<'PY'
+          import numpy as np
+          import torch
+          from ManipulaPy.backend import register, set_backend
+          from ManipulaPy.backend.torch_backend import TorchBackend
+          from ManipulaPy.kinematics import SerialManipulator
 
-    - name: Install linting tools
-      run: |
-        python -m pip install --upgrade pip==26.0.1
-        pip install flake8==7.3.0 black==25.11.0 isort==6.1.0
+          assert torch.cuda.is_available()
+          cuda_backend = TorchBackend(device="cuda")
+          register("torch-cuda", cuda_backend)
+          set_backend("torch-cuda")
+          screws = np.array([
+              [0., 0., 1., 0., 0., 0.],
+              [0., 1., 0., -.3, 0., .2],
+          ]).T
+          robot = SerialManipulator(
+              np.eye(4), screws[:3], S_list=screws, B_list=screws.copy()
+          )
+          fk = robot.forward_kinematics([.2, -.3])
+          jacobian = robot.jacobian([.2, -.3])
+          torch.cuda.synchronize()
+          assert fk.device.type == jacobian.device.type == "cuda"
+          assert torch.isfinite(fk).all() and torch.isfinite(jacobian).all()
+          print(torch.cuda.get_device_name(0))
+          PY
+      - name: Run public API freeze
+        run: python -m pytest tests/test_public_api_freeze.py -q
+      - name: Run Torch and gradient contracts without skips
+        run: |
+          python -m pytest tests/test_torch_call_sites.py tests/test_gradient_contract.py \
+            -k torch --junitxml=torch-cuda.xml -q
+          python scripts/assert_junit_no_skips.py torch-cuda.xml
 
-    - name: Check code formatting with black
-      continue-on-error: true
-      run: |
-        black --check --diff ManipulaPy/ || echo "⚠️ Code formatting issues found"
-
-    - name: Check import sorting with isort
-      continue-on-error: true
-      run: |
-        isort --check-only --diff ManipulaPy/ || echo "⚠️ Import sorting issues found"
-
-    - name: Lint with flake8
-      continue-on-error: true
-      run: |
-        # Critical errors only
-        flake8 ManipulaPy/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        # Style issues (non-blocking)
-        flake8 ManipulaPy/ --count --exit-zero --max-complexity=15 --max-line-length=120 --statistics
+  jax-cuda:
+    name: jax-cuda
+    if: >-
+      vars.GPU_RUNNER_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 45
+    env:
+      JAX_PLATFORMS: cuda
+      JAX_ENABLE_X64: "1"
+      NUMBA_DISABLE_CUDA: "0"
+      MANIPULAPY_FORCE_CPU: "0"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install JAX CUDA backend
+        run: python -m pip install -e ".[dev,jax-cuda]"
+      - name: Assert JAX core math on a live CUDA device
+        run: |
+          python - <<'PY'
+          import jax
+          import jax.numpy as jnp
+          devices = jax.devices()
+          assert devices and all(device.platform == "gpu" for device in devices)
+          result = jax.jit(lambda x: x @ x)(jnp.eye(3, dtype=jnp.float64))
+          result.block_until_ready()
+          assert result.device.platform == "gpu"
+          print(devices)
+          PY
+      - name: Run public API freeze
+        run: python -m pytest tests/test_public_api_freeze.py -q
+      - name: Run JAX and gradient contracts without skips
+        run: |
+          python -m pytest tests/test_jax_call_sites.py tests/test_gradient_contract.py \
+            -k jax --junitxml=jax-cuda.xml -q
+          python scripts/assert_junit_no_skips.py jax-cuda.xml
 
   build-check:
+    name: build-check
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-    
-    - name: Set up Python 3.9
-      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-      with:
-        python-version: 3.9
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.9"
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip==26.0.1 build==1.4.4 wheel==0.47.0
+          pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
+      - name: Build and inspect package
+        run: |
+          python -m build
+          python scripts/check_sdist_tracked.py dist/*.tar.gz
+          python -m pip install dist/*.whl
+          python -c "import ManipulaPy; print(ManipulaPy.__version__)"
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist-packages
+          path: dist/
+          retention-days: 7
 
-    - name: Install build tools
-      run: |
-        python -m pip install --upgrade pip==26.0.1 build==1.4.4 wheel==0.47.0
-
-    - name: Install PyTorch for build test
-      run: |
-        pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
-
-    - name: Build package
-      run: |
-        python -m build
-
-    # The sdist is built from the working tree, not from git, so an untracked
-    # file matching a MANIFEST.in include is silently packaged. Catch that on
-    # every PR rather than at publish time.
-    - name: Assert the sdist contains only tracked files
-      run: python scripts/check_sdist_tracked.py dist/*.tar.gz
-
-    - name: Check distribution
-      run: |
-        ls -la dist/
-        python -m pip install dist/*.whl
-        python -c "import ManipulaPy; print(f'✅ Installed ManipulaPy {ManipulaPy.__version__}')"
-        python -c "from ManipulaPy import kinematics; print('✅ Kinematics module with PyTorch working')"
-        
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-      with:
-        name: dist-packages
-        path: dist/
-        retention-days: 7
+  gpu-axes-passed:
+    name: gpu-axes-passed
+    needs: [cupy-gpu, torch-cuda, jax-cuda]
+    if: >-
+      always() && vars.GPU_RUNNER_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every live CUDA axis
+        env:
+          CUPY_RESULT: ${{ needs.cupy-gpu.result }}
+          TORCH_RESULT: ${{ needs.torch-cuda.result }}
+          JAX_RESULT: ${{ needs.jax-cuda.result }}
+        run: |
+          test "$CUPY_RESULT" = success
+          test "$TORCH_RESULT" = success
+          test "$JAX_RESULT" = success
+          echo "All live GPU axes passed for ${GITHUB_SHA}"

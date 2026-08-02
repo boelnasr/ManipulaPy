@@ -290,6 +290,7 @@ markers = [
     "benchmark: marks tests as benchmarks",
     "parametrize: marks parametrized tests",
     "functional: marks functional tests",
+    "tpu: marks fail-closed tests requiring a real Google Cloud TPU",
 ]
 
 filterwarnings = [

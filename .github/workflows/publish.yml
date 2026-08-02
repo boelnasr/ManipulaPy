@@ -44,9 +44,16 @@ jobs:
           name: dist
           path: dist/
 
+  tpu-contract:
+    name: TPU and GPU release gates
+    uses: ./.github/workflows/tpu-release.yml
+    permissions:
+      contents: read
+      id-token: write
+
   publish:
     name: Publish to PyPI
-    needs: build
+    needs: [build, tpu-contract]
     runs-on: ubuntu-latest
     environment:
       name: pypi

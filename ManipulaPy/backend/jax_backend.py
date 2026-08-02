@@ -154,9 +154,7 @@ class JaxBackend(ArrayBackend):
         Complex values bake into a trace and are never differentiated anywhere
         in ManipulaPy, so nothing is lost by leaving the accelerator here.
         """
-        host = [
-            np.asarray(op) if hasattr(op, "dtype") else op for op in operands
-        ]
+        host = [np.asarray(op) if hasattr(op, "dtype") else op for op in operands]
         return self.asarray(np_func(*host, **kwargs))
 
     def _promote_float(self, x: Any) -> Any:
@@ -171,10 +169,37 @@ class JaxBackend(ArrayBackend):
         return x if jnp.issubdtype(x.dtype, jnp.inexact) else x.astype(jnp.float64)
 
     # -- construction ---------------------------------------------------
+    @staticmethod
+    def _reject_tpu_complex(obj: Any, dtype: Optional[Any] = None) -> None:
+        """Reject complex values before JAX transfers them to a TPU.
+
+        Complex device transfer is not part of the v1.4 TPU contract and has
+        hung on TPU runtimes instead of returning a useful unsupported-dtype
+        error.  CPU and GPU behavior is deliberately unchanged; only a live
+        TPU backend applies this fail-fast boundary.
+        """
+        if jax.default_backend() != "tpu":
+            return
+        obj_dtype = getattr(obj, "dtype", None)
+        source_dtype = (
+            np.dtype(obj_dtype) if obj_dtype is not None else np.asarray(obj).dtype
+        )
+        requested_dtype = np.dtype(dtype) if dtype is not None else None
+        if np.issubdtype(source_dtype, np.complexfloating) or (
+            requested_dtype is not None
+            and np.issubdtype(requested_dtype, np.complexfloating)
+        ):
+            raise TypeError(
+                "complex inputs are not supported by the ManipulaPy JAX "
+                "backend on TPU; use real float32, float64, or int64 inputs"
+            )
+
     def array(self, obj: Any, dtype: Optional[Any] = None) -> Any:
+        self._reject_tpu_complex(obj, dtype)
         return jnp.array(self._native_byteorder(obj), dtype=dtype)
 
     def asarray(self, obj: Any, dtype: Optional[Any] = None) -> Any:
+        self._reject_tpu_complex(obj, dtype)
         return jnp.asarray(self._native_byteorder(obj), dtype=dtype)
 
     def zeros(self, shape: Any, dtype: Optional[Any] = None) -> Any:
@@ -304,7 +329,7 @@ class JaxBackend(ArrayBackend):
         return jnp.cross(*self._promote(a, b))
 
     def matmul(self, a: Any, b: Any) -> Any:
-        return jnp.matmul(*self._promote(a, b))
+        return jnp.matmul(*self._promote(a, b), precision=jax.lax.Precision.HIGHEST)
 
     # -- reductions -----------------------------------------------------
     def sum(self, x: Any, axis: Optional[Any] = None) -> Any:
