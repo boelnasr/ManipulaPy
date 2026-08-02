@@ -221,3 +221,9 @@ Examples/**/*_demo_report.txt
 
 # nbsphinx: notebooks copied into the docs tree at build time
 docs/source/tutorials/notebooks/
+
+# Local environment snapshots and generated reports — these sit next to the
+# package but are not part of it. Untracked-and-unignored files are the ones
+# that get swept into a careless `git add -A`.
+.venv.requirements.txt
+journey-into-*.md
