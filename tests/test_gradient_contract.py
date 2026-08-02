@@ -38,6 +38,22 @@ _HAS_TORCH = _real_torch_available()
 requires_torch = pytest.mark.skipif(not _HAS_TORCH, reason="PyTorch is not installed")
 
 
+def _torch_or_skip():
+    """Return the real PyTorch module, or skip the calling test.
+
+    ``pytest.importorskip("torch")`` cannot be used for this. The conftest
+    stand-in described in ``_real_torch_available`` makes the import *succeed*
+    on a base install, so the test would proceed against the mock and fail
+    with an unrelated ``TypeError`` deep inside the prototype instead of
+    skipping.
+    """
+    if not _HAS_TORCH:
+        pytest.skip("PyTorch is not installed")
+    import torch
+
+    return torch
+
+
 SCREWS = np.array(
     [
         [0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
@@ -175,7 +191,7 @@ def _torch_functions(torch):
 @pytest.mark.parametrize("configuration", CONFIGURATIONS)
 def test_torch_fk_full_jacobian_matches_finite_difference(configuration):
     """Torch feasibility prototype matches the full finite-difference FK Jacobian."""
-    torch = pytest.importorskip("torch", exc_type=ImportError)
+    torch = _torch_or_skip()
     dtype, fk, _, _, _ = _torch_functions(torch)
     q = torch.tensor(configuration, dtype=dtype, requires_grad=True)
 
@@ -192,7 +208,7 @@ def test_torch_fk_full_jacobian_matches_finite_difference(configuration):
 @pytest.mark.parametrize("axis, angle", LOG_CASES)
 def test_torch_log_singular_endpoints_have_forward_parity(axis, angle):
     """Torch feasibility keeps exact log endpoints forward-only by contract."""
-    torch = pytest.importorskip("torch", exc_type=ImportError)
+    torch = _torch_or_skip()
     dtype, _, rotation, rotation_log, skew = _torch_functions(torch)
     axis_tensor = torch.tensor(axis, dtype=dtype)
     angle_tensor = torch.tensor(angle, dtype=dtype)
@@ -207,7 +223,7 @@ def test_torch_log_singular_endpoints_have_forward_parity(axis, angle):
 @pytest.mark.parametrize("axis, angle", SMOOTH_LOG_CASES)
 def test_torch_log_gradient_matches_finite_difference_in_smooth_interior(axis, angle):
     """Torch log gradients agree away from the identity and half-turn singularities."""
-    torch = pytest.importorskip("torch", exc_type=ImportError)
+    torch = _torch_or_skip()
     dtype, _, rotation, rotation_log, _ = _torch_functions(torch)
     axis_tensor = torch.tensor(axis, dtype=dtype)
     theta = torch.tensor(angle, dtype=dtype, requires_grad=True)
@@ -738,7 +754,7 @@ def test_se3_log_translation_matches_scipy_with_fixed_translation(
     """
     scipy_linalg = pytest.importorskip("scipy.linalg")
     if backend_name == "torch":
-        pytest.importorskip("torch", exc_type=ImportError)
+        _torch_or_skip()
     if backend_name == "jax":
         jax = pytest.importorskip("jax", exc_type=ImportError)
         jax.config.update("jax_enable_x64", True)
@@ -778,7 +794,7 @@ def test_se3_log_is_exact_near_pi_with_fixed_translation(backend_name, api, gap)
     """
     scipy_linalg = pytest.importorskip("scipy.linalg")
     if backend_name == "torch":
-        pytest.importorskip("torch", exc_type=ImportError)
+        _torch_or_skip()
     if backend_name == "jax":
         jax = pytest.importorskip("jax", exc_type=ImportError)
         jax.config.update("jax_enable_x64", True)
@@ -830,7 +846,7 @@ def test_matrix_log6_round_trip_is_exact_at_small_angles(backend_name, theta_val
     its angular part zeroed on NumPy, Torch and JAX alike.
     """
     if backend_name == "torch":
-        pytest.importorskip("torch", exc_type=ImportError)
+        _torch_or_skip()
     if backend_name == "jax":
         jax = pytest.importorskip("jax", exc_type=ImportError)
         jax.config.update("jax_enable_x64", True)
@@ -1201,7 +1217,7 @@ class TestJaxProductionGradientContract:
         backends run the identical dispatch, so they must agree to round-off.
         """
         jax, jnp = _requires_jax()
-        torch = pytest.importorskip("torch", exc_type=ImportError)
+        torch = _torch_or_skip()
 
 
         with use_backend("jax"):
