@@ -190,6 +190,10 @@ html_title = f"{project} {release} Documentation"
 html_short_title = f"{project} Docs"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
+# anime.js is vendored rather than loaded from a CDN so the docs pull in no
+# third-party script at read time and build identically offline. Order matters:
+# motion.js reads the global the bundle defines.
+html_js_files = ["anime.umd.min.js", "motion.js"]
 html_baseurl = "https://manipulapy.readthedocs.io/en/latest/"
 
 # Better HTML output options
