@@ -4,6 +4,13 @@ Control Module User Guide
 
 The ManipulaPy Control Module provides comprehensive control algorithms for robotic manipulators with GPU acceleration using CuPy. This guide covers all available control methods, their parameters, and usage examples.
 
+.. note::
+   **New in v1.4:** the control laws and metrics dispatch through the compute
+   backend, so they run on NumPy, CuPy, PyTorch or JAX. They carry **no
+   gradient guarantee** — the differentiable contract covers
+   ``utils``/``kinematics``/``dynamics``/``singularity`` only. See the
+   :doc:`Compute Backends guide <Backends>`.
+
 .. contents:: Table of Contents
    :depth: 3
    :local:

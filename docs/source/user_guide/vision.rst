@@ -5,6 +5,12 @@ Vision User Guide
 
 This comprehensive guide covers the Vision module in ManipulaPy, which provides advanced computer vision capabilities for robotic perception, including stereo vision, object detection, and PyBullet integration.
 
+.. note::
+   **New in v1.4:** the vision pipeline is **outside** array-backend dispatch —
+   it keeps its own PyTorch/YOLO stack and was deliberately left unmigrated.
+   Selecting a backend does not change how vision executes. See the
+   :doc:`Compute Backends guide <Backends>`.
+
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2

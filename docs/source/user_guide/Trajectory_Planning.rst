@@ -3,6 +3,18 @@ Trajectory Planning User Guide
 
 This guide covers the trajectory planning capabilities in ManipulaPy, including joint-space and Cartesian-space trajectory generation, dynamics integration, and collision avoidance using CUDA acceleration.
 
+.. note::
+   **New in v1.4:** the CPU trajectory, inverse- and forward-dynamics paths
+   dispatch through the compute backend, so they run on NumPy, CuPy, PyTorch or
+   JAX. They carry **no gradient guarantee**: the CUDA kernels below are Numba
+   kernels that take device pointers rather than backend arrays, and the
+   collision stage converts at a host boundary. Gradients are guaranteed only
+   for ``utils``/``kinematics``/``dynamics``/``singularity`` — see the
+   :doc:`Compute Backends guide <Backends>`.
+
+   Note also that this module's ``ManipulatorDynamics`` calls *are* autodiff-safe;
+   it is the kernel and collision stages that break the chain.
+
 Introduction
 ----------------
 

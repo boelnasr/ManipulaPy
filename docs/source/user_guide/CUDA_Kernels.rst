@@ -3,6 +3,14 @@ CUDA Kernels User Guide
 
 This guide covers the **CUDA acceleration** features in ManipulaPy, which provide GPU-accelerated functions for high-performance robotic computations including trajectory planning, dynamics computation, and potential field calculations.
 
+.. note::
+   **New in v1.4:** these Numba CUDA kernels sit **outside** array-backend
+   dispatch. They take device pointers rather than backend arrays, so they run
+   unchanged whichever backend is active, and they are not part of the
+   differentiable contract. Selecting the ``cupy`` backend changes where the
+   core kinematics and dynamics math runs, not which kernel is launched. See
+   the :doc:`Compute Backends guide <Backends>`.
+
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2

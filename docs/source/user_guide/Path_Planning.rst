@@ -3,6 +3,12 @@ Optimized Path Planning User Guide
 
 This guide covers the highly optimized trajectory planning capabilities in ManipulaPy, including adaptive GPU/CPU execution, memory pooling, batch processing, and advanced performance optimizations for robotic manipulators.
 
+.. note::
+   **New in v1.4:** the array math here dispatches through the compute backend
+   and runs on NumPy, CuPy, PyTorch or JAX, but carries **no gradient
+   guarantee** — the Numba CUDA kernels and the collision stage are host-bound.
+   See the :doc:`Compute Backends guide <Backends>`.
+
 Introduction
 --------------
 

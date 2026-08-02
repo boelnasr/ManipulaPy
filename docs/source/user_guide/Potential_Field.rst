@@ -7,6 +7,14 @@ This comprehensive guide covers the potential field path-planning tools in Manip
    This guide is written for Python 3.10.12 users and includes version-specific examples 
    and performance tips.
 
+.. note::
+   **New in v1.4:** the field computations dispatch through the compute backend
+   and run on NumPy, CuPy, PyTorch or JAX. They carry **no gradient
+   guarantee**: obstacle handling uses SciPy's ``ConvexHull``, which is
+   host-only, so the backend arrays are converted at that boundary. The
+   *analytic* field gradient documented below is unrelated to autodiff — it is
+   computed in closed form. See the :doc:`Compute Backends guide <Backends>`.
+
 Introduction to Potential Fields
 --------------------------------------
 

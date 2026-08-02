@@ -7,6 +7,12 @@ This guide covers the :class:`ManipulaPy.potential_field.CollisionChecker` class
 which performs geometry-based **self-collision detection** for serial manipulators
 using URDF meshes.
 
+.. note::
+   **New in v1.4:** collision checking runs under every backend, but through
+   **host-boundary conversion** — SciPy's ``ConvexHull`` is host-only. There is
+   **no gradient guarantee** through this module. See the
+   :doc:`Compute Backends guide <Backends>`.
+
 .. contents:: **Quick navigation**
    :local:
    :depth: 2

@@ -10,6 +10,12 @@ computations through CuPy integration.
    This guide assumes Python 3.10+, PyBullet 3.2.5+, CuPy 12.0+, and Matplotlib 3.5+.
    For optimal performance, CUDA-capable GPU is recommended but not required.
 
+.. note::
+   **New in v1.4:** simulation runs under every backend, but PyBullet is an
+   external physics engine that only accepts host arrays, so values are
+   converted at that boundary. There is **no gradient guarantee** through
+   simulation. See the :doc:`Compute Backends guide <Backends>`.
+
 .. contents:: Table of Contents
    :depth: 3
    :local:
