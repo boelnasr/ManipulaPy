@@ -16,7 +16,7 @@ Welcome to the comprehensive ManipulaPy User Guide! This section provides detail
          
          <div class="learning-stats">
             <div class="stat">
-               <span class="stat-number">13</span>
+               <span class="stat-number">14</span>
                <span class="stat-label">Comprehensive Guides</span>
             </div>
             <div class="stat">
@@ -70,6 +70,7 @@ Welcome to the comprehensive ManipulaPy User Guide! This section provides detail
    :maxdepth: 2
    :caption: Advanced Topics
 
+   Backends
    CUDA_Kernels
 
 🗺️ Learning Pathways
@@ -388,6 +389,17 @@ Cutting-edge techniques for performance and analysis:
          <div class="guide-features">
             <span class="feature-tag">📊 Workspace Mapping</span>
             <span class="feature-tag">🎯 Monte Carlo</span>
+         </div>
+      </div>
+
+      <div class="guide-card advanced">
+         <div class="guide-icon">🔀</div>
+         <h4><a href="Backends.html">Compute Backends</a></h4>
+         <p><strong>Difficulty:</strong> Intermediate</p>
+         <p>Run the same kinematics and dynamics on NumPy, CuPy, PyTorch, or JAX — with autodiff gradients on the core math.</p>
+         <div class="guide-features">
+            <span class="feature-tag">🧮 Differentiable</span>
+            <span class="feature-tag">🔁 One API</span>
          </div>
       </div>
 

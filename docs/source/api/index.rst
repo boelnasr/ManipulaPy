@@ -32,6 +32,7 @@ This section contains auto-generated documentation for all key modules, classes,
    trac_ik
    ik_helpers
    utils
+   backend
    urdf
    urdf_processor
 
@@ -72,7 +73,7 @@ This section contains auto-generated documentation for all key modules, classes,
 
 - **Class attributes** and properties are listed, with docstrings if provided  
 
-- **NumPy/CuPy compatibility** is noted where applicable  
+- **Backend compatibility** (NumPy / CuPy / PyTorch / JAX) is noted where applicable — see :doc:`backend`
 
 - **Examples** may be included for select methods/classes
 

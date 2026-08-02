@@ -1,5 +1,5 @@
-Dynamics User Guide
-===================
+Dynamics Tutorial: Worked Examples
+==================================
 
 This comprehensive guide covers robot dynamics computations in ManipulaPy, compatible with Python 3.9 through 3.12.
 

@@ -1,5 +1,5 @@
-URDF Processor User Guide
-=========================
+URDF Processor Tutorial: Worked Examples
+========================================
 
 This guide covers URDF (Unified Robot Description Format) loading in ManipulaPy.
 As of v1.3.2 the recommended entry point is the **native URDF parser** under

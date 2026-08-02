@@ -1,5 +1,5 @@
-Kinematics User Guide
-=====================
+Kinematics Tutorial: Worked Examples
+====================================
 
 This chapter walks you through **everyday kinematics workflows** in ManipulaPy:
 from building a *SerialManipulator* object, to computing forward & inverse

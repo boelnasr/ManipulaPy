@@ -4,7 +4,7 @@
 Installation Guide
 ==================
 
-ManipulaPy 1.3.2 ships with a **lightweight default install** and a set
+ManipulaPy 1.4.0 ships with a **lightweight default install** and a set
 of **optional extras** that pull in heavy or platform-specific
 dependencies on demand. Most workflows only need one or two extras.
 
@@ -82,8 +82,18 @@ Optional extras
    * - ``[gpu-pycuda]``
      - PyCUDA backend (alternative to CuPy)
      - ``pip install "ManipulaPy[gpu-pycuda]"``
+   * - ``[pytorch]``
+     - PyTorch compute backend (autodiff on the core math)
+     - ``pip install "ManipulaPy[pytorch]"``
+   * - ``[jax-cpu]``
+     - JAX compute backend, CPU build (autodiff on the core math)
+     - ``pip install "ManipulaPy[jax-cpu]"``
+   * - ``[jax-cuda]``
+     - JAX compute backend, CUDA 12 build (Linux only)
+     - ``pip install "ManipulaPy[jax-cuda]"``
    * - ``[all]``
-     - Every runtime extra above (CPU + simulation + vision + ml + cuda)
+     - Every runtime extra above (CPU + simulation + vision + ml + cuda
+       + pytorch + jax-cpu)
      - ``pip install "ManipulaPy[all]"``
    * - ``[minimal]``
      - Backwards-compatible pre-1.3.2 set (core + PyBullet)
@@ -131,6 +141,35 @@ was validated against on driver 580. For older CUDA 11.x toolchains
 
 If GPU acceleration is unavailable, ManipulaPy automatically falls
 back to NumPy/Numba CPU paths -- no code changes needed.
+
+Compute backend extras
+======================
+
+.. versionadded:: 1.4.0
+
+The core math dispatches through a single backend protocol, so these
+extras select an *array library* rather than adding features. NumPy is
+the default and the base install stays NumPy-only -- nothing is
+imported until a backend is explicitly requested.
+
+.. code-block:: bash
+
+   pip install ManipulaPy                # NumPy only (default)
+   pip install "ManipulaPy[pytorch]"     # + PyTorch >= 2.7.1
+   pip install "ManipulaPy[jax-cpu]"     # + JAX >= 0.6 (CPU)
+   pip install "ManipulaPy[jax-cuda]"    # + JAX >= 0.6 (CUDA 12, Linux only)
+   pip install "ManipulaPy[cuda]"        # + CuPy 13.x (CUDA 12)
+
+.. note::
+
+   There is no ``jax-tpu`` extra. ``jax[tpu]`` only installs on a TPU VM
+   and the backend contract suite has not been demonstrated on TPU
+   hardware.
+
+The PyTorch and JAX backends make ``utils``, ``kinematics``, ``dynamics``
+and ``singularity`` differentiable; the remaining modules run under every
+backend through host-boundary conversion and carry no gradient
+guarantee. See :doc:`user_guide/Backends` for the full contract.
 
 Apple Silicon (M1 / M2 / M3)
 ============================
@@ -203,4 +242,5 @@ See also
 ========
 
 - :doc:`getting_started/index` -- quick-start tutorial.
+- :doc:`user_guide/Backends` -- choosing and using a compute backend.
 - :doc:`api/index` -- full API reference.

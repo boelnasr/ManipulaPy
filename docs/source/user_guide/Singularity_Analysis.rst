@@ -10,6 +10,14 @@ and workspace optimization.
    This guide assumes familiarity with robotics fundamentals, linear algebra, and 
    Python 3.10+ with NumPy, SciPy, Matplotlib, and optionally CUDA/Numba for acceleration.
 
+.. note::
+   **New in v1.4:** the singularity analysis math dispatches through the
+   compute backend and is autodiff-safe under PyTorch and JAX, so measures such
+   as the condition number can be differentiated with respect to the joint
+   configuration. Monte-Carlo workspace sampling is the exception: it uses
+   Numba CUDA kernels and SciPy's ``ConvexHull`` on the host, outside backend
+   dispatch. See the :doc:`Compute Backends guide <Backends>`.
+
 .. contents:: Table of Contents
    :depth: 2
    :local:

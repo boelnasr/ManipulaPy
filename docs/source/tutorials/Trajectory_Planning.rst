@@ -1,5 +1,5 @@
-Trajectory Planning User Guide
-==============================
+Trajectory Planning Tutorial: Worked Examples
+=============================================
 
 This guide covers the trajectory planning capabilities in ManipulaPy, including joint-space and Cartesian-space trajectory generation, dynamics integration, and collision avoidance using CUDA acceleration.
 

@@ -3,6 +3,14 @@ Kinematics User Guide
 
 This guide covers the **SerialManipulator** class in ManipulaPy, which provides forward kinematics, inverse kinematics, and Jacobian computations for serial robot manipulators using modern screw theory.
 
+.. note::
+   **New in v1.4:** this module dispatches through the compute backend, so the
+   examples below run unchanged on NumPy, CuPy, PyTorch, or JAX — and the
+   kinematics math is autodiff-safe under PyTorch and JAX
+   (``jax.jacrev(robot.forward_kinematics)`` works). The SLSQP-based
+   ``TracIKSolver`` is host-bound and is *not* differentiable. See the
+   :doc:`Compute Backends guide <Backends>`.
+
 .. contents:: **Quick Navigation**
    :local:
    :depth: 2

@@ -77,8 +77,17 @@ If you want to contribute or modify the library:
      - ``[urdf]`` — trimesh-based URDF mesh loading
      - ``[vision]`` — OpenCV, Ultralytics/YOLO, PyTorch
      - ``[ml]`` — PyTorch + scikit-learn for learning-based components
-     - ``[cuda]`` — CuPy (CUDA 11.x) for GPU acceleration
-     - ``[all]`` — everything above
+     - ``[cuda]`` — CuPy (CUDA 12.x) for GPU acceleration
+     - ``[pytorch]`` — PyTorch compute backend (new in v1.4)
+     - ``[jax-cpu]`` / ``[jax-cuda]`` — JAX compute backend (new in v1.4)
+     - ``[all]`` — everything above except ``[jax-cuda]``
+
+.. tip::
+   The ``[pytorch]`` and ``[jax-cpu]`` / ``[jax-cuda]`` extras select an
+   alternative *array library* rather than adding features: the same
+   kinematics and dynamics code then runs on PyTorch or JAX, with autodiff
+   gradients on the core math. NumPy remains the default. See the
+   :doc:`Compute Backends guide <../user_guide/Backends>`.
 
 Verify Your Installation
 ~~~~~~~~~~~~~~~~~~~~~~~~

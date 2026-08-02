@@ -10,8 +10,8 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
    <div class="hero-section">
       <div class="hero-content">
          <h2>🤖 Modern Robotics Made Simple</h2>
-         <p>ManipulaPy brings cutting-edge robotics algorithms to your fingertips with GPU acceleration, 
-            computer vision integration, and a clean Python API.</p>
+         <p>ManipulaPy brings cutting-edge robotics algorithms to your fingertips with GPU acceleration,
+            computer vision integration, differentiable compute backends, and a clean Python API.</p>
          
          <!-- Project Badges -->
          <div class="project-badges">
@@ -53,6 +53,11 @@ A modern, GPU-accelerated Python toolbox for **robot kinematics, dynamics, traje
                <span class="feature-icon">🎮</span>
                <strong>Real-time Control</strong><br>
                PyBullet simulation and advanced controllers
+            </div>
+            <div class="feature">
+               <span class="feature-icon">🔀</span>
+               <strong>Differentiable Backends</strong><br>
+               <a href="user_guide/Backends.html">NumPy, CuPy, PyTorch or JAX</a> behind one API
             </div>
 
          </div>
@@ -269,6 +274,29 @@ If you're in a hurry, install the package into a fresh virtual-env and try the e
    print(f"👁️  Detected {len(obstacle_points)} obstacle points")
    print(f"🔍 Found {num_clusters} distinct object clusters")
 
+**7. Differentiable Kinematics on a Different Backend**
+
+.. code-block:: python
+
+   import jax
+   from ManipulaPy.backend import use_backend
+
+   # Same robot, same call — JAX arrays instead of NumPy, restored on exit
+   with use_backend("jax"):
+       T = robot.forward_kinematics(joint_angles)
+
+       # Gradients come from the framework, not finite differences
+       dT = jax.jacrev(robot.forward_kinematics)(joint_angles)
+
+   print(f"🧮 d(pose)/d(theta) shape: {dT.shape}")
+
+.. note::
+   Backends are opt-in (``pip install "manipulapy[jax-cpu]"`` or
+   ``[pytorch]``); NumPy remains the default. Gradients are guaranteed for the
+   **core math only** — ``utils``, ``kinematics``, ``dynamics``, and
+   ``singularity``. See the :doc:`Compute Backends guide <user_guide/Backends>`
+   for the full contract.
+
 .. raw:: html
 
    <div class="getting-started-tips">
@@ -330,6 +358,15 @@ Key Features at a Glance
             <li><strong>Real-time:</strong> Sub-millisecond kinematics</li>
          </ul>
       </div>
+      <div class="feature-category">
+         <h4>🔀 Compute Backends <em>(new in 1.4)</em></h4>
+         <ul>
+            <li><strong>One API:</strong> NumPy, CuPy, PyTorch, or JAX behind a single dispatch layer</li>
+            <li><strong>Autodiff:</strong> gradients through kinematics, dynamics, singularity and utils</li>
+            <li><strong>Scoped Selection:</strong> <code>set_backend()</code> or a <code>use_backend()</code> block</li>
+            <li><strong>Opt-in:</strong> NumPy stays the default; nothing is imported until requested</li>
+         </ul>
+      </div>
    </div>
 
 Documentation Map
@@ -389,7 +426,7 @@ Popular Learning Paths
          <ol>
             <li><a href="user_guide/CUDA_Kernels.html">⚡ CUDA Setup</a></li>
             <li><a href="user_guide/Trajectory_Planning.html">🚀 GPU Acceleration</a></li>
-            <li><a href="user_guide/index.html">📊 Performance Profiling</a></li>
+            <li><a href="user_guide/Backends.html">🔀 Compute Backends</a></li>
             <li><a href="user_guide/index.html">🔧 Optimization Tips</a></li>
          </ol>
       </div>
@@ -410,7 +447,18 @@ What's New
 .. raw:: html
 
    <div class="whats-new">
-      <h4>🎉 Latest in v1.3.2</h4>
+      <h4>🎉 Latest in v1.4.0</h4>
+      <ul>
+         <li><strong>New:</strong> Unified compute backend system — the same kinematics, dynamics, planning and control code runs on <strong>NumPy, CuPy, PyTorch or JAX</strong> behind one dispatch API (<code>ManipulaPy.backend</code>: <code>set_backend</code>, <code>use_backend</code>, <code>get_backend</code>)</li>
+         <li><strong>New:</strong> Differentiable contract for <code>utils</code>, <code>kinematics</code>, <code>dynamics</code> and <code>singularity</code> — <code>jax.grad</code>/<code>jacrev</code>, <code>jit</code>, and <code>torch.autograd</code> are safe on the core math. Every other module runs on all four backends through host-boundary conversion, with no gradient guarantee</li>
+         <li><strong>New:</strong> Optional extras <code>[pytorch]</code>, <code>[jax-cpu]</code>, <code>[jax-cuda]</code> — NumPy remains the default and nothing extra is imported until a backend is requested</li>
+         <li><strong>Fixed:</strong> SE(3)/SO(3) logarithm conditioning — <code>MatrixLog6</code> no longer discards small rotations and the translation term is derived from <code>MatrixLog3</code>, so values and gradients stay correct at θ ≈ 0 and θ ≈ π (this also corrects NumPy results)</li>
+         <li><strong>Note:</strong> JAX eager dispatch is roughly 40× slower than NumPy on single small calls, so time-budgeted solvers such as <code>TracIKSolver</code> need a wider <code>timeout</code> — see the <a href="user_guide/Backends.html">Compute Backends guide</a></li>
+      </ul>
+   </div>
+
+   <div class="whats-new">
+      <h4>📦 Previously in v1.3.2</h4>
       <ul>
          <li><strong>New:</strong> Modular optional extras — <code>[simulation]</code>, <code>[urdf]</code>, <code>[vision]</code>, <code>[ml]</code>, <code>[cuda]</code>, <code>[all]</code> — default install is now lightweight</li>
          <li><strong>New:</strong> Native NumPy 2.0-compatible URDF parser (<code>ManipulaPy.urdf.URDF</code>) with <code>PackageResolver</code> for <code>package://</code> and <code>file://</code> URIs</li>
@@ -446,7 +494,12 @@ Installation Options
    # Add CUDA acceleration (CUDA 12.x)
    pip install "manipulapy[cuda]"
 
-   # Everything (sim + urdf + vision + ml + cuda)
+   # Add a differentiable compute backend (new in 1.4)
+   pip install "manipulapy[pytorch]"    # PyTorch
+   pip install "manipulapy[jax-cpu]"    # JAX, CPU
+   pip install "manipulapy[jax-cuda]"   # JAX, CUDA 12 (Linux only)
+
+   # Everything (sim + urdf + vision + ml + cuda + pytorch + jax-cpu)
    pip install "manipulapy[all]"
 
    # Development installation
@@ -494,7 +547,7 @@ If you use ManipulaPy in your research, please cite:
      author={Mohamed Aboelnasr},
      year={2026},
      url={https://github.com/boelnasr/ManipulaPy},
-     version={1.3.2}
+     version={1.4.0}
    }
 
 License

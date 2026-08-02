@@ -6,6 +6,14 @@ This comprehensive guide covers robot dynamics computations in ManipulaPy, optim
 .. note::
    This guide is written for Python 3.10.12 users and includes version-specific optimizations and performance improvements.
 
+.. note::
+   **New in v1.4:** ``ManipulatorDynamics`` dispatches through the compute
+   backend — the mass matrix, inverse dynamics, and forward dynamics run on
+   NumPy, CuPy, PyTorch, or JAX, and are autodiff-safe under PyTorch and JAX.
+   The mass-matrix cache described below is bypassed under the tracing
+   backends, because caching on a tracer would detach the gradient. See the
+   :doc:`Compute Backends guide <Backends>`.
+
 Introduction to Robot Dynamics
 ----------------------------------
 
