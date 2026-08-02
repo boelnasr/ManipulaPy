@@ -31,6 +31,13 @@ jobs:
       - name: Build sdist and wheel
         run: python -m build
 
+      # The sdist is assembled from the working tree, not from git, so any
+      # untracked file matching a MANIFEST.in include is published. This is the
+      # last gate before an artifact leaves for PyPI: refuse to publish one
+      # containing anything git does not track.
+      - name: Assert the sdist contains only tracked files
+        run: python scripts/check_sdist_tracked.py dist/*.tar.gz
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

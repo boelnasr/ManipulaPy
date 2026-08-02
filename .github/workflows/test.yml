@@ -765,6 +765,12 @@ jobs:
       run: |
         python -m build
 
+    # The sdist is built from the working tree, not from git, so an untracked
+    # file matching a MANIFEST.in include is silently packaged. Catch that on
+    # every PR rather than at publish time.
+    - name: Assert the sdist contains only tracked files
+      run: python scripts/check_sdist_tracked.py dist/*.tar.gz
+
     - name: Check distribution
       run: |
         ls -la dist/
