@@ -1140,17 +1140,27 @@ def optimized_trajectory_generation_monitored(
     kernel_type: str = "auto",
     enable_monitoring: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate a trajectory through the active backend's dispatch boundary."""
-    if not _cuda_routing_enabled():
-        return trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
-    return _optimized_trajectory_generation_monitored_cuda(
+    """Generate a trajectory through the registered backend dispatch boundary."""
+    from .registry import execute_registered_kernel
+
+    variants = {
+        "auto",
+        "auto_tune",
+        "standard",
+        "vectorized",
+        "memory_optimized",
+        "warp_optimized",
+        "cache_friendly",
+    }
+    variant = kernel_type if kernel_type in variants else "standard"
+    return execute_registered_kernel(
+        f"trajectory.{variant}",
         thetastart,
         thetaend,
         Tf,
         N,
         method,
         use_pinned,
-        kernel_type,
         enable_monitoring=enable_monitoring,
     )
 

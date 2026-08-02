@@ -18,6 +18,7 @@ import pytest
 from ManipulaPy import cuda_kernels
 import ManipulaPy.backend as backend_dispatch
 from ManipulaPy.backend.numpy_backend import NumpyBackend
+from ManipulaPy.cuda_kernels import field_kernels, registry, trajectory_kernels
 from ManipulaPy.cuda_kernels import (
     auto_select_optimal_kernel,
     check_cuda_availability,
@@ -46,6 +47,95 @@ def test_cuda_routing_predicate_requires_gpu_backend_and_cuda(monkeypatch) -> No
 
     monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     assert cuda_kernels._cuda_routing_enabled() is False
+
+
+def test_registry_describes_existing_trajectory_and_field_kernels() -> None:
+    """Registry entries retain the raw kernel, launch policy, and CPU path."""
+    trajectory = registry.get_registered_kernel("trajectory.standard")
+    potential = registry.get_registered_kernel("potential_field.fused")
+
+    assert trajectory.implementation is trajectory_kernels.trajectory_kernel
+    assert trajectory.cpu_fallback is trajectory_kernels.trajectory_cpu_fallback
+    assert trajectory.metadata == {
+        "family": "trajectory",
+        "variant": "standard",
+        "dimensions": 2,
+    }
+    assert callable(trajectory.launch_config)
+
+    assert potential.implementation is field_kernels.fused_potential_gradient_kernel
+    assert potential.cpu_fallback is field_kernels.potential_field_cpu_fallback
+    assert potential.metadata == {
+        "family": "potential_field",
+        "variant": "fused",
+        "dimensions": 1,
+    }
+    assert callable(potential.launch_config)
+
+
+def test_registry_rejects_unknown_kernel_name() -> None:
+    """A misspelled dispatch name fails before any backend work begins."""
+    with pytest.raises(KeyError, match="Unknown CUDA kernel 'trajectory.typo'"):
+        registry.get_registered_kernel("trajectory.typo")
+
+
+def test_registry_rejects_duplicate_kernel_name() -> None:
+    """A second registration cannot silently replace a launch contract."""
+    isolated = registry.KernelRegistry()
+    entry = registry.get_registered_kernel("trajectory.standard")
+
+    isolated.register(entry)
+    with pytest.raises(ValueError, match="already registered"):
+        isolated.register(entry)
+
+
+def test_registry_executes_trajectory_cpu_fallback() -> None:
+    """Registry dispatch runs the numerical CPU reference without CUDA."""
+    start = np.array([0.0, 1.0], dtype=np.float32)
+    end = np.array([1.0, -1.0], dtype=np.float32)
+
+    actual = registry.execute_registered_kernel(
+        "trajectory.standard", start, end, 2.0, 5, 3
+    )
+    expected = trajectory_cpu_fallback(start, end, 2.0, 5, 3)
+
+    for result, wanted in zip(actual, expected):
+        assert np.array_equal(result, wanted)
+
+
+def test_registry_executes_fused_potential_field_cpu_fallback() -> None:
+    """The fused field operation has an explicit, hand-checked CPU result."""
+    positions = np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]], dtype=np.float32)
+    goal = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    obstacles = np.array([[0.5, 0.0, 0.0]], dtype=np.float32)
+
+    potential, gradient = registry.execute_registered_kernel(
+        "potential_field.fused", positions, goal, obstacles, 1.0
+    )
+
+    assert np.allclose(potential, np.array([1.0, 0.5], dtype=np.float32))
+    assert np.allclose(
+        gradient,
+        np.array([[3.0, 0.0, 0.0], [1.0, 0.0, 0.0]], dtype=np.float32),
+    )
+
+
+def test_potential_field_wrapper_falls_back_for_numpy_backend(monkeypatch) -> None:
+    """The existing wrapper reaches the registered CPU field implementation."""
+    monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", True)
+    monkeypatch.setattr(backend_dispatch, "_active", NumpyBackend())
+    positions = np.array([[2.0, 0.0, 0.0]], dtype=np.float32)
+
+    potential, gradient = optimized_potential_field(
+        positions,
+        np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        np.empty((0, 3), dtype=np.float32),
+        influence_distance=1.0,
+        use_pinned=False,
+    )
+
+    assert np.array_equal(potential, np.array([0.5], dtype=np.float32))
+    assert np.array_equal(gradient, np.array([[1.0, 0.0, 0.0]], dtype=np.float32))
 
 
 def test_direct_wrapper_falls_back_when_numpy_backend_is_active(monkeypatch) -> None:
@@ -251,15 +341,6 @@ def test_gpu_only_entrypoints_raise_when_no_cuda(
     """Verify GPU-only entrypoints raise RuntimeError when CUDA is unavailable."""
     monkeypatch.setattr(cuda_kernels, "CUDA_AVAILABLE", False)
     assert check_cuda_availability() is False
-
-    positions = np.zeros((2, 3), dtype=np.float32)
-    goal = np.zeros(3, dtype=np.float32)
-    obstacles = np.zeros((1, 3), dtype=np.float32)
-
-    with pytest.raises(RuntimeError):
-        optimized_potential_field(
-            positions, goal, obstacles, influence_distance=1.0, use_pinned=False
-        )
 
     with pytest.raises(RuntimeError):
         optimized_batch_trajectory_generation(

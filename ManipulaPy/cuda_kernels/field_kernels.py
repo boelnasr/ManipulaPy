@@ -110,33 +110,65 @@ else:
         raise RuntimeError("CUDA potential field kernel not available")
 
 
-def optimized_potential_field(
+def potential_field_cpu_fallback(
+    positions: np.ndarray,
+    goal: np.ndarray,
+    obstacles: np.ndarray,
+    influence_distance: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute the fused attractive/repulsive field with NumPy.
+
+    This is the CPU reference for ``fused_potential_gradient_kernel``. Its
+    equations and zero-distance handling intentionally mirror the raw Numba
+    kernel so registry dispatch can compare the two paths directly.
+    """
+    positions_arr = np.ascontiguousarray(positions, dtype=np.float32).reshape(-1, 3)
+    goal_arr = np.ascontiguousarray(goal, dtype=np.float32).reshape(3)
+    obstacles_arr = np.ascontiguousarray(obstacles, dtype=np.float32).reshape(-1, 3)
+
+    differences = positions_arr - goal_arr
+    potential = 0.5 * np.sum(differences * differences, axis=1)
+    gradient = differences.copy()
+
+    influence_inverse = (
+        np.float32(1.0 / influence_distance)
+        if influence_distance > 0.0
+        else np.float32(0.0)
+    )
+    influence_squared = np.float32(influence_distance * influence_distance)
+
+    for obstacle in obstacles_arr:
+        obstacle_difference = positions_arr - obstacle
+        distance_squared = np.sum(
+            obstacle_difference * obstacle_difference, axis=1
+        )
+        influenced = (distance_squared > 0.0) & (
+            distance_squared < influence_squared
+        )
+        if not np.any(influenced):
+            continue
+
+        distance_inverse = np.float32(1.0) / np.sqrt(distance_squared[influenced])
+        influence_term = distance_inverse - influence_inverse
+        potential[influenced] += np.float32(0.5) * influence_term * influence_term
+        gradient_factor = (
+            -influence_term * distance_inverse * distance_inverse * distance_inverse
+        )
+        gradient[influenced] += (
+            gradient_factor[:, np.newaxis] * obstacle_difference[influenced]
+        )
+
+    return potential.astype(np.float32), gradient.astype(np.float32)
+
+
+def _optimized_potential_field_cuda(
     positions: np.ndarray,
     goal: np.ndarray,
     obstacles: np.ndarray,
     influence_distance: float,
     use_pinned: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Optimized potential field computation with CUDA acceleration.
-
-    Args:
-        positions: (N, 3) ndarray of query point positions.
-        goal: (3,) ndarray, attractive goal position.
-        obstacles: (num_obstacles, 3) ndarray of obstacle positions.
-        influence_distance: Repulsive influence radius; obstacles farther than
-            this contribute nothing.
-        use_pinned: If True, use pinned host memory for host-to-device transfers.
-
-    Returns:
-        Tuple[np.ndarray, np.ndarray]: ``(potential, gradient)`` where
-        ``potential`` is an ``(N,)`` float32 array of total potential values and
-        ``gradient`` is an ``(N, 3)`` float32 array of potential gradients.
-
-    Raises:
-        RuntimeError: If CUDA is not available.
-    """
-    if not _cuda_routing_enabled():
-        raise RuntimeError("CUDA not available for potential field computation")
+    """Launch the fused potential-field CUDA implementation."""
 
     N = positions.shape[0]
 
@@ -184,6 +216,26 @@ def optimized_potential_field(
         # Return arrays to pool
         return_cuda_array(d_potential)
         return_cuda_array(d_gradient)
+
+
+def optimized_potential_field(
+    positions: np.ndarray,
+    goal: np.ndarray,
+    obstacles: np.ndarray,
+    influence_distance: float,
+    use_pinned: bool = True,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Compute a fused potential field through registered backend dispatch."""
+    from .registry import execute_registered_kernel
+
+    return execute_registered_kernel(
+        "potential_field.fused",
+        positions,
+        goal,
+        obstacles,
+        influence_distance,
+        use_pinned=use_pinned,
+    )
 
 
 def attractive_potential_kernel(*args: Any, **kwargs: Any) -> NoReturn:

@@ -3,10 +3,12 @@
 """CUDA kernel implementation split by runtime concern."""
 
 from functools import lru_cache
+from dataclasses import dataclass
 import math
 import os
 from time import perf_counter
-from typing import Any, Dict, Optional, Tuple
+from types import MappingProxyType
+from typing import Any, Callable, Dict, Mapping, Optional, Tuple
 import warnings
 
 import numpy as np
@@ -25,15 +27,66 @@ from .trajectory_kernels import (
     batch_trajectory_kernel,
     optimized_batch_trajectory_generation,
     optimized_trajectory_generation_monitored,
+    trajectory_cpu_fallback,
     trajectory_kernel,
     trajectory_kernel_cache_friendly,
     trajectory_kernel_memory_optimized,
     trajectory_kernel_vectorized,
     trajectory_kernel_warp_optimized,
 )
-from .field_kernels import optimized_potential_field
+from .field_kernels import (
+    fused_potential_gradient_kernel,
+    optimized_potential_field,
+    potential_field_cpu_fallback,
+)
 
 _cuda_error: Any = None
+
+
+@dataclass(frozen=True)
+class KernelRegistration:
+    """One backend-aware CUDA operation and its launch contract."""
+
+    name: str
+    implementation: Any
+    launch_config: Callable[..., Any]
+    cpu_fallback: Callable[..., Any]
+    gpu_launcher: Callable[..., Any]
+    cpu_launcher: Callable[..., Any]
+    metadata: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        """Freeze metadata so registry callers cannot mutate shared entries."""
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+
+class KernelRegistry:
+    """Fail-closed name-to-kernel registry used by CUDA operation wrappers."""
+
+    def __init__(self) -> None:
+        self._entries: Dict[str, KernelRegistration] = {}
+
+    def register(self, entry: KernelRegistration) -> None:
+        """Register ``entry`` without allowing accidental replacement."""
+        if entry.name in self._entries:
+            raise ValueError(f"CUDA kernel '{entry.name}' is already registered")
+        self._entries[entry.name] = entry
+
+    def get(self, name: str) -> KernelRegistration:
+        """Return a registration or raise an explicit unknown-name error."""
+        try:
+            return self._entries[name]
+        except KeyError:
+            available = ", ".join(sorted(self._entries))
+            raise KeyError(
+                f"Unknown CUDA kernel '{name}'. Available kernels: {available}"
+            ) from None
+
+    def execute(self, name: str, *args: Any, **kwargs: Any) -> Any:
+        """Execute through the Task 9 active-backend CUDA predicate."""
+        entry = self.get(name)
+        launcher = entry.gpu_launcher if _cuda_routing_enabled() else entry.cpu_launcher
+        return launcher(*args, **kwargs)
 
 
 def check_cuda_availability() -> bool:
@@ -758,3 +811,155 @@ def setup_cuda_environment_for_40x_speedup() -> None:
             print(f"⚠️  CuPy memory pool not configured: {exc}")
 
     print("✅ CUDA environment optimized for maximum performance")
+
+
+def _trajectory_launch_config(
+    N: int, num_joints: int, *, variant: str
+) -> Optional[Dict[str, Any]]:
+    """Resolve the existing trajectory launch policy for a registry variant."""
+    return get_optimal_kernel_config(N, num_joints, variant)
+
+
+def _potential_field_launch_config(size: int) -> Tuple[Tuple[int, ...], Tuple[int, ...]]:
+    """Resolve the existing one-dimensional fused-field launch policy."""
+    return make_1d_grid(size)
+
+
+def _launch_trajectory_gpu(
+    thetastart: Any,
+    thetaend: Any,
+    Tf: float,
+    N: int,
+    method: int,
+    use_pinned: bool = True,
+    *,
+    variant: str,
+    enable_monitoring: bool = True,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Call the existing monitored CUDA launcher for one registry variant."""
+    from . import trajectory_kernels
+
+    return trajectory_kernels._optimized_trajectory_generation_monitored_cuda(
+        thetastart,
+        thetaend,
+        Tf,
+        N,
+        method,
+        use_pinned,
+        variant,
+        enable_monitoring=enable_monitoring,
+    )
+
+
+def _launch_trajectory_cpu(
+    thetastart: Any,
+    thetaend: Any,
+    Tf: float,
+    N: int,
+    method: int,
+    use_pinned: bool = True,
+    *,
+    variant: str,
+    enable_monitoring: bool = True,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Adapt registry launch options to the existing trajectory CPU reference."""
+    del use_pinned, variant, enable_monitoring
+    return trajectory_cpu_fallback(thetastart, thetaend, Tf, N, method)
+
+
+def _launch_potential_field_gpu(
+    positions: np.ndarray,
+    goal: np.ndarray,
+    obstacles: np.ndarray,
+    influence_distance: float,
+    use_pinned: bool = True,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Call the existing fused-field CUDA transfer and launch wrapper."""
+    from . import field_kernels
+
+    return field_kernels._optimized_potential_field_cuda(
+        positions, goal, obstacles, influence_distance, use_pinned
+    )
+
+
+def _launch_potential_field_cpu(
+    positions: np.ndarray,
+    goal: np.ndarray,
+    obstacles: np.ndarray,
+    influence_distance: float,
+    use_pinned: bool = True,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Adapt the transfer-only option to the fused-field CPU reference."""
+    del use_pinned
+    return potential_field_cpu_fallback(
+        positions, goal, obstacles, influence_distance
+    )
+
+
+def _bind_variant(function: Callable[..., Any], variant: str) -> Callable[..., Any]:
+    """Bind a trajectory variant without hiding the registry call signature."""
+
+    def bound(*args: Any, **kwargs: Any) -> Any:
+        return function(*args, variant=variant, **kwargs)
+
+    return bound
+
+
+def _build_kernel_registry() -> KernelRegistry:
+    """Register the existing trajectory variants and fused field operation."""
+    result = KernelRegistry()
+    trajectory_implementations = {
+        "auto": trajectory_kernel,
+        "auto_tune": trajectory_kernel,
+        "standard": trajectory_kernel,
+        "vectorized": trajectory_kernel_vectorized,
+        "memory_optimized": trajectory_kernel_memory_optimized,
+        "warp_optimized": trajectory_kernel_warp_optimized,
+        "cache_friendly": trajectory_kernel_cache_friendly,
+    }
+    for variant, implementation in trajectory_implementations.items():
+        result.register(
+            KernelRegistration(
+                name=f"trajectory.{variant}",
+                implementation=implementation,
+                launch_config=_bind_variant(_trajectory_launch_config, variant),
+                cpu_fallback=trajectory_cpu_fallback,
+                gpu_launcher=_bind_variant(_launch_trajectory_gpu, variant),
+                cpu_launcher=_bind_variant(_launch_trajectory_cpu, variant),
+                metadata={
+                    "family": "trajectory",
+                    "variant": variant,
+                    "dimensions": 2,
+                },
+            )
+        )
+
+    result.register(
+        KernelRegistration(
+            name="potential_field.fused",
+            implementation=fused_potential_gradient_kernel,
+            launch_config=_potential_field_launch_config,
+            cpu_fallback=potential_field_cpu_fallback,
+            gpu_launcher=_launch_potential_field_gpu,
+            cpu_launcher=_launch_potential_field_cpu,
+            metadata={
+                "family": "potential_field",
+                "variant": "fused",
+                "dimensions": 1,
+            },
+        )
+    )
+    return result
+
+
+_KERNEL_REGISTRY = _build_kernel_registry()
+
+
+def get_registered_kernel(name: str) -> KernelRegistration:
+    """Return internal registry metadata for ``name``."""
+    return _KERNEL_REGISTRY.get(name)
+
+
+def execute_registered_kernel(name: str, *args: Any, **kwargs: Any) -> Any:
+    """Execute a registered operation on CUDA or its explicit CPU fallback."""
+    return _KERNEL_REGISTRY.execute(name, *args, **kwargs)

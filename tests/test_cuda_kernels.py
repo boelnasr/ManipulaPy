@@ -17,6 +17,9 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
+import ManipulaPy.cuda_kernels as cuda_module
+from ManipulaPy.cuda_kernels import registry as kernel_registry
+
 # Import ManipulaPy modules. Top-level ManipulaPy uses lazy __getattr__ that
 # only exposes high-level classes (SerialManipulator, ManipulatorController, …);
 # CUDA helpers must be imported from ManipulaPy.cuda_kernels directly.
@@ -95,6 +98,103 @@ def _gpu_capable_backend():
         pytest.skip("CuPy backend required for GPU kernel routing tests")
     yield
     _backend.set_backend("numpy")
+
+
+def test_registry_contract_covers_trajectory_and_potential_field() -> None:
+    """Each operation exposes its raw kernel, launch policy, and CPU reference."""
+    trajectory = kernel_registry.get_registered_kernel("trajectory.standard")
+    potential = kernel_registry.get_registered_kernel("potential_field.fused")
+
+    assert trajectory.implementation is cuda_module.trajectory_kernels.trajectory_kernel
+    assert trajectory.cpu_fallback is cuda_module.trajectory_cpu_fallback
+    assert trajectory.metadata["family"] == "trajectory"
+    assert trajectory.metadata["dimensions"] == 2
+    assert callable(trajectory.launch_config)
+
+    assert potential.implementation is cuda_module.field_kernels.fused_potential_gradient_kernel
+    assert potential.cpu_fallback is cuda_module.field_kernels.potential_field_cpu_fallback
+    assert potential.metadata["family"] == "potential_field"
+    assert potential.metadata["dimensions"] == 1
+    assert callable(potential.launch_config)
+
+
+def test_registry_unknown_and_duplicate_names_fail_closed() -> None:
+    """Registry typos and accidental replacement are explicit errors."""
+    with pytest.raises(KeyError, match="Unknown CUDA kernel 'trajectory.typo'"):
+        kernel_registry.get_registered_kernel("trajectory.typo")
+
+    isolated = kernel_registry.KernelRegistry()
+    entry = kernel_registry.get_registered_kernel("trajectory.standard")
+    isolated.register(entry)
+    with pytest.raises(ValueError, match="already registered"):
+        isolated.register(entry)
+
+
+def test_registry_cpu_fallbacks_match_hand_checked_values() -> None:
+    """Registry execution remains useful on hosts where CUDA is disabled."""
+    start = np.array([0.0], dtype=np.float32)
+    end = np.array([1.0], dtype=np.float32)
+    trajectory = kernel_registry.execute_registered_kernel(
+        "trajectory.standard", start, end, 1.0, 3, 1
+    )
+    assert np.array_equal(trajectory[0][:, 0], np.array([0.0, 0.5, 1.0]))
+    assert np.array_equal(trajectory[1][:, 0], np.ones(3, dtype=np.float32))
+    assert np.array_equal(trajectory[2][:, 0], np.zeros(3, dtype=np.float32))
+
+    potential, gradient = kernel_registry.execute_registered_kernel(
+        "potential_field.fused",
+        np.array([[0.0, 0.0, 0.0]], dtype=np.float32),
+        np.array([1.0, 0.0, 0.0], dtype=np.float32),
+        np.array([[0.5, 0.0, 0.0]], dtype=np.float32),
+        1.0,
+    )
+    assert np.array_equal(potential, np.array([1.0], dtype=np.float32))
+    assert np.array_equal(gradient, np.array([[3.0, 0.0, 0.0]], dtype=np.float32))
+
+
+@pytest.mark.cuda
+def test_registry_executes_trajectory_on_live_gpu() -> None:
+    """Registry GPU dispatch preserves the trajectory CPU reference values."""
+    start = np.array([0.0, -0.5], dtype=np.float32)
+    end = np.array([1.0, 0.5], dtype=np.float32)
+
+    actual = kernel_registry.execute_registered_kernel(
+        "trajectory.standard",
+        start,
+        end,
+        2.0,
+        17,
+        5,
+        use_pinned=False,
+        enable_monitoring=False,
+    )
+    expected = trajectory_cpu_fallback(start, end, 2.0, 17, 5)
+
+    for result, wanted in zip(actual, expected):
+        assert np.allclose(result, wanted, atol=1e-5)
+
+
+@pytest.mark.cuda
+def test_registry_executes_fused_potential_field_on_live_gpu() -> None:
+    """Registry GPU dispatch preserves the fused field CPU reference values."""
+    positions = np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]], dtype=np.float32)
+    goal = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+    obstacles = np.array([[0.5, 0.0, 0.0]], dtype=np.float32)
+
+    actual = kernel_registry.execute_registered_kernel(
+        "potential_field.fused",
+        positions,
+        goal,
+        obstacles,
+        1.0,
+        use_pinned=False,
+    )
+    expected = kernel_registry.get_registered_kernel(
+        "potential_field.fused"
+    ).cpu_fallback(positions, goal, obstacles, 1.0)
+
+    for result, wanted in zip(actual, expected):
+        assert np.allclose(result, wanted, atol=1e-5)
 
 
 class TestCUDAAvailability:
