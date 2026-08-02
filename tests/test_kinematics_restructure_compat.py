@@ -12,6 +12,7 @@ import numpy as np
 import ManipulaPy
 import ManipulaPy.kinematics as kinematics
 import ManipulaPy.kinematics.serial_manipulator as implementation
+from tests._signature_norm import canonical_signature
 
 
 EXPECTED_IMPLEMENTATION_NAMESPACE = {
@@ -184,7 +185,11 @@ def _ast_hash(descriptor):
 
 
 def _signature_hash(function):
-    return hashlib.sha256(str(inspect.signature(function)).encode()).hexdigest()
+    # Canonicalised first: NDArray annotations render NumPy's own shape
+    # type-parameter, respelled across the 2.x line, which would otherwise
+    # change every digest below per NumPy version. See tests/_signature_norm.py.
+    text = canonical_signature(str(inspect.signature(function)))
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 def _robot():

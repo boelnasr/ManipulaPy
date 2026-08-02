@@ -13,7 +13,8 @@ wrapper - expect a float64 np.ndarray). Signatures alone are not enough.
 The golden contract lives in tests/data/api_contract_golden.json. To regenerate
 it (only when a change is intentional), run this module as a script:
 
-    NUMBA_DISABLE_CUDA=1 MPLBACKEND=Agg .venv/bin/python tests/test_public_api_freeze.py --regen
+    NUMBA_DISABLE_CUDA=1 MPLBACKEND=Agg \
+        .venv/bin/python -m tests.test_public_api_freeze --regen
 
 The test rebuilds the live contract with the same deterministic fixtures and
 asserts equality per symbol, printing a readable unified diff naming the symbol
@@ -31,7 +32,7 @@ import sys
 import warnings
 from math import pi
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -40,6 +41,7 @@ from ManipulaPy.kinematics import SerialManipulator
 from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
 from ManipulaPy.singularity import Singularity
 from ManipulaPy.trac_ik import TracIKSolver, trac_ik_solve
+from tests._signature_norm import canonical_signature
 
 GOLDEN_PATH = Path(__file__).parent / "data" / "api_contract_golden.json"
 
@@ -79,8 +81,14 @@ def describe(value: Any) -> Dict[str, Any]:
 
 
 def _signature_str(fn: Callable[..., Any]) -> str:
-    """Stable string form of a callable's signature."""
-    return str(inspect.signature(fn))
+    """Stable string form of a callable's signature.
+
+    Canonicalised because ``NDArray[np.float64]`` renders NumPy's own shape
+    type-parameter, which NumPy respelled across the 2.x line (``Any`` ->
+    ``tuple[int, ...]`` -> ``tuple[Any, ...]``). That slot carries no
+    ManipulaPy signal - see tests/_signature_norm.py.
+    """
+    return canonical_signature(str(inspect.signature(fn)))
 
 
 # ---------------------------------------------------------------------------
@@ -384,10 +392,14 @@ def test_public_api_return_contract() -> None:
     assert GOLDEN_PATH.exists(), (
         f"Golden contract missing at {GOLDEN_PATH}. Regenerate with:\n"
         f"    NUMBA_DISABLE_CUDA=1 MPLBACKEND=Agg .venv/bin/python "
-        f"{Path(__file__).name} --regen"
+        f"-m tests.{Path(__file__).stem} --regen"
     )
 
     golden = json.loads(GOLDEN_PATH.read_text())
+    # Normalise the golden side too: a golden frozen under a different NumPy
+    # carries a different ndarray shape spelling, which is not API drift.
+    for entry in golden.values():
+        entry["signature"] = canonical_signature(entry["signature"])
     live = build_contract()
 
     problems: List[str] = []
@@ -408,6 +420,110 @@ def test_public_api_return_contract() -> None:
         f"Public API contract drift detected in {len(problems)} symbol(s). "
         f"If intentional, regenerate the golden file.\n" + "\n".join(problems)
     )
+
+
+# ---------------------------------------------------------------------------
+# Normaliser guards
+#
+# Only one NumPy version is installed on any given machine, so the cross-version
+# property cannot be observed by simply running the suite. Instead the other
+# NumPy spellings of ``NDArray[np.float64]`` are constructed here as alias
+# objects and rendered through real ``inspect.Signature`` instances, which is
+# byte-for-byte what a different NumPy would hand ``inspect.formatannotation``.
+# ---------------------------------------------------------------------------
+
+
+# The three shape type-parameters NumPy 2.x has shipped for ``NDArray``.
+_SHAPE_PARAMS = (
+    Any,  # numpy 2.0 / 2.1
+    tuple[int, ...],  # numpy 2.2
+    tuple[Any, ...],  # numpy >= 2.3
+)
+
+
+def _rendered_signature(annotation: Any) -> str:
+    """Render a probe signature that uses ``annotation`` bare and nested.
+
+    Both placements matter: ``inspect.formatannotation`` strips the ``typing.``
+    prefix only for annotations whose outermost object lives in ``typing``, so
+    the bare return annotation and the ``Optional``-wrapped parameter render the
+    same alias two different ways.
+    """
+
+    def probe(arr, opt=None, pair=None, flag="space"):
+        raise NotImplementedError
+
+    probe.__annotations__ = {
+        "arr": annotation,
+        "opt": Optional[annotation],
+        "pair": Tuple[annotation, bool],
+        "flag": str,
+        "return": annotation,
+    }
+    return str(inspect.signature(probe))
+
+
+def test_normaliser_collapses_numpy_shape_spellings() -> None:
+    """All NumPy 2.x ndarray shape spellings must normalise to one string."""
+    variants = [
+        "numpy.ndarray[Any, numpy.dtype[numpy.float64]]",
+        "numpy.ndarray[typing.Any, numpy.dtype[numpy.float64]]",
+        "numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]",
+        "numpy.ndarray[tuple[Any, ...], numpy.dtype[numpy.float64]]",
+        "numpy.ndarray[tuple[typing.Any, ...], numpy.dtype[numpy.float64]]",
+    ]
+    normalised = {canonical_signature(v) for v in variants}
+    assert len(normalised) == 1, f"spellings did not converge: {normalised}"
+
+
+def test_normaliser_collapses_rendered_signatures_across_numpy_versions() -> None:
+    """Real signatures rendered under every NumPy spelling must converge."""
+    rendered = [
+        _rendered_signature(np.ndarray[shape, np.dtype[np.float64]])
+        for shape in _SHAPE_PARAMS
+    ]
+    # Sanity: the raw renderings really do differ, i.e. the bug is reproduced
+    # here rather than the test passing because nothing varied.
+    assert len(set(rendered)) == len(_SHAPE_PARAMS), rendered
+
+    normalised = {canonical_signature(text) for text in rendered}
+    assert len(normalised) == 1, f"spellings did not converge: {normalised}"
+
+
+def test_normaliser_is_a_noop_on_the_checked_in_golden() -> None:
+    """The frozen golden must survive normalisation byte-for-byte."""
+    golden = json.loads(GOLDEN_PATH.read_text())
+    for name, entry in golden.items():
+        assert canonical_signature(entry["signature"]) == entry["signature"], name
+
+
+def test_normaliser_still_reports_real_signature_drift() -> None:
+    """Genuine signature changes must remain visible after normalisation."""
+    base = _rendered_signature(np.ndarray[tuple[int, ...], np.dtype[np.float64]])
+
+    drifted = {
+        # Real API changes the freeze exists to catch.
+        "added parameter": base.replace("flag: str", "flag: str, extra: int"),
+        "removed parameter": base.replace(", flag: str = 'space'", ""),
+        "renamed parameter": base.replace("arr:", "array:"),
+        "changed default": base.replace("= 'space'", "= 'body'"),
+        "changed non-NumPy type": base.replace("flag: str", "flag: int"),
+        # The two that matter most for the swappable-backend refactor: the
+        # normaliser rewrites only the shape slot, so dtype drift and a
+        # torch.Tensor leaking out are both still fully visible.
+        "changed ndarray dtype": base.replace("numpy.float64", "numpy.float32"),
+        "ndarray return replaced": base.replace(
+            "-> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]",
+            "-> torch.Tensor",
+        ),
+    }
+
+    canonical_base = canonical_signature(base)
+    for label, variant in drifted.items():
+        assert variant != base, f"negative control {label!r} changed nothing"
+        assert (
+            canonical_signature(variant) != canonical_base
+        ), f"normalisation hid real drift: {label}"
 
 
 def _regen() -> None:

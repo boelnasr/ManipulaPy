@@ -207,17 +207,17 @@ OWNERS = {
 }
 
 EXPECTED_HASHES = {
-    "batch_trajectory_kernel": "cbfec25a30cd927a170362f000d29eb2b7721ab8768ddc41a5760f19b6ff23c9",
-    "cartesian_trajectory_kernel": "427071e518d68a0f8c5ca52d19ce328df305e44018dd80f189342750c82370b2",
-    "forward_dynamics_kernel": "be68833e70b4829c1d548839a7f5c2e1b1a47ea9fe4ad89481369f0f57ee4970",
-    "fused_potential_gradient_kernel": "37ca0321febd399e05b3e81746c693759c7e8264d8618b5aef2591e000cc02eb",
-    "inverse_dynamics_kernel": "8a38a7f22e26c5816cba3effe17a3e3ce51716d613e1bb7dcdf3bd4f14b57d54",
-    "matrix_vector_multiply_6x6": "7c2133a072cf001a55def3cfed1a2e7c41fdac5a276f03d8257bd92314ece18a",
-    "trajectory_kernel": "ef1e5eab8f054fee45f65a99b1c1603be3bd2e688e96c0ddbd634c5e373d4962",
-    "trajectory_kernel_cache_friendly": "bbd8792d7929260d72e0b6dab3d3621214be8828504c7bd77829264864bff975",
-    "trajectory_kernel_memory_optimized": "a5b7980844c44ab20280f8ca68f5a0200beb02a90e8b11a20685a614bd705592",
-    "trajectory_kernel_vectorized": "69eac7c3fe7c3b6fb99d95065c94cbaae255f84ea111383b15611218505422cf",
-    "trajectory_kernel_warp_optimized": "32de4f1018d42d13dbdab99d201b54095d1e721015736f54971932455e51dac1",
+    "batch_trajectory_kernel": "d12d4571b9a9a1a8f25a16c1eb415b70e0f4a75e10eecb4e8d156da4267838ac",
+    "cartesian_trajectory_kernel": "741a048b733cfdeeb6525971c6bc6810388049fd585b876c3cd1c05d434b3b4b",
+    "forward_dynamics_kernel": "b68c1f0ba7fdf4e4f5ef6fd2d53b58d85e527b18b524ed4158c497ea77cac21b",
+    "fused_potential_gradient_kernel": "afebfa8639fd3153a714f009b51fc046ddefe937d90351e77855e76c2fa4022a",
+    "inverse_dynamics_kernel": "2f8a21b2ff128c3cdca9e5b4fe7dc72aadac8a4bd3ecd62162f75123420e6f3e",
+    "matrix_vector_multiply_6x6": "00086faf13936989888986e40d576514fe8e3856d557892001951199d34b688e",
+    "trajectory_kernel": "df1e6b8d4ca2c7490f4d67e497ba59dc41d5aac195c7c4a81066a20c2e2c164c",
+    "trajectory_kernel_cache_friendly": "9302986ee8dc5596264e5a6665758ff4215cc436dcd4b328bdbb3b620cf8ca95",
+    "trajectory_kernel_memory_optimized": "64f969d5bde8546939ef82ae8e87650aef34d9a219f31de5291d418eab24cd97",
+    "trajectory_kernel_vectorized": "9ab7ffaf7fb7791c11a0b1319f95e31bac2b8892191f9d9b6da3c1fcae73bd52",
+    "trajectory_kernel_warp_optimized": "341c79806193337a848dcd08ddf3c5d44f6ed71acb92acc501ac9566fa76f1df",
 }
 
 
@@ -319,21 +319,48 @@ def test_patch_restore_does_not_leave_split_brain(monkeypatch):
                 assert getattr(module, name) is original
 
 
-def test_raw_cuda_kernel_ast_hashes_across_modules():
+def _cuda_kernel_digests(module) -> dict:
+    """Hash each cuda.jit kernel's own source lines.
+
+    The AST is used only to *locate* the kernels; the digest is taken over
+    repo-owned bytes. ``ast.dump`` cannot be hashed here because it renders
+    whatever fields the running CPython declares in ``_fields``, so its text
+    moves with the interpreter: 3.9 dropped ``annotation=None``/``kind=None``,
+    3.12 appended PEP 695 ``type_params=[]`` to every ``FunctionDef``, and
+    3.13 flips the ``show_empty`` default. The kernel source does not move.
+
+    ``split("\\n")`` rather than ``splitlines()`` is deliberate: ``splitlines``
+    also breaks on form feed and \\x0b, which the tokenizer does not count as
+    line breaks, so it could desynchronise from ``lineno``.
+    """
+    source = Path(module.__file__).read_text(encoding="utf-8")
+    lines = source.split("\n")  # read_text() already normalised newlines
+    digests = {}
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        is_cuda_kernel = any(
+            isinstance(decorator, ast.Call)
+            and isinstance(decorator.func, ast.Attribute)
+            and isinstance(decorator.func.value, ast.Name)
+            and decorator.func.value.id == "cuda"
+            and decorator.func.attr == "jit"
+            for decorator in node.decorator_list
+        )
+        if not is_cuda_kernel:
+            continue
+        first = node.decorator_list[0].lineno  # include the decorator itself
+        payload = "\n".join(
+            line.rstrip() for line in lines[first - 1 : node.end_lineno]
+        )
+        digests[node.name] = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return digests
+
+
+def test_raw_cuda_kernel_source_hashes_across_modules():
     actual = {}
     for module in (trajectory_kernels, field_kernels):
-        for node in ast.walk(ast.parse(Path(module.__file__).read_text())):
-            if isinstance(node, ast.FunctionDef) and any(
-                isinstance(d, ast.Call)
-                and isinstance(d.func, ast.Attribute)
-                and isinstance(d.func.value, ast.Name)
-                and d.func.value.id == "cuda"
-                and d.func.attr == "jit"
-                for d in node.decorator_list
-            ):
-                actual[node.name] = hashlib.sha256(
-                    ast.dump(node, include_attributes=False).encode()
-                ).hexdigest()
+        actual.update(_cuda_kernel_digests(module))
     assert actual == EXPECTED_HASHES
 
 
