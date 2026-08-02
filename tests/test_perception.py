@@ -9,6 +9,7 @@ Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-
 
 import os
 import sys
+import types
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
@@ -20,12 +21,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 
 def is_module_available(module_name) -> bool:
-    """Check if a module is really available (not mocked)."""
+    """Check if a module is really available (not mocked).
+
+    conftest installs stand-ins in ``sys.modules`` when a dependency is
+    absent, and those stand-ins are plain objects rather than real modules
+    (the sklearn one even reports ``_name == "sklearn"``). A module-type
+    check is therefore the reliable discriminator, matching the predicate in
+    ``tests/test_gradient_contract.py``.
+    """
     try:
         module = __import__(module_name)
-        return not hasattr(module, "_name") or not str(module._name).startswith("Mock")
     except ImportError:
         return False
+    return isinstance(module, types.ModuleType)
 
 
 class TestPerceptionInitialization(unittest.TestCase):

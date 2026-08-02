@@ -1089,8 +1089,12 @@ class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
                 # Test without YOLO (should still initialize)
                 vision = Vision(use_pybullet_debug=False, show_plot=False)
 
-                # Force YOLO to None
+                # Force YOLO to None. The load is lazy, so clearing the model
+                # alone would just make detect_obstacles load it again; mark
+                # the attempt as spent too, which is the state Vision reaches
+                # when ultralytics genuinely is not installed.
                 vision.yolo_model = None
+                vision._yolo_load_attempted = True
 
                 # Should handle gracefully
                 rgb = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)

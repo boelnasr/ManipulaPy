@@ -505,22 +505,51 @@ def create_smart_mock(module_name) -> Any:
                 self.labels_ = None
 
             def fit(self, X) -> "MockDBSCAN":
-                """Assign synthetic cluster labels and return self."""
-                if len(X) == 0:
-                    self.labels_ = np.array([])
-                else:
-                    # Generate reasonable clustering labels
-                    self.labels_ = np.zeros(len(X), dtype=int)
-                    if len(X) > 3:
-                        self.labels_[len(X) // 2 :] = 1
-                    if len(X) > 6:
-                        self.labels_[2 * len(X) // 3 :] = 2
-                    # Add some noise points
-                    if len(X) > 10:
-                        self.labels_[::7] = -1
+                """Cluster by actual density and return self.
+
+                This runs the real DBSCAN rule (core points within ``eps``,
+                expanded transitively) rather than labelling by array
+                position. Positional labels are cheaper but they contradict
+                the geometry callers assert on -- identical points came back
+                in different clusters -- so tests failed against the mock
+                for reasons the real library would never produce.
+                """
+                points = np.asarray(X, dtype=float)
+                if len(points) == 0:
+                    self.labels_ = np.array([], dtype=int)
+                    return self
+
+                distances = np.linalg.norm(
+                    points[:, None, :] - points[None, :, :], axis=-1
+                )
+                neighbours = distances <= self.eps
+                is_core = neighbours.sum(axis=1) >= self.min_samples
+
+                labels = np.full(len(points), -1, dtype=int)
+                cluster = 0
+                for seed in range(len(points)):
+                    if labels[seed] != -1 or not is_core[seed]:
+                        continue
+                    labels[seed] = cluster
+                    stack = [seed]
+                    while stack:
+                        current = stack.pop()
+                        for reachable in np.flatnonzero(neighbours[current]):
+                            if labels[reachable] != -1:
+                                continue
+                            labels[reachable] = cluster
+                            if is_core[reachable]:
+                                stack.append(reachable)
+                    cluster += 1
+
+                self.labels_ = labels
                 return self
 
         sklearn_mock.cluster.DBSCAN = MockDBSCAN
+        # ``from sklearn.cluster import DBSCAN`` reads sys.modules["sklearn.cluster"],
+        # so that key must hold the submodule mock carrying MockDBSCAN, not the root.
+        if module_name == "sklearn.cluster":
+            return sklearn_mock.cluster
         return sklearn_mock
 
     elif module_name == "ultralytics":
@@ -646,6 +675,14 @@ def create_smart_mock(module_name) -> Any:
 
         return pb_mock
 
+    elif module_name == "pybullet_data":
+        # Ships inside the pybullet distribution, so it is absent whenever
+        # pybullet is. ManipulaPy/sim/_runtime.py imports both in one try
+        # block, so mocking only pybullet leaves _PYBULLET_AVAILABLE False.
+        pb_data_mock = MockModule("pybullet_data")
+        pb_data_mock.getDataPath = lambda: "/fake/pybullet_data"
+        return pb_data_mock
+
     else:
         return MockModule(module_name)
 
@@ -680,6 +717,7 @@ ALWAYS_MOCK = [
 # Simulation/complex modules that are problematic in CI
 MOCK_IN_CI = [
     "pybullet",
+    "pybullet_data",
 ]
 
 # CPU libraries that should be tested when available
