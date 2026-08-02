@@ -13,12 +13,23 @@ Copyright (c) 2025 Mohamed Aboelnasr
 import json
 import logging
 import os
+import re
+from collections import deque
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Union
 from urllib.parse import urlparse
 from urllib.request import url2pathname
+from xml.etree import ElementTree
 
 logger = logging.getLogger(__name__)
+
+_PACKAGE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*\Z")
+_MAX_DISCOVERY_UPWARD_DEPTH = 16
+_MAX_DISCOVERY_DOWNWARD_DEPTH = 8
+_MAX_DISCOVERY_CANDIDATES = 256
+_MAX_DISCOVERY_DIRECTORIES = 4096
+_MAX_DISCOVERY_ENTRIES = 16384
+_MAX_DISCOVERY_BOUNDARIES = 64
 
 
 def _path_escapes_base(candidate: Path, base: Path) -> bool:
@@ -47,8 +58,12 @@ class PackageResolver:
 
     Example:
         >>> resolver = PackageResolver()
-        >>> resolver.add_package("ur_description", "/opt/ros/melodic/share/ur_description")
-        >>> resolved = resolver.resolve("package://ur_description/meshes/ur5/visual/base.dae")
+        >>> resolver.add_package(
+        ...     "ur_description", "/opt/ros/melodic/share/ur_description"
+        ... )
+        >>> resolved = resolver.resolve(
+        ...     "package://ur_description/meshes/ur5/visual/base.dae"
+        ... )
         "/opt/ros/melodic/share/ur_description/meshes/ur5/visual/base.dae"
     """
 
@@ -71,6 +86,7 @@ class PackageResolver:
         self.base_path = Path(base_path) if base_path else None
         self._package_map: Dict[str, Path] = {}
         self._search_paths: List[Path] = []
+        self._deep_search_paths: List[Path] = []
         self._use_ros = use_ros
 
         # Add initial package map
@@ -96,22 +112,23 @@ class PackageResolver:
                 for path_str in ros_package_path.split(os.pathsep):
                     path = Path(path_str)
                     if path.exists():
-                        self._search_paths.append(path)
+                        self._add_direct_search_path(path)
 
             ament_prefix_path = os.environ.get("AMENT_PREFIX_PATH", "")
             if ament_prefix_path:
                 for prefix in ament_prefix_path.split(os.pathsep):
                     share_path = Path(prefix) / "share"
                     if share_path.exists():
-                        self._search_paths.append(share_path)
+                        self._add_direct_search_path(share_path)
 
-        # Custom ManipulaPy package path
+        # The custom ManipulaPy path is an explicit user-controlled discovery
+        # root, so unlike ambient ROS/Ament paths it permits bounded indexing.
         manipulapy_package_path = os.environ.get("MANIPULAPY_PACKAGE_PATH", "")
         if manipulapy_package_path:
             for path_str in manipulapy_package_path.split(os.pathsep):
                 path = Path(path_str)
                 if path.exists():
-                    self._search_paths.append(path)
+                    self.add_search_path(path)
 
         # Optional explicit package map (JSON file path or JSON string)
         package_map_env = os.environ.get("MANIPULAPY_PACKAGE_MAP", "")
@@ -130,7 +147,8 @@ class PackageResolver:
                     map_data = json.loads(package_map_env)
                 except json.JSONDecodeError:
                     logger.warning(
-                        "MANIPULAPY_PACKAGE_MAP must be a JSON file path or JSON string."
+                        "MANIPULAPY_PACKAGE_MAP must be a JSON file path "
+                        "or JSON string."
                     )
 
             if isinstance(map_data, dict):
@@ -138,7 +156,8 @@ class PackageResolver:
                     self.add_package(name, path)
             elif map_data is not None:
                 logger.warning(
-                    "MANIPULAPY_PACKAGE_MAP must be a JSON object mapping package name to path."
+                    "MANIPULAPY_PACKAGE_MAP must be a JSON object mapping "
+                    "package name to path."
                 )
 
     def add_package(self, name: str, path: Union[str, Path]) -> None:
@@ -164,9 +183,16 @@ class PackageResolver:
             path: Directory to search for packages
         """
         path = Path(path)
-        if path.exists() and path not in self._search_paths:
-            self._search_paths.append(path)
+        if path.exists():
+            self._add_direct_search_path(path)
+            if path not in self._deep_search_paths:
+                self._deep_search_paths.append(path)
             logger.debug(f"Added search path: {path}")
+
+    def _add_direct_search_path(self, path: Path) -> None:
+        """Add a permitted direct-lookup root without enabling recursive scan."""
+        if path not in self._search_paths:
+            self._search_paths.append(path)
 
     def resolve(self, uri: str) -> str:
         """
@@ -226,6 +252,14 @@ class PackageResolver:
             return uri
         package_name, relative_path = parts[0], parts[1]
 
+        if _PACKAGE_NAME_RE.fullmatch(package_name) is None:
+            logger.warning(
+                "Refusing to resolve %r: invalid package name %r",
+                uri,
+                package_name,
+            )
+            return uri
+
         rel_parts = Path(relative_path).parts
         if ".." in rel_parts or Path(relative_path).is_absolute():
             logger.warning(
@@ -273,7 +307,7 @@ class PackageResolver:
         # forms (regression: prior code only tried search_path/pkg/relative).
         for search_path in self._search_paths:
             root = Path(search_path)
-            accept(root / package_name / relative_path, root / package_name)
+            accept(root / package_name / relative_path, root)
             accept(root / relative_path, root)
 
         # Strategy 3: ROS package discovery (only when use_ros is enabled).
@@ -325,6 +359,19 @@ class PackageResolver:
                 if ancestor.name == package_name:
                     accept(ancestor / relative_path, ancestor)
 
+        discovered_roots = self._discover_package_roots(package_name)
+        if discovered_roots is None:
+            logger.warning(
+                "Refusing to resolve %r because package discovery was incomplete",
+                uri,
+            )
+            return uri
+        for discovered_root in discovered_roots:
+            accept(
+                discovered_root / relative_path,
+                discovered_root,
+            )
+
         # Dedup by canonical (symlink/case-resolved) path before ambiguity check.
         seen_canonical = set()
         unique_paths: List[str] = []
@@ -351,6 +398,151 @@ class PackageResolver:
             "package mapping with resolver.add_package(name, path)."
         )
         return uri
+
+    @staticmethod
+    def _package_name_from_manifest(manifest: Path) -> Optional[str]:
+        """Return a validated package name from a real ``package.xml`` file."""
+        try:
+            if manifest.is_symlink() or not manifest.is_file():
+                return None
+            document_root = ElementTree.parse(manifest).getroot()
+            if document_root.tag != "package":
+                return None
+            name = document_root.findtext("name")
+        except ElementTree.ParseError:
+            return None
+        if name is None:
+            return None
+        normalized = name.strip()
+        if _PACKAGE_NAME_RE.fullmatch(normalized) is None:
+            return None
+        return normalized
+
+    def _has_workspace_marker(self, directory: Path) -> bool:
+        """Return whether ``directory`` has a usable discovery boundary marker."""
+        try:
+            if self._package_name_from_manifest(directory / "package.xml"):
+                return True
+            colcon_marker = directory / "COLCON_IGNORE"
+            if colcon_marker.is_file() and not colcon_marker.is_symlink():
+                return True
+            git_marker = directory / ".git"
+            if git_marker.is_dir() and (git_marker / "HEAD").is_file():
+                return True
+            if git_marker.is_file() and not git_marker.is_symlink():
+                with git_marker.open(encoding="utf-8") as marker_file:
+                    return marker_file.read(256).startswith("gitdir:")
+        except (OSError, RuntimeError, UnicodeError):
+            return False
+        return False
+
+    def _discovery_boundaries(self) -> Optional[List[Path]]:
+        """Find explicit or marker-terminated roots for bounded discovery."""
+        boundaries: List[Path] = []
+        boundaries.extend(Path(path) for path in self._deep_search_paths)
+
+        if self.base_path is not None:
+            current = Path(self.base_path).resolve()
+            for _depth in range(_MAX_DISCOVERY_UPWARD_DEPTH + 1):
+                if self._has_workspace_marker(current):
+                    boundaries.append(current)
+                    break
+                parent = current.parent
+                if parent == current:
+                    break
+                current = parent
+
+        unique: List[Path] = []
+        seen = set()
+        for boundary in boundaries:
+            try:
+                canonical = boundary.resolve(strict=True)
+            except (OSError, RuntimeError):
+                return None
+            key = str(canonical)
+            if key not in seen and canonical.is_dir():
+                seen.add(key)
+                unique.append(canonical)
+                if len(unique) > _MAX_DISCOVERY_BOUNDARIES:
+                    logger.warning("URDF package discovery exceeded the root cap")
+                    return None
+        return unique
+
+    def _index_packages(
+        self, boundary: Path, budget: Dict[str, int]
+    ) -> Optional[Dict[str, List[Path]]]:
+        """Index validated package manifests under one bounded workspace root.
+
+        ``None`` means a safety cap was exhausted. Callers must discard the
+        partial index because unseen packages could make a result ambiguous.
+        """
+        packages: Dict[str, List[Path]] = {}
+        queue = deque([(boundary, 0)])
+
+        while queue:
+            directory, depth = queue.popleft()
+            budget["directories"] += 1
+            if budget["directories"] > _MAX_DISCOVERY_DIRECTORIES:
+                logger.warning("URDF package discovery exceeded the directory cap")
+                return None
+
+            manifest = directory / "package.xml"
+            try:
+                manifest_exists = manifest.exists()
+            except OSError:
+                return None
+            if manifest_exists:
+                budget["candidates"] += 1
+                if budget["candidates"] > _MAX_DISCOVERY_CANDIDATES:
+                    logger.warning("URDF package discovery exceeded the candidate cap")
+                    return None
+                try:
+                    package_name = self._package_name_from_manifest(manifest)
+                except OSError:
+                    return None
+                if package_name is not None and not _path_escapes_base(
+                    directory, boundary
+                ):
+                    packages.setdefault(package_name, []).append(directory)
+
+            if depth >= _MAX_DISCOVERY_DOWNWARD_DEPTH:
+                continue
+            try:
+                entries = os.scandir(directory)
+            except OSError:
+                return None
+            with entries:
+                for entry in entries:
+                    budget["entries"] += 1
+                    if budget["entries"] > _MAX_DISCOVERY_ENTRIES:
+                        logger.warning(
+                            "URDF package discovery exceeded the filesystem entry cap"
+                        )
+                        return None
+                    try:
+                        if entry.is_symlink() or not entry.is_dir(
+                            follow_symlinks=False
+                        ):
+                            continue
+                    except OSError:
+                        return None
+                    queue.append((Path(entry.path), depth + 1))
+
+        return packages
+
+    def _discover_package_roots(self, package_name: str) -> Optional[List[Path]]:
+        """Return contained roots, or ``None`` when discovery was incomplete."""
+        discovered: List[Path] = []
+        boundaries = self._discovery_boundaries()
+        if boundaries is None:
+            return None
+        budget = {"candidates": 0, "directories": 0, "entries": 0}
+        for boundary in boundaries:
+            index = self._index_packages(boundary, budget)
+            if index is None:
+                return None
+            discovered.extend(index.get(package_name, []))
+        return discovered
 
     def _resolve_relative_path(self, path: str) -> str:
         """
@@ -464,8 +656,8 @@ class PackageResolver:
         """
         Create a resolver configured for a specific URDF file.
 
-        Automatically sets base_path to the URDF's directory and
-        adds common relative package locations.
+        Sets ``base_path`` to the URDF's directory. Package roots are then
+        found by the resolver's bounded, manifest-based discovery.
 
         Args:
             urdf_path: Path to the URDF file
@@ -476,24 +668,4 @@ class PackageResolver:
         urdf_path = Path(urdf_path).resolve()
         base_path = urdf_path.parent
 
-        resolver = cls(base_path=base_path)
-
-        # Add parent directories as potential package roots
-        # Common structures:
-        # - package/urdf/robot.urdf -> package is 2 levels up
-        # - package/robots/model.urdf -> package is 2 levels up
-        for parent in [base_path.parent, base_path.parent.parent]:
-            if parent.exists():
-                resolver.add_search_path(parent)
-                # If it looks like a package directory, add it
-                if (parent / "package.xml").exists():
-                    resolver.add_package(parent.name, parent)
-                # Scan more ancestor levels for deeply nested URDFs
-        for depth in range(1, 4):
-            if depth < len(urdf_path.parents):
-                parent = urdf_path.parents[depth]
-                if parent.exists():
-                    resolver.add_search_path(parent)
-                    if (parent / "package.xml").exists():
-                        resolver.add_package(parent.name, parent)
-        return resolver
+        return cls(base_path=base_path)

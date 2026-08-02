@@ -222,7 +222,9 @@ class TestPackageUriContainment:
         mesh = ws / "mypkg" / "meshes" / "link.stl"
         mesh.parent.mkdir(parents=True)
         mesh.write_text("solid")
-        (ws / "mypkg" / "package.xml").write_text("<package><name>mypkg</name></package>")
+        (ws / "mypkg" / "package.xml").write_text(
+            "<package><name>mypkg</name></package>"
+        )
         base = ws / "desc"
         base.mkdir()
 
@@ -251,3 +253,302 @@ class TestPackageUriContainment:
         result = resolver.resolve(uri)
 
         assert result == uri, f"read outside the description tree: {result!r}"
+
+
+class TestDeepPackageDiscovery:
+    """Bounded workspace discovery supports deeply nested URDF layouts."""
+
+    def test_discovers_package_from_deeply_nested_urdf(self, tmp_path):
+        """A marked workspace may contain a package beyond the old ancestor scan."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        workspace = tmp_path / "workspace"
+        (workspace / ".git").mkdir(parents=True)
+        (workspace / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+        package = workspace / "src" / "vendor" / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("solid arm")
+        (package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        urdf_dir = workspace / "inputs" / "robots" / "arm" / "models" / "urdf"
+        urdf_dir.mkdir(parents=True)
+
+        resolver = PackageResolver(base_path=urdf_dir, use_ros=False)
+
+        assert resolver.resolve("package://arm_description/meshes/arm.stl") == str(mesh)
+
+    def test_rejects_invalid_package_name_before_ros_lookup(
+        self, tmp_path, monkeypatch
+    ):
+        """Option-like package names never reach ROS or catkin discovery."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        resolver = PackageResolver(base_path=tmp_path, use_ros=True)
+
+        def fail_if_called(package_name):
+            raise AssertionError(f"unsafe package name reached ROS: {package_name}")
+
+        monkeypatch.setattr(resolver, "_find_ros_package", fail_if_called)
+
+        assert resolver.resolve("package://--version/meshes/arm.stl") == (
+            "package://--version/meshes/arm.stl"
+        )
+
+    def test_incomplete_git_directory_is_not_a_workspace_boundary(self, tmp_path):
+        """An arbitrary empty ``.git`` directory cannot authorize a tree scan."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        boundary = tmp_path / "boundary"
+        (boundary / ".git").mkdir(parents=True)
+        package = boundary / "src" / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("private")
+        (package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        urdf_dir = boundary / "inputs" / "deep"
+        urdf_dir.mkdir(parents=True)
+        resolver = PackageResolver(base_path=urdf_dir, use_ros=False)
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_discovers_nested_package_under_explicit_search_root(self, tmp_path):
+        """A caller-permitted search root is also a bounded discovery root."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        search_root = tmp_path / "packages"
+        package = search_root / "vendor" / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("solid arm")
+        (package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        resolver = PackageResolver(search_paths=[search_root], use_ros=False)
+
+        assert resolver.resolve("package://arm_description/meshes/arm.stl") == str(mesh)
+
+    def test_ambient_ros_path_is_direct_only(self, tmp_path, monkeypatch):
+        """Ambient ROS roots are not recursively indexed for nested packages."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        ros_root = tmp_path / "ros_packages"
+        package = ros_root / "vendor" / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("private")
+        (package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        monkeypatch.setenv("ROS_PACKAGE_PATH", str(ros_root))
+        monkeypatch.delenv("AMENT_PREFIX_PATH", raising=False)
+        monkeypatch.delenv("MANIPULAPY_PACKAGE_PATH", raising=False)
+        resolver = PackageResolver(use_ros=True)
+        monkeypatch.setattr(resolver, "_find_ros_package", lambda _name: None)
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_custom_manipulapy_path_remains_a_deep_root(self, tmp_path, monkeypatch):
+        """The explicit custom path retains bounded nested-package discovery."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        custom_root = tmp_path / "custom_packages"
+        package = custom_root / "vendor" / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("solid arm")
+        (package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        monkeypatch.setenv("MANIPULAPY_PACKAGE_PATH", str(custom_root))
+        monkeypatch.delenv("ROS_PACKAGE_PATH", raising=False)
+        monkeypatch.delenv("AMENT_PREFIX_PATH", raising=False)
+        resolver = PackageResolver(use_ros=False)
+
+        assert resolver.resolve("package://arm_description/meshes/arm.stl") == str(mesh)
+
+    def test_search_root_refuses_symlinked_direct_package_escape(self, tmp_path):
+        """A direct package symlink cannot widen its caller-permitted root."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        search_root = tmp_path / "packages"
+        search_root.mkdir()
+        outside_package = tmp_path / "outside" / "arm_description"
+        mesh = outside_package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("private")
+        (search_root / "arm_description").symlink_to(
+            outside_package, target_is_directory=True
+        )
+        resolver = PackageResolver(search_paths=[search_root], use_ros=False)
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_non_package_xml_cannot_authorize_upward_discovery(self, tmp_path):
+        """Only a ROS ``<package>`` document may define a package boundary."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        boundary = tmp_path / "workspace"
+        mesh = boundary / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("private")
+        (boundary / "package.xml").write_text(
+            "<metadata><name>arm_description</name></metadata>"
+        )
+        urdf_dir = boundary / "inputs" / "deep"
+        urdf_dir.mkdir(parents=True)
+        resolver = PackageResolver(base_path=urdf_dir, use_ros=False)
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_candidate_cap_exhaustion_discards_all_discovery_results(
+        self, tmp_path, monkeypatch
+    ):
+        """An incomplete package index cannot be combined with another root."""
+        import ManipulaPy.urdf.resolver as resolver_module
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        incomplete_roots = []
+        for name in ("a_decoy", "b_decoy"):
+            package = tmp_path / name
+            package.mkdir(parents=True)
+            (package / "package.xml").write_text(
+                f"<package><name>{name}</name></package>"
+            )
+            incomplete_roots.append(package)
+
+        complete = tmp_path / "complete"
+        package = complete / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("solid arm")
+        (package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        monkeypatch.setattr(resolver_module, "_MAX_DISCOVERY_CANDIDATES", 1)
+        resolver = PackageResolver(
+            search_paths=[*incomplete_roots, complete], use_ros=False
+        )
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_upward_discovery_stops_at_depth_cap(self, tmp_path, monkeypatch):
+        """A workspace marker beyond the upward cap is never reached."""
+        import ManipulaPy.urdf.resolver as resolver_module
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        workspace = tmp_path / "workspace"
+        (workspace / ".git").mkdir(parents=True)
+        (workspace / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+        package = workspace / "src" / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("solid arm")
+        (package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        urdf_dir = workspace / "a" / "b" / "c" / "d"
+        urdf_dir.mkdir(parents=True)
+        monkeypatch.setattr(resolver_module, "_MAX_DISCOVERY_UPWARD_DEPTH", 2)
+        resolver = PackageResolver(base_path=urdf_dir, use_ros=False)
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_downward_discovery_stops_at_depth_cap(self, tmp_path, monkeypatch):
+        """Package manifests deeper than the downward cap are not indexed."""
+        import ManipulaPy.urdf.resolver as resolver_module
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        workspace = tmp_path / "workspace"
+        (workspace / ".git").mkdir(parents=True)
+        (workspace / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+        package = workspace / "one" / "two" / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("solid arm")
+        (package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        urdf_dir = workspace / "inputs"
+        urdf_dir.mkdir()
+        monkeypatch.setattr(resolver_module, "_MAX_DISCOVERY_DOWNWARD_DEPTH", 1)
+        resolver = PackageResolver(base_path=urdf_dir, use_ros=False)
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_discovery_refuses_symlinked_package_escape(self, tmp_path):
+        """A package-directory symlink cannot escape a discovered workspace."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        workspace = tmp_path / "workspace"
+        (workspace / ".git").mkdir(parents=True)
+        (workspace / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+        outside_package = tmp_path / "outside" / "arm_description"
+        mesh = outside_package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("private")
+        (outside_package / "package.xml").write_text(
+            "<package><name>arm_description</name></package>"
+        )
+        (workspace / "src").mkdir()
+        (workspace / "src" / "arm_description").symlink_to(
+            outside_package, target_is_directory=True
+        )
+        urdf_dir = workspace / "inputs" / "deep"
+        urdf_dir.mkdir(parents=True)
+        resolver = PackageResolver(base_path=urdf_dir, use_ros=False)
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_deep_discovery_refuses_ambiguous_packages(self, tmp_path):
+        """Two distinct validated package roots remain fail-closed."""
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        workspace = tmp_path / "workspace"
+        (workspace / ".git").mkdir(parents=True)
+        (workspace / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+        for vendor in ("one", "two"):
+            package = workspace / "src" / vendor / "arm_description"
+            mesh = package / "meshes" / "arm.stl"
+            mesh.parent.mkdir(parents=True)
+            mesh.write_text(f"solid {vendor}")
+            (package / "package.xml").write_text(
+                "<package><name>arm_description</name></package>"
+            )
+        urdf_dir = workspace / "inputs" / "deep"
+        urdf_dir.mkdir(parents=True)
+        resolver = PackageResolver(base_path=urdf_dir, use_ros=False)
+        uri = "package://arm_description/meshes/arm.stl"
+
+        assert resolver.resolve(uri) == uri
+
+    def test_canonical_duplicate_candidates_are_not_ambiguous(self, tmp_path):
+        """Aliases to one permitted package deduplicate by canonical target."""
+        from pathlib import Path
+
+        from ManipulaPy.urdf.resolver import PackageResolver
+
+        packages = tmp_path / "packages"
+        package = packages / "arm_description"
+        mesh = package / "meshes" / "arm.stl"
+        mesh.parent.mkdir(parents=True)
+        mesh.write_text("solid arm")
+        alias = tmp_path / "arm_alias"
+        alias.symlink_to(package, target_is_directory=True)
+        resolver = PackageResolver(search_paths=[packages, alias], use_ros=False)
+
+        result = resolver.resolve("package://arm_description/meshes/arm.stl")
+
+        assert result != "package://arm_description/meshes/arm.stl"
+        assert Path(result).resolve() == mesh.resolve()
