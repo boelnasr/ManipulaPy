@@ -3,19 +3,13 @@
 Getting Started with ManipulaPy
 ===============================
 
-Welcome to ManipulaPy! This guide will get you up and running with modern robotics programming in Python.
-
 .. raw:: html
 
-   <div class="getting-started-hero">
-      <div class="hero-content">
-         <h2>🚀 Ready to Build Robots?</h2>
-         <p>ManipulaPy makes robot programming accessible with GPU acceleration, 
-            computer vision, and a clean Python API. Let's get started!</p>
-      </div>
-   </div>
+   <p class="mp-lede">Install ManipulaPy, load a robot, and work up through kinematics,
+   trajectory planning, simulation, control and perception — each step a complete,
+   runnable script.</p>
 
-.. contents:: **What you'll learn**
+.. contents:: On this page
    :local:
    :depth: 2
    :backlinks: none
@@ -23,7 +17,8 @@ Welcome to ManipulaPy! This guide will get you up and running with modern roboti
 Installation
 ------------
 
-🔧 **Quick Install**
+Quick install
+~~~~~~~~~~~~~
 
 The fastest way to get started:
 
@@ -40,7 +35,8 @@ The fastest way to get started:
    install succeeds on minimal images and platforms without prebuilt wheels
    (e.g., Apple Silicon).
 
-🚀 **Recommended Install (with GPU acceleration)**
+Recommended install (with GPU acceleration)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For the best performance:
 
@@ -48,7 +44,8 @@ For the best performance:
 
    pip install manipulapy[cuda]
 
-📦 **Full Installation (all features)**
+Full installation (all features)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To unlock all capabilities:
 
@@ -56,7 +53,8 @@ To unlock all capabilities:
 
    pip install manipulapy[all]
 
-🛠️ **Development Installation**
+Development installation
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you want to contribute or modify the library:
 
@@ -89,7 +87,7 @@ If you want to contribute or modify the library:
    gradients on the core math. NumPy remains the default. See the
    :doc:`Compute Backends guide <../user_guide/Backends>`.
 
-Verify Your Installation
+Verify your installation
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 Let's make sure everything is working:
@@ -97,13 +95,13 @@ Let's make sure everything is working:
 .. code-block:: python
 
    import ManipulaPy
-   print("🎉 ManipulaPy installed successfully!")
-   print(f"Version: {ManipulaPy.__version__}")
+   print(f"ManipulaPy {ManipulaPy.__version__} installed successfully")
 
 Your First Robot
 ----------------
 
-🤖 **Load a Robot Model**
+Load a robot model
+~~~~~~~~~~~~~~~~~~
 
 ManipulaPy comes with built-in robot models. Let's start with the xArm:
 
@@ -114,14 +112,14 @@ ManipulaPy comes with built-in robot models. Let's start with the xArm:
    from ManipulaPy.ManipulaPy_data.xarm import urdf_file as xarm_urdf_file
 
    # Load the built-in xArm robot
-   print("📁 Loading xArm robot model...")
    urdf_processor = URDFToSerialManipulator(xarm_urdf_file)
    robot = urdf_processor.serial_manipulator
    dynamics = urdf_processor.dynamics
 
-   print(f"✅ Robot loaded with {len(robot.S_list[0])} degrees of freedom")
+   print(f"Robot loaded with {len(robot.S_list[0])} degrees of freedom")
 
-🎯 **Forward Kinematics**
+Forward kinematics
+~~~~~~~~~~~~~~~~~~
 
 Calculate where the robot's end-effector is:
 
@@ -131,11 +129,12 @@ Calculate where the robot's end-effector is:
    home_angles = np.zeros(6)
    end_effector_pose = robot.forward_kinematics(home_angles, frame="space")
 
-   print("🏠 Home position:")
+   print("Home position:")
    print(f"   Position: {end_effector_pose[:3, 3]}")
    print(f"   Orientation:\n{end_effector_pose[:3, :3]}")
 
-🔄 **Inverse Kinematics**
+Inverse kinematics
+~~~~~~~~~~~~~~~~~~
 
 Find joint angles to reach a target position:
 
@@ -146,7 +145,6 @@ Find joint angles to reach a target position:
    T_target = robot.forward_kinematics(target_position)
 
    # Solve inverse kinematics
-   print("🎯 Solving inverse kinematics...")
    solution, success, iterations = robot.iterative_inverse_kinematics(
        T_desired=T_target,
        thetalist0=np.zeros(6),
@@ -154,15 +152,16 @@ Find joint angles to reach a target position:
    )
 
    if success:
-       print(f"✅ Solution found in {iterations} iterations!")
-       print(f"🔧 Joint angles: {np.degrees(solution)}°")
+       print(f"Solution found in {iterations} iterations")
+       print(f"Joint angles: {np.degrees(solution)}°")
    else:
-       print("❌ No solution found")
+       print("No solution found")
 
 Your First Trajectory
 ---------------------
 
-⚡ **GPU-Accelerated Planning**
+GPU-accelerated planning
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 Plan smooth robot motions with CUDA acceleration:
 
@@ -178,7 +177,6 @@ Plan smooth robot motions with CUDA acceleration:
    start_angles = np.zeros(6)
    end_angles = np.array([0.5, -0.3, 0.8, 0.0, 0.5, 0.0])
 
-   print("📈 Planning trajectory...")
    trajectory = planner.joint_trajectory(
        thetastart=start_angles,
        thetaend=end_angles,
@@ -187,11 +185,12 @@ Plan smooth robot motions with CUDA acceleration:
        method=5         # Quintic (smooth) interpolation
    )
 
-   print(f"✅ Generated {trajectory['positions'].shape[0]} waypoints")
-   print(f"🚀 Start velocity: {trajectory['velocities'][0]}")
-   print(f"🏁 End velocity: {trajectory['velocities'][-1]}")
+   print(f"Generated {trajectory['positions'].shape[0]} waypoints")
+   print(f"Start velocity: {trajectory['velocities'][0]}")
+   print(f"End velocity: {trajectory['velocities'][-1]}")
 
-📊 **Visualize the Trajectory**
+Visualize the trajectory
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 See your robot's planned motion:
 
@@ -203,7 +202,8 @@ See your robot's planned motion:
 Your First Simulation
 ---------------------
 
-🎬 **PyBullet Physics Simulation**
+PyBullet physics simulation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
    Simulation runs on CPU via PyBullet — no GPU or CUDA is required.
@@ -220,7 +220,6 @@ Bring your robot to life with realistic physics:
    from ManipulaPy.sim import Simulation
 
    # Create physics simulation
-   print("🎬 Starting simulation...")
    sim = Simulation(
        urdf_file_path=xarm_urdf_file,
        joint_limits=joint_limits,
@@ -234,15 +233,15 @@ Bring your robot to life with realistic physics:
 
    # Execute the trajectory in simulation
    waypoints = trajectory["positions"][::10]  # Use every 10th point
-   
-   print("🏃 Running simulation...")
+
    final_position = sim.run_trajectory(waypoints)
-   print(f"🏁 Final end-effector position: {final_position}")
+   print(f"Final end-effector position: {final_position}")
 
 Your First Control System
 -------------------------
 
-🎛️ **Intelligent Robot Control**
+Computed-torque control
+~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
    The control module is pure NumPy/SciPy — it ships with the default
@@ -254,7 +253,6 @@ Control your robot with advanced algorithms:
 
    from ManipulaPy.control import ManipulatorController
 
-   # Create smart controller
    controller = ManipulatorController(dynamics)
 
    # Current and desired robot states
@@ -268,7 +266,7 @@ Control your robot with advanced algorithms:
    ultimate_period = 0.5   # Measure from oscillations
    Kp, Ki, Kd = controller.tune_controller(ultimate_gain, ultimate_period, kind="PID")
 
-   print(f"🎛️ Auto-tuned gains:")
+   print("Auto-tuned gains:")
    print(f"   Kp: {Kp[0]:.2f}, Ki: {Ki[0]:.2f}, Kd: {Kd[0]:.2f}")
 
    # Compute control torques
@@ -283,12 +281,13 @@ Control your robot with advanced algorithms:
        Kp=Kp, Ki=Ki, Kd=Kd
    )
 
-   print(f"⚡ Control torques: {control_torques}")
+   print(f"Control torques: {control_torques}")
 
 Your First Vision System
 ------------------------
 
-👁️ **Computer Vision & Perception**
+Detection and clustering
+~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. note::
    The vision and perception modules pull in OpenCV, Ultralytics/YOLO,
@@ -321,7 +320,6 @@ Add eyes to your robot:
    }
 
    # Create vision system
-   print("👁️ Setting up vision system...")
    vision = Vision(camera_configs=[camera_config])
    perception = Perception(vision_instance=vision)
 
@@ -334,48 +332,52 @@ Add eyes to your robot:
    )
 
    num_clusters = len(set(cluster_labels)) - (1 if -1 in cluster_labels else 0)
-   print(f"🔍 Detected {len(obstacle_points)} obstacle points")
-   print(f"📦 Found {num_clusters} distinct objects")
+   print(f"Detected {len(obstacle_points)} obstacle points")
+   print(f"Found {num_clusters} distinct objects")
 
-What's Next?
-------------
+What's Next
+-----------
 
-🎉 **Congratulations!** You've just built your first robot system with ManipulaPy.
+You now have a working robot system. These are the natural next steps:
 
 .. raw:: html
 
-   <div class="next-steps">
-      <div class="step-category">
-         <h4>📚 Learn the Fundamentals</h4>
+   <div class="mp-grid">
+      <div class="mp-card">
+         <span class="mp-kicker">Fundamentals</span>
          <ul>
-            <li><a href="../user_guide/Kinematics.html">🔧 Kinematics Deep Dive</a></li>
-            <li><a href="../user_guide/Dynamics.html">⚖️ Robot Dynamics</a></li>
-            <li><a href="../user_guide/Trajectory_Planning.html">🛤️ Motion Planning</a></li>
+            <li><a href="../user_guide/Kinematics.html">Kinematics deep dive</a></li>
+            <li><a href="../user_guide/Dynamics.html">Robot dynamics</a></li>
+            <li><a href="../user_guide/Trajectory_Planning.html">Motion planning</a></li>
+            <li><a href="../user_guide/Backends.html">Compute backends</a></li>
          </ul>
       </div>
-      <div class="step-category">
-         <h4>🎓 Explore Tutorials</h4>
+
+      <div class="mp-card">
+         <span class="mp-kicker">Tutorials</span>
          <ul>
-            <li><a href="../tutorials/index.html">🤖 Build a Pick & Place Robot</a></li>
-            <li><a href="../tutorials/index.html">👁️ Vision-Guided Manipulation</a></li>
-            <li><a href="../tutorials/index.html">🏭 Multi-Robot Coordination</a></li>
+            <li><a href="../tutorials/index.html">Notebook course</a></li>
+            <li><a href="../tutorials/kinematics_guide.html">Kinematics walkthrough</a></li>
+            <li><a href="../tutorials/dynamics_guide.html">Dynamics walkthrough</a></li>
          </ul>
       </div>
-      <div class="step-category">
-         <h4>🛠️ API Reference</h4>
+
+      <div class="mp-card">
+         <span class="mp-kicker">API reference</span>
          <ul>
-            <li><a href="../api/kinematics.html">📖 Kinematics API</a></li>
-            <li><a href="../api/dynamics.html">📖 Dynamics API</a></li>
-            <li><a href="../api/control.html">📖 Control API</a></li>
-            <li><a href="../api/path_planning.html">📖 Planning API</a></li>
+            <li><a href="../api/kinematics.html">kinematics</a></li>
+            <li><a href="../api/dynamics.html">dynamics</a></li>
+            <li><a href="../api/control.html">control</a></li>
+            <li><a href="../api/path_planning.html">path_planning</a></li>
          </ul>
       </div>
    </div>
 
-Common Issues & Solutions
--------------------------
+Common Issues
+-------------
 
-⚠️ **Installation Problems**
+Installation problems
+~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: bash
 
@@ -385,9 +387,10 @@ Common Issues & Solutions
    # If you need CUDA support
    pip install manipulapy[cuda]
    # Verify CUDA is available
-   python -c "import cupy; print('CUDA available!')"
+   python -c "import cupy; print('CUDA available')"
 
-⚠️ **Import Errors**
+Import errors
+~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -396,69 +399,41 @@ Common Issues & Solutions
    sys.path.append('/path/to/ManipulaPy')
    import ManipulaPy
 
-⚠️ **Simulation Issues**
+Simulation failures
+~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
    # If PyBullet simulation fails
    pip install pybullet
-   
+
    # Test PyBullet installation
    import pybullet as p
    p.connect(p.DIRECT)
-   print("PyBullet working!")
+   print("PyBullet working")
 
-⚠️ **Performance Issues**
+Performance
+~~~~~~~~~~~
 
 .. code-block:: python
 
    # Check if CUDA acceleration is working
    try:
        import cupy
-       print("🚀 CUDA acceleration available")
+       print("CUDA acceleration available")
    except ImportError:
-       print("⚠️ Install CuPy for GPU acceleration")
+       print("Install CuPy for GPU acceleration")
 
-💡 **Pro Tips**
+Getting Help
+------------
 
-.. raw:: html
-
-   <div class="pro-tips">
-      <div class="tip">
-         <span class="tip-icon">🎯</span>
-         <strong>Start Simple</strong><br>
-         Begin with forward kinematics before inverse kinematics
-      </div>
-      <div class="tip">
-         <span class="tip-icon">📊</span>
-         <strong>Visualize Everything</strong><br>
-         Use the plotting functions to understand robot behavior
-      </div>
-      <div class="tip">
-         <span class="tip-icon">⚡</span>
-         <strong>Use GPU Acceleration</strong><br>
-         Install CUDA for 7x faster computations
-      </div>
-      <div class="tip">
-         <span class="tip-icon">🔧</span>
-         <strong>Check Joint Limits</strong><br>
-         Always define realistic joint limits for safety
-      </div>
-   </div>
-
-📞 **Need Help?**
-
-- 📖 Check the :doc:`../api/index` for detailed function documentation
-- 🐛 Report bugs on `GitHub Issues <https://github.com/boelnasr/ManipulaPy/issues>`_
-- 💬 Join our community discussions
-- 📧 Contact the maintainers for support
+- Check the :doc:`../api/index` for exact signatures and defaults.
+- Report bugs on `GitHub Issues <https://github.com/boelnasr/ManipulaPy/issues>`_.
+- Contact the maintainers for anything the issue tracker cannot cover.
 
 .. tip::
    Curious what changed in this release? See the
-   `v1.3.2 changelog <https://github.com/boelnasr/ManipulaPy/blob/main/CHANGELOG.md>`_
-   for highlights — the lightweight default install, the new ``[simulation]``,
-   ``[urdf]``, ``[vision]``, and ``[ml]`` extras, plus control/sim/URDF bug fixes.
-
-.. Styles for .getting-started-hero, .next-steps, .step-category, .pro-tips,
-   and .tip live in docs/source/_static/custom.css so they adapt to Furo's
-   light/dark theme via CSS variables.
+   `changelog <https://github.com/boelnasr/ManipulaPy/blob/main/CHANGELOG.md>`_
+   for highlights — the unified compute backends and differentiable core math in
+   v1.4, and the lightweight default install with ``[simulation]``, ``[urdf]``,
+   ``[vision]`` and ``[ml]`` extras introduced in v1.3.2.
