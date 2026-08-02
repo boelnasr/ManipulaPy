@@ -12,10 +12,17 @@ recursive-include ManipulaPy *.py
 recursive-include ManipulaPy/ManipulaPy_data *.urdf
 recursive-include ManipulaPy/ManipulaPy_data *.md
 recursive-include ManipulaPy/ManipulaPy_data *.yaml
-recursive-include ManipulaPy/ManipulaPy_data *.json
 
-# Include configuration files
-recursive-include ManipulaPy *.yaml *.json *.xml *.cfg *.ini
+# Include configuration files.
+#
+# These are named explicitly rather than globbed. The sdist is built from the
+# WORKING TREE, not from git, so a recursive glob over ManipulaPy/ sweeps up
+# any untracked or gitignored file that happens to match — a root .gitignore
+# entry does not protect paths nested under the package. A broad
+# "*.yaml *.json *.xml *.cfg *.ini" glob here previously shipped a local
+# developer tool config to PyPI; anything matching that pattern is a direct,
+# silent path from a developer's disk into a published artifact.
+include ManipulaPy/urdf/package_map.example.json
 
 # Include tests
 recursive-include tests *.py
@@ -42,6 +49,12 @@ global-exclude .DS_Store
 global-exclude __pycache__
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
+
+# Defence in depth: never ship developer tool configuration or local
+# overrides that happen to sit under the package tree, whatever the includes
+# above may match in future.
+global-exclude *.local.json
+prune ManipulaPy/ManipulaPy_data/.claude
 
 # Exclude development files
 exclude .gitignore

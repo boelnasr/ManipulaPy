@@ -1,3 +1,14 @@
+"""Legacy setuptools shim. NOT the release path.
+
+pyproject.toml's [project] table is canonical. pip and `python -m build`
+(PEP 517) read it and ignore the metadata below; only a direct
+`python setup.py sdist` uses these values, and they are known to diverge —
+description, keywords and the optional-dependency extras all differ. Building
+a release with `setup.py sdist` therefore publishes stale metadata and omits
+the backend extras entirely.
+
+Build releases with `python -m build`, via the publish workflow.
+"""
 from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -8,7 +19,7 @@ setup(
     # Version is canonical in pyproject.toml; this duplicate is kept synced
     # for any legacy tooling that still parses setup.py directly. pip and
     # `python -m build` use pyproject.toml's [project] table, not this.
-    version="1.3.2.post1",
+    version="1.4.0",
     author="Mohamed Aboelnasr",
     author_email="aboelnasr1997@gmail.com",
     description="A comprehensive, GPU-accelerated Python framework for robotic manipulation, perception, and control",
