@@ -678,6 +678,15 @@ class Vision:
             self.logger.error("❌ Invalid depth or RGB input")
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
+        # The ROI slice below indexes depth_image on two axes, so anything
+        # flatter than the documented (H, W) array raises IndexError once a
+        # detection is found rather than being reported as bad input.
+        if np.ndim(depth_image) < 2:
+            self.logger.error(
+                f"❌ Expected a 2-D depth image, got {np.ndim(depth_image)}-D"
+            )
+            return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
+
         if camera_index not in self.cameras:
             self.logger.error(f"Camera index {camera_index} not found.")
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
