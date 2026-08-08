@@ -582,10 +582,14 @@ def test_annotation_facet_reports_hand_written_ndarray_respelling(tmp_path) -> N
         tmp_path, "probe_drifted", "np.ndarray[Any, np.dtype[np.float64]]"
     )
 
-    # The two annotations really are distinct objects rendering differently,
-    # so this is not a no-op edit...
-    assert str(inspect.signature(frozen)) != str(inspect.signature(drifted))
-    # ...yet the canonical signature is blind to it, which is precisely the
+    # This is a real edit, not a no-op. Assert that against the source, which
+    # is the same on every NumPy: whether the two spellings also *render*
+    # differently is itself version-dependent -- NumPy >= 2.2 renders NDArray
+    # with a tuple shape so the canonical rewrite collapses them, while NumPy
+    # 2.0/2.1 already render it as the bare ``Any`` form the edit spells out,
+    # so they coincide before normalisation ever runs.
+    assert inspect.getsource(frozen) != inspect.getsource(drifted)
+    # Either way the rendered signature cannot report the edit, which is the
     # price paid for the cross-version fix and the reason the facet exists.
     assert _signature_str(frozen) == _signature_str(drifted)
 
