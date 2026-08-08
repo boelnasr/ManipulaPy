@@ -13,6 +13,7 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
+import numbers
 import os
 import shutil
 import subprocess
@@ -495,6 +496,16 @@ def create_smart_mock(module_name) -> Any:
         sklearn_mock = MockModule("sklearn")
         sklearn_mock.cluster = MockModule("sklearn.cluster")
 
+        class MockInvalidParameterError(ValueError, TypeError):
+            """Stand-in for sklearn.utils._param_validation.InvalidParameterError.
+
+            The real class cannot be imported here -- this mock only exists
+            when sklearn is absent -- so it is mirrored instead. sklearn's
+            version derives from *both* ValueError and TypeError, so code
+            written against either handler behaves the same on the mock as
+            on the real library.
+            """
+
         class MockDBSCAN:
             """Mock of sklearn.cluster.DBSCAN producing deterministic labels."""
 
@@ -503,6 +514,31 @@ def create_smart_mock(module_name) -> Any:
                 self.eps = eps
                 self.min_samples = min_samples
                 self.labels_ = None
+
+            def _validate_params(self) -> None:
+                """Reject hyperparameters the real DBSCAN would reject.
+
+                Without this the mock silently clusters with eps=0, negative
+                or NaN eps, and non-positive or non-integral min_samples,
+                so tests asserting that bad parameters are rejected pass
+                against the mock while failing against sklearn. sklearn
+                checks these in fit(), not __init__(), and requires
+                eps in (0, inf) and an integral min_samples >= 1.
+                """
+                if not isinstance(self.eps, numbers.Real) or not (
+                    np.isfinite(self.eps) and self.eps > 0
+                ):
+                    raise MockInvalidParameterError(
+                        "The 'eps' parameter of DBSCAN must be a float in the "
+                        f"range (0.0, inf). Got {self.eps!r} instead."
+                    )
+                if not isinstance(self.min_samples, numbers.Integral) or (
+                    self.min_samples < 1
+                ):
+                    raise MockInvalidParameterError(
+                        "The 'min_samples' parameter of DBSCAN must be an int "
+                        f"in the range [1, inf). Got {self.min_samples!r} instead."
+                    )
 
             def fit(self, X) -> "MockDBSCAN":
                 """Cluster by actual density and return self.
@@ -514,7 +550,17 @@ def create_smart_mock(module_name) -> Any:
                 in different clusters -- so tests failed against the mock
                 for reasons the real library would never produce.
                 """
+                self._validate_params()
                 points = np.asarray(X, dtype=float)
+                # sklearn's check_array rejects non-finite samples with a
+                # plain ValueError; the mock used to fold them into noise.
+                if points.size and not np.all(np.isfinite(points)):
+                    raise ValueError(
+                        "Input X contains NaN."
+                        if np.isnan(points).any()
+                        else "Input X contains infinity or a value too large "
+                        "for dtype('float64')."
+                    )
                 if len(points) == 0:
                     self.labels_ = np.array([], dtype=int)
                     return self
