@@ -200,6 +200,7 @@ scripts/record_robot_gifs.py
 # Local tooling / editor workspaces
 .gstack/
 .obsidian/
+.worktrees/
 
 # Sphinx build log captured by `make ... | tee build.log`
 docs/build.log
