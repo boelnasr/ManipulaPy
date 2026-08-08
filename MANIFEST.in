@@ -1,9 +1,8 @@
 # Include the README and license files
 include README.md
-include LICENSE
+include LICENSE.md
 include CHANGELOG.md
 include CODE_OF_CONDUCT.md
-include STATUS.md
 
 # Include all Python files in the main package
 recursive-include ManipulaPy *.py

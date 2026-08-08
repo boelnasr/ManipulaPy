@@ -162,6 +162,11 @@ dev = [
     "mypy>=0.950",
     "pre-commit>=2.15.0",
     "tox>=4.0.0",
+    # tests/test_packaging_metadata.py falls back to tomli where tomllib does
+    # not exist. It currently arrives only as a transitive dependency of
+    # coverage[toml]; declare it so the packaging gate cannot be broken by an
+    # unrelated dependency change.
+    "tomli>=1.2.0;python_version<'3.11'",
 ]
 
 # Documentation dependencies
