@@ -162,7 +162,7 @@ def test_eyebrow_budget_is_not_exceeded():
 
 - [ ] **Step 2: Run the contract to prove the current design fails**
 
-Run: `python -m pytest tests/test_docs_design.py -q`
+Run: `python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: failures for missing homepage classes, missing local fonts and hero asset, old Anime.js registration, and missing new CSS tokens.
 
@@ -236,7 +236,7 @@ In `docs/source/conf.py`:
 
 - [ ] **Step 4: Run the asset and configuration contract tests**
 
-Run: `python -m pytest tests/test_docs_design.py -q`
+Run: `python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: asset and theme-registration tests pass; homepage, CSS, and motion tests still fail.
 
@@ -271,7 +271,7 @@ ManipulaPy Documentation
 
 .. raw:: html
 
-   <main class="mp-home">
+   <div class="mp-home">
       <section class="mp-hero" aria-labelledby="mp-hero-title">
          <div class="mp-hero__copy">
             <p class="mp-overline">Python robotics, from model to motion</p>
@@ -355,7 +355,7 @@ ManipulaPy Documentation
             <div><h3>Compute</h3><a href="api/backend.html">Backends</a><a href="api/cuda_kernels.html">CUDA kernels</a><a href="api/utils.html">Utilities</a></div>
          </div>
       </section>
-   </main>
+   </div>
 ```
 
 Fill the learning paths with existing destinations:
@@ -409,11 +409,11 @@ Append these unchanged document roots after the raw homepage markup:
 
 - [ ] **Step 3: Run homepage contract and RST parser checks**
 
-Run: `python -m pytest tests/test_docs_design.py -q`
+Run: `python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: homepage structure, route preservation, CTA, clutter-removal, dash, and eyebrow-budget tests pass; CSS and motion tests still fail.
 
-Run: `python -m sphinx -b dummy docs/source /tmp/manipulapy-docs-dummy -W --keep-going`
+Run: `python3 -m sphinx -b dummy docs/source /tmp/manipulapy-docs-dummy -W --keep-going`
 
 Expected: no new malformed-HTML, unknown-document, or toctree warnings attributable to `index.rst`.
 
@@ -564,7 +564,7 @@ Use the same palette and radius for search, copy buttons, tables, admonitions, A
 
 - [ ] **Step 5: Run CSS contract tests and build HTML**
 
-Run: `python -m pytest tests/test_docs_design.py -q`
+Run: `python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: every test except the native-motion contract passes.
 
@@ -661,7 +661,7 @@ Run: `git rm docs/source/_static/anime.umd.min.js`
 
 - [ ] **Step 3: Run the full design contract and HTML build**
 
-Run: `python -m pytest tests/test_docs_design.py -q`
+Run: `python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: all tests pass.
 
@@ -692,7 +692,7 @@ git commit -m "refactor: use native docs motion"
 - [ ] **Step 1: Run clean source and builder verification**
 
 ```bash
-python -m pytest tests/test_docs_design.py -q
+python3 -m pytest tests/test_docs_design.py -q
 make -C docs clean
 make -C docs html
 make -C docs epub
@@ -717,7 +717,7 @@ Expected: every command exits successfully.
 
 - [ ] **Step 3: Serve the built documentation and capture four homepage views**
 
-Run `python -m http.server 8765 --directory docs/build/html` in a long-running terminal, then capture:
+Run `python3 -m http.server 8765 --directory docs/build/html` in a long-running terminal, then capture:
 
 ```bash
 google-chrome --headless=new --disable-gpu --hide-scrollbars --window-size=1440,1000 --screenshot=/tmp/manipulapy-docs-light-desktop.png http://127.0.0.1:8765/
