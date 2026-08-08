@@ -46,8 +46,10 @@ pip install "ManipulaPy[simulation]"   # PyBullet physics + visualization
 pip install "ManipulaPy[urdf]"         # trimesh-backed mesh loading
 pip install "ManipulaPy[vision]"       # OpenCV + Ultralytics YOLO + torch
 pip install "ManipulaPy[ml]"           # scikit-learn (DBSCAN clustering)
-pip install "ManipulaPy[cuda]"         # CuPy 12.x for CUDA 12.x toolchains
-pip install "ManipulaPy[all]"          # everything above
+pip install "ManipulaPy[cuda]"         # CuPy 13.x for CUDA 12.x toolchains
+pip install "ManipulaPy[pytorch]"      # PyTorch backend — differentiable core math
+pip install "ManipulaPy[jax-cpu]"      # JAX backend (CPU); [jax-cuda] for CUDA 12
+pip install "ManipulaPy[all]"          # everything above except the JAX GPU/TPU wheels
 ```
 
 For CUDA 11.x toolchains use `[gpu-cuda11]`; for AMD/ROCm use `[gpu-rocm]`. Full matrix in the [Installation Guide](docs/source/Installation%20Guide.rst).
@@ -69,10 +71,11 @@ CUDA/GPU features are not available on macOS — the `[cuda]` extra is skipped a
 |---|---|---|
 | **Python** | 3.9 – 3.12 | CI matrix runs all four; 3.12 added in v1.3.2 |
 | **OS** | Linux (primary) · macOS · Windows | CUDA extras Linux-only |
-| **CPU stack** | NumPy ≥ 2.0,< 3.0 · SciPy ≥ 1.14 · Numba ≥ 0.60 · Matplotlib ≥ 3.9 · Pillow ≥ 8.0 | Installed by default |
+| **CPU stack** | NumPy ≥ 2.0,< 3.0 · SciPy ≥ 1.13 · Numba ≥ 0.60 · Matplotlib ≥ 3.9 · Pillow ≥ 8.0 | Installed by default |
 | **GPU stack** | CUDA 12.x via `[cuda]` · CUDA 11.x via `[gpu-cuda11]` | NVIDIA, compute capability ≥ 6.0 |
 | **Simulation** | PyBullet ≥ 3.2 | Optional, `[simulation]` extra |
-| **Vision** | OpenCV ≥ 4.5 · Ultralytics ≥ 8.4 · PyTorch ≥ 1.8 | Optional, `[vision]` extra |
+| **Vision** | OpenCV ≥ 4.8.1 · Ultralytics ≥ 8.4 · PyTorch ≥ 2.7.1 | Optional, `[vision]` extra |
+| **Backends** | PyTorch ≥ 2.7.1 via `[pytorch]` · JAX ≥ 0.6 via `[jax-cpu]` / `[jax-cuda]` | Optional, differentiable core math |
 
 ### Verify
 
@@ -240,26 +243,28 @@ Stereo rectification, disparity, and 3D point-cloud generation live on the same 
 
 ```
 ManipulaPy/
-├── kinematics.py        # SerialManipulator — FK, IK (DLS/SQP/TRAC-IK/smart), Jacobians
-├── dynamics.py          # ManipulatorDynamics — M, C, g, inverse / forward dynamics
-├── control.py           # ManipulatorController — PID, CTC, adaptive, robust, Kalman
-├── path_planning.py     # OptimizedTrajectoryPlanning — CPU/GPU quintic·cubic·linear
-├── singularity.py       # Manipulability ellipsoid, condition number, MC workspace
-├── potential_field.py   # Attractive + repulsive fields (sign-corrected in v1.3.2)
-├── ik_helpers.py        # smart_inverse_kinematics dispatch table + TRAC-IK glue
+├── backend/             # Array-backend protocol + registry — NumPy · CuPy · PyTorch · JAX
+├── utils/               # SO(3)/SE(3) screw math, exponentials, logarithms, time scaling
+├── kinematics/          # SerialManipulator — FK, IK (DLS/SQP/TRAC-IK/smart), Jacobians
+├── dynamics/            # ManipulatorDynamics — M, C, g, inverse / forward dynamics
+├── control/             # ManipulatorController — PID, CTC, adaptive, robust, Kalman
+├── planning/            # OptimizedTrajectoryPlanning — CPU/GPU quintic·cubic·linear
+├── singularity/         # Manipulability ellipsoid, condition number, MC workspace
+├── potential_field/     # Attractive + repulsive fields (sign-corrected in v1.3.2)
 ├── urdf/                # Native URDF parser — package://, file://, ROS discovery
 │   ├── parser.py        #   v1.3.2: NumPy 2.0 compatible, no urchin dependency
 │   ├── resolver.py      #   PackageResolver — explicit overrides + auto-discovery
 │   └── scene.py         #   Visualization / kinematic tree introspection
-├── sim.py               # PyBullet wrapper                        [simulation]
+├── sim/                 # PyBullet wrapper                        [simulation]
 ├── vision.py            # OpenCV + Ultralytics YOLO + stereo      [vision]
 ├── perception.py        # Depth → obstacles + DBSCAN clustering   [vision, ml]
-├── cuda_kernels.py      # Numba/CuPy kernels                      [cuda]
-├── ManipulaPy_data/     # 25 bundled robot URDFs + meshes
-└── Benchmark/           # Reproducible CPU vs GPU benchmark suite
+├── cuda_kernels/        # Numba/CuPy kernel registry              [cuda]
+└── ManipulaPy_data/     # 25 bundled robot URDFs + meshes
 ```
 
-The library is layered: every higher-level module depends only on the ones above it in this list. You can use `kinematics` / `dynamics` / `control` / `path_planning` end-to-end with zero optional dependencies installed.
+The library is layered: every higher-level module depends only on the ones above it in this list. You can use `kinematics` / `dynamics` / `control` / `planning` end-to-end with zero optional dependencies installed.
+
+Most of these were single modules before v1.4 and became packages during the backend migration. **Existing imports keep working** — `ManipulaPy.path_planning` and `ManipulaPy.ik_helpers` remain importable as compatibility shims, and the public API is frozen by a regression test.
 
 ---
 
@@ -329,6 +334,7 @@ All visuals are rendered from the live API — joint and trajectory plots throug
 - **`[vision]`** — OpenCV + Ultralytics YOLO + stereo + 3D point clouds
 - **`[ml]`** — DBSCAN-based obstacle clustering on top of vision
 - **`[cuda]`** — CuPy/Numba CUDA kernels: trajectory generation (40×+), batch trajectories (20×+), inverse dynamics (100×+), Monte-Carlo workspace (10×+)
+- **`[pytorch]` / `[jax-cpu]` / `[jax-cuda]`** — differentiable backends for the core math; `∂FK/∂θ` and `∂(inverse dynamics)/∂θ` straight from `torch.autograd` or `jax.grad`
 
 ### Bundled robots
 
