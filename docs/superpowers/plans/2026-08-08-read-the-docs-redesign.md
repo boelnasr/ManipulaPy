@@ -162,7 +162,7 @@ def test_eyebrow_budget_is_not_exceeded():
 
 - [ ] **Step 2: Run the contract to prove the current design fails**
 
-Run: `python3 -m pytest tests/test_docs_design.py -q`
+Run: `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: failures for missing homepage classes, missing local fonts and hero asset, old Anime.js registration, and missing new CSS tokens.
 
@@ -236,7 +236,7 @@ In `docs/source/conf.py`:
 
 - [ ] **Step 4: Run the asset and configuration contract tests**
 
-Run: `python3 -m pytest tests/test_docs_design.py -q`
+Run: `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: asset and theme-registration tests pass; homepage, CSS, and motion tests still fail.
 
@@ -409,7 +409,7 @@ Append these unchanged document roots after the raw homepage markup:
 
 - [ ] **Step 3: Run homepage contract and RST parser checks**
 
-Run: `python3 -m pytest tests/test_docs_design.py -q`
+Run: `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: homepage structure, route preservation, CTA, clutter-removal, dash, and eyebrow-budget tests pass; CSS and motion tests still fail.
 
@@ -564,7 +564,7 @@ Use the same palette and radius for search, copy buttons, tables, admonitions, A
 
 - [ ] **Step 5: Run CSS contract tests and build HTML**
 
-Run: `python3 -m pytest tests/test_docs_design.py -q`
+Run: `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: every test except the native-motion contract passes.
 
@@ -661,7 +661,7 @@ Run: `git rm docs/source/_static/anime.umd.min.js`
 
 - [ ] **Step 3: Run the full design contract and HTML build**
 
-Run: `python3 -m pytest tests/test_docs_design.py -q`
+Run: `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/test_docs_design.py -q`
 
 Expected: all tests pass.
 
@@ -692,7 +692,7 @@ git commit -m "refactor: use native docs motion"
 - [ ] **Step 1: Run clean source and builder verification**
 
 ```bash
-python3 -m pytest tests/test_docs_design.py -q
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests/test_docs_design.py -q
 make -C docs clean
 make -C docs html
 make -C docs epub
