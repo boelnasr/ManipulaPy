@@ -678,12 +678,16 @@ class Vision:
             self.logger.error("❌ Invalid depth or RGB input")
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 
-        # The ROI slice below indexes depth_image on two axes, so anything
-        # flatter than the documented (H, W) array raises IndexError once a
-        # detection is found rather than being reported as bad input.
-        if np.ndim(depth_image) < 2:
+        # The ROI slice below indexes depth_image on two axes. Anything flatter
+        # than the documented (H, W) array raises IndexError once a detection is
+        # found, and anything with a wider trailing axis makes the ROI median run
+        # across channels instead of across depth samples, silently returning a
+        # wrong depth. Accept (H, W) and the equivalent (H, W, 1); reject the rest.
+        if np.ndim(depth_image) == 3 and np.shape(depth_image)[2] == 1:
+            depth_image = depth_image[..., 0]
+        elif np.ndim(depth_image) != 2:
             self.logger.error(
-                f"❌ Expected a 2-D depth image, got {np.ndim(depth_image)}-D"
+                f"❌ Expected a 2-D depth image, got shape {np.shape(depth_image)}"
             )
             return np.empty((0, 3), dtype=np.float32), np.empty((0,), dtype=np.float32)
 

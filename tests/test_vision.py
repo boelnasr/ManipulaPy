@@ -1155,6 +1155,89 @@ class TestVisionErrorHandlingAndEdgeCases(unittest.TestCase):
         except ImportError as e:
             self.skipTest(f"Vision module not available: {e}")
 
+    def test_detect_obstacles_depth_rank_domain(self) -> None:
+        """Only (H, W) and (H, W, 1) depth images are accepted."""
+        try:
+            from ManipulaPy.vision import Vision
+
+            class MockBox:
+                def __init__(self) -> None:
+                    """Store a single mock bounding box in xyxy format."""
+                    self.xyxy = np.array([[160, 120, 480, 360]])
+
+            class MockResults:
+                def __init__(self) -> None:
+                    """Store an iterable list of mock detection boxes."""
+                    self.boxes = [MockBox()]
+
+            class MockYOLO:
+                def __call__(self, image, conf=0.3) -> list:
+                    """Return one mock detection covering the ROI under test."""
+                    return [MockResults()]
+
+            with (
+                patch("pybullet.addUserDebugParameter"),
+                patch("pybullet.readUserDebugParameter"),
+            ):
+                vision = Vision(use_pybullet_debug=False, show_plot=False)
+
+            vision.yolo_model = MockYOLO()
+            rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+            depth_2d = np.full((480, 640), 1.0, dtype=np.float32)
+
+            # 2-D: accepted, and the reference the other shapes are judged against.
+            positions_2d, _ = vision.detect_obstacles(
+                depth_2d, rgb, depth_threshold=10.0
+            )
+            self.assertEqual(
+                positions_2d.shape, (1, 3), "2-D depth image should be accepted"
+            )
+
+            # (H, W, 1): accepted, and numerically identical to the 2-D input.
+            positions_hw1, _ = vision.detect_obstacles(
+                depth_2d[:, :, np.newaxis], rgb, depth_threshold=10.0
+            )
+            np.testing.assert_allclose(
+                positions_hw1,
+                positions_2d,
+                err_msg="(H, W, 1) depth must give the same result as (H, W)",
+            )
+
+            # 1-D: rejected.
+            positions_1d, _ = vision.detect_obstacles(
+                np.array([1.0, 2.0, 3.0], dtype=np.float32), rgb, depth_threshold=10.0
+            )
+            self.assertEqual(
+                positions_1d.shape, (0, 3), "1-D depth image should be rejected"
+            )
+
+            # (H, W, 3): rejected. Medianing across channels would otherwise
+            # report a depth of 3.0 where the true depth plane is 1.0.
+            depth_3ch = np.zeros((480, 640, 3), dtype=np.float32)
+            depth_3ch[:, :, 0] = depth_2d
+            depth_3ch[:, :, 1:] = 3.0
+            positions_3ch, _ = vision.detect_obstacles(
+                depth_3ch, rgb, depth_threshold=10.0
+            )
+            self.assertEqual(
+                positions_3ch.shape,
+                (0, 3),
+                "(H, W, 3) depth image should be rejected, not medianed over channels",
+            )
+
+            # 4-D: rejected.
+            positions_4d, _ = vision.detect_obstacles(
+                depth_2d[:, :, np.newaxis, np.newaxis], rgb, depth_threshold=10.0
+            )
+            self.assertEqual(
+                positions_4d.shape, (0, 3), "4-D depth image should be rejected"
+            )
+
+            print("✅ Vision depth-image rank domain enforced")
+
+        except ImportError as e:
+            self.skipTest(f"Vision module not available: {e}")
+
     def test_vision_stereo_without_config(self) -> None:
         """Test stereo methods fail appropriately without config."""
         try:
