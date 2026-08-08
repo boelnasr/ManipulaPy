@@ -92,7 +92,7 @@ Optional extras
      - JAX compute backend, CUDA 12 build (Linux only)
      - ``pip install "ManipulaPy[jax-cuda]"``
    * - ``[jax-tpu]``
-     - JAX compute backend for a Google Cloud TPU VM (Linux only; release evidence pending Task 17)
+     - JAX compute backend for a Google Cloud TPU VM (Linux only; release evidence pending the TPU release gate)
      - ``pip install "ManipulaPy[jax-tpu]"``
    * - ``[all]``
      - All non-TPU runtime extras, including CPU JAX; excludes ``jax-tpu``
@@ -169,8 +169,8 @@ imported until a backend is explicitly requested.
    not local hardware. The planned supported domain is real ``float32``,
    ``float64``, and ``int64``. X64 is required and can increase TPU resource
    use and compilation cost; a linalg compilation has exceeded 60 seconds.
-   Complex TPU inputs must fail fast under Task 17. Packaging is not proof of
-   support: real release evidence remains pending the Task-17 contract gate in
+   Complex TPU inputs must fail fast under the release gate. Packaging is not proof of
+   support: real release evidence remains pending the TPU release gate in
    `tests/test_tpu_contract.py <../../tests/test_tpu_contract.py>`_ and
    `.github/workflows/tpu-release.yml <../../.github/workflows/tpu-release.yml>`_.
 

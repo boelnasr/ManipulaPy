@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `[jax-tpu]` targets a Google Cloud one-chip `v5litepod-1` (TPU v5e); its
   planned real domain is `float32`, `float64`, and `int64`. X64 is required and
   may raise resource and compile cost (a linalg compilation exceeded 60
-  seconds). Complex TPU inputs must fail fast in Task 17. Packaging does not
+  seconds). Complex TPU inputs must fail fast under the release gate. Packaging does not
   prove support: release evidence is pending
   [tests/test_tpu_contract.py](tests/test_tpu_contract.py) and
   [.github/workflows/tpu-release.yml](.github/workflows/tpu-release.yml).
@@ -91,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The JAX backend enables `jax_enable_x64` when it is imported, which is
   process-global JAX state and is not reverted.
 - `[jax-tpu]` requires a Google Cloud TPU VM. Its real-hardware release
-  contract is pending Task 17; complex TPU inputs must fail fast, and no TPU
+  contract is pending the TPU release gate; complex TPU inputs must fail fast, and no TPU
   support claim is made until the planned gate passes.
 
 ## [1.3.2] — 2026-05-31

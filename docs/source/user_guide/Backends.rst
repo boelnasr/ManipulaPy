@@ -212,8 +212,8 @@ Installation
    a local accelerator. Its planned supported domain is real ``float32``,
    ``float64``, and ``int64``. X64 is required and may increase resource use
    and compilation cost; a linalg compilation has taken more than 60 seconds.
-   Complex TPU inputs must fail fast under Task 17. This package extra does
-   **not** prove TPU support: release evidence is pending the Task-17 contract
+   Complex TPU inputs must fail fast under the release gate. This package extra does
+   **not** prove TPU support: release evidence is pending the TPU release contract
    gate, `tests/test_tpu_contract.py <../../../tests/test_tpu_contract.py>`_,
    and `.github/workflows/tpu-release.yml <../../../.github/workflows/tpu-release.yml>`_.
 

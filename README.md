@@ -441,7 +441,7 @@ dT_dtheta = jax.jacrev(robot.forward_kinematics)(theta)
 - **TPU release status** — `[jax-tpu]` targets a Google Cloud one-chip
   `v5litepod-1` (TPU v5e). Its planned domain is real `float32`, `float64`, and
   `int64`; X64 is required and can raise resource and compile costs (a linalg
-  compile exceeded 60 seconds). Complex TPU inputs must fail fast in Task 17.
+  compile exceeded 60 seconds). Complex TPU inputs must fail fast under the release gate.
   Support is not yet proven: real release evidence is pending
   [tests/test_tpu_contract.py](tests/test_tpu_contract.py) and
   [.github/workflows/tpu-release.yml](.github/workflows/tpu-release.yml).
