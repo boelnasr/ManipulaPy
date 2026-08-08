@@ -1,5 +1,13 @@
 {
   "ManipulatorDynamics.forward_dynamics": {
+    "annotations": {
+      "Ftip": "Union[NDArray[np.float64], List[float]]",
+      "dthetalist": "Union[NDArray[np.float64], List[float]]",
+      "g": "Union[NDArray[np.float64], List[float]]",
+      "return": "NDArray[np.float64]",
+      "taulist": "Union[NDArray[np.float64], List[float]]",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "shape": [
@@ -10,6 +18,11 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], dthetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], taulist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], g: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], Ftip: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]]) -> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]"
   },
   "ManipulatorDynamics.gravity_forces": {
+    "annotations": {
+      "g": "Optional[Union[NDArray[np.float64], List[float]]]",
+      "return": "NDArray[np.float64]",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "shape": [
@@ -20,6 +33,14 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], g: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float], NoneType] = None) -> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]"
   },
   "ManipulatorDynamics.inverse_dynamics": {
+    "annotations": {
+      "Ftip": "Union[NDArray[np.float64], List[float]]",
+      "ddthetalist": "Union[NDArray[np.float64], List[float]]",
+      "dthetalist": "Union[NDArray[np.float64], List[float]]",
+      "g": "Union[NDArray[np.float64], List[float]]",
+      "return": "NDArray[np.float64]",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "shape": [
@@ -30,6 +51,10 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], dthetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], ddthetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], g: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], Ftip: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]]) -> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]"
   },
   "ManipulatorDynamics.mass_matrix": {
+    "annotations": {
+      "return": "NDArray[np.float64]",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "shape": [
@@ -41,6 +66,11 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]]) -> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]"
   },
   "ManipulatorDynamics.velocity_quadratic_forces": {
+    "annotations": {
+      "dthetalist": "Union[NDArray[np.float64], List[float]]",
+      "return": "NDArray[np.float64]",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "shape": [
@@ -51,6 +81,9 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], dthetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]]) -> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]"
   },
   "OptimizedTrajectoryPlanning.calculate_derivatives": {
+    "annotations": {
+      "return": "Tuple[np.ndarray, np.ndarray, np.ndarray]"
+    },
     "return": {
       "elements": [
         {
@@ -83,6 +116,9 @@
     "signature": "(positions, dt) -> Tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]"
   },
   "OptimizedTrajectoryPlanning.cartesian_trajectory": {
+    "annotations": {
+      "return": "Dict[str, np.ndarray]"
+    },
     "return": {
       "items": {
         "accelerations": {
@@ -124,6 +160,9 @@
     "signature": "(Xstart, Xend, Tf, N, method) -> Dict[str, numpy.ndarray]"
   },
   "OptimizedTrajectoryPlanning.forward_dynamics_trajectory": {
+    "annotations": {
+      "return": "Dict[str, np.ndarray]"
+    },
     "return": {
       "items": {
         "accelerations": {
@@ -156,6 +195,9 @@
     "signature": "(thetalist, dthetalist, taumat, g, Ftipmat, dt, intRes) -> Dict[str, numpy.ndarray]"
   },
   "OptimizedTrajectoryPlanning.inverse_dynamics_trajectory": {
+    "annotations": {
+      "return": "np.ndarray"
+    },
     "return": {
       "dtype": "float32",
       "shape": [
@@ -167,6 +209,9 @@
     "signature": "(thetalist_trajectory, dthetalist_trajectory, ddthetalist_trajectory, gravity_vector=None, Ftip=None) -> numpy.ndarray"
   },
   "OptimizedTrajectoryPlanning.joint_trajectory": {
+    "annotations": {
+      "return": "Dict[str, np.ndarray]"
+    },
     "return": {
       "items": {
         "accelerations": {
@@ -199,6 +244,12 @@
     "signature": "(thetastart, thetaend, Tf, N, method, kernel_type=None, enable_monitoring=None) -> Dict[str, numpy.ndarray]"
   },
   "SerialManipulator.end_effector_velocity": {
+    "annotations": {
+      "dthetalist": "Union[NDArray[np.float64], List[float]]",
+      "frame": "str",
+      "return": "NDArray[np.float64]",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "shape": [
@@ -209,6 +260,11 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], dthetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], frame: str = 'space') -> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]"
   },
   "SerialManipulator.forward_kinematics": {
+    "annotations": {
+      "frame": "str",
+      "return": "NDArray[np.float64]",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "shape": [
@@ -220,6 +276,22 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], frame: str = 'space') -> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]"
   },
   "SerialManipulator.iterative_inverse_kinematics": {
+    "annotations": {
+      "T_desired": "NDArray[np.float64]",
+      "adaptive_tuning": "bool",
+      "backtracking": "bool",
+      "damping": "float",
+      "eomg": "float",
+      "ev": "float",
+      "max_iterations": "int",
+      "plot_residuals": "bool",
+      "png_name": "str",
+      "return": "Tuple[NDArray[np.float64], bool, int]",
+      "step_cap": "float",
+      "thetalist0": "Union[NDArray[np.float64], List[float]]",
+      "weight_orientation": "float",
+      "weight_position": "float"
+    },
     "return": {
       "elements": [
         {
@@ -241,6 +313,11 @@
     "signature": "(T_desired: numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], thetalist0: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], eomg: float = 1e-06, ev: float = 1e-06, max_iterations: int = 10000, plot_residuals: bool = False, damping: float = 0.02, step_cap: float = 0.3, png_name: str = 'ik_residuals.png', weight_orientation: float = 1.0, weight_position: float = 1.0, adaptive_tuning: bool = False, backtracking: bool = False) -> Tuple[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], bool, int]"
   },
   "SerialManipulator.jacobian": {
+    "annotations": {
+      "frame": "str",
+      "return": "NDArray[np.float64]",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "shape": [
@@ -252,6 +329,15 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], frame: str = 'space') -> numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]"
   },
   "SerialManipulator.robust_inverse_kinematics": {
+    "annotations": {
+      "T_desired": "NDArray[np.float64]",
+      "eomg": "float",
+      "ev": "float",
+      "max_attempts": "int",
+      "max_iterations": "int",
+      "return": "Tuple[NDArray[np.float64], bool, int, str]",
+      "verbose": "bool"
+    },
     "return": {
       "elements": [
         {
@@ -276,6 +362,26 @@
     "signature": "(T_desired: numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], max_attempts: int = 10, eomg: float = 0.002, ev: float = 0.002, max_iterations: int = 5000, verbose: bool = False) -> Tuple[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], bool, int, str]"
   },
   "SerialManipulator.smart_inverse_kinematics": {
+    "annotations": {
+      "T_current": "Optional[NDArray[np.float64]]",
+      "T_desired": "NDArray[np.float64]",
+      "adaptive_tuning": "bool",
+      "auto_fallback": "bool",
+      "backtracking": "bool",
+      "cache": "Optional[Any]",
+      "damping": "float",
+      "eomg": "float",
+      "ev": "float",
+      "max_iterations": "int",
+      "plot_residuals": "bool",
+      "png_name": "str",
+      "return": "Tuple[NDArray[np.float64], bool, int]",
+      "step_cap": "float",
+      "strategy": "str",
+      "theta_current": "Optional[Union[NDArray[np.float64], List[float]]]",
+      "weight_orientation": "float",
+      "weight_position": "float"
+    },
     "return": {
       "elements": [
         {
@@ -297,6 +403,16 @@
     "signature": "(T_desired: numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], strategy: str = 'workspace_heuristic', theta_current: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float], NoneType] = None, T_current: Optional[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]] = None, cache: Optional[Any] = None, eomg: float = 1e-06, ev: float = 1e-06, max_iterations: int = 10000, plot_residuals: bool = False, damping: float = 0.02, step_cap: float = 0.3, png_name: str = 'ik_residuals.png', weight_orientation: float = 1.0, weight_position: float = 1.0, adaptive_tuning: bool = True, backtracking: bool = True, auto_fallback: bool = True) -> Tuple[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], bool, int]"
   },
   "SerialManipulator.trac_ik": {
+    "annotations": {
+      "T_desired": "NDArray[np.float64]",
+      "eomg": "float",
+      "ev": "float",
+      "num_restarts": "int",
+      "return": "Tuple[NDArray[np.float64], bool, float]",
+      "theta0": "Optional[Union[NDArray[np.float64], List[float]]]",
+      "timeout": "float",
+      "use_parallel": "bool"
+    },
     "return": {
       "elements": [
         {
@@ -318,6 +434,10 @@
     "signature": "(T_desired: numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], theta0: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float], NoneType] = None, timeout: float = 0.2, eomg: float = 0.0001, ev: float = 0.0001, num_restarts: int = 5, use_parallel: bool = False) -> Tuple[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], bool, float]"
   },
   "Singularity.condition_number": {
+    "annotations": {
+      "return": "float",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "dtype": "float64",
       "type": "numpy.float64"
@@ -325,6 +445,11 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]]) -> float"
   },
   "Singularity.near_singularity_detection": {
+    "annotations": {
+      "return": "bool",
+      "thetalist": "Union[NDArray[np.float64], List[float]]",
+      "threshold": "float"
+    },
     "return": {
       "dtype": "bool",
       "type": "numpy.bool"
@@ -332,12 +457,26 @@
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], threshold: float = 0.01) -> bool"
   },
   "Singularity.singularity_analysis": {
+    "annotations": {
+      "return": "bool",
+      "thetalist": "Union[NDArray[np.float64], List[float]]"
+    },
     "return": {
       "type": "bool"
     },
     "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]]) -> bool"
   },
   "trac_ik.TracIKSolver.solve": {
+    "annotations": {
+      "T_desired": "NDArray[np.float64]",
+      "eomg": "float",
+      "ev": "float",
+      "num_restarts": "int",
+      "return": "Tuple[NDArray[np.float64], bool, float]",
+      "theta0": "Optional[NDArray[np.float64]]",
+      "timeout": "float",
+      "use_parallel": "bool"
+    },
     "return": {
       "elements": [
         {
@@ -359,6 +498,17 @@
     "signature": "(T_desired: numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], theta0: Optional[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]]] = None, timeout: float = 0.2, eomg: float = 0.0001, ev: float = 0.0001, num_restarts: int = 5, use_parallel: bool = False) -> Tuple[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], bool, float]"
   },
   "trac_ik.trac_ik_solve": {
+    "annotations": {
+      "T_desired": "NDArray[np.float64]",
+      "eomg": "float",
+      "ev": "float",
+      "num_restarts": "int",
+      "return": "Tuple[NDArray[np.float64], bool, float]",
+      "robot": "Any",
+      "theta0": "Optional[NDArray[np.float64]]",
+      "timeout": "float",
+      "use_parallel": "bool"
+    },
     "return": {
       "elements": [
         {

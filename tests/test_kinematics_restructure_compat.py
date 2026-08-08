@@ -3,6 +3,7 @@
 import ast
 import hashlib
 import importlib
+import importlib.util
 import inspect
 import pickle
 import textwrap
@@ -253,6 +254,49 @@ def test_every_moved_method_matches_the_pre_split_ast():
         for name in METHOD_OWNERS
     }
     assert observed == EXPECTED_AST_HASHES
+
+
+def test_annotation_drift_is_guarded_by_the_ast_pin_not_the_signature_pin(tmp_path):
+    """Annotation respellings are invisible to the signature hash by design.
+
+    Canonicalisation maps every NumPy shape spelling onto one string, so an
+    author rewriting ``NDArray[np.float64]`` as ``np.ndarray[Any, ...]`` -
+    which drops shape typing and is real drift - collides in
+    ``_signature_hash``. What catches it here is the AST pin, which hashes the
+    annotation expressions as written. This test pins that division of labour
+    so the AST hashes are never dropped as redundant with the signature ones.
+    """
+    module_source = textwrap.dedent(
+        '''
+        from typing import Any
+
+        import numpy as np
+        from numpy.typing import NDArray
+
+
+        def moved_method(self, thetalist: {annotation}) -> {annotation}:
+            """Probe standing in for a moved SerialManipulator method."""
+            return thetalist
+        '''
+    )
+
+    def load(name, annotation):
+        path = tmp_path / f"{name}.py"
+        path.write_text(module_source.format(annotation=annotation))
+        spec = importlib.util.spec_from_file_location(name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.moved_method
+
+    frozen = load("probe_frozen", "NDArray[np.float64]")
+    drifted = load("probe_drifted", "np.ndarray[Any, np.dtype[np.float64]]")
+
+    assert _signature_hash(frozen) == _signature_hash(drifted)
+    assert _ast_hash(frozen) != _ast_hash(drifted)
+
+    # Every method whose signature is pinned must also have an AST pin, or the
+    # blind spot above would be unguarded for it.
+    assert set(EXPECTED_SIGNATURE_HASHES) <= set(EXPECTED_AST_HASHES)
 
 
 def test_serial_manipulator_instances_still_pickle_through_historical_class():

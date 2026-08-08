@@ -18,13 +18,15 @@ it (only when a change is intentional), run this module as a script:
 
 The test rebuilds the live contract with the same deterministic fixtures and
 asserts equality per symbol, printing a readable unified diff naming the symbol
-and which facet (signature / return type / shape / dtype) drifted.
+and which facet (signature / annotation source / return type / shape / dtype)
+drifted.
 
 Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
 import difflib
+import importlib.util
 import inspect
 import json
 import os
@@ -41,7 +43,12 @@ from ManipulaPy.kinematics import SerialManipulator
 from ManipulaPy.path_planning import OptimizedTrajectoryPlanning
 from ManipulaPy.singularity import Singularity
 from ManipulaPy.trac_ik import TracIKSolver, trac_ik_solve
-from tests._signature_norm import canonical_signature
+from tests._signature_norm import (
+    _SHAPE_SPELLINGS,
+    UNAVAILABLE_ANNOTATION_SOURCES,
+    annotation_sources,
+    canonical_signature,
+)
 
 GOLDEN_PATH = Path(__file__).parent / "data" / "api_contract_golden.json"
 
@@ -86,7 +93,9 @@ def _signature_str(fn: Callable[..., Any]) -> str:
     Canonicalised because ``NDArray[np.float64]`` renders NumPy's own shape
     type-parameter, which NumPy respelled across the 2.x line (``Any`` ->
     ``tuple[int, ...]`` -> ``tuple[Any, ...]``). That slot carries no
-    ManipulaPy signal - see tests/_signature_norm.py.
+    ManipulaPy signal - see tests/_signature_norm.py. The information the
+    canonicalisation discards is frozen separately as the ``annotations``
+    facet, which records the annotation source the author actually wrote.
     """
     return canonical_signature(str(inspect.signature(fn)))
 
@@ -332,6 +341,7 @@ def build_contract() -> Dict[str, Dict[str, Any]]:
             result = call()
             contract[name] = {
                 "signature": _signature_str(fn),
+                "annotations": annotation_sources(fn),
                 "return": describe(result),
             }
     return contract
@@ -524,6 +534,145 @@ def test_normaliser_still_reports_real_signature_drift() -> None:
         assert (
             canonical_signature(variant) != canonical_base
         ), f"normalisation hid real drift: {label}"
+
+
+# ---------------------------------------------------------------------------
+# Annotation-source facet
+#
+# The canonicalisation above is deliberately lossy: five spellings map onto one
+# string. A NumPy upgrade and an author rewriting the annotation by hand
+# therefore render byte-identically, so the rendered signature cannot tell them
+# apart - and the second is real API drift (``NDArray[np.float64]`` ->
+# ``np.ndarray[Any, np.dtype[np.float64]]`` silently drops shape typing). The
+# ``annotations`` facet closes that hole by freezing what the author wrote,
+# read back from the AST. The probes below are real modules loaded from disk,
+# so the difference under test is a genuine source-level edit rather than a
+# patched ``__annotations__``.
+# ---------------------------------------------------------------------------
+
+
+_PROBE_MODULE = '''\
+import typing
+from typing import Any, List, Union
+
+import numpy as np
+from numpy.typing import NDArray
+
+
+def forward_kinematics(thetalist: {annotation}, frame: str = "space") -> {annotation}:
+    """Probe standing in for a public ManipulaPy entry point."""
+    return thetalist
+'''
+
+
+def _load_probe(tmp_path: Path, name: str, annotation: str) -> Callable[..., Any]:
+    """Import a throwaway module whose annotation is written as ``annotation``."""
+    path = tmp_path / f"{name}.py"
+    path.write_text(_PROBE_MODULE.format(annotation=annotation))
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.forward_kinematics
+
+
+def test_annotation_facet_reports_hand_written_ndarray_respelling(tmp_path) -> None:
+    """Rewriting ``NDArray[np.float64]`` as a bare ndarray alias is drift."""
+    frozen = _load_probe(tmp_path, "probe_frozen", "NDArray[np.float64]")
+    drifted = _load_probe(
+        tmp_path, "probe_drifted", "np.ndarray[Any, np.dtype[np.float64]]"
+    )
+
+    # The two annotations really are distinct objects rendering differently,
+    # so this is not a no-op edit...
+    assert str(inspect.signature(frozen)) != str(inspect.signature(drifted))
+    # ...yet the canonical signature is blind to it, which is precisely the
+    # price paid for the cross-version fix and the reason the facet exists.
+    assert _signature_str(frozen) == _signature_str(drifted)
+
+    sources_frozen = annotation_sources(frozen)
+    sources_drifted = annotation_sources(drifted)
+    assert sources_frozen != sources_drifted, "annotation facet hid real drift"
+    assert sources_frozen["return"] == "NDArray[np.float64]"
+    assert sources_drifted["return"] == "np.ndarray[Any, np.dtype[np.float64]]"
+
+
+def test_annotation_facet_separates_every_collapsed_shape_spelling(tmp_path) -> None:
+    """Swapping any collapsed shape spelling for another must be reported.
+
+    Imported from the normaliser rather than restated so the negative control
+    provably covers every spelling the rewrite collapses, including ones added
+    later.
+    """
+    probes = {
+        spelling: _load_probe(
+            tmp_path,
+            f"probe_shape_{index}",
+            f"np.ndarray[{spelling}, np.dtype[np.float64]]",
+        )
+        for index, spelling in enumerate(_SHAPE_SPELLINGS)
+    }
+
+    # Intended and load-bearing: the rendered signature collapses all of them,
+    # which is what keeps a NumPy upgrade from being reported as drift.
+    assert len({_signature_str(fn) for fn in probes.values()}) == 1
+
+    # Required: the source facet keeps all of them apart, so an author who
+    # swaps one for another does not slip through that collapse.
+    facets = {
+        spelling: json.dumps(annotation_sources(fn), sort_keys=True)
+        for spelling, fn in probes.items()
+    }
+    assert len(set(facets.values())) == len(_SHAPE_SPELLINGS), facets
+
+
+def test_annotation_facet_survives_a_reflowed_annotation(tmp_path) -> None:
+    """Rewrapping a long annotation across lines must not be reported."""
+    flat = _load_probe(
+        tmp_path, "probe_flat", "Union[NDArray[np.float64], List[float]]"
+    )
+    reflowed = _load_probe(
+        tmp_path,
+        "probe_reflowed",
+        "Union[\n        NDArray[np.float64],\n        List[float],\n    ]",
+    )
+    assert annotation_sources(flat) == annotation_sources(reflowed)
+
+
+def test_annotation_facet_carries_no_numpy_version_variant_text() -> None:
+    """The frozen facet must not reintroduce cross-version false positives.
+
+    Every frozen annotation is the source ManipulaPy wrote, which never spells
+    an ndarray shape parameter - that is the only slot NumPy respells - so no
+    NumPy version can move these values.
+    """
+    golden = json.loads(GOLDEN_PATH.read_text())
+    for name, entry in golden.items():
+        for parameter, text in entry["annotations"].items():
+            assert "ndarray[" not in text, f"{name}.{parameter}: {text}"
+
+
+def test_annotation_facet_is_frozen_for_every_symbol() -> None:
+    """No golden entry may record the source-unavailable sentinel."""
+    golden = json.loads(GOLDEN_PATH.read_text())
+    for name, entry in golden.items():
+        assert "annotations" in entry, name
+        assert entry["annotations"] != UNAVAILABLE_ANNOTATION_SOURCES, name
+
+
+def test_annotation_sources_degrades_visibly_without_retrievable_source() -> None:
+    """Unreadable source must record a sentinel, not an empty map."""
+
+    def unannotated(x, y):
+        return x
+
+    # A C-implemented callable has no source to read back.
+    assert annotation_sources(len) == UNAVAILABLE_ANNOTATION_SOURCES
+    assert annotation_sources(np.dot) == UNAVAILABLE_ANNOTATION_SOURCES
+    # "no annotations" must stay distinguishable from "source unavailable",
+    # otherwise a symbol that stopped being introspectable would freeze as if
+    # its annotations had merely been removed.
+    assert annotation_sources(unannotated) == {}
+    assert UNAVAILABLE_ANNOTATION_SOURCES != {}
 
 
 def _regen() -> None:
