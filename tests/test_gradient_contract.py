@@ -13,8 +13,18 @@ import numpy as np
 import pytest
 
 from ManipulaPy import utils
-from ManipulaPy.backend import use_backend
+from ManipulaPy.backend import get_backend, use_backend
 from ManipulaPy.dynamics import ManipulatorDynamics
+
+
+def _to_host(value):
+    """Host NumPy view of a backend-native array.
+
+    ``np.asarray`` reaches a CUDA-resident tensor through ``__array__`` and
+    raises; the active backend knows how to cross its own device boundary.
+    """
+    return get_backend().to_numpy(value)
+
 
 
 def _real_torch_available() -> bool:
@@ -773,7 +783,7 @@ def test_se3_log_translation_matches_scipy_with_fixed_translation(
     )
 
     with use_backend(backend_name):
-        observed = np.asarray(getattr(utils, api)(transform))
+        observed = _to_host(getattr(utils, api)(transform))
 
     np.testing.assert_allclose(observed, expected, rtol=1e-9, atol=1e-12)
 
@@ -804,7 +814,7 @@ def test_se3_log_is_exact_near_pi_with_fixed_translation(backend_name, api, gap)
     transform = np.asarray(utils.MatrixExp6(utils.VecTose3(screw)))
 
     with use_backend(backend_name):
-        observed = np.asarray(getattr(utils, api)(transform))
+        observed = _to_host(getattr(utils, api)(transform))
     observed_matrix = (
         observed
         if api == "MatrixLog6"
@@ -853,12 +863,12 @@ def test_matrix_log6_round_trip_is_exact_at_small_angles(backend_name, theta_val
 
     screw = np.array([0.0, 0.0, 1.0, 1.0, 2.0, 3.0])
     with use_backend(backend_name):
-        observed = np.asarray(
+        observed = _to_host(
             utils.se3ToVec(
                 utils.MatrixLog6(utils.MatrixExp6(utils.VecTose3(screw * theta_val)))
             )
         )
-        via_logm = np.asarray(
+        via_logm = _to_host(
             utils.logm(utils.MatrixExp6(utils.VecTose3(screw * theta_val)))
         )
 
@@ -1239,14 +1249,26 @@ class TestJaxProductionGradientContract:
             jax_grad = np.asarray(jax.jacrev(jax_vec)(jnp.asarray(theta_val)))
 
         with use_backend("torch"):
+            # Build every literal on the backend's own device: under a
+            # CUDA-bound torch backend, MatrixExp3 returns a device tensor and
+            # cat() refuses to mix it with CPU literals.
+            device = get_backend().asarray(np.zeros(1)).device
+
             def torch_vec(t):
                 rot = utils.MatrixExp3(
                     utils.VecToso3(
-                        torch.as_tensor(_LOG6_AXIS, dtype=torch.float64) * t
+                        torch.as_tensor(
+                            _LOG6_AXIS, dtype=torch.float64, device=device
+                        )
+                        * t
                     )
                 )
-                bottom = torch.tensor([[0.0, 0.0, 0.0, 1.0]], dtype=torch.float64)
-                p_col = torch.as_tensor(_FIXED_P, dtype=torch.float64).reshape(3, 1)
+                bottom = torch.tensor(
+                    [[0.0, 0.0, 0.0, 1.0]], dtype=torch.float64, device=device
+                )
+                p_col = torch.as_tensor(
+                    _FIXED_P, dtype=torch.float64, device=device
+                ).reshape(3, 1)
                 transform = torch.cat(
                     (torch.cat((rot, p_col), dim=1), bottom), dim=0
                 )
@@ -1254,9 +1276,11 @@ class TestJaxProductionGradientContract:
 
             torch_grad = (
                 torch.autograd.functional.jacobian(
-                    torch_vec, torch.tensor(theta_val, dtype=torch.float64)
+                    torch_vec,
+                    torch.tensor(theta_val, dtype=torch.float64, device=device),
                 )
                 .detach()
+                .cpu()
                 .numpy()
             )
 

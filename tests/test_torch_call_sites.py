@@ -25,7 +25,7 @@ import types
 import numpy as np
 import pytest
 
-from ManipulaPy.backend import use_backend
+from ManipulaPy.backend import get_backend, use_backend
 from ManipulaPy.control import ManipulatorController
 from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
@@ -182,8 +182,15 @@ def test_trac_ik_solver_runs_under_torch():
     robot = _robot()
     T_desired = robot.forward_kinematics(np.array([0.25, -0.1, 0.3]), frame="space")
 
+    # trac_ik is wall-clock budgeted, and on a GPU-resident backend the first
+    # call spends most of the 0.2 s default on device warm-up rather than on
+    # iterations. Once warm it converges in ~40 ms, so widen the budget here
+    # instead of asserting a default that measures warm-up latency; the library
+    # default is deliberately unchanged.
     with use_backend("torch"):
-        theta, success, _ = robot.trac_ik(T_desired, np.array([0.2, -0.05, 0.25]))
+        theta, success, _ = robot.trac_ik(
+            T_desired, np.array([0.2, -0.05, 0.25]), timeout=2.0
+        )
 
     assert success
     T_reached = robot.forward_kinematics(_to_host(theta), frame="space")
@@ -253,10 +260,16 @@ def test_adaptive_control_runs_under_torch():
 
 # --- gap 3: dtype-capability check in the CPU forward-dynamics loop --------
 class _TauForwardDynamics:
-    """Deterministic dynamics: joint acceleration equals applied torque."""
+    """Deterministic dynamics: joint acceleration equals applied torque.
+
+    Returns a backend-native array, matching ``ManipulatorDynamics``, whose
+    ``forward_dynamics`` ends in ``backend.solve``. A host array here would
+    mix domains with the integrator's device-resident state under a
+    CUDA-bound backend and fail the add rather than exercise the dtype check.
+    """
 
     def forward_dynamics(self, theta, dtheta, tau, g, Ftip):
-        return np.asarray(tau, dtype=np.float64)
+        return get_backend().asarray(np.asarray(tau, dtype=np.float64))
 
 
 def _dynamics_planner(dynamics, joint_limits):

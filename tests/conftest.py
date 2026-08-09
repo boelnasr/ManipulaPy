@@ -882,8 +882,45 @@ def pytest_addoption(parser) -> None:
     )
 
 
+def _bind_torch_backend_to_requested_device() -> None:
+    """Register the ``torch`` backend on ``MANIPULAPY_TEST_TORCH_DEVICE``.
+
+    ``_ensure_torch_registered`` constructs ``TorchBackend()``, whose device
+    defaults to CPU, and the registry never overwrites a name. A CI job that
+    proves CUDA works in a separate process therefore still runs its contracts
+    on CPU here, because this pytest process registers a fresh CPU backend on
+    the first ``use_backend("torch")``.
+
+    Registering the requested device first makes that impossible. This fails
+    loudly rather than degrading: a job that asks for CUDA and cannot get it
+    must not report a pass, because it feeds the release GPU marker.
+    """
+    device = os.environ.get("MANIPULAPY_TEST_TORCH_DEVICE")
+    if not device:
+        return
+
+    import torch
+
+    from ManipulaPy.backend import get_registered, register
+    from ManipulaPy.backend.torch_backend import TorchBackend
+
+    if device.startswith("cuda"):
+        assert torch.cuda.is_available(), (
+            "MANIPULAPY_TEST_TORCH_DEVICE requested CUDA but torch.cuda is "
+            "unavailable; refusing to run the contracts on CPU."
+        )
+
+    register("torch", TorchBackend(device=device))
+    bound = get_registered("torch").asarray(np.zeros(1)).device.type
+    assert bound == torch.device(device).type, (
+        f"torch backend bound to {bound!r}, expected {device!r}"
+    )
+
+
 def pytest_configure(config) -> None:
     """Configure pytest markers and environment."""
+    _bind_torch_backend_to_requested_device()
+
     # Register custom markers
     config.addinivalue_line("markers", "cuda: mark test as requiring CUDA")
     config.addinivalue_line("markers", "gpu: alias for cuda marker")

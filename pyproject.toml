@@ -110,11 +110,17 @@ cuda = ["cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'"]
 # Floors are set to what the backends were actually validated against, not to
 # the oldest version that might import.
 pytorch = ["torch>=2.7.1"]
-jax-cpu = ["jax[cpu]>=0.6.0"]
+# JAX 0.6 declares requires-python >=3.10, but this package supports >=3.9. An
+# unmarked JAX requirement therefore makes the extra unresolvable on 3.9 rather
+# than merely unavailable, so every JAX requirement carries a python_version
+# marker. On 3.9 these extras install as a no-op and the JAX backend is absent.
+jax-cpu = ["jax[cpu]>=0.6.0; python_version >= '3.10'"]
 # jax[cuda12] pulls its nvidia-* wheels from PyPI proper, so no extra index is
 # needed — do NOT add one with --extra-index-url, which is dependency-confusion
 # bait. Linux only: jax publishes no CUDA wheels for macOS or Windows.
-jax-cuda = ["jax[cuda12]>=0.6.0; sys_platform == 'linux'"]
+jax-cuda = [
+    "jax[cuda12]>=0.6.0; sys_platform == 'linux' and python_version >= '3.10'",
+]
 # There is deliberately no `jax-tpu` extra. Validating one on a real TPU v5e
 # showed XLA:TPU implements no float64 LU decomposition and no int64 dot, so
 # `inv`, `solve` and every dynamics path built on them raise UNIMPLEMENTED; and
@@ -133,8 +139,9 @@ all = [
     "scikit-learn>=1.5.0",
     "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
     # CPU JAX, not jax[cuda12]: `all` must stay installable on machines with no
-    # CUDA. GPU JAX is an explicit opt-in via [jax-cuda].
-    "jax[cpu]>=0.6.0",
+    # CUDA. GPU JAX is an explicit opt-in via [jax-cuda]. The python_version
+    # marker keeps `all` resolvable on 3.9, which JAX 0.6 does not support.
+    "jax[cpu]>=0.6.0; python_version >= '3.10'",
 ]
 
 # Alternative GPU options for legacy CUDA versions and AMD/PyCUDA paths.

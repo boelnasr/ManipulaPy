@@ -352,6 +352,15 @@ class _GenerationMixin:
         if kernel_type is None:
             kernel_type = getattr(self, "kernel_type", "auto")
 
+        # Same host boundary as joint_trajectory: the CUDA batch launcher runs
+        # np.ascontiguousarray, which refuses a CuPy array, and the broad
+        # handler below would turn that refusal into a silent CPU rerun. Force
+        # callers' backend-native batches to host first (a no-op for NumPy).
+        # _batch_joint_trajectory_cpu re-enters the backend on its own returns.
+        backend = _runtime.get_backend()
+        thetastart_batch = backend.to_numpy(backend.asarray(thetastart_batch))
+        thetaend_batch = backend.to_numpy(backend.asarray(thetaend_batch))
+
         batch_size, num_joints = thetastart_batch.shape
         _runtime.logger.info(
             f"Generating batch trajectories: batch_size={batch_size}, "
@@ -402,10 +411,13 @@ class _GenerationMixin:
             )
             _runtime.logger.info(f"📊 Throughput: {throughput:.1f} M elements/sec")
 
+            # Re-enter the backend domain: the launcher returns host NumPy, and
+            # the documented contract is that a non-default backend yields its
+            # own native arrays (a no-op under NumPy).
             return {
-                "positions": traj_pos_host,
-                "velocities": traj_vel_host,
-                "accelerations": traj_acc_host,
+                "positions": backend.asarray(traj_pos_host),
+                "velocities": backend.asarray(traj_vel_host),
+                "accelerations": backend.asarray(traj_acc_host),
             }
 
         except Exception as e:

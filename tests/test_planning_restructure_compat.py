@@ -69,7 +69,12 @@ _BASE_MOVED_METHOD_HASHES = {
     "_cartesian_trajectory_gpu": "cfe253ac0c567780e7de2ad2dc48f02c1af029c98ee15f1b19f2a16f2873ac6e",
     "_joint_trajectory_cpu": "832e4ec5ccef73fc5145ea7b4fc367e4640e3425a10dcb9c35ae2c3d7a63a7e6",
     "_joint_trajectory_gpu": "70b95df213ae58820de1ccf0ea3def7a1625f0a3e723af31c3aec2012256d364",
-    "batch_joint_trajectory": "b13fa5bbd4d77ba032a2dda3d6997277121f0b56b1081c3ae2fe0ca4f0cd47f6",
+    # Deliberately re-baselined: the GPU batch path was missing the host
+    # boundary that joint_trajectory already had, so backend-native inputs fell
+    # through np.ascontiguousarray into a silent CPU rerun and the success path
+    # returned host arrays under a non-default backend. Everything else in this
+    # map is still byte-identical to the pre-restructure body.
+    "batch_joint_trajectory": "9b4bc5c9d52f2f48b7818832bab4abe9bf0d6226b53ab3967ea1512789930dce",
     "cartesian_trajectory": "711dc4bb4c343e779bfc0259d3b06a0cf1d464c05ea24afc3e48ef87ee28dcd8",
     "joint_trajectory": "58b2685013876277df3c73f27a7e8167191e6219e9937c3e7233301c94163681",
     "_forward_dynamics_cpu": "003c4a60f2fa408cea21f3a0c6a4261c5d9082641b362ea34cafd9c7c1aab45a",

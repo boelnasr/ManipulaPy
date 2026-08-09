@@ -180,6 +180,11 @@ jobs:
     env:
       NUMBA_DISABLE_CUDA: "0"
       MANIPULAPY_FORCE_CPU: "0"
+      # TorchBackend defaults to CPU and the registry never overwrites a name,
+      # so without this the contracts below would run on CPU while still
+      # feeding gpu-axes-passed. conftest binds the backend to this device and
+      # fails the job if CUDA is unavailable.
+      MANIPULAPY_TEST_TORCH_DEVICE: cuda
     steps:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

@@ -39,3 +39,25 @@ def test_accelerators_remain_optional_and_no_extra_installs_tpu_jax() -> None:
         for requirements in extras.values()
         for dependency in requirements
     )
+
+
+def test_every_jax_requirement_is_gated_off_unsupported_pythons() -> None:
+    """No extra may become unresolvable on a supported Python.
+
+    ``requires-python`` admits 3.9, but JAX 0.6 declares ``>=3.10``. An
+    unmarked JAX requirement does not merely leave the backend unavailable
+    there -- it makes ``pip install "ManipulaPy[all]"`` fail to resolve on an
+    interpreter the project claims to support.
+    """
+    project = _project_metadata()
+    assert project["requires-python"] == ">=3.9"
+
+    jax_requirements = [
+        dependency
+        for requirements in project["optional-dependencies"].values()
+        for dependency in requirements
+        if dependency.lower().startswith("jax")
+    ]
+    assert jax_requirements, "expected JAX to appear in at least one extra"
+    for dependency in jax_requirements:
+        assert "python_version >= '3.10'" in dependency, dependency
