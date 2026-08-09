@@ -117,8 +117,9 @@ GPU extras detail
 =================
 
 The default ``[cuda]`` extra installs ``cupy-cuda12x`` — the version
-that ships with Ubuntu 22.04's NVIDIA apt repos and is what v1.3.2
-was validated against on driver 580. For older CUDA 11.x toolchains
+that ships with Ubuntu 22.04's NVIDIA apt repos. Every v1.4.0 release
+candidate runs the CuPy, PyTorch-CUDA and JAX-CUDA contracts on live
+CUDA hardware before it can be published. For older CUDA 11.x toolchains
 (driver 470 – 524), use the ``[gpu-cuda11]`` extra:
 
 .. code-block:: bash
