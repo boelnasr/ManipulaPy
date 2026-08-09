@@ -1256,6 +1256,14 @@ div.topic.contents ul ul {
     margin-left: 0.4rem;
     padding-left: 0.75rem;
   }
+
+  .bd-content dl.py > dt.sig,
+  .bd-content dl.class > dt,
+  .bd-content dl.function > dt,
+  .bd-content dl.method > dt {
+    max-width: 100%;
+    overflow-x: auto;
+  }
 }
 
 @media (max-width: 359px) {

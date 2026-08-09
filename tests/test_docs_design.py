@@ -112,6 +112,18 @@ def test_css_has_theme_responsive_and_accessibility_contracts():
     assert "#ffffff" not in css.lower()
 
 
+def test_mobile_api_signatures_remain_horizontally_scrollable():
+    css = read(CSS)
+    mobile = css[css.index("@media (max-width: 767px)") :]
+
+    assert re.search(
+        r"\.bd-content dl\.py > dt\.sig,[^{]+\{[^}]*"
+        r"max-width:\s*100%;[^}]*overflow-x:\s*auto;",
+        mobile,
+        re.DOTALL,
+    )
+
+
 def test_backend_eyebrow_is_visually_ordered_before_its_rst_heading():
     source = read(INDEX)
     css = read(CSS)
