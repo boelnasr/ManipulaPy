@@ -205,6 +205,25 @@ def test_manim_config_has_stable_scientific_output():
         assert contract in config
 
 
+def test_committed_kinematics_media_pairs_are_valid():
+    stems = (
+        "panda_forward_kinematics",
+        "panda_jacobian_velocity",
+        "panda_ik_convergence",
+    )
+    for stem in stems:
+        gif = ASSETS / f"{stem}.gif"
+        png = ASSETS / f"{stem}.png"
+        assert gif.stat().st_size > 10_000
+        assert png.stat().st_size > 10_000
+        with Image.open(gif) as animated:
+            assert animated.size == (960, 540)
+            assert getattr(animated, "n_frames", 1) > 1
+        with Image.open(png) as still:
+            assert still.size == (960, 540)
+            assert still.format == "PNG"
+
+
 def test_manim_tool_frame_marks_all_three_axes():
     scenes = read(MANIM / "kinematics_scenes.py")
     triad = scenes.split("triad = VGroup(", maxsplit=1)[1].split(
@@ -221,6 +240,17 @@ def test_manim_rules_and_major_content_are_frame_centered():
     assert "rule.set_x(0.0)" in scenes
     assert "equation.set_x(0.0)" in scenes
     assert "charts.set_x(0.0)" in scenes
+
+
+def test_manim_ik_plot_uses_explicit_log10_scientific_scale():
+    scenes = read(MANIM / "kinematics_scenes.py")
+    assert "RESIDUAL_DISPLAY_FLOOR = 1e-9" in scenes
+    assert "RESIDUAL_TOLERANCE = 1e-5" in scenes
+    assert "TOLERANCE_LOG10 = -5.0" in scenes
+    assert "np.log10(np.maximum(residuals, RESIDUAL_DISPLAY_FLOOR))" in scenes
+    assert "RESIDUAL_DECADES = (0, -3, -5, -7, -9)" in scenes
+    assert 'rf"10^{{{decade}}}"' in scenes
+    assert "y_range=[-9.0, 0.0, 1.0]" in scenes
 
 
 def test_manim_render_command_and_config_isolate_user_settings(tmp_path):

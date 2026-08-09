@@ -20,6 +20,7 @@ from manim import (
     Axes,
     Circle,
     Create,
+    DashedLine,
     Dot,
     FadeIn,
     LaggedStart,
@@ -52,6 +53,10 @@ MUTED = "#94A3A8"
 TEAL = "#63C9BC"
 RULE = "#405158"
 PANEL = "#172126"
+RESIDUAL_DISPLAY_FLOOR = 1e-9
+RESIDUAL_TOLERANCE = 1e-5
+TOLERANCE_LOG10 = -5.0
+RESIDUAL_DECADES = (0, -3, -5, -7, -9)
 
 
 def _title(text: str, subtitle: str) -> VGroup:
@@ -316,6 +321,11 @@ class PandaJacobianVelocity(Scene):
         self.wait(0.7)
 
 
+def _log10_residuals_for_display(residuals: np.ndarray) -> np.ndarray:
+    """Map real residuals to log10, clamping only below the display floor."""
+    return np.log10(np.maximum(residuals, RESIDUAL_DISPLAY_FLOOR))
+
+
 def _residual_axis(
     budgets: np.ndarray,
     residuals: np.ndarray,
@@ -323,24 +333,32 @@ def _residual_axis(
     units: str,
     line_color: str,
 ) -> tuple[VGroup, Axes, VGroup]:
-    maximum = max(float(np.max(residuals)) * 1.08, 1.5e-5)
+    display_values = _log10_residuals_for_display(residuals)
     axes = Axes(
         x_range=[float(budgets[0]), float(budgets[-1]), 1],
-        y_range=[0.0, maximum, maximum / 4.0],
+        y_range=[-9.0, 0.0, 1.0],
         x_length=8.7,
         y_length=1.65,
         axis_config={"color": RULE, "stroke_width": 1},
         x_axis_config={"include_numbers": True, "font_size": 16},
-        y_axis_config={
-            "include_numbers": True,
-            "font_size": 14,
-            "decimal_number_config": {"num_decimal_places": 3},
-        },
+        y_axis_config={"include_numbers": False},
         tips=False,
     )
+    decade_labels = VGroup()
+    for decade in RESIDUAL_DECADES:
+        tick = Line(
+            axes.c2p(float(budgets[0]), decade),
+            axes.c2p(float(budgets[0]) + 0.08, decade),
+            color=RULE,
+            stroke_width=1,
+        )
+        decade_label = MathTex(
+            rf"10^{{{decade}}}", color=MUTED, font_size=13
+        ).next_to(tick, LEFT, buff=0.06)
+        decade_labels.add(tick, decade_label)
     curve = axes.plot_line_graph(
         x_values=budgets,
-        y_values=residuals,
+        y_values=display_values,
         line_color=line_color,
         stroke_width=3,
         add_vertex_dots=True,
@@ -352,23 +370,38 @@ def _residual_axis(
         Text(units, color=MUTED, font_size=14),
     ).arrange(RIGHT, buff=0.12)
     heading.next_to(axes, UP, aligned_edge=LEFT, buff=0.06)
-    tolerance = Line(
-        axes.c2p(float(budgets[0]), 1e-5),
-        axes.c2p(float(budgets[-1]), 1e-5),
+    tolerance = DashedLine(
+        axes.c2p(float(budgets[0]), TOLERANCE_LOG10),
+        axes.c2p(float(budgets[-1]), TOLERANCE_LOG10),
         color=TEAL,
-        stroke_width=1,
+        stroke_width=1.5,
+        dash_length=0.08,
     )
-    return VGroup(axes, heading, tolerance, curve), axes, curve
+    tolerance_label = MathTex(
+        r"10^{-5}\ \mathrm{tolerance}", color=TEAL, font_size=14
+    ).next_to(tolerance, RIGHT, buff=0.08)
+    return (
+        VGroup(
+            axes,
+            decade_labels,
+            heading,
+            tolerance,
+            tolerance_label,
+            curve,
+        ),
+        axes,
+        curve,
+    )
 
 
 class PandaIKConvergence(Scene):
-    """Plot unmodified solver residuals against the actual iteration budgets."""
+    """Plot real solver residuals in explicit log10 display coordinates."""
 
     def construct(self) -> None:
         budgets, translation, rotation = compute_ik_trace()
         title = _title(
             "Inverse kinematics convergence",
-            "Recorded solver residuals  ·  independent vertical scales",
+            "Recorded residuals  ·  log10 scale  ·  display floor 10⁻⁹",
         ).to_corner(UP + LEFT, buff=0.38)
         rule = _rule_below(title)
 
@@ -387,18 +420,23 @@ class PandaIKConvergence(Scene):
             charts, DOWN, buff=0.08
         )
 
-        solved = np.flatnonzero((translation <= 1e-5) & (rotation <= 1e-5))
+        translation_log = _log10_residuals_for_display(translation)
+        rotation_log = _log10_residuals_for_display(rotation)
+        solved = np.flatnonzero(
+            (translation <= RESIDUAL_TOLERANCE)
+            & (rotation <= RESIDUAL_TOLERANCE)
+        )
         solved_marks = VGroup()
         if solved.size:
             index = int(solved[0])
             solved_marks.add(
                 Dot(
-                    translation_axes.c2p(budgets[index], translation[index]),
+                    translation_axes.c2p(budgets[index], translation_log[index]),
                     radius=0.08,
                     color=TEAL,
                 ),
                 Dot(
-                    rotation_axes.c2p(budgets[index], rotation[index]),
+                    rotation_axes.c2p(budgets[index], rotation_log[index]),
                     radius=0.08,
                     color=TEAL,
                 ),
@@ -414,8 +452,8 @@ class PandaIKConvergence(Scene):
         self.play(
             Create(translation_axes),
             Create(rotation_axes),
-            FadeIn(translation_group[1:3]),
-            FadeIn(rotation_group[1:3]),
+            FadeIn(translation_group[1:5]),
+            FadeIn(rotation_group[1:5]),
             FadeIn(x_label),
             run_time=0.9,
             rate_func=smooth,
