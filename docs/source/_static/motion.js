@@ -5,6 +5,8 @@
   if (reducedMotion.matches) return;
 
   function reveal(element) {
+    if (typeof element.animate !== "function") return;
+
     var animation = element.animate(
       [
         { opacity: 0, transform: "translateY(18px)" },
@@ -17,6 +19,7 @@
       }
     );
     animation.addEventListener("finish", function () {
+      animation.cancel();
       element.style.opacity = "";
       element.style.transform = "";
     }, { once: true });
