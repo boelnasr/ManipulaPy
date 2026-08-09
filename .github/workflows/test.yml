@@ -115,6 +115,11 @@ jobs:
       - name: Install regression dependencies
         run: |
           if python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"; then
+            # nbsphinx shells out to pandoc to convert the notebooks' markdown
+            # cells. It is a system binary, not a wheel, so installing the docs
+            # extra alone leaves the build failing with PandocMissing.
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends pandoc
             python -m pip install -e ".[dev,docs]"
           else
             python -m pip install -e ".[dev]"
