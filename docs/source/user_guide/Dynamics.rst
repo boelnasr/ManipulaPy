@@ -270,6 +270,46 @@ The mass matrix changes with robot configuration:
    plt.tight_layout()
    plt.show()
 
+The following study uses the bundled seven-axis Panda and one fixed color scale,
+so a changing cell intensity represents a real change in inertia or coupling,
+not a rescaled palette.
+
+.. literalinclude:: ../../examples/robotics_motion_studies.py
+   :language: python
+   :dedent: 0
+   :start-after: # [dynamics-study-start]
+   :end-before: # [dynamics-study-end]
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/dynamics/panda_mass_matrix_evolution.png">
+            <img src="../_static/tutorials/dynamics/panda_mass_matrix_evolution.gif" width="960" height="540" loading="lazy" alt="A seven-joint Panda changes pose while a fixed-scale seven-by-seven mass-matrix heatmap reveals changing inertia and joint coupling.">
+         </picture>
+         <figcaption>The Panda mass matrix evolves with configuration while remaining symmetric.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/dynamics/panda_mass_matrix_evolution.png
+      :alt: A seven-joint Panda changes pose while a fixed-scale seven-by-seven mass-matrix heatmap reveals changing inertia and joint coupling.
+
+      The Panda mass matrix evolves with configuration while remaining symmetric.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/dynamics/panda_mass_matrix_evolution.png
+      :alt: A seven-joint Panda changes pose while a fixed-scale seven-by-seven mass-matrix heatmap reveals changing inertia and joint coupling.
+
+      The Panda mass matrix evolves with configuration while remaining symmetric.
+
+**What to notice:** off-diagonal terms change with the arm pose. Those terms
+encode joint coupling; the displayed symmetry residual verifies
+:math:`M(q)=M(q)^T` for every sampled configuration.
+
 Caching for Performance
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -661,6 +701,37 @@ Analyzing Torque Components
 
    components = analyze_torque_components(dynamics, theta, theta_dot, theta_ddot, g, Ftip)
 
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/dynamics/panda_torque_decomposition.png">
+            <img src="../_static/tutorials/dynamics/panda_torque_decomposition.gif" width="960" height="540" loading="lazy" alt="Synchronized Panda motion and torque traces separate inertial, velocity-dependent, gravity, and total torque for one representative joint.">
+         </picture>
+         <figcaption>Inverse-dynamics torque separated into physical contributions.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/dynamics/panda_torque_decomposition.png
+      :alt: Synchronized Panda motion and torque traces separate inertial, velocity-dependent, gravity, and total torque for one representative joint.
+
+      Inverse-dynamics torque separated into physical contributions.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/dynamics/panda_torque_decomposition.png
+      :alt: Synchronized Panda motion and torque traces separate inertial, velocity-dependent, gravity, and total torque for one representative joint.
+
+      Inverse-dynamics torque separated into physical contributions.
+
+**What to notice:** the dominant contribution changes over time even though the
+robot model is fixed. The white total trace is the public
+``inverse_dynamics`` result; the other traces reconstruct it from the same
+state, gravity vector, and tool wrench.
+
 Forward Dynamics
 ------------------
 
@@ -690,6 +761,36 @@ Basic Forward Dynamics
    tau_verify = dynamics.inverse_dynamics(theta, theta_dot, theta_ddot, g, Ftip)
    print(f"Verification (should match applied): {tau_verify}")
    print(f"Error: {np.abs(tau - tau_verify)}")
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/dynamics/panda_dynamics_round_trip.png">
+            <img src="../_static/tutorials/dynamics/panda_dynamics_round_trip.gif" width="960" height="540" loading="lazy" alt="Desired Panda joint acceleration passes through inverse dynamics and forward dynamics, then overlays the recovered acceleration with a numerical error bound.">
+         </picture>
+         <figcaption>Forward dynamics recovers the acceleration used to produce the torque.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/dynamics/panda_dynamics_round_trip.png
+      :alt: Desired Panda joint acceleration passes through inverse dynamics and forward dynamics, then overlays the recovered acceleration with a numerical error bound.
+
+      Forward dynamics recovers the acceleration used to produce the torque.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/dynamics/panda_dynamics_round_trip.png
+      :alt: Desired Panda joint acceleration passes through inverse dynamics and forward dynamics, then overlays the recovered acceleration with a numerical error bound.
+
+      Forward dynamics recovers the acceleration used to produce the torque.
+
+**What to notice:** desired and recovered acceleration traces coincide when both
+calls use the same pose, velocity, gravity, and external wrench. The final badge
+reports a numerical tolerance, not symbolic equality.
 
 Simulation with Forward Dynamics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

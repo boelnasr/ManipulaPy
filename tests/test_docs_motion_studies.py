@@ -224,3 +224,32 @@ def test_dynamics_example_region_is_top_level_and_executable():
     assert "mass_matrix" in body
     assert "inverse_dynamics" in body
     assert "forward_dynamics" in body
+
+
+def test_dynamics_scenes_and_guide_embed_three_accessible_studies():
+    scenes = (MANIM / "dynamics_scenes.py").read_text(encoding="utf-8")
+    guide = (ROOT / "docs" / "source" / "user_guide" / "Dynamics.rst").read_text(
+        encoding="utf-8"
+    )
+    classes = (
+        "PandaMassMatrixEvolution",
+        "PandaTorqueDecomposition",
+        "PandaDynamicsRoundTrip",
+    )
+    stems = (
+        "panda_mass_matrix_evolution",
+        "panda_torque_decomposition",
+        "panda_dynamics_round_trip",
+    )
+    for scene in classes:
+        assert f"class {scene}(Scene):" in scenes
+    assert "compute_dynamics_results" in scenes
+    assert "rate_func=linear" in scenes
+    for stem in stems:
+        assert guide.count(f"{stem}.gif") == 1
+        assert guide.count(f"{stem}.png") == 3
+    assert guide.count("What to notice") >= 3
+    assert ":start-after: # [dynamics-study-start]" in guide
+    assert ":end-before: # [dynamics-study-end]" in guide
+    assert guide.count('width="960" height="540"') >= 3
+    assert guide.count(".. only:: html and not epub") >= 3
