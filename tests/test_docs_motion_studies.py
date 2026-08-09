@@ -169,3 +169,22 @@ def test_motion_asset_validation_rejects_invalid_pillow_images(tmp_path):
     Image.new("RGB", (320, 180)).save(wrong_size, format="PNG")
     with pytest.raises(renderer.RenderOutputError, match="invalid dimensions"):
         renderer._validate_asset(wrong_size, ".png")
+
+
+def test_shared_scene_primitives_define_accessible_visual_tokens():
+    source = (MANIM / "scientific_scene.py").read_text(encoding="utf-8")
+    for symbol in (
+        "PANEL",
+        "TEAL",
+        "AMBER",
+        "VIOLATION",
+        "panda_chain",
+        "time_cursor",
+        "metric_badge",
+        "study_title",
+        "scientific_legend",
+    ):
+        assert symbol in source
+    assert "rate_func=linear" in source
+    for forbidden in ("Flash(", "Wiggle(", "there_and_back", "random"):
+        assert forbidden not in source
