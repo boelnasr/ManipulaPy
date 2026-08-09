@@ -1119,7 +1119,12 @@ def test_torch_arctan2_joint_promotion_matches_numpy():
     ref2 = numpy_be.arctan2(np.float32(1.0), 1.5)
     out2 = backend.arctan2(np.float32(1.0), 1.5)
     assert backend.to_numpy(out2).dtype == ref2.dtype == np.float32
-    np.testing.assert_allclose(backend.to_numpy(out2), ref2)
+    # float32 comparison, so assert_allclose's 1e-7 default is unusable: it is
+    # below float32 epsilon (1.19e-7) and therefore demands bit-identical
+    # results from two independent arctan2 implementations. Torch and NumPy
+    # differed by exactly one ULP here. What this test pins is the promotion
+    # rule asserted above, not bit equality.
+    np.testing.assert_allclose(backend.to_numpy(out2), ref2, rtol=1e-6)
 
 
 @requires_torch
