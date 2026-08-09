@@ -96,6 +96,8 @@ def _render_command(spec: SceneSpec, media_dir: Path, suffix: str) -> list[str]:
         "cairo",
         "--seed",
         "0",
+        "--resolution",
+        f"{EXPECTED_DIMENSIONS[0]},{EXPECTED_DIMENSIONS[1]}",
         f"--format={suffix.removeprefix('.')}",
     ]
     if suffix == ".png":

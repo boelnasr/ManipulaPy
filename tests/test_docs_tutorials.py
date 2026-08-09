@@ -229,11 +229,14 @@ def test_manim_render_command_and_config_isolate_user_settings(tmp_path):
     assert command[command.index("--output_file") + 1] == "PandaForwardKinematics"
     assert command[command.index("--renderer") + 1] == "cairo"
     assert command[command.index("--seed") + 1] == "0"
+    assert command[command.index("--resolution") + 1] == "960,540"
 
     config = configparser.ConfigParser()
     config.read(MANIM / "manim.cfg")
     assert config["CLI"].getboolean("transparent") is False
     assert config["CLI"].getfloat("background_opacity") == 1.0
+    assert config["CLI"].getfloat("frame_width") == pytest.approx(128.0 / 9.0)
+    assert config["CLI"].getfloat("frame_height") == 8.0
 
 
 def test_manim_asset_validation_uses_real_pillow_images(tmp_path):
