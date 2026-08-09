@@ -119,6 +119,70 @@ def test_static_brand_assets_are_local_and_valid():
         assert image.size == (1600, 1100)
 
 
+def test_motion_gallery_static_fallbacks_are_valid():
+    expected = {
+        "workspace-still.png": (550, 450),
+        "joint-trajectory-still.png": (700, 320),
+        "ur5-pick-motion-still.png": (480, 360),
+    }
+    for name, size in expected.items():
+        with Image.open(DOCS / "_static" / "images" / name) as image:
+            assert image.format == "PNG"
+            assert image.size == size
+
+
+def test_workspace_static_fallback_shows_a_populated_workspace_cloud():
+    with Image.open(DOCS / "_static" / "images" / "workspace-still.png") as image:
+        pixels = image.convert("RGB").getdata()
+    green_workspace_pixels = sum(
+        green > 130 and green > red * 1.3 and green > blue * 1.1 and red < 150
+        for red, green, blue in pixels
+    )
+    assert green_workspace_pixels > 4_000
+
+
+def test_motion_gallery_uses_wide_lead_calibrated_pair():
+    source = read(INDEX)
+    css = read(CSS)
+    assert 'class="mp-motion-gallery__primary"' in source
+    assert re.search(
+        r"\.mp-motion-gallery__grid\s*\{[^}]*"
+        r"grid-template-columns:\s*minmax\(0,\s*7fr\)\s+minmax\(0,\s*5fr\);",
+        css,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.mp-motion-gallery__primary\s*\{[^}]*grid-column:\s*1\s*/\s*-1;",
+        css,
+        re.DOTALL,
+    )
+    gallery_css = css[css.index(".mp-motion-gallery {") : css.index("/* Backend heading")]
+    assert "grid-row:" not in gallery_css
+    assert "object-fit: cover" not in gallery_css
+    assert "object-fit: contain" in gallery_css
+    assert "nth-child(2)" not in gallery_css
+    assert "nth-child(3)" not in gallery_css
+
+
+def test_motion_gallery_has_reduced_motion_stills():
+    source = read(INDEX)
+    assert (
+        ".. only:: html and not epub\n\n"
+        "   .. raw:: html\n\n"
+        '      <div class="mp-motion-gallery__grid" data-reveal>' in source
+    )
+    for stem in (
+        "workspace-still.png",
+        "joint-trajectory-still.png",
+        "ur5-pick-motion-still.png",
+    ):
+        assert (
+            f'<source media="(prefers-reduced-motion: reduce)" '
+            f'srcset="_static/images/{stem}">' in source
+        )
+    assert source.count('class="mp-motion-gallery__media"') == 3
+
+
 def test_theme_assets_are_registered_once():
     conf = read(CONF)
     assert 'html_css_files = ["custom.css"]' in conf

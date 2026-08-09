@@ -6,7 +6,6 @@ Tutorials
 
    notebook_course
    kinematics_guide
-   Kinematics
    dynamics_guide
    Dynamics
    Trajectory_Planning
