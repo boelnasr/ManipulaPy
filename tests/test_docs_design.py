@@ -160,20 +160,28 @@ def test_theme_accent_and_focus_tokens_meet_wcag_contrast_contract():
 
     assert ".bd-content a.headerlink" in css
     assert re.search(
+        r"a:focus-visible,[^{]+\[tabindex\]:focus-visible\s*\{[^}]*"
+        r"outline:\s*2px solid var\(--mp-focus\)\s*!important;[^}]*"
+        r"outline-offset:\s*3px\s*!important;[^}]*"
+        r"box-shadow:\s*none\s*!important;",
+        css,
+        re.DOTALL,
+    )
+    assert re.search(
         r"\.bd-header button:focus,[^{]+\{[^}]*box-shadow:\s*none\s*!important;",
         css,
         re.DOTALL,
     )
     assert re.search(
         r"\.bd-header button:focus-visible,[^{]+\{[^}]*"
-        r"outline:\s*3px solid var\(--mp-focus\);[^}]*"
+        r"outline:\s*3px solid var\(--mp-focus\)\s*!important;[^}]*"
         r"box-shadow:\s*none\s*!important;",
         css,
         re.DOTALL,
     )
     assert re.search(
         r"\.bd-content div\.highlight button\.copybtn:focus-visible\s*\{[^}]*"
-        r"outline:\s*2px solid var\(--mp-focus\);[^}]*"
+        r"outline:\s*2px solid var\(--mp-focus\)\s*!important;[^}]*"
         r"box-shadow:\s*none\s*!important;",
         css,
         re.DOTALL,

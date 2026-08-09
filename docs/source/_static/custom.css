@@ -253,8 +253,9 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--mp-focus);
-  outline-offset: 3px;
+  outline: 2px solid var(--mp-focus) !important;
+  outline-offset: 3px !important;
+  box-shadow: none !important;
 }
 
 /* PyData and Bootstrap add a purple focus shadow to header controls. Keep the
@@ -268,14 +269,14 @@ textarea:focus-visible,
 .bd-header button:focus-visible,
 .bd-header a:focus-visible,
 .bd-header [tabindex]:focus-visible {
-  outline: 3px solid var(--mp-focus);
-  outline-offset: 2px;
+  outline: 3px solid var(--mp-focus) !important;
+  outline-offset: 2px !important;
   box-shadow: none !important;
 }
 
 .bd-content div.highlight button.copybtn:focus-visible {
-  outline: 2px solid var(--mp-focus);
-  outline-offset: 3px;
+  outline: 2px solid var(--mp-focus) !important;
+  outline-offset: 3px !important;
   box-shadow: none !important;
 }
 
