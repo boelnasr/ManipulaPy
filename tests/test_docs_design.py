@@ -112,6 +112,29 @@ def test_css_has_theme_responsive_and_accessibility_contracts():
     assert "#ffffff" not in css.lower()
 
 
+def test_backend_eyebrow_is_visually_ordered_before_its_rst_heading():
+    source = read(INDEX)
+    css = read(CSS)
+
+    assert re.search(
+        r"^\.\. rst-class:: mp-backends\n\nCompute where your work belongs\.\n-{3,}$",
+        source,
+        re.MULTILINE,
+    )
+    assert '<section class="mp-backends"' not in source
+    assert source.index("Compute where your work belongs.") < source.index(
+        'class="mp-overline">One API, four array libraries'
+    )
+    assert re.search(
+        r"\.mp-backends\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;",
+        css,
+        re.DOTALL,
+    )
+    assert re.search(r"\.mp-backends\s*>\s*\.mp-overline\s*\{[^}]*order:\s*0;", css)
+    assert re.search(r"\.mp-backends\s*>\s*h2\s*\{[^}]*order:\s*1;", css)
+    assert re.search(r"\.mp-backends\s*>\s*\.mp-backends__grid\s*\{[^}]*order:\s*2;", css)
+
+
 def test_motion_is_progressive_and_scroll_listener_free():
     script = read(MOTION)
     assert "IntersectionObserver" in script

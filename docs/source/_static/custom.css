@@ -51,6 +51,29 @@ html {
     --mp-label-weight: 600;
 }
 
+/* The backend title remains a Sphinx section heading for the page TOC. Place
+   the supporting eyebrow before it visually without changing document order. */
+.mp-backends {
+    display: flex;
+    flex-direction: column;
+}
+
+.mp-backends > .mp-overline {
+    order: 0;
+}
+
+.mp-backends > h2 {
+    order: 1;
+}
+
+.mp-backends > .mp-backends__grid {
+    order: 2;
+}
+
+.mp-backends > .mp-backends__links {
+    order: 3;
+}
+
 /* ── 2. Primitives ───────────────────────────────────────────────────────── */
 
 /* Monospace eyebrow / label. Used for section kickers, card categories,
