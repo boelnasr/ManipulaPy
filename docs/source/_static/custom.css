@@ -1023,7 +1023,7 @@ div.topic.contents ul ul {
   }
 }
 
-@media (max-width: 959px) {
+@media (max-width: 1319px) {
   .bd-header .bd-header__inner {
     gap: 0.15rem;
     padding-inline: 0.5rem;
@@ -1070,6 +1070,12 @@ div.topic.contents ul ul {
     min-width: 40px;
   }
 
+  .bd-header button.primary-toggle {
+    display: flex;
+  }
+}
+
+@media (max-width: 959px) {
   .mp-hero {
     grid-template-columns: 1fr;
     grid-template-areas:
