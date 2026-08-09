@@ -4,6 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 
@@ -189,6 +190,10 @@ def test_theme_accent_and_focus_tokens_meet_wcag_contrast_contract():
 
 
 def test_latex_homepage_fallback_is_generated(tmp_path):
+    # The only test here that shells out to Sphinx. The regression job installs
+    # the docs extra so this runs, but Sphinx 8 requires Python >= 3.10, so on
+    # 3.9 there is nothing to build with and the contract cannot be checked.
+    pytest.importorskip("sphinx")
     output = tmp_path / "latex"
     subprocess.run(
         [
