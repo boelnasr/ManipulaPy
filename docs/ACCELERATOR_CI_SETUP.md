@@ -16,16 +16,21 @@ the two ever disagree, `CONTRIBUTING.md` wins and this file is the stale one.
 
 ## Why this blocks the release
 
-`publish.yml` declares `needs: [build, tpu-contract]`, and `tpu-release.yml`
-begins with a `gpu-release-gate` job that queries the check-runs API for a
-successful `gpu-axes-passed` on the exact release SHA. That marker is produced
-only by `gpu-axes-passed` in `test.yml`, which requires all three self-hosted
-CUDA jobs to pass.
+`publish.yml` declares `needs: [build, gpu-release-gate]`, and that gate queries
+the check-runs API for a successful `gpu-axes-passed` on the exact release SHA.
+That marker is produced only by `gpu-axes-passed` in `test.yml`, which requires
+all three self-hosted CUDA jobs to pass.
 
 With `GPU_RUNNER_ENABLED` unset, those jobs are skipped at the job boundary.
 A skipped marker is not evidence, so the gate fails closed and `publish` never
-runs. That is the current state: every hosted job is green, and the four
-accelerator jobs read `skipped`.
+runs.
+
+Phase 1 is now complete: the runner is registered, `GPU_RUNNER_ENABLED=true`,
+and every job including the three CUDA axes is green. Phase 2 is not — the
+`v5litepod-1` quota is not granted, so `tpu-release.yml` is **not** in
+`publish.yml`'s `needs` and runs on `workflow_dispatch` only. Restoring the full
+gate means swapping that one job back; `tpu-release.yml` calls the same
+`gpu-release-gate.yml`, so the GPU requirement is unaffected either way.
 
 There is a second reason worth naming. CuPy has never executed anywhere in this
 project — not in CI, not locally. Phase 1's stated acceptance is "existing suite

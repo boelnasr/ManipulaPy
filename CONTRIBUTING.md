@@ -62,12 +62,16 @@ python -m sphinx -b html docs/source docs/build/html
 - **test.yml** (*CI Tests*): hosted NumPy, Torch-CPU, and JAX-CPU contracts plus
   CuPy, Torch-CUDA, and JAX-CUDA contracts on the self-hosted GPU runner. Every
   axis runs the public-API freeze; Torch/JAX axes also run gradient contracts.
-- **tpu-release.yml** (*TPU Release Contract*): release-only, reviewer-approved
-  Google Cloud TPU validation for the exact commit. It requires a successful
-  `gpu-axes-passed` check for the same SHA, provisions one `v5litepod-1`, uploads
-  JUnit evidence, and always tears the TPU down.
+- **gpu-release-gate.yml** (*GPU Release Gate*): reusable job that requires a
+  successful `gpu-axes-passed` check-run for the exact release SHA. Called by
+  both `publish.yml` and `tpu-release.yml` so they read the same evidence.
+- **tpu-release.yml** (*TPU Release Contract*): reviewer-approved Google Cloud
+  TPU validation for the exact commit. It runs the GPU release gate first, then
+  provisions one `v5litepod-1`, uploads JUnit evidence, and always tears the TPU
+  down. **Not yet wired into `publish.yml`** — the `v5litepod-1` quota is not
+  granted, so it runs on `workflow_dispatch` only.
 - **lint.yml** (*Lint with flake8 and black*): `flake8 ManipulaPy tests --max-line-length=88` + `black --check`; auto-commits formatting fixes (`contents: write`).
-- **publish.yml** (*Publish to PyPI*): triggered when a GitHub **Release** is published; builds the sdist/wheel, waits for the GPU/TPU release workflow, and uploads via PyPI **Trusted Publishing** (OIDC `id-token: write`, `pypi` environment) — no API token.
+- **publish.yml** (*Publish to PyPI*): triggered when a GitHub **Release** is published; builds the sdist/wheel, waits for the GPU release gate, and uploads via PyPI **Trusted Publishing** (OIDC `id-token: write`, `pypi` environment) — no API token.
 - **draft-pdf.yml**: builds the JOSS `paper.pdf` on `v*` tags and attaches it to the release.
 - **codeql.yml** (*CodeQL Advanced*) and **scorecard.yml** (*Scorecard supply-chain security*): security analysis on push/PR plus weekly schedules.
 

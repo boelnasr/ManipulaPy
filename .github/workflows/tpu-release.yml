@@ -15,22 +15,10 @@ concurrency:
 
 jobs:
   gpu-release-gate:
-    name: Require live GPU evidence
-    runs-on: ubuntu-latest
-    steps:
-      - name: Require gpu-axes-passed for the exact commit
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          count="$(curl --fail --silent --show-error --location \
-            --retry 3 --retry-all-errors --retry-delay 2 --max-time 30 \
-            --header "Authorization: Bearer ${GITHUB_TOKEN}" \
-            --header "Accept: application/vnd.github+json" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/check-runs?per_page=100" \
-            | jq '[.check_runs[] | select(.name == "gpu-axes-passed" and .conclusion == "success")] | length')"
-          test "$count" -ge 1
-          echo "Found live gpu-axes-passed evidence for ${GITHUB_SHA}"
+    uses: ./.github/workflows/gpu-release-gate.yml
+    permissions:
+      checks: read
+      contents: read
 
   tpu-contract:
     name: tpu-contract-passed
