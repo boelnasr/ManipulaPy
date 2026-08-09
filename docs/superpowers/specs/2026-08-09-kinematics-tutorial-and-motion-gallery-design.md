@@ -70,8 +70,12 @@ The page follows one continuous Franka Panda task. It does not introduce disconn
 
 - Resolve `ManipulaPy/ManipulaPy_data/franka_panda/panda.urdf` through package resources.
 - Construct `URDFToSerialManipulator` with the built-in parser and obtain its `serial_manipulator`.
-- Derive the joint count from robot data rather than hard-coding six axes.
-- Display the seven joint names or limits as an early verification checkpoint.
+- Define the tutorial's arm view as the first seven revolute Panda joints and
+  derive their names from the loaded URDF rather than hard-coding six axes.
+- Explain the bundled-model wrinkle once: the public processor also exposes one
+  actuated gripper joint, while this arm-kinematics path consistently passes a
+  seven-element arm vector. Display the seven arm names or limits as an early
+  verification checkpoint.
 
 ### 3. Forward kinematics
 
@@ -234,7 +238,7 @@ No notebooks, public package modules, URDF data, unrelated tutorials, or deploym
 ### Tutorial correctness
 
 - Execute the source-of-truth tutorial module against the bundled Panda URDF.
-- Assert seven active joints, FK shape, Jacobian shape, finite velocity output, IK success for the documented reachable target, pose residual tolerances, and joint-limit compliance.
+- Assert that the selected arm view has seven revolute joints, then check FK shape, a 6 by 7 Jacobian, finite velocity output, IK success for the documented reachable target, pose residual tolerances, and compliance with the first seven Panda limits. Separately assert the documented processor behavior that the bundled model also exposes its gripper degree of freedom.
 - Verify every tutorial `literalinclude` region exists and is nonempty.
 - Scan RST code for non-breaking spaces and references to the known nonexistent APIs removed by this redesign.
 - Confirm the tutorials toctree lists only the canonical kinematics page while both old and new HTML routes build.
