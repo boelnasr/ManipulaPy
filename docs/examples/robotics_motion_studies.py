@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 from ManipulaPy.ManipulaPy_data import get_robot_urdf
 from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
+from ManipulaPy.singularity import Singularity
 from ManipulaPy.urdf.types import JointType
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
 
@@ -181,3 +182,61 @@ def compute_dynamics_results() -> DynamicsResults:
 
 
 # [dynamics-study-end]
+
+
+@dataclass(frozen=True)
+class SingularityResults:
+    """Jacobian spectra and linear velocity ellipsoids along one Panda path."""
+
+    time: NDArray[np.float64]
+    theta: NDArray[np.float64]
+    singular_values: NDArray[np.float64]
+    minimum_sigma: NDArray[np.float64]
+    condition_number: NDArray[np.float64]
+    linear_axes: NDArray[np.float64]
+    ellipsoid_radii: NDArray[np.float64]
+    near_singular: NDArray[np.bool_]
+    public_status: NDArray[np.bool_]
+    threshold: float
+
+
+def compute_singularity_results() -> SingularityResults:
+    """Compute public singularity diagnostics and a linear velocity ellipsoid."""
+    fixture = load_panda_fixture()
+    theta, _dtheta, _ddtheta = _quintic_reference(MID, NEAR_SINGULAR)
+    analysis = Singularity(fixture.serial)
+    spectra = []
+    conditions = []
+    axes = []
+    radii = []
+    statuses = []
+    for q in theta:
+        jacobian = assert_finite("space Jacobian", fixture.serial.jacobian(q))
+        singular_values = assert_finite(
+            "Jacobian singular values",
+            np.linalg.svd(jacobian, compute_uv=False),
+        )
+        linear_u, linear_s, _linear_vh = np.linalg.svd(
+            jacobian[3:, :], full_matrices=False
+        )
+        spectra.append(singular_values)
+        axes.append(assert_finite("linear ellipsoid axes", linear_u))
+        radii.append(assert_finite("linear ellipsoid radii", linear_s))
+        conditions.append(float(analysis.condition_number(q)))
+        statuses.append(bool(analysis.singularity_analysis(q)))
+
+    singular_array = np.stack(spectra)
+    minimum = singular_array[:, -1]
+    near = minimum < SINGULARITY_THRESHOLD
+    return SingularityResults(
+        time=STUDY_TIME.copy(),
+        theta=theta,
+        singular_values=singular_array,
+        minimum_sigma=minimum,
+        condition_number=np.asarray(conditions, dtype=np.float64),
+        linear_axes=np.stack(axes),
+        ellipsoid_radii=np.stack(radii),
+        near_singular=near,
+        public_status=np.asarray(statuses, dtype=np.bool_),
+        threshold=SINGULARITY_THRESHOLD,
+    )

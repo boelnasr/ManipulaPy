@@ -253,3 +253,38 @@ def test_dynamics_scenes_and_guide_embed_three_accessible_studies():
     assert ":end-before: # [dynamics-study-end]" in guide
     assert guide.count('width="960" height="540"') >= 3
     assert guide.count(".. only:: html and not epub") >= 3
+
+
+def test_singularity_path_crosses_public_threshold():
+    result = load_studies().compute_singularity_results()
+    assert result.theta.shape == (61, 7)
+    assert result.singular_values.shape == (61, 6)
+    assert result.linear_axes.shape == (61, 3, 3)
+    assert result.ellipsoid_radii.shape == (61, 3)
+    assert np.isfinite(result.singular_values).all()
+    assert np.isfinite(result.ellipsoid_radii).all()
+    assert result.minimum_sigma[0] > result.threshold
+    assert result.minimum_sigma[-1] < result.threshold
+    assert np.array_equal(
+        result.near_singular, result.minimum_sigma < result.threshold
+    )
+    assert np.array_equal(result.public_status, result.near_singular)
+    assert np.all(result.ellipsoid_radii >= 0.0)
+    assert np.isfinite(result.condition_number[:-1]).all()
+
+
+def test_singularity_scenes_and_guide_embed_two_accessible_studies():
+    scenes = (MANIM / "singularity_scenes.py").read_text(encoding="utf-8")
+    guide = (
+        ROOT / "docs" / "source" / "user_guide" / "Singularity_Analysis.rst"
+    ).read_text(encoding="utf-8")
+    for scene in ("PandaManipulabilityCollapse", "PandaSingularityMonitor"):
+        assert f"class {scene}(Scene):" in scenes
+    assert "compute_singularity_results" in scenes
+    assert "1e-4" in scenes
+    for stem in ("panda_manipulability_collapse", "panda_singularity_monitor"):
+        assert guide.count(f"{stem}.gif") == 1
+        assert guide.count(f"{stem}.png") == 3
+    assert guide.count("What to notice") >= 2
+    assert guide.count('width="960" height="540"') >= 2
+    assert "minimum singular value" in guide.lower()

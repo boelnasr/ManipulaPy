@@ -187,6 +187,40 @@ Manipulability Ellipsoid Visualization
     plt.tight_layout()
     plt.show()
 
+The velocity ellipsoid below is computed from the linear-velocity block of the
+Panda space Jacobian. Its radii are singular values, so a shrinking axis means
+the tool is losing velocity capability in that principal direction.
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/singularity/panda_manipulability_collapse.png">
+            <img src="../_static/tutorials/singularity/panda_manipulability_collapse.gif" width="960" height="540" loading="lazy" alt="A Panda arm approaches a near-singular pose while the weakest axis of its linear velocity manipulability ellipsoid contracts.">
+         </picture>
+         <figcaption>The linear velocity ellipsoid loses capability along its weakest direction.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/singularity/panda_manipulability_collapse.png
+      :alt: A Panda arm approaches a near-singular pose while the weakest axis of its linear velocity manipulability ellipsoid contracts.
+
+      The linear velocity ellipsoid loses capability along its weakest direction.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/singularity/panda_manipulability_collapse.png
+      :alt: A Panda arm approaches a near-singular pose while the weakest axis of its linear velocity manipulability ellipsoid contracts.
+
+      The linear velocity ellipsoid loses capability along its weakest direction.
+
+**What to notice:** the strongest direction remains available while the weakest
+radius contracts. Singularity is directional; the robot does not lose every
+Cartesian velocity direction at once.
+
 Module API Reference
 --------------------
 
@@ -458,6 +492,40 @@ Analyze singularities along planned trajectories:
         
         plt.tight_layout()
         plt.show()
+
+The same deterministic path can be monitored without reducing the diagnosis to
+a single Boolean. The next study plots the minimum singular value beside the
+condition number and retains the public :math:`10^{-4}` threshold.
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/singularity/panda_singularity_monitor.png">
+            <img src="../_static/tutorials/singularity/panda_singularity_monitor.gif" width="960" height="540" loading="lazy" alt="A Panda trajectory is synchronized with logarithmic minimum-singular-value and condition-number traces that cross the public near-singularity threshold.">
+         </picture>
+         <figcaption>Minimum singular value and condition number identify the same near-singular pose.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/singularity/panda_singularity_monitor.png
+      :alt: A Panda trajectory is synchronized with logarithmic minimum-singular-value and condition-number traces that cross the public near-singularity threshold.
+
+      Minimum singular value and condition number identify the same near-singular pose.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/singularity/panda_singularity_monitor.png
+      :alt: A Panda trajectory is synchronized with logarithmic minimum-singular-value and condition-number traces that cross the public near-singularity threshold.
+
+      Minimum singular value and condition number identify the same near-singular pose.
+
+**What to notice:** the minimum singular value falls through
+:math:`10^{-4}` as the condition number rises sharply. Logarithmic axes keep the
+threshold and the final value legible without hiding the finite samples.
 
 Real-Time Singularity Monitoring
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
