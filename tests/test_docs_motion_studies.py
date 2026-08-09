@@ -328,3 +328,30 @@ def test_planning_results_are_deterministic():
     ):
         assert np.array_equal(getattr(first, name), getattr(second, name))
     assert first.minimum_joint_clearance == second.minimum_joint_clearance
+
+
+def test_planning_scenes_and_guide_embed_three_accessible_studies():
+    scenes = (MANIM / "path_planning_scenes.py").read_text(encoding="utf-8")
+    guide = (
+        ROOT / "docs" / "source" / "user_guide" / "Path_Planning.rst"
+    ).read_text(encoding="utf-8")
+    for scene in (
+        "PandaTimeScalingComparison",
+        "PandaInterpolationDomains",
+        "PandaCollisionCorrection",
+    ):
+        assert f"class {scene}(Scene):" in scenes
+    assert "compute_planning_results" in scenes
+    assert "0.20 rad" in scenes
+    assert "joint-space" in scenes.lower()
+    for stem in (
+        "panda_time_scaling_comparison",
+        "panda_interpolation_domains",
+        "panda_collision_correction",
+    ):
+        assert guide.count(f"{stem}.gif") == 1
+        assert guide.count(f"{stem}.png") == 3
+    assert guide.count("What to notice") >= 3
+    assert guide.count('width="960" height="540"') >= 3
+    assert ":start-after: # [planning-study-start]" in guide
+    assert "joint-space obstacle" in guide.lower()

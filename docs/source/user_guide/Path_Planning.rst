@@ -182,6 +182,46 @@ The optimized `joint_trajectory()` method automatically selects the best executi
    # Run demonstration
    demo_trajectory = optimized_trajectory_demo()
 
+The Panda study below holds start, goal, and duration fixed while changing only
+the public time-scaling method. The plotted derivatives use the returned
+trajectory arrays and the same sample interval.
+
+.. literalinclude:: ../../examples/robotics_motion_studies.py
+   :language: python
+   :dedent: 0
+   :start-after: # [planning-study-start]
+   :end-before: # [planning-study-end]
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/path_planning/panda_time_scaling_comparison.png">
+            <img src="../_static/tutorials/path_planning/panda_time_scaling_comparison.gif" width="960" height="540" loading="lazy" alt="One Panda joint follows cubic and quintic time scaling while aligned position, velocity, acceleration, and jerk traces expose endpoint smoothness.">
+         </picture>
+         <figcaption>Cubic and quintic time scaling reach the same joint-space endpoints differently.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/path_planning/panda_time_scaling_comparison.png
+      :alt: One Panda joint follows cubic and quintic time scaling while aligned position, velocity, acceleration, and jerk traces expose endpoint smoothness.
+
+      Cubic and quintic time scaling reach the same joint-space endpoints differently.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/path_planning/panda_time_scaling_comparison.png
+      :alt: One Panda joint follows cubic and quintic time scaling while aligned position, velocity, acceleration, and jerk traces expose endpoint smoothness.
+
+      Cubic and quintic time scaling reach the same joint-space endpoints differently.
+
+**What to notice:** both profiles reach the same joint angle. Quintic scaling
+also brings velocity and acceleration to zero at both endpoints, trading a
+different jerk history for smoother boundary conditions.
+
 batch_joint_trajectory() for Multiple Trajectories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -638,6 +678,36 @@ GPU-accelerated Cartesian trajectory generation with adaptive execution:
    # Run Cartesian trajectory demonstration
    cartesian_demo = optimized_cartesian_demo()
 
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/path_planning/panda_interpolation_domains.png">
+            <img src="../_static/tutorials/path_planning/panda_interpolation_domains.gif" width="960" height="540" loading="lazy" alt="Joint-space and Cartesian interpolation move the Panda between the same poses while persistent tool-tip trails reveal different XY paths.">
+         </picture>
+         <figcaption>The interpolation domain determines the path between common task endpoints.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/path_planning/panda_interpolation_domains.png
+      :alt: Joint-space and Cartesian interpolation move the Panda between the same poses while persistent tool-tip trails reveal different XY paths.
+
+      The interpolation domain determines the path between common task endpoints.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/path_planning/panda_interpolation_domains.png
+      :alt: Joint-space and Cartesian interpolation move the Panda between the same poses while persistent tool-tip trails reveal different XY paths.
+
+      The interpolation domain determines the path between common task endpoints.
+
+**What to notice:** joint interpolation is smooth in configuration space but its
+tool path curves. Cartesian interpolation produces the straight positional path
+shown here while interpolating orientation between the same endpoint poses.
+
 Real-World Application Examples
 -------------------------------
 
@@ -823,6 +893,41 @@ Optimized trajectory planning for industrial pick-and-place operations:
    
    # Run optimized pick-and-place demonstration
    pick_place_traj, segments = optimized_pick_and_place()
+
+The public potential field accepts obstacles as joint configurations. This
+example keeps the Panda gripper fixed, corrects the seven arm joints, and
+measures Euclidean joint-space clearance in radians. It does not portray the
+configuration-space obstacle as physical workspace geometry.
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/path_planning/panda_collision_correction.png">
+            <img src="../_static/tutorials/path_planning/panda_collision_correction.gif" width="960" height="540" loading="lazy" alt="A nominal Panda joint-space path intersects a configuration exclusion region, then a public potential field moves six waypoints outside a 0.20-radian clearance margin.">
+         </picture>
+         <figcaption>A potential field corrects the nominal path around a joint-space obstacle.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/path_planning/panda_collision_correction.png
+      :alt: A nominal Panda joint-space path intersects a configuration exclusion region, then a public potential field moves six waypoints outside a 0.20-radian clearance margin.
+
+      A potential field corrects the nominal path around a joint-space obstacle.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/path_planning/panda_collision_correction.png
+      :alt: A nominal Panda joint-space path intersects a configuration exclusion region, then a public potential field moves six waypoints outside a 0.20-radian clearance margin.
+
+      A potential field corrects the nominal path around a joint-space obstacle.
+
+**What to notice:** the faint nominal path passes through the exclusion region;
+the corrected waypoints retain the same start and goal while the independently
+measured minimum joint-space distance stays above 0.20 rad.
 
 Multi-Robot Trajectory Coordination
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
