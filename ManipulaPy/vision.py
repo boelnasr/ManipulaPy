@@ -805,7 +805,11 @@ class Vision:
         K2 = K2.astype(np.float64)
         D2 = D2.astype(np.float64)
         R_lr = R_lr.astype(np.float64)
-        t_lr = t_lr.astype(np.float64)
+        # stereoRectify documents T as a 3x1 translation. The subtraction above
+        # yields a 1-D (3,) vector, which OpenCV 4 accepted but OpenCV 5 rejects
+        # inside gemm with "a_size.width == len". Reshape to the documented
+        # column vector, which both major versions accept.
+        t_lr = t_lr.astype(np.float64).reshape(3, 1)
 
         # Now call stereoRectify with consistent 64-bit floats
         R1, R2, P1, P2, Q, _, _ = cv2.stereoRectify(
