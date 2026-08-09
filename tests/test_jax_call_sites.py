@@ -428,7 +428,14 @@ def test_trac_ik_solve_runs_through_the_slsqp_boundary_under_jax():
     )
     assert success is success_np
     np.testing.assert_allclose(np.asarray(theta), np.asarray(theta_np), atol=1e-5)
-    np.testing.assert_allclose(err, err_np, rtol=1e-5)
+    # err is a function of theta, and the assertion above already accepts a
+    # 1e-5 difference there. Measured on this fixture, perturbing theta by
+    # exactly 1e-5 moves err by up to 3.8e-5, so a bound tighter than that
+    # contradicts the line above: it fails whenever a backend lands elsewhere
+    # inside the band theta is already permitted to occupy. rtol=1e-5 allowed
+    # only 1.4e-6 and failed on JAX CUDA at 1.8e-6 -- a point well within that
+    # band, not a precision defect.
+    np.testing.assert_allclose(err, err_np, atol=1e-4)
 
 
 # Half-turn axes driving each possible ``argmax`` of the rotation-error
