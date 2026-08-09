@@ -25,8 +25,10 @@ angles are in radians and distances are in metres.
 Load the bundled Panda
 ----------------------
 
+This first unit imports the needed APIs and defines the fixed tutorial inputs.
 ``load_panda`` returns the serial manipulator, the seven arm-joint names and
-limits, and the model's full exposed degree-of-freedom count.
+limits, and the model's full exposed degree-of-freedom count. Run the units in
+order: each later function takes its required inputs explicitly.
 
 .. literalinclude:: ../../examples/kinematics_tutorial.py
    :language: python
@@ -41,9 +43,10 @@ Expected output::
 Forward kinematics: joints to pose
 ----------------------------------
 
-Forward kinematics maps the fixed seven-element ``HOME`` configuration to a
-homogeneous pose matrix for the Panda tool. Its upper-left 3 by 3 block is the
-rotation and its final column contains the position in metres.
+``forward_kinematics_step`` maps the fixed seven-element ``HOME`` configuration
+to a homogeneous pose matrix for the Panda tool and returns its IK target pose.
+The upper-left 3 by 3 block is the rotation and the final column contains the
+position in metres.
 
 .. literalinclude:: ../../examples/kinematics_tutorial.py
    :language: python
@@ -53,15 +56,15 @@ rotation and its final column contains the position in metres.
 
 Expected output::
 
-   pose.shape == (4, 4)
+   returned pose.shape == (4, 4)
 
 Jacobian: joints to tool velocity
 ---------------------------------
 
-The space Jacobian maps the seven joint rates to a six-component tool twist.
-The first three twist components are angular velocity in rad/s; the final
-three are linear velocity in m/s. Singular values provide a compact signal of
-how close that configuration is to losing a direction of motion.
+``velocity_kinematics_step`` maps the seven joint rates to a six-component tool
+twist. The first three twist components are angular velocity in rad/s; the
+final three are linear velocity in m/s. Singular values provide a compact
+signal of how close that configuration is to losing a direction of motion.
 
 .. literalinclude:: ../../examples/kinematics_tutorial.py
    :language: python
@@ -71,15 +74,15 @@ how close that configuration is to losing a direction of motion.
 
 Expected output::
 
-   jacobian.shape == (6, 7)
-   twist.shape == (6,)
+   returned jacobian.shape == (6, 7)
+   returned twist.shape == (6,)
 
 Inverse kinematics: pose to joints
 ----------------------------------
 
-Inverse kinematics starts from ``HOME`` and asks the public iterative solver
-to reach the pose produced from ``TARGET``. The returned configuration respects
-the Panda arm's limits and the solver reports whether it converged.
+``inverse_kinematics_step`` starts from ``HOME`` and asks the public iterative
+solver to reach the pose produced from ``TARGET``. The returned configuration
+respects the Panda arm's limits and the solver reports whether it converged.
 
 .. literalinclude:: ../../examples/kinematics_tutorial.py
    :language: python
@@ -89,12 +92,12 @@ the Panda arm's limits and the solver reports whether it converged.
 
 Expected output::
 
-   success is True; iterations <= 20
+   returned success is True; returned iterations <= 20
 
 Validate the result
 -------------------
 
-Validate IK by running forward kinematics on the solution and comparing its
+``validation_step`` runs forward kinematics on the solution and compares its
 pose with the target. Do not require joint-vector equality: several joint
 configurations can produce the same tool pose, and a numerical solver may
 choose any valid one. Translation and rotation pose residuals directly test
@@ -108,8 +111,8 @@ the result the robot must achieve.
 
 Expected output::
 
-   translation residual < 1e-5 m
-   rotation residual < 1e-5 rad
+   returned translation residual < 1e-5 m
+   returned rotation residual < 1e-5 rad
 
 Troubleshooting
 ---------------

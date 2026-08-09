@@ -13,6 +13,12 @@ def read(path):
     return path.read_text(encoding="utf-8")
 
 
+def marker_body(source, marker):
+    start = f"# [{marker}-start]"
+    end = f"# [{marker}-end]"
+    return source.split(start, maxsplit=1)[1].split(end, maxsplit=1)[0]
+
+
 def load_example():
     spec = importlib.util.spec_from_file_location("kinematics_tutorial", EXAMPLE)
     assert spec is not None and spec.loader is not None
@@ -89,3 +95,37 @@ def test_tutorial_uses_tested_regions_and_current_api():
     ):
         assert forbidden not in source
     assert "\u00a0" not in source
+
+
+def test_literalinclude_regions_are_unindented_executable_tutorial_units():
+    source = read(EXAMPLE)
+    regions = {
+        marker: marker_body(source, marker)
+        for marker in (
+            "load-panda",
+            "forward-kinematics",
+            "velocity-kinematics",
+            "inverse-kinematics",
+            "validation",
+        )
+    }
+
+    for marker, body in regions.items():
+        assert body.lstrip("\n") == body.lstrip("\n ")
+        compile(body, f"{EXAMPLE}:{marker}", "exec")
+
+    assert "import numpy as np" in regions["load-panda"]
+    assert "HOME = np.array" in regions["load-panda"]
+    assert "TARGET = np.array" in regions["load-panda"]
+    assert "JOINT_RATES = np.array" in regions["load-panda"]
+    assert "def load_panda" in regions["load-panda"]
+    assert "def forward_kinematics_step(robot, home, target)" in regions[
+        "forward-kinematics"
+    ]
+    assert "def velocity_kinematics_step(robot, configuration, joint_rates)" in regions[
+        "velocity-kinematics"
+    ]
+    assert "def inverse_kinematics_step(robot, target_pose, initial_guess)" in regions[
+        "inverse-kinematics"
+    ]
+    assert "def validation_step(robot, solution, target_pose)" in regions["validation"]

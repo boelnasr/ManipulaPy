@@ -4,18 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import numpy as np
 from numpy.typing import NDArray
-
-from ManipulaPy.ManipulaPy_data import get_robot_urdf
-from ManipulaPy.kinematics import SerialManipulator
-from ManipulaPy.urdf.types import JointType
-from ManipulaPy.urdf_processor import URDFToSerialManipulator
-
-ARM_DOF = 7
-HOME = np.array([0.0, -0.3, 0.0, -2.0, 0.0, 1.7, 0.785])
-TARGET = np.array([0.15, -0.45, 0.1, -1.8, 0.05, 1.45, 0.65])
-JOINT_RATES = np.array([0.05, -0.03, 0.02, 0.0, 0.01, -0.02, 0.03])
 
 
 @dataclass(frozen=True)
@@ -35,6 +24,19 @@ class TutorialResults:
 
 
 # [load-panda-start]
+import numpy as np
+
+from ManipulaPy.ManipulaPy_data import get_robot_urdf
+from ManipulaPy.kinematics import SerialManipulator
+from ManipulaPy.urdf.types import JointType
+from ManipulaPy.urdf_processor import URDFToSerialManipulator
+
+ARM_DOF = 7
+HOME = np.array([0.0, -0.3, 0.0, -2.0, 0.0, 1.7, 0.785])
+TARGET = np.array([0.15, -0.45, 0.1, -1.8, 0.05, 1.45, 0.65])
+JOINT_RATES = np.array([0.05, -0.03, 0.02, 0.0, 0.01, -0.02, 0.03])
+
+
 def load_panda() -> tuple[
     SerialManipulator,
     tuple[str, ...],
@@ -84,39 +86,72 @@ def _solve_to_target(robot, target_pose, max_iterations):
     )
 
 
-def compute_tutorial_results() -> TutorialResults:
-    """Compute the deterministic values used in the kinematics tutorial."""
-    robot, joint_names, _limits, _full_dof = load_panda()
+# [forward-kinematics-start]
+def forward_kinematics_step(robot, home, target):
+    """Return the tool pose at ``home`` and the target pose for IK."""
+    pose = np.asarray(robot.forward_kinematics(home, frame="space"), dtype=np.float64)
+    target_pose = robot.forward_kinematics(target)
+    return pose, target_pose
 
-    # [forward-kinematics-start]
-    pose = np.asarray(robot.forward_kinematics(HOME, frame="space"), dtype=np.float64)
-    target_pose = robot.forward_kinematics(TARGET)
-    # [forward-kinematics-end]
 
-    # [velocity-kinematics-start]
-    jacobian = np.asarray(robot.jacobian(HOME, frame="space"), dtype=np.float64)
+# [forward-kinematics-end]
+
+
+# [velocity-kinematics-start]
+def velocity_kinematics_step(robot, configuration, joint_rates):
+    """Return the space Jacobian, tool twist, and Jacobian singular values."""
+    jacobian = np.asarray(robot.jacobian(configuration, frame="space"), dtype=np.float64)
     twist = np.asarray(
-        robot.end_effector_velocity(HOME, JOINT_RATES, frame="space"),
+        robot.end_effector_velocity(configuration, joint_rates, frame="space"),
         dtype=np.float64,
     )
     singular_values = np.linalg.svd(jacobian, compute_uv=False)
-    # [velocity-kinematics-end]
+    return jacobian, twist, singular_values
 
-    # [inverse-kinematics-start]
+
+# [velocity-kinematics-end]
+
+
+# [inverse-kinematics-start]
+def inverse_kinematics_step(robot, target_pose, initial_guess):
+    """Solve for the Panda arm configuration that reaches ``target_pose``."""
     solution, success, iterations = robot.iterative_inverse_kinematics(
         target_pose,
-        HOME,
+        initial_guess,
         max_iterations=400,
         adaptive_tuning=True,
         backtracking=True,
     )
     ik_solution = np.asarray(solution, dtype=np.float64)
-    # [inverse-kinematics-end]
+    return ik_solution, success, iterations
 
-    # [validation-start]
-    solved_pose = robot.forward_kinematics(ik_solution)
-    translation_residual, rotation_residual = pose_residual(solved_pose, target_pose)
-    # [validation-end]
+
+# [inverse-kinematics-end]
+
+
+# [validation-start]
+def validation_step(robot, solution, target_pose):
+    """Return translation and rotation pose residuals for an IK solution."""
+    solved_pose = robot.forward_kinematics(solution)
+    return pose_residual(solved_pose, target_pose)
+
+
+# [validation-end]
+
+
+def compute_tutorial_results() -> TutorialResults:
+    """Compute the deterministic values used in the kinematics tutorial."""
+    robot, joint_names, _limits, _full_dof = load_panda()
+    pose, target_pose = forward_kinematics_step(robot, HOME, TARGET)
+    jacobian, twist, singular_values = velocity_kinematics_step(
+        robot, HOME, JOINT_RATES
+    )
+    ik_solution, success, iterations = inverse_kinematics_step(
+        robot, target_pose, HOME
+    )
+    translation_residual, rotation_residual = validation_step(
+        robot, ik_solution, target_pose
+    )
 
     return TutorialResults(
         joint_names=joint_names,
