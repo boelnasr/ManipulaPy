@@ -115,9 +115,12 @@ jax-cpu = ["jax[cpu]>=0.6.0"]
 # needed — do NOT add one with --extra-index-url, which is dependency-confusion
 # bait. Linux only: jax publishes no CUDA wheels for macOS or Windows.
 jax-cuda = ["jax[cuda12]>=0.6.0; sys_platform == 'linux'"]
-# TPU wheels are meaningful only on a Google Cloud TPU VM. Packaging this extra
-# does not establish the hardware contract; Task 17 supplies the release gate.
-jax-tpu = ["jax[tpu]>=0.6.0; sys_platform == 'linux'"]
+# There is deliberately no `jax-tpu` extra. Validating one on a real TPU v5e
+# showed XLA:TPU implements no float64 LU decomposition and no int64 dot, so
+# `inv`, `solve` and every dynamics path built on them raise UNIMPLEMENTED; and
+# float64 matmul that does run lands at float32 accuracy (~3e-8 against NumPy).
+# This backend enables jax_enable_x64 unconditionally, so TPU cannot satisfy its
+# contract. Restoring the extra requires a per-platform precision domain first.
 
 # Convenience: install everything (no self-references — the resolver
 # handles direct deps more reliably than ``ManipulaPy[simulation,...]``).

@@ -44,12 +44,12 @@ jobs:
           name: dist
           path: dist/
 
-  # The TPU contract (tpu-release.yml) is not wired in here yet: it provisions a
-  # v5litepod-1 in europe-west4-b, and that quota is not yet granted on the
-  # project. Publishing therefore requires live GPU evidence only, and the
-  # `[jax-tpu]` extra ships documented as packaged-but-unproven. To restore the
-  # full gate, swap this job back to `uses: ./.github/workflows/tpu-release.yml`
-  # (which calls the same GPU gate itself) and grant it `id-token: write`.
+  # The TPU contract (tpu-release.yml) is deliberately not wired in: TPUs are
+  # not a supported target — XLA:TPU has no float64 LU decomposition, and this
+  # backend is float64-only — so there is no TPU extra and nothing to gate on.
+  # Publishing requires live GPU evidence. If TPU support is ever built, swap
+  # this job to `uses: ./.github/workflows/tpu-release.yml` (which calls the
+  # same GPU gate itself) and grant it `id-token: write`.
   gpu-release-gate:
     name: GPU release gate
     uses: ./.github/workflows/gpu-release-gate.yml

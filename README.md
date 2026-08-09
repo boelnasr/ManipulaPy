@@ -441,16 +441,17 @@ dT_dtheta = jax.jacrev(robot.forward_kinematics)(theta)
   and JAX. Every other module *runs* on all four backends via host-boundary
   conversion, but carries no gradient guarantee — see the backend guide for
   exactly where that line sits.
-- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, `[jax-cuda]`, and
-  `[jax-tpu]`. The base install remains NumPy-only; `all` deliberately excludes
-  TPU because that wheel is meaningful only on a Google Cloud TPU VM.
-- **TPU release status** — `[jax-tpu]` targets a Google Cloud one-chip
-  `v5litepod-1` (TPU v5e). Its planned domain is real `float32`, `float64`, and
-  `int64`; X64 is required and can raise resource and compile costs (a linalg
-  compile exceeded 60 seconds). Complex TPU inputs must fail fast under the release gate.
-  Support is not yet proven: real release evidence is pending
-  [tests/test_tpu_contract.py](tests/test_tpu_contract.py) and
-  [.github/workflows/tpu-release.yml](.github/workflows/tpu-release.yml).
+- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, and `[jax-cuda]`.
+  The base install remains NumPy-only.
+- **TPU is not supported, and there is no TPU extra.** Validating one on a real
+  TPU v5e found two blocking limits. XLA:TPU implements no float64 LU
+  decomposition and no int64 dot, so `inv`, `solve` and every dynamics path
+  built on them raise `UNIMPLEMENTED`. The float64 matmuls that *do* run land at
+  float32 accuracy — forward kinematics deviates from NumPy by ~3e-8 even with
+  `Precision.HIGHEST`, because the MXU is bf16-native. The JAX backend enables
+  `jax_enable_x64` unconditionally, so TPU cannot satisfy its contract. This is
+  a hardware/precision mismatch, not a tolerance question; supporting TPU needs
+  a per-platform precision domain in the backend.
 - **Core math fixes that affect every backend** — building the gradient contract
   exposed three real defects in the shipped SE(3)/SO(3) code: `MatrixLog6`
   discarded small rotations, log gradients were NaN near the identity, and the

@@ -68,7 +68,7 @@ Available Backends
      - yes
      - ``torch.autograd`` and ``torch.jit.trace`` safe on core math.
    * - ``jax``
-     - ``[jax-cpu]`` / ``[jax-cuda]`` / ``[jax-tpu]``
+     - ``[jax-cpu]`` / ``[jax-cuda]``
      - no
      - yes
      - ``jax.grad`` / ``jax.jacrev`` / ``jit`` safe on core math.
@@ -204,18 +204,19 @@ Installation
    pip install ManipulaPy[pytorch]       # + PyTorch
    pip install ManipulaPy[jax-cpu]       # + JAX (CPU)
    pip install ManipulaPy[jax-cuda]      # + JAX (CUDA 12, Linux only)
-   pip install "ManipulaPy[jax-tpu]"     # + JAX (Google Cloud TPU VM, Linux only)
    pip install ManipulaPy[cuda]          # + CuPy (CUDA 12)
 
 .. warning::
-   ``[jax-tpu]`` is for a Google Cloud one-chip ``v5litepod-1`` (TPU v5e), not
-   a local accelerator. Its planned supported domain is real ``float32``,
-   ``float64``, and ``int64``. X64 is required and may increase resource use
-   and compilation cost; a linalg compilation has taken more than 60 seconds.
-   Complex TPU inputs must fail fast under the release gate. This package extra does
-   **not** prove TPU support: release evidence is pending the TPU release contract
-   gate, `tests/test_tpu_contract.py <../../../tests/test_tpu_contract.py>`_,
-   and `.github/workflows/tpu-release.yml <../../../.github/workflows/tpu-release.yml>`_.
+   **TPUs are not a supported target.** This backend calls
+   ``jax.config.update("jax_enable_x64", True)`` at import and routes every
+   linear-algebra op through a float64 promotion. XLA:TPU implements no float64
+   ``LuDecomposition`` and no int64 ``dot``, so ``inv``, ``solve``, ``mass_matrix``
+   and ``inverse_dynamics`` raise ``UNIMPLEMENTED`` on real TPU hardware. The
+   float64 matmuls that do execute are emulated on a bf16-native MXU and return
+   float32-level accuracy — measured at ~``3e-8`` deviation from NumPy for
+   forward kinematics under ``Precision.HIGHEST``. Supporting TPU would require a
+   per-platform precision domain rather than a tolerance change, so no TPU extra
+   is published.
 
 Gotchas
 -------

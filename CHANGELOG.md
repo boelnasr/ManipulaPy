@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0] — 2026-08-02
+## [1.4.0] — 2026-08-09
 
 > **Summary:** The unified compute backend system. The same kinematics,
 > dynamics, planning and control code now runs on **NumPy, CuPy, PyTorch, or
@@ -36,15 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   autodiff gradient tests against finite differences on both frameworks.
   Every other module runs on all four backends via host-boundary conversion
   but carries **no gradient guarantee** — see the Compute Backends user guide.
-- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, `[jax-cuda]`, and
-  `[jax-tpu]`. The base install remains NumPy-only and `all` excludes TPU.
-  `[jax-tpu]` targets a Google Cloud one-chip `v5litepod-1` (TPU v5e); its
-  planned real domain is `float32`, `float64`, and `int64`. X64 is required and
-  may raise resource and compile cost (a linalg compilation exceeded 60
-  seconds). Complex TPU inputs must fail fast under the release gate. Packaging does not
-  prove support: release evidence is pending
-  [tests/test_tpu_contract.py](tests/test_tpu_contract.py) and
-  [.github/workflows/tpu-release.yml](.github/workflows/tpu-release.yml).
+- **Optional accelerator extras** — `[pytorch]`, `[jax-cpu]`, and `[jax-cuda]`.
+  The base install remains NumPy-only.
 - **Compute Backends user guide** (`docs/source/user_guide/Backends.rst`)
   covering selection, the gradient boundary, host boundaries, JAX float64
   behavior, and performance characteristics.
@@ -90,9 +83,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The default is deliberately unchanged; widen `timeout` explicitly instead.
 - The JAX backend enables `jax_enable_x64` when it is imported, which is
   process-global JAX state and is not reverted.
-- `[jax-tpu]` requires a Google Cloud TPU VM. Its real-hardware release
-  contract is pending the TPU release gate; complex TPU inputs must fail fast, and no TPU
-  support claim is made until the planned gate passes.
+- **TPUs are not supported and no TPU extra is published.** The contract was run
+  on a real one-chip TPU v5e and 9 of its 18 checks failed, for two reasons that
+  no tolerance change can fix. XLA:TPU implements neither float64
+  `LuDecomposition` nor int64 `dot`, so `inv`, `solve`, `mass_matrix` and
+  `inverse_dynamics` raise `UNIMPLEMENTED`. The float64 matmuls that do execute
+  are emulated on a bf16-native MXU and return float32-level accuracy —
+  forward kinematics deviated from NumPy by ~`3e-8` under `Precision.HIGHEST`,
+  against a `1e-10` contract. Since this backend enables `jax_enable_x64`
+  unconditionally, TPU cannot meet its contract; a per-platform precision domain
+  would be needed first.
 
 ## [1.3.2] — 2026-05-31
 

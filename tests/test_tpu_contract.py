@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Fail-closed numerical contract for the v1.4 Google Cloud TPU gate.
+"""Fail-closed numerical contract for a Google Cloud TPU.
 
 This module intentionally has no skip path.  It is run only on the ephemeral
 TPU VM provisioned by ``tpu-release.yml``; running it on a CPU or GPU must fail
 the platform assertion instead of silently validating a fallback device.
+
+STATUS: this contract does not pass.  Run on a real one-chip TPU v5e, 9 of its
+18 checks fail.  XLA:TPU implements neither float64 ``LuDecomposition`` nor
+int64 ``dot``, so ``inv``, ``solve``, ``mass_matrix`` and ``inverse_dynamics``
+raise ``UNIMPLEMENTED``; and the float64 matmuls that do execute are emulated on
+a bf16-native MXU at float32 accuracy, missing the tolerances asserted below by
+roughly three orders of magnitude.  TPUs are therefore not a supported target
+and no ``jax-tpu`` extra is published.  This file is kept as the executable
+specification for the per-platform precision domain that TPU support would
+need; it is excluded from CI by ``--ignore`` in ``test.yml``.
 """
 
 from pathlib import Path

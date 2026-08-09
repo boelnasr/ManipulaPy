@@ -1,5 +1,19 @@
 name: TPU Release Contract
 
+# STATUS: this contract does NOT pass on real hardware, and TPUs are not a
+# supported target. Run manually on a one-chip TPU v5e, 9 of the 18 checks in
+# test_tpu_contract.py failed: XLA:TPU implements neither float64
+# LuDecomposition nor int64 dot (inv/solve/mass_matrix/inverse_dynamics raise
+# UNIMPLEMENTED), and the float64 matmuls that do run are emulated on a
+# bf16-native MXU at float32 accuracy (~3e-8 vs NumPy, against a 1e-10
+# contract). The JAX backend enables jax_enable_x64 unconditionally, so TPU
+# cannot satisfy it without a per-platform precision domain.
+#
+# The workflow is kept as the executable specification for that future work and
+# as the record of what was measured. It is workflow_dispatch only and is NOT
+# wired into publish.yml. There is no `jax-tpu` extra, so it installs jax[tpu]
+# directly.
+
 on:
   workflow_call:
   workflow_dispatch:
@@ -75,7 +89,7 @@ jobs:
           timeout --signal=TERM --kill-after=30s 24m \
             gcloud compute tpus tpu-vm ssh "$TPU_NAME" \
             --project="$PROJECT_ID" --zone="$TPU_ZONE" \
-            --command="bash -lc 'set -euo pipefail; git clone https://github.com/boelnasr/ManipulaPy.git; cd ManipulaPy; git checkout ${GITHUB_SHA}; echo Tested commit: ${GITHUB_SHA}; python3 -m pip install -e \".[dev,jax-tpu]\"; export JAX_PLATFORMS=tpu JAX_ENABLE_X64=1 NUMBA_DISABLE_CUDA=1 MPLBACKEND=Agg; python3 -m pytest tests/test_tpu_contract.py --junitxml=tpu-contract.xml -q; python3 scripts/assert_junit_no_skips.py tpu-contract.xml; python3 -m pytest tests/test_public_api_freeze.py --junitxml=tpu-freeze.xml -q; python3 scripts/assert_junit_no_skips.py tpu-freeze.xml; python3 -m pytest tests/test_jax_call_sites.py --junitxml=tpu-callsites.xml -q; python3 scripts/assert_junit_no_skips.py tpu-callsites.xml; python3 -m pytest tests/test_gradient_contract.py -k jax --junitxml=tpu-gradients.xml -q; python3 scripts/assert_junit_no_skips.py tpu-gradients.xml'"
+            --command="bash -lc 'set -euo pipefail; git clone https://github.com/boelnasr/ManipulaPy.git; cd ManipulaPy; git checkout ${GITHUB_SHA}; echo Tested commit: ${GITHUB_SHA}; python3 -m pip install -e \".[dev]\" \"jax[tpu]>=0.6.0\"; export JAX_PLATFORMS=tpu JAX_ENABLE_X64=1 NUMBA_DISABLE_CUDA=1 MPLBACKEND=Agg; python3 -m pytest tests/test_tpu_contract.py --junitxml=tpu-contract.xml -q; python3 scripts/assert_junit_no_skips.py tpu-contract.xml; python3 -m pytest tests/test_public_api_freeze.py --junitxml=tpu-freeze.xml -q; python3 scripts/assert_junit_no_skips.py tpu-freeze.xml; python3 -m pytest tests/test_jax_call_sites.py --junitxml=tpu-callsites.xml -q; python3 scripts/assert_junit_no_skips.py tpu-callsites.xml; python3 -m pytest tests/test_gradient_contract.py -k jax --junitxml=tpu-gradients.xml -q; python3 scripts/assert_junit_no_skips.py tpu-gradients.xml'"
 
       - name: Collect TPU JUnit evidence
         if: always()

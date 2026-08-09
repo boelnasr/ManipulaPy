@@ -91,11 +91,8 @@ Optional extras
    * - ``[jax-cuda]``
      - JAX compute backend, CUDA 12 build (Linux only)
      - ``pip install "ManipulaPy[jax-cuda]"``
-   * - ``[jax-tpu]``
-     - JAX compute backend for a Google Cloud TPU VM (Linux only; release evidence pending the TPU release gate)
-     - ``pip install "ManipulaPy[jax-tpu]"``
    * - ``[all]``
-     - All non-TPU runtime extras, including CPU JAX; excludes ``jax-tpu``
+     - All runtime extras, including CPU JAX
      - ``pip install "ManipulaPy[all]"``
    * - ``[minimal]``
      - Backwards-compatible pre-1.3.2 set (core + PyBullet)
@@ -160,19 +157,20 @@ imported until a backend is explicitly requested.
    pip install "ManipulaPy[pytorch]"     # + PyTorch >= 2.7.1
    pip install "ManipulaPy[jax-cpu]"     # + JAX >= 0.6 (CPU)
    pip install "ManipulaPy[jax-cuda]"    # + JAX >= 0.6 (CUDA 12, Linux only)
-   pip install "ManipulaPy[jax-tpu]"     # + JAX >= 0.6 (Google Cloud TPU VM, Linux only)
    pip install "ManipulaPy[cuda]"        # + CuPy 13.x (CUDA 12)
 
 .. warning::
 
-   ``[jax-tpu]`` targets a Google Cloud one-chip ``v5litepod-1`` (TPU v5e),
-   not local hardware. The planned supported domain is real ``float32``,
-   ``float64``, and ``int64``. X64 is required and can increase TPU resource
-   use and compilation cost; a linalg compilation has exceeded 60 seconds.
-   Complex TPU inputs must fail fast under the release gate. Packaging is not proof of
-   support: real release evidence remains pending the TPU release gate in
-   `tests/test_tpu_contract.py <../../tests/test_tpu_contract.py>`_ and
-   `.github/workflows/tpu-release.yml <../../.github/workflows/tpu-release.yml>`_.
+   **TPUs are not supported and there is no TPU extra.** Running the contract on
+   a real one-chip TPU v5e found two blocking limits. XLA:TPU implements neither
+   float64 ``LuDecomposition`` nor int64 ``dot``, so ``inv``, ``solve`` and the
+   dynamics paths built on them raise ``UNIMPLEMENTED``. The float64 matmuls that
+   do run return float32-level accuracy — forward kinematics deviates from NumPy
+   by roughly ``3e-8`` even with ``Precision.HIGHEST``, since the MXU is
+   bf16-native. Because the JAX backend enables ``jax_enable_x64``
+   unconditionally, TPU cannot meet its contract. Installing ``jax[tpu]``
+   yourself will import, but the core math will crash or silently lose
+   precision.
 
 The PyTorch and JAX backends make ``utils``, ``kinematics``, ``dynamics``
 and ``singularity`` differentiable; the remaining modules run under every

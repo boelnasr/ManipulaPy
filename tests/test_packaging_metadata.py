@@ -18,7 +18,7 @@ def _project_metadata() -> dict:
         return tomllib.load(pyproject_file)["project"]
 
 
-def test_accelerators_remain_optional_and_tpu_extra_is_linux_only() -> None:
+def test_accelerators_remain_optional_and_no_extra_installs_tpu_jax() -> None:
     project = _project_metadata()
     dependencies = project["dependencies"]
     extras = project["optional-dependencies"]
@@ -28,7 +28,14 @@ def test_accelerators_remain_optional_and_tpu_extra_is_linux_only() -> None:
         for dependency in dependencies
         for accelerator in ("torch", "jax", "cupy")
     )
-    assert extras["jax-tpu"] == [
-        "jax[tpu]>=0.6.0; sys_platform == 'linux'",
-    ]
-    assert all("jax[tpu]" not in dependency.lower() for dependency in extras["all"])
+    # No TPU extra: XLA:TPU implements neither float64 LU decomposition nor
+    # int64 dot, and this backend enables jax_enable_x64 unconditionally, so
+    # inv/solve and the dynamics built on them raise UNIMPLEMENTED on real
+    # hardware. Advertising an installable path to that is worse than omitting
+    # it; restoring one needs a per-platform precision domain first.
+    assert "jax-tpu" not in extras
+    assert all(
+        "jax[tpu]" not in dependency.lower()
+        for requirements in extras.values()
+        for dependency in requirements
+    )
