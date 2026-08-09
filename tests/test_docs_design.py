@@ -16,18 +16,27 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_homepage_has_approved_sections_and_copy():
+def test_homepage_has_approved_sections_and_page_toc_headings():
     source = read(INDEX)
+    editorial_headings = (
+        "Move from equations to motion.",
+        "Choose your path",
+        "See the math move",
+        "Compute where your work belongs.",
+        "Go straight to the reference",
+    )
     for class_name in (
-        "mp-home",
         "mp-hero",
         "mp-paths",
         "mp-motion-gallery",
         "mp-backends",
         "mp-api-links",
     ):
-        assert class_name in source
-    assert "Move from equations to motion." in source
+        assert f".. rst-class:: {class_name}" in source
+    assert len(re.findall(r"^.+\n-{3,}$", source, re.MULTILINE)) == 5
+    for heading in editorial_headings:
+        assert re.search(rf"^{re.escape(heading)}\n-{{3,}}$", source, re.MULTILINE)
+    assert '<section class="mp-' not in source
     assert source.count("Start building") == 1
 
 
@@ -52,6 +61,16 @@ def test_homepage_preserves_navigation_documents():
         "user_guide/index",
     ):
         assert document in source
+
+
+def test_homepage_preserves_exact_agpl_notice():
+    source = read(INDEX)
+    agpl_notice = """ManipulaPy is released under the **AGPL-3.0 License**: the source is freely
+available, derivative works must also be open source, modified network services
+must offer their source to users, and commercial use is permitted under those
+same terms. For commercial licensing options or AGPL compliance questions,
+please contact the maintainers."""
+    assert agpl_notice in source
 
 
 def test_static_brand_assets_are_local_and_valid():
@@ -104,7 +123,13 @@ def test_motion_is_progressive_and_scroll_listener_free():
 
 def test_eyebrow_budget_is_not_exceeded():
     source = read(INDEX)
-    section_count = len(re.findall(r'<section class="mp-(?:hero|paths|motion-gallery|backends|api-links)"', source))
+    section_count = len(
+        re.findall(
+            r"^\.\. rst-class:: mp-(?:hero|paths|motion-gallery|backends|api-links)$",
+            source,
+            re.MULTILINE,
+        )
+    )
     eyebrow_count = source.count('class="mp-overline"')
     assert section_count == 5
     assert eyebrow_count <= 2
