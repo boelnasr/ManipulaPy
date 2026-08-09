@@ -26,6 +26,15 @@ Move from equations to motion.
       <img src="_static/images/robotics-lab-hero.webp" width="1600" height="1100" alt="Six-axis industrial robot arm in a research lab">
    </figure>
 
+.. only:: latex
+
+   Build, differentiate, and accelerate robot kinematics, dynamics, planning,
+   perception, and control in Python.
+
+   **Install:** ``python -m pip install manipulapy``
+
+   Begin with :doc:`Getting Started <getting_started/index>`.
+
 .. rst-class:: mp-paths
 
 Choose your path
@@ -56,6 +65,15 @@ Choose your path
       </a>
    </div>
 
+.. only:: latex
+
+   Choose a learning route:
+
+   * :doc:`Learn robotics through executable notebooks <tutorials/notebook_course>`
+   * :doc:`Load a robot from a URDF <user_guide/URDF_Processor>`
+   * :doc:`Plan joint and Cartesian motion <user_guide/Trajectory_Planning>`
+   * :doc:`Use accelerated array backends <user_guide/Backends>`
+
 .. rst-class:: mp-motion-gallery
 
 See the math move
@@ -78,6 +96,12 @@ See the math move
       </figure>
    </div>
 
+.. only:: latex
+
+   The motion studies show a robot tracing its reachable workspace, joint
+   position, velocity, and acceleration changing along a smooth trajectory,
+   and a UR5 robot executing a planned pick motion in simulation.
+
 .. rst-class:: mp-backends
 
 Compute where your work belongs.
@@ -97,6 +121,16 @@ Compute where your work belongs.
       <a href="api/backend.html">Open the backend API</a>
    </div>
 
+.. only:: latex
+
+   **NumPy** is the lightweight CPU default. **CuPy** moves compatible array
+   work to NVIDIA GPUs. **PyTorch** connects robot models to training loops and
+   supported gradients. **JAX** differentiates and compiles supported robotics
+   operations.
+
+   Continue with the :doc:`Compute Backends guide <user_guide/Backends>` or
+   open the :doc:`backend API <api/backend>`.
+
 .. rst-class:: mp-api-links
 
 Go straight to the reference
@@ -110,6 +144,24 @@ Go straight to the reference
       <div><h3>Sense</h3><a href="api/vision.html">Vision</a><a href="api/perception.html">Perception</a><a href="api/simulation.html">Simulation</a></div>
       <div><h3>Compute</h3><a href="api/backend.html">Backends</a><a href="api/cuda_kernels.html">CUDA kernels</a><a href="api/utils.html">Utilities</a></div>
    </div>
+
+.. only:: latex
+
+   **Model:** :doc:`Kinematics <api/kinematics>`,
+   :doc:`Dynamics <api/dynamics>`, and
+   :doc:`URDF processor <api/urdf_processor>`.
+
+   **Move:** :doc:`Path planning <api/path_planning>`,
+   :doc:`Control <api/control>`, and
+   :doc:`Potential fields <api/potential_field>`.
+
+   **Sense:** :doc:`Vision <api/vision>`,
+   :doc:`Perception <api/perception>`, and
+   :doc:`Simulation <api/simulation>`.
+
+   **Compute:** :doc:`Backends <api/backend>`,
+   :doc:`CUDA kernels <api/cuda_kernels>`, and
+   :doc:`Utilities <api/utils>`.
 
 .. raw:: html
 

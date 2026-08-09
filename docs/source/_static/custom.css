@@ -23,7 +23,7 @@ html[data-theme="light"] {
   --mp-ink: #172126;
   --mp-muted: #53636b;
   --mp-rule: #c4ced2;
-  --mp-accent: #087f75;
+  --mp-accent: #006b63;
   --mp-accent-strong: #05645d;
   --mp-code: #10181c;
   --mp-code-ink: #e4ecee;
@@ -241,7 +241,7 @@ code, pre, kbd, samp, .highlight {
   color: color-mix(in srgb, var(--mp-accent-strong) 78%, var(--mp-ink));
 }
 
-.headerlink {
+.bd-content a.headerlink {
   color: var(--mp-accent);
 }
 
@@ -253,6 +253,22 @@ textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--mp-accent);
   outline-offset: 3px;
+}
+
+/* PyData and Bootstrap add a purple focus shadow to header controls. Keep the
+   native control behavior, but express keyboard focus in this site's teal. */
+.bd-header button:focus,
+.bd-header a:focus,
+.bd-header [tabindex]:focus {
+  box-shadow: none !important;
+}
+
+.bd-header button:focus-visible,
+.bd-header a:focus-visible,
+.bd-header [tabindex]:focus-visible {
+  outline: 3px solid var(--mp-accent);
+  outline-offset: 2px;
+  box-shadow: none !important;
 }
 
 .search-button,

@@ -1,5 +1,8 @@
 from pathlib import Path
+import os
 import re
+import subprocess
+import sys
 
 from PIL import Image
 
@@ -110,6 +113,58 @@ def test_css_has_theme_responsive_and_accessibility_contracts():
     assert "min-height: 100dvh" in css
     assert "#000000" not in css.lower()
     assert "#ffffff" not in css.lower()
+
+
+def test_light_accent_and_header_focus_meet_accessibility_contract():
+    css = read(CSS)
+
+    assert "--mp-accent: #006b63;" in css
+    assert ".bd-content a.headerlink" in css
+    assert re.search(
+        r"\.bd-header button:focus,[^{]+\{[^}]*box-shadow:\s*none\s*!important;",
+        css,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.bd-header button:focus-visible,[^{]+\{[^}]*"
+        r"outline:\s*3px solid var\(--mp-accent\);[^}]*"
+        r"box-shadow:\s*none\s*!important;",
+        css,
+        re.DOTALL,
+    )
+
+
+def test_latex_homepage_fallback_is_generated(tmp_path):
+    output = tmp_path / "latex"
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "sphinx",
+            "-b",
+            "latex",
+            "-q",
+            str(DOCS),
+            str(output),
+        ],
+        check=True,
+        cwd=ROOT,
+        env={**os.environ, "READTHEDOCS": "True"},
+    )
+    latex = read(output / "manipulapy.tex")
+
+    for required in (
+        "pip install manipulapy",
+        "Learn robotics through executable notebooks",
+        "robot tracing its reachable workspace",
+        "NumPy",
+        "Compute Backends guide",
+        "Path planning",
+        "AGPL compliance questions",
+        "modified network services",
+        "commercial licensing options",
+    ):
+        assert required in latex
 
 
 def test_mobile_api_signatures_remain_horizontally_scrollable():
