@@ -27,6 +27,7 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
+import math
 import threading
 import types
 from unittest import mock
@@ -94,6 +95,11 @@ _GLIST = [np.diag([0.1, 0.1, 0.1, 1.0, 1.0, 1.0]) for _ in range(3)]
 # (200 ms by default), so JAX needs a wider budget to reach the same answer;
 # this is a dispatch-overhead characteristic, not a solver difference.
 _JAX_SOLVE_TIMEOUT = 10.0
+# Iteration cap for the SLSQP boundary test. Small on purpose: the test
+# pins the host-boundary contract, which the first iteration already
+# exercises, and a low cap keeps the JAX CUDA path from spending minutes
+# dispatching a solve that is known not to converge on this fixture.
+_SQP_MAXITER = 5
 
 
 def _robot() -> SerialManipulator:
@@ -404,14 +410,26 @@ def test_trac_ik_solve_runs_through_the_slsqp_boundary_under_jax():
         jac = kwargs.get("jac")
         if jac is not None:
             captured["grad"] = jac(x0)
-        return real_minimize(fun, x0, *args, **kwargs)
+        # Bound the solve by iterations rather than leaving it to run to
+        # ftol. _sqp_solver's objective returns 1e10 once its wall clock
+        # expires, which terminates SLSQP at whatever iterate the clock
+        # happened to land on. Two backends with different per-call latency
+        # therefore stop in different places, and comparing their outputs is
+        # nondeterministic: on JAX CUDA this test stalled at the seed on one
+        # run and drifted 3.3e-3 away on the next, from identical code. A
+        # fixed iteration count makes both backends perform the same work.
+        options = dict(kwargs.pop("options", None) or {})
+        options["maxiter"] = _SQP_MAXITER
+        return real_minimize(fun, x0, *args, options=options, **kwargs)
 
     # `solve` races DLS against SQP and DLS wins on this fixture, so calling it
     # would never touch SciPy. The SQP path is invoked directly instead.
+    # math.inf as the budget takes the wall clock out of the comparison
+    # entirely; maxiter above is what bounds the work.
     with use_backend("jax"):
         with mock.patch.object(scipy.optimize, "minimize", spy):
             theta, success, err = solver._sqp_solver(
-                T_desired, seed, 1e-4, 1e-4, _JAX_SOLVE_TIMEOUT, threading.Event()
+                T_desired, seed, 1e-4, 1e-4, math.inf, threading.Event()
             )
 
     assert "x0" in captured, "SLSQP was never reached"
@@ -420,12 +438,18 @@ def test_trac_ik_solve_runs_through_the_slsqp_boundary_under_jax():
     assert type(captured["grad"]) is np.ndarray, f"leaked {type(captured['grad'])}"
 
     # The SQP fallback does not converge on this fixture -- it stalls at the
-    # seed under NumPy too, identically -- so what is pinned here is the
-    # boundary contract and backend agreement, not convergence. Asserting
-    # success would be asserting a pre-existing solver weakness.
-    theta_np, success_np, err_np = solver._sqp_solver(
-        T_desired, seed, 1e-4, 1e-4, _JAX_SOLVE_TIMEOUT, threading.Event()
-    )
+    # seed under NumPy too -- so what is pinned here is the boundary contract
+    # and backend agreement, not convergence. Asserting success would be
+    # asserting a pre-existing solver weakness.
+    #
+    # The reference runs under the same iteration cap and the same infinite
+    # wall clock, so both backends execute an identical number of SLSQP steps
+    # and the comparison below comes down to arithmetic rather than to which
+    # backend dispatched faster.
+    with mock.patch.object(scipy.optimize, "minimize", spy):
+        theta_np, success_np, err_np = solver._sqp_solver(
+            T_desired, seed, 1e-4, 1e-4, math.inf, threading.Event()
+        )
     assert success is success_np
     np.testing.assert_allclose(np.asarray(theta), np.asarray(theta_np), atol=1e-5)
     # err is a function of theta, and the assertion above already accepts a
