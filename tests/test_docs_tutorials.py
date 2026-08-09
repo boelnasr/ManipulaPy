@@ -238,20 +238,23 @@ def test_kinematics_tutorial_media_embedding_is_accessible():
             "panda_forward_kinematics",
             "Seven Panda arm joints build a base-to-tool transform and reveal "
             "the resulting tool frame.",
+            "Base-to-tool transform and resulting tool frame.",
         ),
         (
             "panda_jacobian_velocity",
             "Seven joint rates pass through a six-by-seven Jacobian into angular "
             "and linear tool velocity.",
+            "Joint rates mapped to angular and linear tool velocity.",
         ),
         (
             "panda_ik_convergence",
             "Translation and rotation residuals converge as inverse kinematics "
             "approaches a reachable Panda pose.",
+            "Translation and rotation residuals converge to a reachable pose.",
         ),
     )
 
-    for stem, alt_text in studies:
+    for stem, alt_text, caption in studies:
         assert (
             f'<source media="(prefers-reduced-motion: reduce)" '
             f'srcset="../_static/tutorials/kinematics/{stem}.png">' in source
@@ -260,8 +263,12 @@ def test_kinematics_tutorial_media_embedding_is_accessible():
             f'<img src="../_static/tutorials/kinematics/{stem}.gif" '
             'width="960" height="540"' in source
         )
-        assert f".. image:: ../_static/tutorials/kinematics/{stem}.png" in source
-        assert alt_text in source
+        assert (
+            source.count(f".. figure:: ../_static/tutorials/kinematics/{stem}.png")
+            == 2
+        )
+        assert source.count(alt_text) == 3
+        assert source.count(caption) == 3
 
     assert ".. only:: html and not epub" in source
     assert ".. only:: epub" in source

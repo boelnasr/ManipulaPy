@@ -72,13 +72,17 @@ Expected output::
 
 .. only:: epub
 
-   .. image:: ../_static/tutorials/kinematics/panda_forward_kinematics.png
+   .. figure:: ../_static/tutorials/kinematics/panda_forward_kinematics.png
       :alt: Seven Panda arm joints build a base-to-tool transform and reveal the resulting tool frame.
+
+      Base-to-tool transform and resulting tool frame.
 
 .. only:: latex
 
-   .. image:: ../_static/tutorials/kinematics/panda_forward_kinematics.png
+   .. figure:: ../_static/tutorials/kinematics/panda_forward_kinematics.png
       :alt: Seven Panda arm joints build a base-to-tool transform and reveal the resulting tool frame.
+
+      Base-to-tool transform and resulting tool frame.
 
 Jacobian: joints to tool velocity
 ---------------------------------
@@ -113,13 +117,17 @@ Expected output::
 
 .. only:: epub
 
-   .. image:: ../_static/tutorials/kinematics/panda_jacobian_velocity.png
+   .. figure:: ../_static/tutorials/kinematics/panda_jacobian_velocity.png
       :alt: Seven joint rates pass through a six-by-seven Jacobian into angular and linear tool velocity.
+
+      Joint rates mapped to angular and linear tool velocity.
 
 .. only:: latex
 
-   .. image:: ../_static/tutorials/kinematics/panda_jacobian_velocity.png
+   .. figure:: ../_static/tutorials/kinematics/panda_jacobian_velocity.png
       :alt: Seven joint rates pass through a six-by-seven Jacobian into angular and linear tool velocity.
+
+      Joint rates mapped to angular and linear tool velocity.
 
 Inverse kinematics: pose to joints
 ----------------------------------
@@ -152,13 +160,17 @@ Expected output::
 
 .. only:: epub
 
-   .. image:: ../_static/tutorials/kinematics/panda_ik_convergence.png
+   .. figure:: ../_static/tutorials/kinematics/panda_ik_convergence.png
       :alt: Translation and rotation residuals converge as inverse kinematics approaches a reachable Panda pose.
+
+      Translation and rotation residuals converge to a reachable pose.
 
 .. only:: latex
 
-   .. image:: ../_static/tutorials/kinematics/panda_ik_convergence.png
+   .. figure:: ../_static/tutorials/kinematics/panda_ik_convergence.png
       :alt: Translation and rotation residuals converge as inverse kinematics approaches a reachable Panda pose.
+
+      Translation and rotation residuals converge to a reachable pose.
 
 Validate the result
 -------------------
