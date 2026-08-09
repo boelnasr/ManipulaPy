@@ -25,6 +25,7 @@ html[data-theme="light"] {
   --mp-rule: #c4ced2;
   --mp-accent: #006b63;
   --mp-accent-strong: #05645d;
+  --mp-focus: #077d73;
   --mp-code: #10181c;
   --mp-code-ink: #e4ecee;
   --mp-radius: 6px;
@@ -39,6 +40,7 @@ html[data-theme="dark"] {
   --mp-rule: #34454d;
   --mp-accent: #63c9bc;
   --mp-accent-strong: #8edfd5;
+  --mp-focus: #63c9bc;
   --mp-code: #0c1216;
   --mp-code-ink: #dce8e9;
   --mp-radius: 6px;
@@ -251,7 +253,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--mp-accent);
+  outline: 2px solid var(--mp-focus);
   outline-offset: 3px;
 }
 
@@ -266,8 +268,14 @@ textarea:focus-visible,
 .bd-header button:focus-visible,
 .bd-header a:focus-visible,
 .bd-header [tabindex]:focus-visible {
-  outline: 3px solid var(--mp-accent);
+  outline: 3px solid var(--mp-focus);
   outline-offset: 2px;
+  box-shadow: none !important;
+}
+
+.bd-content div.highlight button.copybtn:focus-visible {
+  outline: 2px solid var(--mp-focus);
+  outline-offset: 3px;
   box-shadow: none !important;
 }
 

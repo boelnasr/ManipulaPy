@@ -1,8 +1,8 @@
-from pathlib import Path
 import os
 import re
 import subprocess
 import sys
+from pathlib import Path
 
 from PIL import Image
 
@@ -17,6 +17,36 @@ CONF = DOCS / "conf.py"
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def theme_tokens(css: str, theme: str) -> dict[str, str]:
+    block = re.search(
+        rf'html\[data-theme="{theme}"\]\s*\{{(?P<body>.*?)\}}',
+        css,
+        re.DOTALL,
+    )
+    assert block is not None
+    return dict(
+        re.findall(r"--(?P<name>mp-[\w-]+):\s*(?P<value>#[0-9a-fA-F]{6});", block["body"])
+    )
+
+
+def relative_luminance(color: str) -> float:
+    channels = [int(color[index : index + 2], 16) / 255 for index in (1, 3, 5)]
+    linear = [
+        channel / 12.92
+        if channel <= 0.04045
+        else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    ]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
+def contrast_ratio(first: str, second: str) -> float:
+    lighter, darker = sorted(
+        (relative_luminance(first), relative_luminance(second)), reverse=True
+    )
+    return (lighter + 0.05) / (darker + 0.05)
 
 
 def test_homepage_has_approved_sections_and_page_toc_headings():
@@ -100,6 +130,7 @@ def test_css_has_theme_responsive_and_accessibility_contracts():
     css = read(CSS)
     for token in (
         "--mp-accent",
+        "--mp-focus",
         "--mp-canvas",
         "--mp-panel",
         "--mp-ink",
@@ -115,10 +146,18 @@ def test_css_has_theme_responsive_and_accessibility_contracts():
     assert "#ffffff" not in css.lower()
 
 
-def test_light_accent_and_header_focus_meet_accessibility_contract():
+def test_theme_accent_and_focus_tokens_meet_wcag_contrast_contract():
     css = read(CSS)
+    light = theme_tokens(css, "light")
+    dark = theme_tokens(css, "dark")
 
-    assert "--mp-accent: #006b63;" in css
+    for surface in ("mp-canvas", "mp-panel", "mp-panel-strong"):
+        assert contrast_ratio(light["mp-accent"], light[surface]) >= 4.5
+
+    for surface in ("mp-canvas", "mp-panel", "mp-panel-strong", "mp-code"):
+        assert contrast_ratio(light["mp-focus"], light[surface]) >= 3.0
+        assert contrast_ratio(dark["mp-focus"], dark[surface]) >= 3.0
+
     assert ".bd-content a.headerlink" in css
     assert re.search(
         r"\.bd-header button:focus,[^{]+\{[^}]*box-shadow:\s*none\s*!important;",
@@ -127,7 +166,14 @@ def test_light_accent_and_header_focus_meet_accessibility_contract():
     )
     assert re.search(
         r"\.bd-header button:focus-visible,[^{]+\{[^}]*"
-        r"outline:\s*3px solid var\(--mp-accent\);[^}]*"
+        r"outline:\s*3px solid var\(--mp-focus\);[^}]*"
+        r"box-shadow:\s*none\s*!important;",
+        css,
+        re.DOTALL,
+    )
+    assert re.search(
+        r"\.bd-content div\.highlight button\.copybtn:focus-visible\s*\{[^}]*"
+        r"outline:\s*2px solid var\(--mp-focus\);[^}]*"
         r"box-shadow:\s*none\s*!important;",
         css,
         re.DOTALL,
