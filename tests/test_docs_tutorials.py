@@ -7,6 +7,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "docs" / "examples" / "kinematics_tutorial.py"
 TUTORIALS = ROOT / "docs" / "source" / "tutorials"
+MANIM = ROOT / "docs" / "manim"
+ASSETS = ROOT / "docs" / "source" / "_static" / "tutorials" / "kinematics"
 
 
 def read(path):
@@ -165,3 +167,26 @@ def test_literalinclude_regions_execute_as_the_displayed_tutorial():
     assert iterations <= 20
     assert translation < 1e-5
     assert rotation < 1e-5
+
+
+def test_manim_pipeline_is_render_only_and_pinned():
+    scenes = read(MANIM / "kinematics_scenes.py")
+    renderer = read(MANIM / "render_kinematics.py")
+    requirements = read(MANIM / "requirements.txt")
+    assert requirements.strip() == "manim==0.20.1"
+    for scene in (
+        "PandaForwardKinematics",
+        "PandaJacobianVelocity",
+        "PandaIKConvergence",
+    ):
+        assert f"class {scene}" in scenes
+        assert scene in renderer
+    assert "compute_tutorial_results" in scenes
+    assert "compute_ik_trace" in scenes
+    assert "docs/requirements.txt" not in renderer
+
+
+def test_manim_config_has_stable_scientific_output():
+    config = read(MANIM / "manim.cfg")
+    for contract in ("pixel_width = 960", "pixel_height = 540", "frame_rate = 30"):
+        assert contract in config
