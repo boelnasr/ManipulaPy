@@ -25,6 +25,7 @@ class TutorialResults:
 
 # [load-panda-start]
 import numpy as np
+from numpy.typing import NDArray
 
 from ManipulaPy.ManipulaPy_data import get_robot_urdf
 from ManipulaPy.kinematics import SerialManipulator
@@ -65,6 +66,7 @@ def load_panda() -> tuple[
 # [load-panda-end]
 
 
+# [validation-start]
 def pose_residual(
     actual: NDArray[np.float64], desired: NDArray[np.float64]
 ) -> tuple[float, float]:
@@ -129,7 +131,6 @@ def inverse_kinematics_step(robot, target_pose, initial_guess):
 # [inverse-kinematics-end]
 
 
-# [validation-start]
 def validation_step(robot, solution, target_pose):
     """Return translation and rotation pose residuals for an IK solution."""
     solved_pose = robot.forward_kinematics(solution)

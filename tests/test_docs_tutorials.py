@@ -129,3 +129,39 @@ def test_literalinclude_regions_are_unindented_executable_tutorial_units():
         "inverse-kinematics"
     ]
     assert "def validation_step(robot, solution, target_pose)" in regions["validation"]
+
+
+def test_literalinclude_regions_execute_as_the_displayed_tutorial():
+    source = read(EXAMPLE)
+    namespace = {"__name__": "kinematics_tutorial_snippets"}
+    for marker in (
+        "load-panda",
+        "forward-kinematics",
+        "velocity-kinematics",
+        "inverse-kinematics",
+        "validation",
+    ):
+        body = marker_body(source, marker)
+        exec(compile(body, f"{EXAMPLE}:{marker}", "exec"), namespace)
+
+    robot, _names, _limits, _full_dof = namespace["load_panda"]()
+    pose, target_pose = namespace["forward_kinematics_step"](
+        robot, namespace["HOME"], namespace["TARGET"]
+    )
+    jacobian, twist, _singular_values = namespace["velocity_kinematics_step"](
+        robot, namespace["HOME"], namespace["JOINT_RATES"]
+    )
+    solution, success, iterations = namespace["inverse_kinematics_step"](
+        robot, target_pose, namespace["HOME"]
+    )
+    translation, rotation = namespace["validation_step"](
+        robot, solution, target_pose
+    )
+
+    assert pose.shape == (4, 4)
+    assert jacobian.shape == (6, 7)
+    assert twist.shape == (6,)
+    assert success
+    assert iterations <= 20
+    assert translation < 1e-5
+    assert rotation < 1e-5
