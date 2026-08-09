@@ -188,3 +188,39 @@ def test_shared_scene_primitives_define_accessible_visual_tokens():
     assert "rate_func=linear" in source
     for forbidden in ("Flash(", "Wiggle(", "there_and_back", "random"):
         assert forbidden not in source
+
+
+def test_dynamics_study_reconstructs_torque_and_round_trip():
+    result = load_studies().compute_dynamics_results()
+    assert result.time.shape == (61,)
+    assert result.theta.shape == result.velocity.shape == result.acceleration.shape == (
+        61,
+        7,
+    )
+    assert result.mass_matrices.shape == (61, 7, 7)
+    assert np.isfinite(result.mass_matrices).all()
+    symmetry_error = np.max(
+        np.abs(result.mass_matrices - result.mass_matrices.swapaxes(1, 2))
+    )
+    assert symmetry_error < 1e-8
+    reconstructed = result.inertia + result.velocity_force + result.gravity + result.tool
+    assert np.allclose(
+        reconstructed, result.total_torque, atol=1e-8, rtol=1e-8
+    )
+    round_trip_error = np.max(
+        np.abs(result.recovered_acceleration - result.acceleration)
+    )
+    assert round_trip_error < 1e-8
+
+
+def test_dynamics_example_region_is_top_level_and_executable():
+    source = EXAMPLE.read_text(encoding="utf-8")
+    start = "# [dynamics-study-start]"
+    end = "# [dynamics-study-end]"
+    assert source.count(start) == source.count(end) == 1
+    body = source.split(start, 1)[1].split(end, 1)[0]
+    assert body.lstrip("\n") == body.lstrip("\n ")
+    compile(body, f"{EXAMPLE}:dynamics-study", "exec")
+    assert "mass_matrix" in body
+    assert "inverse_dynamics" in body
+    assert "forward_dynamics" in body

@@ -83,3 +83,101 @@ def assert_finite(name: str, value: Any) -> NDArray[np.float64]:
     if not np.isfinite(array).all():
         raise RuntimeError(f"{name} contains non-finite values")
     return array
+
+
+@dataclass(frozen=True)
+class DynamicsResults:
+    """Time histories used by the three dynamics motion studies."""
+
+    time: NDArray[np.float64]
+    theta: NDArray[np.float64]
+    velocity: NDArray[np.float64]
+    acceleration: NDArray[np.float64]
+    mass_matrices: NDArray[np.float64]
+    inertia: NDArray[np.float64]
+    velocity_force: NDArray[np.float64]
+    gravity: NDArray[np.float64]
+    tool: NDArray[np.float64]
+    total_torque: NDArray[np.float64]
+    recovered_acceleration: NDArray[np.float64]
+
+
+def _quintic_reference(
+    start: NDArray[np.float64], end: NDArray[np.float64]
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    duration = float(STUDY_TIME[-1] - STUDY_TIME[0])
+    u = (STUDY_TIME - STUDY_TIME[0]) / duration
+    blend = 10.0 * u**3 - 15.0 * u**4 + 6.0 * u**5
+    blend_rate = (30.0 * u**2 - 60.0 * u**3 + 30.0 * u**4) / duration
+    blend_acceleration = (60.0 * u - 180.0 * u**2 + 120.0 * u**3) / (
+        duration**2
+    )
+    delta = end - start
+    return (
+        start + np.outer(blend, delta),
+        np.outer(blend_rate, delta),
+        np.outer(blend_acceleration, delta),
+    )
+
+
+# [dynamics-study-start]
+def compute_dynamics_results() -> DynamicsResults:
+    """Compute mass, torque, and round-trip histories through public APIs."""
+    fixture = load_panda_fixture()
+    theta, dtheta, ddtheta = _quintic_reference(START, MID)
+
+    matrices = []
+    inertia_rows = []
+    velocity_rows = []
+    gravity_rows = []
+    tool_rows = []
+    torque_rows = []
+    recovered_rows = []
+    for q, dq, ddq in zip(theta, dtheta, ddtheta):
+        mass = assert_finite("mass matrix", fixture.dynamics.mass_matrix(q))
+        velocity_force = assert_finite(
+            "velocity force",
+            fixture.dynamics.velocity_quadratic_forces(q, dq),
+        )
+        gravity = assert_finite(
+            "gravity force", fixture.dynamics.gravity_forces(q, GRAVITY)
+        )
+        jacobian = assert_finite("space Jacobian", fixture.serial.jacobian(q))
+        tool = assert_finite("tool torque", jacobian.T @ TOOL_WRENCH)
+        inertia = assert_finite("inertial torque", mass @ ddq)
+        total = assert_finite(
+            "inverse dynamics torque",
+            fixture.dynamics.inverse_dynamics(
+                q, dq, ddq, GRAVITY, TOOL_WRENCH
+            ),
+        )
+        recovered = assert_finite(
+            "forward dynamics acceleration",
+            fixture.dynamics.forward_dynamics(
+                q, dq, total, GRAVITY, TOOL_WRENCH
+            ),
+        )
+        matrices.append(mass)
+        inertia_rows.append(inertia)
+        velocity_rows.append(velocity_force)
+        gravity_rows.append(gravity)
+        tool_rows.append(tool)
+        torque_rows.append(total)
+        recovered_rows.append(recovered)
+
+    return DynamicsResults(
+        time=STUDY_TIME.copy(),
+        theta=theta,
+        velocity=dtheta,
+        acceleration=ddtheta,
+        mass_matrices=np.stack(matrices),
+        inertia=np.stack(inertia_rows),
+        velocity_force=np.stack(velocity_rows),
+        gravity=np.stack(gravity_rows),
+        tool=np.stack(tool_rows),
+        total_torque=np.stack(torque_rows),
+        recovered_acceleration=np.stack(recovered_rows),
+    )
+
+
+# [dynamics-study-end]
