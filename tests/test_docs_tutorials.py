@@ -5,13 +5,15 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import Image
+from PIL import Image, ImageChops, ImageStat
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "docs" / "examples" / "kinematics_tutorial.py"
 TUTORIALS = ROOT / "docs" / "source" / "tutorials"
 MANIM = ROOT / "docs" / "manim"
 ASSETS = ROOT / "docs" / "source" / "_static" / "tutorials" / "kinematics"
+MAX_GIF_BYTES = 2_000_000
+MAX_TOTAL_GIF_BYTES = 4_000_000
 
 
 def read(path):
@@ -211,10 +213,13 @@ def test_committed_kinematics_media_pairs_are_valid():
         "panda_jacobian_velocity",
         "panda_ik_convergence",
     )
+    total_gif_bytes = 0
     for stem in stems:
         gif = ASSETS / f"{stem}.gif"
         png = ASSETS / f"{stem}.png"
         assert gif.stat().st_size > 10_000
+        assert gif.stat().st_size < MAX_GIF_BYTES
+        total_gif_bytes += gif.stat().st_size
         assert png.stat().st_size > 10_000
         with Image.open(gif) as animated:
             assert animated.size == (960, 540)
@@ -222,6 +227,46 @@ def test_committed_kinematics_media_pairs_are_valid():
         with Image.open(png) as still:
             assert still.size == (960, 540)
             assert still.format == "PNG"
+    assert total_gif_bytes < MAX_TOTAL_GIF_BYTES
+
+
+def test_committed_kinematics_gifs_preserve_palette_and_final_frame_fidelity():
+    stems = (
+        "panda_forward_kinematics",
+        "panda_jacobian_velocity",
+        "panda_ik_convergence",
+    )
+    for stem in stems:
+        with (
+            Image.open(ASSETS / f"{stem}.gif") as animated,
+            Image.open(ASSETS / f"{stem}.png") as still,
+        ):
+            animated.seek(animated.n_frames - 1)
+            gif_final = animated.convert("RGB")
+            png_final = still.convert("RGB")
+
+        colors = gif_final.getcolors(maxcolors=960 * 540)
+        assert colors is not None
+        palette = [color for _count, color in colors]
+        channel_levels = min(
+            len({color[channel] for color in palette}) for channel in range(3)
+        )
+        assert channel_levels >= 32
+
+        full_difference = ImageChops.difference(gif_final, png_final)
+        assert max(ImageStat.Stat(full_difference).rms) < 8.0
+
+        background_difference = ImageChops.difference(
+            gif_final.crop((800, 460, 950, 530)),
+            png_final.crop((800, 460, 950, 530)),
+        )
+        assert max(ImageStat.Stat(background_difference).rms) < 3.0
+
+        title_difference = ImageChops.difference(
+            gif_final.crop((20, 20, 940, 120)),
+            png_final.crop((20, 20, 940, 120)),
+        )
+        assert max(ImageStat.Stat(title_difference).rms) < 5.0
 
 
 def test_manim_tool_frame_marks_all_three_axes():
@@ -255,7 +300,7 @@ def test_manim_ik_plot_uses_explicit_log10_scientific_scale():
 
 def test_manim_render_command_and_config_isolate_user_settings(tmp_path):
     renderer = load_renderer()
-    command = renderer._render_command(renderer.SCENES["fk"], tmp_path, ".gif")
+    command = renderer._render_command(renderer.SCENES["fk"], tmp_path, ".mp4")
     assert command[command.index("--output_file") + 1] == "PandaForwardKinematics"
     assert command[command.index("--renderer") + 1] == "cairo"
     assert command[command.index("--seed") + 1] == "0"
@@ -269,14 +314,64 @@ def test_manim_render_command_and_config_isolate_user_settings(tmp_path):
     assert config["CLI"].getfloat("frame_height") == 8.0
 
 
+def test_manim_renderer_builds_argument_list_ffmpeg_palette_pipeline(tmp_path):
+    renderer = load_renderer()
+    executable = Path("/usr/bin/ffmpeg")
+    video = tmp_path / "scene.mp4"
+    palette = tmp_path / "palette.png"
+    gif = tmp_path / "scene.gif"
+
+    palette_command = renderer._palette_command(executable, video, palette)
+    assert palette_command == [
+        "/usr/bin/ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-i",
+        str(video),
+        "-vf",
+        "fps=15,palettegen=max_colors=256:stats_mode=diff",
+        str(palette),
+    ]
+
+    gif_command = renderer._gif_command(executable, video, palette, gif)
+    assert gif_command == [
+        "/usr/bin/ffmpeg",
+        "-v",
+        "error",
+        "-y",
+        "-i",
+        str(video),
+        "-i",
+        str(palette),
+        "-filter_complex",
+        "fps=15[x];[x][1:v]paletteuse=dither=sierra2_4a:diff_mode=rectangle",
+        "-gifflags",
+        "+transdiff",
+        "-loop",
+        "0",
+        str(gif),
+    ]
+
+
 def test_manim_asset_validation_uses_real_pillow_images(tmp_path):
     renderer = load_renderer()
-    for suffix, image_format in ((".png", "PNG"), (".gif", "GIF")):
-        asset = tmp_path / f"valid{suffix}"
-        Image.new("RGB", (960, 540), (23, 33, 38)).save(
-            asset, format=image_format
-        )
-        renderer._validate_asset(asset, suffix)
+    png = tmp_path / "valid.png"
+    Image.new("RGB", (960, 540), (23, 33, 38)).save(png, format="PNG")
+    renderer._validate_asset(png, ".png")
+
+    gif = tmp_path / "valid.gif"
+    first = Image.new("RGB", (960, 540), (23, 33, 38))
+    second = Image.new("RGB", (960, 540), (24, 34, 39))
+    first.save(
+        gif,
+        format="GIF",
+        save_all=True,
+        append_images=[second],
+        duration=67,
+        loop=0,
+    )
+    renderer._validate_asset(gif, ".gif")
 
     wrong_size = tmp_path / "wrong-size.png"
     Image.new("RGB", (320, 180)).save(wrong_size)
