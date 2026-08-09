@@ -83,20 +83,61 @@ See the math move
 
    <div class="mp-motion-gallery__grid" data-reveal>
       <figure class="mp-motion-gallery__primary">
-         <img src="_static/gifs/workspace.gif" width="550" height="450" loading="lazy" alt="Robot arm tracing its reachable workspace">
+         <picture class="mp-motion-gallery__media">
+            <source media="(prefers-reduced-motion: reduce)" srcset="_static/images/workspace-still.png">
+            <img src="_static/gifs/workspace.gif" width="550" height="450" loading="lazy" alt="Robot arm tracing its reachable workspace">
+         </picture>
          <figcaption>Explore reachable workspaces</figcaption>
       </figure>
       <figure>
-         <img src="_static/gifs/joint_trajectory.gif" width="700" height="320" loading="lazy" alt="Joint position, velocity, and acceleration changing along a trajectory">
+         <picture class="mp-motion-gallery__media">
+            <source media="(prefers-reduced-motion: reduce)" srcset="_static/images/joint-trajectory-still.png">
+            <img src="_static/gifs/joint_trajectory.gif" width="700" height="320" loading="lazy" alt="Joint position, velocity, and acceleration changing along a trajectory">
+         </picture>
          <figcaption>Inspect a smooth joint trajectory</figcaption>
       </figure>
       <figure>
-         <img src="_static/gifs/ur5_pick_motion.gif" width="480" height="360" loading="lazy" alt="UR5 robot executing a pick motion">
+         <picture class="mp-motion-gallery__media">
+            <source media="(prefers-reduced-motion: reduce)" srcset="_static/images/ur5-pick-motion-still.png">
+            <img src="_static/gifs/ur5_pick_motion.gif" width="480" height="360" loading="lazy" alt="UR5 robot executing a pick motion">
+         </picture>
          <figcaption>Execute planned motion in simulation</figcaption>
       </figure>
    </div>
 
+.. only:: epub
+
+   .. figure:: _static/images/workspace-still.png
+      :alt: Robot arm tracing its reachable workspace
+
+      Explore reachable workspaces
+
+   .. figure:: _static/images/joint-trajectory-still.png
+      :alt: Joint position, velocity, and acceleration changing along a trajectory
+
+      Inspect a smooth joint trajectory
+
+   .. figure:: _static/images/ur5-pick-motion-still.png
+      :alt: UR5 robot executing a pick motion
+
+      Execute planned motion in simulation
+
 .. only:: latex
+
+   .. figure:: _static/images/workspace-still.png
+      :alt: Robot arm tracing its reachable workspace
+
+      Explore reachable workspaces
+
+   .. figure:: _static/images/joint-trajectory-still.png
+      :alt: Joint position, velocity, and acceleration changing along a trajectory
+
+      Inspect a smooth joint trajectory
+
+   .. figure:: _static/images/ur5-pick-motion-still.png
+      :alt: UR5 robot executing a pick motion
+
+      Execute planned motion in simulation
 
    The motion studies show a robot tracing its reachable workspace, joint
    position, velocity, and acceleration changing along a smooth trajectory,

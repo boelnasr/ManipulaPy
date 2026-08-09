@@ -827,7 +827,7 @@ div.topic.contents ul ul {
   font-size: 1.05rem;
 }
 
-/* Motion gallery: wide primary study with offset supporting studies */
+/* Motion gallery: wide primary study with a calibrated supporting pair. */
 
 .mp-motion-gallery {
   padding-block: clamp(5rem, 9vw, 9rem);
@@ -836,40 +836,46 @@ div.topic.contents ul ul {
 
 .mp-motion-gallery__grid {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(16rem, 5fr);
-  grid-template-rows: auto auto;
-  gap: 2rem clamp(2rem, 5vw, 5rem);
-  align-items: start;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: clamp(1.5rem, 3vw, 3rem) clamp(1.5rem, 4vw, 4rem);
+  align-items: stretch;
 }
 
 .mp-motion-gallery figure {
+  display: flex;
+  min-width: 0;
   margin: 0;
+  flex-direction: column;
 }
 
 .mp-motion-gallery__primary {
-  grid-row: 1 / span 2;
-  align-self: center;
+  grid-column: 1 / -1;
 }
 
-.mp-motion-gallery__grid > figure:nth-child(2) {
-  margin-top: 3rem;
+.mp-motion-gallery__media {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+  overflow: hidden;
+  background: var(--mp-panel-strong);
+  border: 1px solid var(--mp-rule);
+  border-radius: var(--mp-radius);
 }
 
-.mp-motion-gallery__grid > figure:nth-child(3) {
-  margin-bottom: 3rem;
+.mp-motion-gallery__primary .mp-motion-gallery__media {
+  block-size: clamp(24rem, 48vw, 38rem);
+}
+
+.mp-motion-gallery__grid > figure:not(.mp-motion-gallery__primary) .mp-motion-gallery__media {
+  block-size: clamp(16rem, 28vw, 23rem);
 }
 
 .mp-motion-gallery img {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-  background: var(--mp-panel-strong);
-  border-radius: var(--mp-radius);
-}
-
-.mp-motion-gallery__primary img {
-  aspect-ratio: 11 / 9;
+  height: 100%;
+  object-fit: contain;
 }
 
 .mp-motion-gallery figcaption {
@@ -1211,17 +1217,9 @@ div.topic.contents ul ul {
     padding-left: 1.5rem;
   }
 
-  .mp-motion-gallery__primary {
-    grid-row: auto;
-  }
-
-  .mp-motion-gallery__grid > figure:nth-child(2),
-  .mp-motion-gallery__grid > figure:nth-child(3) {
-    margin: 0;
-  }
-
-  .mp-motion-gallery img,
-  .mp-motion-gallery__primary img {
+  .mp-motion-gallery__primary .mp-motion-gallery__media,
+  .mp-motion-gallery__grid > figure:not(.mp-motion-gallery__primary) .mp-motion-gallery__media {
+    block-size: auto;
     aspect-ratio: 4 / 3;
   }
 
