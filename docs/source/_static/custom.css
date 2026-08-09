@@ -886,6 +886,32 @@ div.topic.contents ul ul {
   line-height: 1.45;
 }
 
+.mp-tutorial-study {
+  margin-block: 2rem;
+  background: var(--mp-panel-strong);
+  border: 1px solid var(--mp-rule);
+  border-radius: var(--mp-radius);
+  overflow: hidden;
+}
+
+.mp-tutorial-study picture,
+.mp-tutorial-study img {
+  display: block;
+}
+
+.mp-tutorial-study img {
+  width: 100%;
+  height: auto;
+}
+
+.mp-tutorial-study figcaption {
+  padding: 0.75rem;
+  color: var(--mp-muted);
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
 /* Backend heading remains semantic for the right table of contents. */
 
 .mp-backends {

@@ -58,6 +58,28 @@ Expected output::
 
    returned pose.shape == (4, 4)
 
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/kinematics/panda_forward_kinematics.png">
+            <img src="../_static/tutorials/kinematics/panda_forward_kinematics.gif" width="960" height="540" loading="lazy" alt="Seven Panda arm joints build a base-to-tool transform and reveal the resulting tool frame.">
+         </picture>
+         <figcaption>Base-to-tool transform and resulting tool frame.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. image:: ../_static/tutorials/kinematics/panda_forward_kinematics.png
+      :alt: Seven Panda arm joints build a base-to-tool transform and reveal the resulting tool frame.
+
+.. only:: latex
+
+   .. image:: ../_static/tutorials/kinematics/panda_forward_kinematics.png
+      :alt: Seven Panda arm joints build a base-to-tool transform and reveal the resulting tool frame.
+
 Jacobian: joints to tool velocity
 ---------------------------------
 
@@ -77,6 +99,28 @@ Expected output::
    returned jacobian.shape == (6, 7)
    returned twist.shape == (6,)
 
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/kinematics/panda_jacobian_velocity.png">
+            <img src="../_static/tutorials/kinematics/panda_jacobian_velocity.gif" width="960" height="540" loading="lazy" alt="Seven joint rates pass through a six-by-seven Jacobian into angular and linear tool velocity.">
+         </picture>
+         <figcaption>Joint rates mapped to angular and linear tool velocity.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. image:: ../_static/tutorials/kinematics/panda_jacobian_velocity.png
+      :alt: Seven joint rates pass through a six-by-seven Jacobian into angular and linear tool velocity.
+
+.. only:: latex
+
+   .. image:: ../_static/tutorials/kinematics/panda_jacobian_velocity.png
+      :alt: Seven joint rates pass through a six-by-seven Jacobian into angular and linear tool velocity.
+
 Inverse kinematics: pose to joints
 ----------------------------------
 
@@ -93,6 +137,28 @@ respects the Panda arm's limits and the solver reports whether it converged.
 Expected output::
 
    returned success is True; returned iterations <= 20
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/kinematics/panda_ik_convergence.png">
+            <img src="../_static/tutorials/kinematics/panda_ik_convergence.gif" width="960" height="540" loading="lazy" alt="Translation and rotation residuals converge as inverse kinematics approaches a reachable Panda pose.">
+         </picture>
+         <figcaption>Translation and rotation residuals converge to a reachable pose.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. image:: ../_static/tutorials/kinematics/panda_ik_convergence.png
+      :alt: Translation and rotation residuals converge as inverse kinematics approaches a reachable Panda pose.
+
+.. only:: latex
+
+   .. image:: ../_static/tutorials/kinematics/panda_ik_convergence.png
+      :alt: Translation and rotation residuals converge as inverse kinematics approaches a reachable Panda pose.
 
 Validate the result
 -------------------

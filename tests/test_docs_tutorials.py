@@ -1,5 +1,6 @@
 import configparser
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -228,6 +229,46 @@ def test_committed_kinematics_media_pairs_are_valid():
             assert still.size == (960, 540)
             assert still.format == "PNG"
     assert total_gif_bytes < MAX_TOTAL_GIF_BYTES
+
+
+def test_kinematics_tutorial_media_embedding_is_accessible():
+    source = read(TUTORIALS / "kinematics_guide.rst")
+    studies = (
+        (
+            "panda_forward_kinematics",
+            "Seven Panda arm joints build a base-to-tool transform and reveal "
+            "the resulting tool frame.",
+        ),
+        (
+            "panda_jacobian_velocity",
+            "Seven joint rates pass through a six-by-seven Jacobian into angular "
+            "and linear tool velocity.",
+        ),
+        (
+            "panda_ik_convergence",
+            "Translation and rotation residuals converge as inverse kinematics "
+            "approaches a reachable Panda pose.",
+        ),
+    )
+
+    for stem, alt_text in studies:
+        assert (
+            f'<source media="(prefers-reduced-motion: reduce)" '
+            f'srcset="../_static/tutorials/kinematics/{stem}.png">' in source
+        )
+        assert (
+            f'<img src="../_static/tutorials/kinematics/{stem}.gif" '
+            'width="960" height="540"' in source
+        )
+        assert f".. image:: ../_static/tutorials/kinematics/{stem}.png" in source
+        assert alt_text in source
+
+    assert ".. only:: html and not epub" in source
+    assert ".. only:: epub" in source
+    assert ".. only:: latex" in source
+    for image in re.findall(r"<img\b[^>]*>", source):
+        assert re.search(r'\balt="[^"\n]+"', image)
+        assert 'loading="lazy"' in image
 
 
 def test_committed_kinematics_gifs_preserve_palette_and_final_frame_fidelity():
