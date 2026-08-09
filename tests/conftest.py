@@ -760,13 +760,22 @@ ALWAYS_MOCK = [
     "torchvision.io",
 ]
 
-# Simulation/complex modules that are problematic in CI
-MOCK_IN_CI = [
-    "pybullet",
-    "pybullet_data",
-]
+# Modules to stand in for while running under CI even when they import.
+# Empty: nothing currently needs mocking on availability grounds alone. Keep
+# the mechanism, because a module that is importable but unusable on a hosted
+# runner is a real category.
+MOCK_IN_CI = []
 
-# CPU libraries that should be tested when available
+# Libraries that should be exercised for real whenever they are installed.
+#
+# pybullet moved here from MOCK_IN_CI. That list is keyed on the CI environment
+# variable rather than on whether the module works, so a runner with pybullet
+# genuinely installed still got the stand-in, and the nine URDF-vs-pybullet
+# accuracy tests skipped as "pybullet not installed" on a machine where it was
+# installed and importable. Those tests cross-check forward kinematics against
+# an independent implementation, so losing them in CI loses an external oracle.
+# The availability check below already gives hosted runners, which do not
+# install pybullet, exactly the stand-in they had before.
 TEST_WHEN_AVAILABLE = [
     "torch",
     "cv2",
@@ -774,6 +783,8 @@ TEST_WHEN_AVAILABLE = [
     "sklearn.cluster",
     "ultralytics",
     "numba",
+    "pybullet",
+    "pybullet_data",
 ]
 
 print("🔧 Setting up intelligent test environment...")
