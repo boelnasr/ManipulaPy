@@ -1,8 +1,11 @@
+import configparser
 import importlib.util
 import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "docs" / "examples" / "kinematics_tutorial.py"
@@ -23,6 +26,16 @@ def marker_body(source, marker):
 
 def load_example():
     spec = importlib.util.spec_from_file_location("kinematics_tutorial", EXAMPLE)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_renderer():
+    path = MANIM / "render_kinematics.py"
+    spec = importlib.util.spec_from_file_location("render_kinematics", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -190,3 +203,49 @@ def test_manim_config_has_stable_scientific_output():
     config = read(MANIM / "manim.cfg")
     for contract in ("pixel_width = 960", "pixel_height = 540", "frame_rate = 30"):
         assert contract in config
+
+
+def test_manim_tool_frame_marks_all_three_axes():
+    scenes = read(MANIM / "kinematics_scenes.py")
+    triad = scenes.split("triad = VGroup(", maxsplit=1)[1].split(
+        "return VGroup(links", maxsplit=1
+    )[0]
+    assert triad.count("Arrow(") == 3
+    for axis in ("x", "y", "z"):
+        assert f'MathTex("{axis}"' in triad
+
+
+def test_manim_rules_and_major_content_are_frame_centered():
+    scenes = read(MANIM / "kinematics_scenes.py")
+    assert scenes.count("rule = _rule_below(title)") == 3
+    assert "rule.set_x(0.0)" in scenes
+    assert "equation.set_x(0.0)" in scenes
+    assert "charts.set_x(0.0)" in scenes
+
+
+def test_manim_render_command_and_config_isolate_user_settings(tmp_path):
+    renderer = load_renderer()
+    command = renderer._render_command(renderer.SCENES["fk"], tmp_path, ".gif")
+    assert command[command.index("--output_file") + 1] == "PandaForwardKinematics"
+    assert command[command.index("--renderer") + 1] == "cairo"
+    assert command[command.index("--seed") + 1] == "0"
+
+    config = configparser.ConfigParser()
+    config.read(MANIM / "manim.cfg")
+    assert config["CLI"].getboolean("transparent") is False
+    assert config["CLI"].getfloat("background_opacity") == 1.0
+
+
+def test_manim_asset_validation_uses_real_pillow_images(tmp_path):
+    renderer = load_renderer()
+    for suffix, image_format in ((".png", "PNG"), (".gif", "GIF")):
+        asset = tmp_path / f"valid{suffix}"
+        Image.new("RGB", (960, 540), (23, 33, 38)).save(
+            asset, format=image_format
+        )
+        renderer._validate_asset(asset, suffix)
+
+    wrong_size = tmp_path / "wrong-size.png"
+    Image.new("RGB", (320, 180)).save(wrong_size)
+    with pytest.raises(renderer.RenderOutputError, match="invalid dimensions"):
+        renderer._validate_asset(wrong_size, ".png")

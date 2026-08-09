@@ -61,6 +61,14 @@ def _title(text: str, subtitle: str) -> VGroup:
     return VGroup(heading, detail).arrange(DOWN, aligned_edge=LEFT, buff=0.08)
 
 
+def _rule_below(title: VGroup) -> Line:
+    """Place a full-width rule below a title while keeping the frame centered."""
+    rule = Line(LEFT * 6.7, RIGHT * 6.7, color=RULE, stroke_width=1)
+    rule.next_to(title, DOWN, buff=0.18)
+    rule.set_x(0.0)
+    return rule
+
+
 def _normalized_chain(configuration: np.ndarray) -> np.ndarray:
     """Map seven measured joint angles to a normalized schematic chain."""
     headings = np.cumsum(np.pi / 2.0 + np.asarray(configuration) * 0.34)
@@ -102,17 +110,28 @@ def _chain(configuration: np.ndarray) -> VGroup:
     base.move_to([*points[0], 0.0]).shift(DOWN * 0.2)
 
     endpoint = np.array([*points[-1], 0.0])
+    y_projection = LEFT * 0.38 + DOWN * 0.26
     triad = VGroup(
         Arrow(endpoint, endpoint + RIGHT * 0.55, buff=0, color=TEAL, stroke_width=3),
+        Arrow(
+            endpoint,
+            endpoint + y_projection,
+            buff=0,
+            color=MUTED,
+            stroke_width=2.5,
+        ),
         Arrow(endpoint, endpoint + UP * 0.55, buff=0, color=INK, stroke_width=3),
         MathTex("x", color=TEAL, font_size=18).next_to(
             endpoint + RIGHT * 0.55, RIGHT, buff=0.04
+        ),
+        MathTex("y", color=MUTED, font_size=18).next_to(
+            endpoint + y_projection, LEFT, buff=0.04
         ),
         MathTex("z", color=INK, font_size=18).next_to(
             endpoint + UP * 0.55, UP, buff=0.04
         ),
         Text("tool frame", color=MUTED, font_size=14).next_to(
-            endpoint, DOWN, buff=0.2
+            endpoint, DOWN + RIGHT, buff=0.2
         ),
     )
     return VGroup(links, joints, base, triad)
@@ -147,9 +166,7 @@ class PandaForwardKinematics(Scene):
             "Forward kinematics",
             "Franka Panda  ·  base to tool  ·  seven revolute joints",
         ).to_corner(UP + LEFT, buff=0.38)
-        rule = Line(LEFT * 6.7, RIGHT * 6.7, color=RULE, stroke_width=1).next_to(
-            title, DOWN, buff=0.18
-        )
+        rule = _rule_below(title)
         chain = _chain(HOME)
         joint_change = VGroup(
             Text("home to target joint change", color=MUTED, font_size=14),
@@ -252,9 +269,7 @@ class PandaJacobianVelocity(Scene):
             "Jacobian velocity map",
             "Seven joint rates map to one spatial tool twist",
         ).to_corner(UP + LEFT, buff=0.38)
-        rule = Line(LEFT * 6.7, RIGHT * 6.7, color=RULE, stroke_width=1).next_to(
-            title, DOWN, buff=0.18
-        )
+        rule = _rule_below(title)
 
         rates = _value_column(JOINT_RATES)
         rate_label = VGroup(
@@ -287,6 +302,7 @@ class PandaJacobianVelocity(Scene):
             RIGHT, buff=0.58, aligned_edge=DOWN
         )
         equation.scale(0.91).next_to(rule, DOWN, buff=0.34)
+        equation.set_x(0.0)
 
         self.play(FadeIn(title), Create(rule), run_time=0.7, rate_func=smooth)
         self.play(FadeIn(rate_group), run_time=0.6, rate_func=smooth)
@@ -354,9 +370,7 @@ class PandaIKConvergence(Scene):
             "Inverse kinematics convergence",
             "Recorded solver residuals  ·  independent vertical scales",
         ).to_corner(UP + LEFT, buff=0.38)
-        rule = Line(LEFT * 6.7, RIGHT * 6.7, color=RULE, stroke_width=1).next_to(
-            title, DOWN, buff=0.18
-        )
+        rule = _rule_below(title)
 
         translation_group, translation_axes, translation_curve = _residual_axis(
             budgets, translation, "translation residual", "[m]", TEAL
@@ -368,6 +382,7 @@ class PandaIKConvergence(Scene):
             DOWN, buff=0.38, aligned_edge=LEFT
         )
         charts.scale(0.88).next_to(rule, DOWN, buff=0.28)
+        charts.set_x(0.0)
         x_label = Text("iteration budget", color=MUTED, font_size=15).next_to(
             charts, DOWN, buff=0.08
         )

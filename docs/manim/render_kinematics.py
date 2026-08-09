@@ -90,6 +90,12 @@ def _render_command(spec: SceneSpec, media_dir: Path, suffix: str) -> list[str]:
         str(CONFIG),
         "--media_dir",
         str(media_dir),
+        "--output_file",
+        spec.scene_class,
+        "--renderer",
+        "cairo",
+        "--seed",
+        "0",
         f"--format={suffix.removeprefix('.')}",
     ]
     if suffix == ".png":
