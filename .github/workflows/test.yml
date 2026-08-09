@@ -266,6 +266,65 @@ jobs:
             -k jax --junitxml=jax-cuda.xml -q
           python scripts/assert_junit_no_skips.py jax-cuda.xml
 
+  # OpenCV, scikit-learn and PyBullet are in no hosted job's install, so 13
+  # tests that need the real libraries skip everywhere and contribute nothing.
+  # Nine of them are the URDF-vs-PyBullet kinematics cross-checks, which are an
+  # independent oracle for the headline math. The self-hosted runner has the
+  # real libraries, so run them there. Deliberately NOT part of gpu-axes-passed:
+  # that marker gates the release on CUDA correctness and must not start
+  # depending on optional CPU libraries.
+  optional-deps:
+    name: optional-deps
+    if: >-
+      vars.GPU_RUNNER_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install the optional runtime dependencies
+        run: python -m pip install -e ".[dev,vision,ml,simulation,urdf]"
+      - name: Assert the real libraries are importable, not stand-ins
+        run: |
+          python - <<'PY'
+          import types
+          import cv2, sklearn.cluster, pybullet
+          for module in (cv2, sklearn.cluster, pybullet):
+              assert isinstance(module, types.ModuleType), module
+          print(f"cv2 {cv2.__version__}, sklearn {sklearn.__version__}")
+          PY
+      - name: Run the suites that need the real libraries
+        run: |
+          python -m pytest tests/test_urdf_accuracy.py tests/test_vision.py \
+            tests/test_perception.py --junitxml=optional-deps.xml -q
+      - name: Refuse a run where a dependency was missing
+        run: |
+          python - <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          # A no-skips gate is wrong here: two vision tests skip on genuine
+          # PyBullet runtime conditions. Only dependency-shaped skips mean the
+          # job silently tested nothing.
+          markers = ("not available", "not installed", "No module named")
+          root = ET.parse("optional-deps.xml").getroot()
+          offenders = [
+              f"{case.get('classname')}.{case.get('name')}: {skip.get('message', '')}"
+              for case in root.iter("testcase")
+              for skip in case.findall("skipped")
+              if any(marker in (skip.get("message") or "") for marker in markers)
+          ]
+          if offenders:
+              print("dependency-gated skips on a runner that should have them:")
+              print("\n".join(offenders))
+              sys.exit(1)
+          print("no dependency-gated skips")
+          PY
+
   build-check:
     name: build-check
     runs-on: ubuntu-latest
