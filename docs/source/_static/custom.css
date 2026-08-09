@@ -1075,6 +1075,40 @@ div.topic.contents ul ul {
   }
 }
 
+@media (min-width: 960px) and (max-width: 1319px) {
+  html:has(dialog#pst-primary-sidebar-modal[open]) {
+    overflow: hidden;
+  }
+
+  dialog#pst-primary-sidebar-modal.bd-sidebar-primary.hide-on-wide {
+    display: flex;
+    flex-grow: 0.75;
+    height: 100dvh;
+    max-height: 100dvh;
+    width: 75%;
+    max-width: 350px;
+    margin-left: -75%;
+    background: var(--mp-canvas);
+    border: 0;
+    position: fixed;
+    inset: 0 auto 0 0;
+    overflow: hidden auto;
+    visibility: hidden;
+    z-index: 1055;
+    transition: visibility 200ms ease-out, margin 200ms ease-out;
+  }
+
+  dialog#pst-primary-sidebar-modal.bd-sidebar-primary.hide-on-wide[open] {
+    margin-left: 0;
+    visibility: visible;
+  }
+
+  dialog#pst-primary-sidebar-modal .sidebar-header-items {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
 @media (max-width: 959px) {
   .mp-hero {
     grid-template-columns: 1fr;
