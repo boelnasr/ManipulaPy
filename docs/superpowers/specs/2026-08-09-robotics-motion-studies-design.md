@@ -186,13 +186,16 @@ study must not imply full-pose interpolation if it visualizes position alone.
 
 The scene begins with an obstructed nominal path, then shows the corrected path
 from the planner's public `plan_trajectory`/collision-avoidance flow around a
-declared obstacle. The nominal path remains as a faint reference, and the
-minimum measured clearance updates as the corrected trajectory develops.
+declared joint-space obstacle. The nominal path remains as a faint reference,
+and the minimum measured joint-space clearance updates as the corrected
+trajectory develops.
 
-Obstacle geometry, robot geometry used for clearance, and safety margin are
-named. The scene passes only if the corrected path reaches the goal and its
-measured minimum clearance satisfies the documented margin. If the current
-public planner cannot reproducibly satisfy that contract on the Panda fixture,
+The obstacle configuration, projected joint-space exclusion region, distance
+metric in radians, and safety margin are named. The scene does not depict this
+joint-space potential-field input as a workspace obstacle. It passes only if
+the corrected path reaches the goal and its measured minimum clearance
+satisfies the documented margin. If the current public planner cannot
+reproducibly satisfy that contract on the Panda fixture,
 implementation must stop and revise the study design rather than animate a
 hand-authored detour.
 
