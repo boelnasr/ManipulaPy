@@ -1023,20 +1023,7 @@ div.topic.contents ul ul {
   }
 }
 
-@media (max-width: 767px) {
-  html,
-  body {
-    overflow-x: clip;
-  }
-
-  .bd-content h1 {
-    font-size: clamp(2.2rem, 11vw, 3.2rem);
-  }
-
-  .bd-content h2 {
-    margin-top: 2.75rem;
-  }
-
+@media (max-width: 959px) {
   .bd-header .bd-header__inner {
     gap: 0.15rem;
     padding-inline: 0.5rem;
@@ -1083,6 +1070,43 @@ div.topic.contents ul ul {
     min-width: 40px;
   }
 
+  .mp-hero {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "copy"
+      "media";
+    min-height: auto;
+    padding-block: 4rem 3rem;
+  }
+
+  .mp-hero > h2,
+  .mp-hero h1 {
+    max-width: none;
+    font-size: clamp(2.5rem, 6vw, 3.25rem);
+    line-height: 0.96;
+  }
+
+  .mp-hero__media {
+    margin-top: 2rem;
+    aspect-ratio: 16 / 11;
+  }
+}
+
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  .bd-content h1 {
+    font-size: clamp(2.2rem, 11vw, 3.2rem);
+  }
+
+  .bd-content h2 {
+    margin-top: 2.75rem;
+  }
+
   .mp-home {
     width: 100%;
     margin-inline: 0;
@@ -1098,15 +1122,6 @@ div.topic.contents ul ul {
     grid-template-columns: 1fr;
   }
 
-  .mp-hero {
-    grid-template-areas:
-      "title"
-      "copy"
-      "media";
-    min-height: auto;
-    padding-block: 4rem 3rem;
-  }
-
   .mp-hero > h2,
   .mp-hero h1 {
     max-width: none;
@@ -1116,11 +1131,6 @@ div.topic.contents ul ul {
 
   .mp-hero__lede {
     font-size: 1rem;
-  }
-
-  .mp-hero__media {
-    margin-top: 2rem;
-    aspect-ratio: 16 / 11;
   }
 
   .mp-paths,
