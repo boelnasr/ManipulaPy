@@ -166,6 +166,11 @@ def test_motion_gallery_uses_wide_lead_calibrated_pair():
 
 def test_motion_gallery_has_reduced_motion_stills():
     source = read(INDEX)
+    assert (
+        ".. only:: html and not epub\n\n"
+        "   .. raw:: html\n\n"
+        '      <div class="mp-motion-gallery__grid" data-reveal>' in source
+    )
     for stem in (
         "workspace-still.png",
         "joint-trajectory-still.png",
