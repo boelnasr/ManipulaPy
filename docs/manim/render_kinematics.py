@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from PIL import Image, ImageChops, ImageStat, UnidentifiedImageError
+from PIL import Image, ImageChops, ImageSequence, ImageStat, UnidentifiedImageError
 
 MANIM_DIR = Path(__file__).resolve().parent
 REPOSITORY = MANIM_DIR.parents[1]
@@ -22,6 +22,7 @@ EXPECTED_DIMENSIONS = (960, 540)
 GIF_FRAME_RATE = 15
 MAX_GIF_BYTES = 2_000_000
 MAX_TOTAL_GIF_BYTES = 4_000_000
+MAX_GIF_DURATION_MS = 5_000
 MIN_CHANNEL_LEVELS = 32
 MAX_FULL_FRAME_RMS = 8.0
 MAX_BACKGROUND_RMS = 3.0
@@ -82,6 +83,16 @@ def _validate_asset(path: Path, expected_suffix: str) -> None:
             dimensions = image.size
             image_format = image.format
             frame_count = getattr(image, "n_frames", 1)
+            loop = image.info.get("loop")
+            duration_ms = (
+                sum(
+                    int(frame.info.get("duration", 0))
+                    for frame in ImageSequence.Iterator(image)
+                )
+                if expected_suffix == ".gif"
+                else 0
+            )
+        with Image.open(path) as image:
             image.verify()
     except (OSError, UnidentifiedImageError) as error:
         raise RenderOutputError(f"unreadable image asset {path}: {error}") from error
@@ -99,6 +110,17 @@ def _validate_asset(path: Path, expected_suffix: str) -> None:
     if expected_suffix == ".gif":
         if frame_count <= 1:
             raise RenderOutputError(f"GIF is not animated: {path}")
+        if loop == 0:
+            raise RenderOutputError(
+                f"GIF loops infinitely instead of playing once: {path}"
+            )
+        if loop is not None:
+            raise RenderOutputError(f"GIF repeats instead of playing once: {path}")
+        if duration_ms >= MAX_GIF_DURATION_MS:
+            raise RenderOutputError(
+                f"GIF duration must be under {MAX_GIF_DURATION_MS} ms: {path} "
+                f"lasts {duration_ms} ms"
+            )
         if path.stat().st_size >= MAX_GIF_BYTES:
             raise RenderOutputError(
                 f"GIF exceeds {MAX_GIF_BYTES}-byte delivery budget: {path} "
@@ -225,7 +247,7 @@ def _gif_command(ffmpeg: Path, video: Path, palette: Path, gif: Path) -> list[st
         "-gifflags",
         "+transdiff",
         "-loop",
-        "0",
+        "-1",
         str(gif),
     ]
 

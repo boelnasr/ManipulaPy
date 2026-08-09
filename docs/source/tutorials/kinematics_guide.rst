@@ -1,10 +1,10 @@
 Kinematics with the Franka Panda
 ================================
 
-This tutorial uses the bundled Franka Panda model to move between joint space,
-tool pose, and tool velocity. The calculations below are literal excerpts from
-the tested tutorial module, so the documentation and gallery share one source
-of truth.
+In about 20 minutes, you will use the bundled Franka Panda model to move between
+joint space, tool pose, and tool velocity. The calculations below are literal
+excerpts from the tested tutorial module, so the documentation and gallery
+share one source of truth.
 
 What you will build
 -------------------
@@ -18,9 +18,11 @@ calculations in this tutorial.
 Before you begin
 ----------------
 
-Use Python 3.9+ with ManipulaPy installed. The examples load the bundled URDF,
-so no robot download or hand-written kinematic parameters are needed. Joint
-angles are in radians and distances are in metres.
+Use Python 3.9+ and follow the :doc:`installation guide
+<../getting_started/index>` to install ManipulaPy. The examples load the URDF
+from the installed package, so no robot download or repository-relative
+``resources/`` path is needed. Joint angles are in radians and distances are in
+metres.
 
 Load the bundled Panda
 ----------------------
@@ -38,7 +40,9 @@ order: each later function takes its required inputs explicitly.
 
 Expected output::
 
-   seven arm-joint names; 7 arm degrees of freedom; 8 exposed model degrees of freedom
+   panda_joint1, panda_joint2, panda_joint3, panda_joint4,
+   panda_joint5, panda_joint6, panda_joint7
+   7 arm degrees of freedom; 8 exposed model degrees of freedom
 
 Forward kinematics: joints to pose
 ----------------------------------
@@ -46,7 +50,8 @@ Forward kinematics: joints to pose
 ``forward_kinematics_step`` maps the fixed seven-element ``HOME`` configuration
 to a homogeneous pose matrix for the Panda tool and returns its IK target pose.
 The upper-left 3 by 3 block is the rotation and the final column contains the
-position in metres.
+position in metres. The two assertions in the executable unit verify the
+homogeneous final row and rotation orthonormality.
 
 .. literalinclude:: ../../examples/kinematics_tutorial.py
    :language: python
@@ -192,15 +197,33 @@ Expected output::
    returned translation residual < 1e-5 m
    returned rotation residual < 1e-5 rad
 
+Final checklist
+---------------
+
+Before continuing, confirm that:
+
+* ``pose.shape == (4, 4)`` and its homogeneous and rotation assertions pass;
+* ``jacobian.shape == (6, 7)`` and the twist contains six finite values;
+* IK reports success and both pose residuals are below ``1e-5``; and
+* all seven solved joint values remain inside the returned Panda limits.
+
 Troubleshooting
 ---------------
 
-If loading fails, verify that you are using the installed ManipulaPy package
-and that its bundled data are available. If an IK attempt does not converge for
-your own target, start from a nearby feasible configuration and check whether
-the target is near a singular configuration. The :doc:`URDF processor guide
-<../user_guide/URDF_Processor>` explains how the robot description becomes a
-serial manipulator.
+* **URDF resolution:** use ``get_robot_urdf("panda")`` from the installed
+  package; do not build a path to a repository ``resources/`` directory.
+* **Joint-vector length:** pass seven values for the Panda arm. The separately
+  exposed gripper degree of freedom does not belong in these calculations.
+* **Unreachable targets:** first test a target produced by forward kinematics
+  from a configuration inside the returned joint limits.
+* **Initial guesses:** start IK from a valid configuration near the expected
+  solution when a distant guess stalls or approaches a singularity.
+* **Tolerance and convergence:** ``eomg`` and ``ev`` set rotation and
+  translation tolerances. More iterations or looser tolerances can improve the
+  success rate, with the expected runtime-versus-accuracy tradeoff.
+
+The :doc:`URDF processor guide <../user_guide/URDF_Processor>` explains how the
+robot description becomes a serial manipulator.
 
 Go deeper
 ---------

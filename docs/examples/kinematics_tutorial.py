@@ -1,29 +1,10 @@
 """Deterministic Panda kinematics calculations used by the tutorial gallery."""
 
+# [load-panda-start]
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from numpy.typing import NDArray
-
-
-@dataclass(frozen=True)
-class TutorialResults:
-    """Calculated values shared by the written and animated tutorials."""
-
-    joint_names: tuple[str, ...]
-    pose: NDArray[np.float64]
-    jacobian: NDArray[np.float64]
-    twist: NDArray[np.float64]
-    singular_values: NDArray[np.float64]
-    ik_solution: NDArray[np.float64]
-    ik_success: bool
-    ik_iterations: int
-    translation_residual: float
-    rotation_residual: float
-
-
-# [load-panda-start]
 import numpy as np
 from numpy.typing import NDArray
 
@@ -31,6 +12,7 @@ from ManipulaPy.ManipulaPy_data import get_robot_urdf
 from ManipulaPy.kinematics import SerialManipulator
 from ManipulaPy.urdf.types import JointType
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
+
 
 ARM_DOF = 7
 HOME = np.array([0.0, -0.3, 0.0, -2.0, 0.0, 1.7, 0.785])
@@ -66,6 +48,22 @@ def load_panda() -> tuple[
 # [load-panda-end]
 
 
+@dataclass(frozen=True)
+class TutorialResults:
+    """Calculated values shared by the written and animated tutorials."""
+
+    joint_names: tuple[str, ...]
+    pose: NDArray[np.float64]
+    jacobian: NDArray[np.float64]
+    twist: NDArray[np.float64]
+    singular_values: NDArray[np.float64]
+    ik_solution: NDArray[np.float64]
+    ik_success: bool
+    ik_iterations: int
+    translation_residual: float
+    rotation_residual: float
+
+
 # [validation-start]
 def pose_residual(
     actual: NDArray[np.float64], desired: NDArray[np.float64]
@@ -77,15 +75,13 @@ def pose_residual(
     return translation, float(np.arccos(cosine))
 
 
-def _solve_to_target(robot, target_pose, max_iterations):
-    """Run the public iterative solver with the tutorial's fixed settings."""
-    return robot.iterative_inverse_kinematics(
-        target_pose,
-        HOME,
-        max_iterations=max_iterations,
-        adaptive_tuning=True,
-        backtracking=True,
-    )
+def validation_step(robot, solution, target_pose):
+    """Return translation and rotation pose residuals for an IK solution."""
+    solved_pose = robot.forward_kinematics(solution)
+    return pose_residual(solved_pose, target_pose)
+
+
+# [validation-end]
 
 
 # [forward-kinematics-start]
@@ -93,6 +89,9 @@ def forward_kinematics_step(robot, home, target):
     """Return the tool pose at ``home`` and the target pose for IK."""
     pose = np.asarray(robot.forward_kinematics(home, frame="space"), dtype=np.float64)
     target_pose = robot.forward_kinematics(target)
+    rotation = pose[:3, :3]
+    assert np.allclose(pose[3], [0.0, 0.0, 0.0, 1.0])
+    assert np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-8)
     return pose, target_pose
 
 
@@ -131,13 +130,15 @@ def inverse_kinematics_step(robot, target_pose, initial_guess):
 # [inverse-kinematics-end]
 
 
-def validation_step(robot, solution, target_pose):
-    """Return translation and rotation pose residuals for an IK solution."""
-    solved_pose = robot.forward_kinematics(solution)
-    return pose_residual(solved_pose, target_pose)
-
-
-# [validation-end]
+def _solve_to_target(robot, target_pose, max_iterations):
+    """Run the public iterative solver with the tutorial's fixed settings."""
+    return robot.iterative_inverse_kinematics(
+        target_pose,
+        HOME,
+        max_iterations=max_iterations,
+        adaptive_tuning=True,
+        backtracking=True,
+    )
 
 
 def compute_tutorial_results() -> TutorialResults:

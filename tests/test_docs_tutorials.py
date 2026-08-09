@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageSequence, ImageStat
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "docs" / "examples" / "kinematics_tutorial.py"
@@ -147,6 +147,8 @@ def test_literalinclude_regions_are_unindented_executable_tutorial_units():
         "inverse-kinematics"
     ]
     assert "def validation_step(robot, solution, target_pose)" in regions["validation"]
+    assert "_solve_to_target" not in regions["validation"]
+    assert re.search(r"# \[[^\]]+-start\]", regions["validation"]) is None
 
 
 def test_literalinclude_regions_execute_as_the_displayed_tutorial():
@@ -229,6 +231,17 @@ def test_committed_kinematics_media_pairs_are_valid():
             assert still.size == (960, 540)
             assert still.format == "PNG"
     assert total_gif_bytes < MAX_TOTAL_GIF_BYTES
+
+
+def test_committed_kinematics_gifs_play_once_within_five_seconds():
+    for gif in sorted(ASSETS.glob("*.gif")):
+        with Image.open(gif) as animated:
+            assert "loop" not in animated.info, f"{gif.name} contains a loop extension"
+            duration_ms = sum(
+                int(frame.info.get("duration", 0))
+                for frame in ImageSequence.Iterator(animated)
+            )
+        assert duration_ms < 5_000, f"{gif.name} lasts {duration_ms / 1_000:.2f}s"
 
 
 def test_kinematics_tutorial_media_embedding_is_accessible():
@@ -397,7 +410,7 @@ def test_manim_renderer_builds_argument_list_ffmpeg_palette_pipeline(tmp_path):
         "-gifflags",
         "+transdiff",
         "-loop",
-        "0",
+        "-1",
         str(gif),
     ]
 
@@ -417,9 +430,20 @@ def test_manim_asset_validation_uses_real_pillow_images(tmp_path):
         save_all=True,
         append_images=[second],
         duration=67,
-        loop=0,
     )
     renderer._validate_asset(gif, ".gif")
+
+    looping_gif = tmp_path / "infinite.gif"
+    first.save(
+        looping_gif,
+        format="GIF",
+        save_all=True,
+        append_images=[second],
+        duration=67,
+        loop=0,
+    )
+    with pytest.raises(renderer.RenderOutputError, match="loops infinitely"):
+        renderer._validate_asset(looping_gif, ".gif")
 
     wrong_size = tmp_path / "wrong-size.png"
     Image.new("RGB", (320, 180)).save(wrong_size)
