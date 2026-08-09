@@ -1023,7 +1023,7 @@ div.topic.contents ul ul {
   }
 }
 
-@media (max-width: 1319px) {
+@media (max-width: 959px) {
   .bd-header .bd-header__inner {
     gap: 0.15rem;
     padding-inline: 0.5rem;
@@ -1069,43 +1069,25 @@ div.topic.contents ul ul {
     flex: 0 0 40px;
     min-width: 40px;
   }
-
-  .bd-header button.primary-toggle {
-    display: flex;
-  }
 }
 
 @media (min-width: 960px) and (max-width: 1319px) {
-  html:has(dialog#pst-primary-sidebar-modal[open]) {
+  .bd-header .navbar-header-items__center .navbar-nav {
+    gap: 0;
+  }
+
+  .bd-header .navbar-header-items__center .navbar-nav > li,
+  .bd-header .navbar-header-items__center .navbar-nav > li:nth-last-child(-n + 2) {
+    display: block;
+    min-width: 0;
+  }
+
+  .bd-header .navbar-header-items__center .nav-link {
+    max-width: 4.5rem;
     overflow: hidden;
-  }
-
-  dialog#pst-primary-sidebar-modal.bd-sidebar-primary.hide-on-wide {
-    display: flex;
-    flex-grow: 0.75;
-    height: 100dvh;
-    max-height: 100dvh;
-    width: 75%;
-    max-width: 350px;
-    margin-left: -75%;
-    background: var(--mp-canvas);
-    border: 0;
-    position: fixed;
-    inset: 0 auto 0 0;
-    overflow: hidden auto;
-    visibility: hidden;
-    z-index: 1055;
-    transition: visibility 200ms ease-out, margin 200ms ease-out;
-  }
-
-  dialog#pst-primary-sidebar-modal.bd-sidebar-primary.hide-on-wide[open] {
-    margin-left: 0;
-    visibility: visible;
-  }
-
-  dialog#pst-primary-sidebar-modal .sidebar-header-items {
-    display: flex;
-    flex-direction: column;
+    padding-inline: 0.35rem;
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
   }
 }
 
