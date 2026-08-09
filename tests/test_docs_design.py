@@ -131,6 +131,16 @@ def test_motion_gallery_static_fallbacks_are_valid():
             assert image.size == size
 
 
+def test_workspace_static_fallback_shows_a_populated_workspace_cloud():
+    with Image.open(DOCS / "_static" / "images" / "workspace-still.png") as image:
+        pixels = image.convert("RGB").getdata()
+    green_workspace_pixels = sum(
+        green > 130 and green > red * 1.3 and green > blue * 1.1 and red < 150
+        for red, green, blue in pixels
+    )
+    assert green_workspace_pixels > 4_000
+
+
 def test_motion_gallery_uses_wide_lead_calibrated_pair():
     source = read(INDEX)
     css = read(CSS)
