@@ -12,6 +12,8 @@ from numpy.typing import NDArray
 from ManipulaPy.ManipulaPy_data import get_robot_urdf
 from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
+from ManipulaPy.path_planning import TrajectoryPlanning
+from ManipulaPy.potential_field import PotentialField
 from ManipulaPy.singularity import Singularity
 from ManipulaPy.urdf.types import JointType
 from ManipulaPy.urdf_processor import URDFToSerialManipulator
@@ -240,3 +242,121 @@ def compute_singularity_results() -> SingularityResults:
         public_status=np.asarray(statuses, dtype=np.bool_),
         threshold=SINGULARITY_THRESHOLD,
     )
+
+
+@dataclass(frozen=True)
+class TrajectorySeries:
+    """Joint trajectory samples and their first three time derivatives."""
+
+    positions: NDArray[np.float64]
+    velocities: NDArray[np.float64]
+    accelerations: NDArray[np.float64]
+    jerk: NDArray[np.float64]
+
+
+@dataclass(frozen=True)
+class PlanningResults:
+    """Interpolation and joint-space obstacle results for three studies."""
+
+    time: NDArray[np.float64]
+    cubic: TrajectorySeries
+    quintic: TrajectorySeries
+    joint_tool_path: NDArray[np.float64]
+    cartesian_tool_path: NDArray[np.float64]
+    nominal_path: NDArray[np.float64]
+    corrected_path: NDArray[np.float64]
+    obstacle_q: NDArray[np.float64]
+    minimum_joint_clearance: float
+
+
+class CollisionStudyUnavailable(RuntimeError):
+    """Raised when the public potential-field path misses its study contract."""
+
+
+def _trajectory_series(data: dict[str, Any]) -> TrajectorySeries:
+    positions = assert_finite("joint positions", data["positions"])
+    velocities = assert_finite("joint velocities", data["velocities"])
+    accelerations = assert_finite("joint accelerations", data["accelerations"])
+    dt = float(STUDY_TIME[1] - STUDY_TIME[0])
+    jerk = assert_finite(
+        "joint jerk", np.gradient(accelerations, dt, axis=0, edge_order=2)
+    )
+    return TrajectorySeries(positions, velocities, accelerations, jerk)
+
+
+# [planning-study-start]
+def compute_planning_results() -> PlanningResults:
+    """Compute public joint, Cartesian, and potential-field planning results."""
+    fixture = load_panda_fixture()
+    planner = TrajectoryPlanning(
+        fixture.serial,
+        None,
+        fixture.dynamics,
+        fixture.joint_limits,
+        use_cuda=False,
+        auto_optimize=False,
+    )
+    cubic = _trajectory_series(
+        planner.joint_trajectory(START, GOAL, 4.0, 61, method=3)
+    )
+    quintic = _trajectory_series(
+        planner.joint_trajectory(START, GOAL, 4.0, 61, method=5)
+    )
+
+    start_pose = assert_finite(
+        "start pose", fixture.serial.forward_kinematics(START)
+    )
+    goal_pose = assert_finite("goal pose", fixture.serial.forward_kinematics(GOAL))
+    cartesian = planner.cartesian_trajectory(
+        start_pose, goal_pose, 4.0, 61, method=5
+    )
+    cartesian_tool_path = assert_finite(
+        "Cartesian tool path", cartesian["positions"]
+    )
+    joint_tool_path = np.stack(
+        [
+            assert_finite(
+                "joint-space tool pose",
+                fixture.serial.forward_kinematics(q),
+            )[:3, 3]
+            for q in quintic.positions
+        ]
+    )
+
+    gripper = 0.02
+    start_full = np.append(START, gripper)
+    goal_full = np.append(GOAL, gripper)
+    obstacle_full = np.append(OBSTACLE_Q, gripper)
+    planner.potential_field = PotentialField(
+        attractive_gain=1.0,
+        repulsive_gain=0.001,
+        influence_distance=0.5,
+    )
+    corrected_full = assert_finite(
+        "joint-space corrected path",
+        planner.plan_trajectory(start_full, goal_full, [obstacle_full]),
+    )
+    clearances = np.linalg.norm(corrected_full - obstacle_full, axis=1)
+    minimum_clearance = float(np.min(clearances))
+    if not np.allclose(corrected_full[-1], goal_full, atol=1e-8):
+        raise CollisionStudyUnavailable("corrected path does not reach the goal")
+    if minimum_clearance < JOINT_CLEARANCE:
+        raise CollisionStudyUnavailable(
+            f"joint-space clearance {minimum_clearance:.3f} rad is below "
+            f"the required {JOINT_CLEARANCE:.3f} rad"
+        )
+
+    return PlanningResults(
+        time=STUDY_TIME.copy(),
+        cubic=cubic,
+        quintic=quintic,
+        joint_tool_path=joint_tool_path,
+        cartesian_tool_path=cartesian_tool_path,
+        nominal_path=np.linspace(START, GOAL, 6, dtype=np.float64),
+        corrected_path=corrected_full[:, :7],
+        obstacle_q=OBSTACLE_Q.copy(),
+        minimum_joint_clearance=minimum_clearance,
+    )
+
+
+# [planning-study-end]

@@ -288,3 +288,43 @@ def test_singularity_scenes_and_guide_embed_two_accessible_studies():
     assert guide.count("What to notice") >= 2
     assert guide.count('width="960" height="540"') >= 2
     assert "minimum singular value" in guide.lower()
+
+
+def test_planning_studies_share_endpoints_and_clear_joint_obstacle():
+    studies = load_studies()
+    result = studies.compute_planning_results()
+    for trajectory in (result.cubic, result.quintic):
+        assert trajectory.positions.shape == (61, 7)
+        assert trajectory.velocities.shape == (61, 7)
+        assert trajectory.accelerations.shape == (61, 7)
+        assert trajectory.jerk.shape == (61, 7)
+        assert np.allclose(trajectory.positions[0], studies.START, atol=1e-6)
+        assert np.allclose(trajectory.positions[-1], studies.GOAL, atol=1e-6)
+    assert np.max(np.abs(result.quintic.velocities[[0, -1]])) < 1e-6
+    assert np.max(np.abs(result.quintic.accelerations[[0, -1]])) < 1e-6
+    assert np.allclose(
+        result.joint_tool_path[[0, -1]],
+        result.cartesian_tool_path[[0, -1]],
+        atol=1e-6,
+    )
+    interior_difference = np.linalg.norm(
+        result.joint_tool_path[1:-1] - result.cartesian_tool_path[1:-1], axis=1
+    )
+    assert interior_difference.max() > 1e-3
+    assert result.nominal_path.shape == result.corrected_path.shape == (6, 7)
+    assert np.allclose(result.corrected_path[-1], studies.GOAL, atol=1e-8)
+    assert result.minimum_joint_clearance >= studies.JOINT_CLEARANCE
+
+
+def test_planning_results_are_deterministic():
+    studies = load_studies()
+    first = studies.compute_planning_results()
+    second = studies.compute_planning_results()
+    for name in (
+        "joint_tool_path",
+        "cartesian_tool_path",
+        "nominal_path",
+        "corrected_path",
+    ):
+        assert np.array_equal(getattr(first, name), getattr(second, name))
+    assert first.minimum_joint_clearance == second.minimum_joint_clearance
