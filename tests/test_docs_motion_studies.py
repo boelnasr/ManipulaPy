@@ -243,6 +243,11 @@ def test_motion_scenes_sample_computed_robot_states_instead_of_morphing_endpoint
     dynamics = (MANIM / "dynamics_scenes.py").read_text(encoding="utf-8")
     assert "result.mass_matrices[sample_index(progress, len(result.time))]" in dynamics
     assert '"tool wrench (zero)"' in dynamics
+    singularity = (MANIM / "singularity_scenes.py").read_text(encoding="utf-8")
+    assert (
+        "result.singular_values[sample_index(progress, len(result.time))]"
+        in singularity
+    )
 
 
 def test_dynamics_example_region_is_top_level_and_executable():

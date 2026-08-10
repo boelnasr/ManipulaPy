@@ -20,6 +20,7 @@ from manim import (
     Text,
     ValueTracker,
     VGroup,
+    always_redraw,
     linear,
 )
 
@@ -38,6 +39,7 @@ from scientific_scene import (  # noqa: E402
     TEAL,
     VIOLATION,
     metric_badge,
+    sample_index,
     sampled_panda_chain,
     scientific_legend,
     study_title,
@@ -78,16 +80,23 @@ class PandaManipulabilityCollapse(Scene):
         ).to_edge(UP, buff=0.28)
         progress = ValueTracker(0.0)
         chain = sampled_panda_chain(result.theta, progress)
-        ellipsoid = _ellipsoid(result.singular_values[0], scale)
-        final_ellipsoid = _ellipsoid(result.singular_values[-1], scale)
+        ellipsoid = always_redraw(
+            lambda: _ellipsoid(
+                result.singular_values[sample_index(progress, len(result.time))],
+                scale,
+            )
+        )
         ratio = result.singular_values[-1, -1] / result.singular_values[0, -1]
-        badge = metric_badge("weak-axis retention", f"{100.0 * ratio:.1f}", "%", "warning")
-        badge.next_to(final_ellipsoid, DOWN, buff=0.16)
+        badge = metric_badge(
+            "weak-axis retention", f"{100.0 * ratio:.1f}", "%", "warning"
+        )
+        badge.next_to(
+            _ellipsoid(result.singular_values[-1], scale), DOWN, buff=0.16
+        )
 
         self.add(title, chain, ellipsoid)
         self.play(
             progress.animate.set_value(1.0),
-            ellipsoid.animate.become(final_ellipsoid),
             run_time=3.6,
             rate_func=linear,
         )
