@@ -14,9 +14,15 @@ intermediate → advanced) or the [`notebooks/`](../notebooks/) course.
 
 A Franka Panda has to move from a start pose to a goal pose. The cheap path —
 a straight line through joint space — plows straight through an obstacle
-sitting between the two. The script fixes it with **gradient descent through
-`forward_kinematics` itself**, for an objective ("stay outside a safety
-margin, stay smooth") that nobody hand-derived a Jacobian for.
+sitting between the two, and not just at the fingertip: the forearm, wrist,
+and gripper sweep through it too. The script fixes the whole arm with
+**gradient descent through forward kinematics itself** — differentiating
+through every link's origin along the kinematic chain, not only the
+end-effector — for an objective ("keep every sampled point along the arm
+outside a combined robot+obstacle margin, stay smooth") that nobody
+hand-derived a Jacobian for. The per-link clearance uses a fixed-radius
+capsule approximation (documented in the script), not full mesh collision —
+accurate enough to keep the optimizer honest, not a substitute for one.
 
 That's the pitch for ManipulaPy v1.4's unified backend system: the same
 `forward_kinematics` call runs on NumPy, CuPy, PyTorch, or JAX, and under the

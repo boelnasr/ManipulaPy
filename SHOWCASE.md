@@ -62,13 +62,14 @@ sets up a Franka Panda reaching across an obstacle:
   <img src="showcase/differentiable_reach_showcase.png" alt="Before/after trajectory, convergence, and clearance plots" width="720">
 </p>
 
-The naive straight-line joint trajectory plows directly through the
-obstacle (0 cm clearance). The script differentiates an objective — "stay
-outside a 12 cm safety margin, stay smooth" — straight through
-`forward_kinematics` with `jax.value_and_grad`, and gradient-descends the
-path clear of it. Nobody wrote a Jacobian for that objective; JAX built it
-from the trace of an ordinary ManipulaPy FK call. It converges in under a
-second on CPU:
+The naive straight-line joint trajectory plows the whole arm through the
+obstacle, not just the fingertip — forearm, wrist and gripper included. The
+script differentiates an objective — "keep every sampled point along the
+kinematic chain outside a combined robot+obstacle margin, stay smooth" —
+straight through every link's forward kinematics with `jax.value_and_grad`,
+and gradient-descends the path clear of it. Nobody wrote a Jacobian for that
+objective; JAX built it from the trace of ordinary ManipulaPy FK calls. It
+converges in about a second on CPU:
 
 ```bash
 pip install "ManipulaPy[jax-cpu,simulation]"

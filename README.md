@@ -454,9 +454,9 @@ dT_dtheta = jax.jacrev(robot.forward_kinematics)(theta)
   a hardware/precision mismatch, not a tolerance question; supporting TPU needs
   a per-platform precision domain in the backend.
 - **See it in action** — [`showcase/differentiable_reach_showcase.py`](showcase/differentiable_reach_showcase.py)
-  gradient-optimizes a Panda's trajectory around an obstacle by differentiating
-  straight through `forward_kinematics` — an objective with no hand-derived
-  Jacobian. Full writeup in [SHOWCASE.md](SHOWCASE.md).
+  gradient-optimizes a Panda's whole-arm trajectory around an obstacle by
+  differentiating straight through the forward kinematics of every link —
+  an objective with no hand-derived Jacobian. Full writeup in [SHOWCASE.md](SHOWCASE.md).
 - **Core math fixes that affect every backend** — building the gradient contract
   exposed three real defects in the shipped SE(3)/SO(3) code: `MatrixLog6`
   discarded small rotations, log gradients were NaN near the identity, and the
