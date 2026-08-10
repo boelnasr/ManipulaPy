@@ -19,7 +19,9 @@ from manim import (
     Square,
     Text,
     Transform,
+    ValueTracker,
     VGroup,
+    always_redraw,
     linear,
 )
 
@@ -38,7 +40,8 @@ from scientific_scene import (  # noqa: E402
     RULE,
     TEAL,
     metric_badge,
-    panda_chain,
+    sample_index,
+    sampled_panda_chain,
     scientific_legend,
     study_title,
     time_cursor,
@@ -93,11 +96,14 @@ class PandaMassMatrixEvolution(Scene):
             "Mass matrix follows configuration",
             "The same Panda carries different joint coupling across its motion",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(result.theta[0])
-        final_chain = panda_chain(result.theta[-1])
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(result.theta, progress)
         scale = float(np.max(np.abs(result.mass_matrices)))
-        heatmap = _heatmap(result.mass_matrices[0], scale)
-        final_heatmap = _heatmap(result.mass_matrices[-1], scale)
+        heatmap = always_redraw(
+            lambda: _heatmap(
+                result.mass_matrices[sample_index(progress, len(result.time))], scale
+            )
+        )
         symmetry = np.max(
             np.abs(result.mass_matrices - result.mass_matrices.swapaxes(1, 2))
         )
@@ -106,8 +112,7 @@ class PandaMassMatrixEvolution(Scene):
 
         self.add(title, chain, heatmap, badge)
         self.play(
-            Transform(chain, final_chain),
-            Transform(heatmap, final_heatmap),
+            progress.animate.set_value(1.0),
             run_time=3.7,
             rate_func=linear,
         )
@@ -124,6 +129,7 @@ class PandaTorqueDecomposition(Scene):
             (result.inertia[:, joint], TEAL, False, "inertia"),
             (result.velocity_force[:, joint], AMBER, True, "velocity"),
             (result.gravity[:, joint], INK, False, "gravity"),
+            (result.tool[:, joint], MUTED, True, "tool wrench (zero)"),
             (result.total_torque[:, joint], "#FFFFFF", True, "total"),
         )
         bound = max(float(np.max(np.abs(values))) for values, *_rest in traces)
@@ -150,15 +156,15 @@ class PandaTorqueDecomposition(Scene):
             "Torque is a sum of physical effects",
             f"Joint {joint + 1} · one model, one state, one shared time cursor",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(result.theta[0])
-        final_chain = panda_chain(result.theta[-1])
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(result.theta, progress)
         cursor = time_cursor(axes, 0.0)
         final_cursor = time_cursor(axes, float(result.time[-1]))
 
         self.add(title, chain, plot, legend, cursor)
         self.play(
             Create(curves),
-            Transform(chain, final_chain),
+            progress.animate.set_value(1.0),
             Transform(cursor, final_cursor),
             run_time=3.7,
             rate_func=linear,

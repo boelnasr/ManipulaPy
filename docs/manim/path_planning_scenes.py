@@ -20,7 +20,7 @@ from manim import (
     FadeIn,
     Scene,
     Text,
-    Transform,
+    ValueTracker,
     VGroup,
     VMobject,
     linear,
@@ -41,7 +41,7 @@ from scientific_scene import (  # noqa: E402
     TEAL,
     VIOLATION,
     metric_badge,
-    panda_chain,
+    sampled_panda_chain,
     scientific_legend,
     study_title,
 )
@@ -127,8 +127,8 @@ class PandaTimeScalingComparison(Scene):
             "Time scaling changes endpoint smoothness",
             f"Joint {joint + 1} · identical Panda endpoints and four-second duration",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(result.quintic.positions[0])
-        final_chain = panda_chain(result.quintic.positions[-1])
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(result.quintic.positions, progress)
         legend = scientific_legend(
             (("cubic", AMBER, True), ("quintic", TEAL, False))
         ).scale(0.9).next_to(grid, DOWN, buff=0.10).align_to(grid, RIGHT)
@@ -137,7 +137,7 @@ class PandaTimeScalingComparison(Scene):
         self.add(title, chain, *(plot[0] for plot in plots), legend)
         self.play(
             Create(curves),
-            Transform(chain, final_chain),
+            progress.animate.set_value(1.0),
             run_time=3.7,
             rate_func=linear,
         )
@@ -182,8 +182,8 @@ class PandaInterpolationDomains(Scene):
             "The interpolation domain shapes the tool path",
             "Same Panda start and goal · XY projection · orientation interpolated",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(result.quintic.positions[0])
-        final_chain = panda_chain(result.quintic.positions[-1])
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(result.quintic.positions, progress)
         legend = scientific_legend(
             (("joint space", AMBER, True), ("Cartesian", TEAL, False))
         ).next_to(axes, UP, buff=0.12).align_to(axes, RIGHT)
@@ -200,7 +200,7 @@ class PandaInterpolationDomains(Scene):
         self.play(
             Create(joint_curve),
             Create(cartesian_curve),
-            Transform(chain, final_chain),
+            progress.animate.set_value(1.0),
             run_time=3.7,
             rate_func=linear,
         )
@@ -258,13 +258,19 @@ class PandaCollisionCorrection(Scene):
             "Potential fields shift colliding waypoints",
             "q2–q7 projection · sampled configurations, not workspace geometry",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(result.nominal_path[0])
-        final_chain = panda_chain(result.corrected_path[-1])
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(result.corrected_path, progress)
         badge = metric_badge(
             "minimum waypoint clearance",
             f"{result.minimum_joint_clearance:.3f}",
             "rad",
         ).next_to(axes, DOWN, buff=0.10).align_to(axes, RIGHT)
+        start_badge = metric_badge(
+            "start sample shift",
+            f"{result.initial_waypoint_shift:.3f}",
+            "rad",
+            "warning",
+        ).next_to(badge, LEFT, buff=0.12)
         legend = scientific_legend(
             (("nominal interpolation", MUTED, True), ("corrected samples", TEAL, False))
         ).next_to(axes, UP, buff=0.12).align_to(axes, RIGHT)
@@ -289,11 +295,12 @@ class PandaCollisionCorrection(Scene):
         )
         self.play(
             FadeIn(corrected_dots),
-            Transform(chain, final_chain),
+            progress.animate.set_value(1.0),
             run_time=3.6,
             rate_func=linear,
         )
         self.play(
+            FadeIn(start_badge),
             FadeIn(badge),
             run_time=0.35,
             rate_func=linear,

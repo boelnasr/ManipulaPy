@@ -730,7 +730,9 @@ Analyzing Torque Components
 **What to notice:** the dominant contribution changes over time even though the
 robot model is fixed. The white total trace is the public
 ``inverse_dynamics`` result; the other traces reconstruct it from the same
-state, gravity vector, and tool wrench.
+state, gravity vector, and tool wrench. This experiment uses a zero tool wrench,
+so that labeled trace lies on the zero line. The representative joint keeps the
+decomposition readable; the executable numerical contract checks all seven.
 
 Forward Dynamics
 ------------------

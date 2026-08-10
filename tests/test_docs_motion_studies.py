@@ -179,6 +179,7 @@ def test_shared_scene_primitives_define_accessible_visual_tokens():
         "AMBER",
         "VIOLATION",
         "panda_chain",
+        "sampled_panda_chain",
         "time_cursor",
         "metric_badge",
         "study_title",
@@ -188,6 +189,19 @@ def test_shared_scene_primitives_define_accessible_visual_tokens():
     assert "rate_func=linear" in source
     for forbidden in ("Flash(", "Wiggle(", "there_and_back", "random"):
         assert forbidden not in source
+
+
+def test_singularity_visual_uses_full_jacobian_mode_and_safe_legend():
+    scenes = (MANIM / "singularity_scenes.py").read_text(encoding="utf-8")
+    guide = (
+        ROOT / "docs" / "source" / "user_guide" / "Singularity_Analysis.rst"
+    ).read_text(encoding="utf-8")
+    assert "result.singular_values" in scenes
+    assert "abstract singular-value cross-section" in scenes.lower()
+    assert ".to_edge(RIGHT, buff=0.35)" in scenes
+    assert "full-Jacobian" in guide
+    assert "twist-velocity" in guide
+    assert "linear velocity ellipsoid loses" not in guide
 
 
 def test_dynamics_study_reconstructs_torque_and_round_trip():
@@ -211,6 +225,24 @@ def test_dynamics_study_reconstructs_torque_and_round_trip():
         np.abs(result.recovered_acceleration - result.acceleration)
     )
     assert round_trip_error < 1e-8
+
+
+def test_motion_scenes_sample_computed_robot_states_instead_of_morphing_endpoints():
+    scene_names = (
+        "dynamics_scenes.py",
+        "singularity_scenes.py",
+        "path_planning_scenes.py",
+        "control_scenes.py",
+    )
+    for name in scene_names:
+        source = (MANIM / name).read_text(encoding="utf-8")
+        assert "sampled_panda_chain" in source
+        assert "progress.animate.set_value(1.0)" in source
+        assert "Transform(chain, final_chain)" not in source
+
+    dynamics = (MANIM / "dynamics_scenes.py").read_text(encoding="utf-8")
+    assert "result.mass_matrices[sample_index(progress, len(result.time))]" in dynamics
+    assert '"tool wrench (zero)"' in dynamics
 
 
 def test_dynamics_example_region_is_top_level_and_executable():
@@ -273,6 +305,21 @@ def test_singularity_path_crosses_public_threshold():
     assert np.isfinite(result.condition_number[:-1]).all()
 
 
+def test_singularity_example_region_is_top_level_and_executable():
+    source = EXAMPLE.read_text(encoding="utf-8")
+    start = "# [singularity-study-start]"
+    end = "# [singularity-study-end]"
+    assert source.count(start) == source.count(end) == 1
+    body = source.split(start, 1)[1].split(end, 1)[0]
+    assert body.lstrip("\n") == body.lstrip("\n ")
+    compile(body, f"{EXAMPLE}:singularity-study", "exec")
+    guide = (
+        ROOT / "docs" / "source" / "user_guide" / "Singularity_Analysis.rst"
+    ).read_text(encoding="utf-8")
+    assert ":start-after: # [singularity-study-start]" in guide
+    assert ":end-before: # [singularity-study-end]" in guide
+
+
 def test_singularity_scenes_and_guide_embed_two_accessible_studies():
     scenes = (MANIM / "singularity_scenes.py").read_text(encoding="utf-8")
     guide = (
@@ -313,6 +360,10 @@ def test_planning_studies_share_endpoints_and_clear_joint_obstacle():
     assert interior_difference.max() > 1e-3
     assert result.nominal_path.shape == result.corrected_path.shape == (6, 7)
     assert np.allclose(result.corrected_path[-1], studies.GOAL, atol=1e-8)
+    assert result.initial_waypoint_shift == pytest.approx(
+        np.linalg.norm(result.corrected_path[0] - studies.START)
+    )
+    assert result.initial_waypoint_shift > 0.0
     assert result.minimum_joint_clearance >= studies.JOINT_CLEARANCE
 
 
@@ -349,6 +400,7 @@ def test_planning_scenes_and_guide_embed_three_accessible_studies():
     assert '"joint 2 [rad]"' in scenes
     assert '"joint 7 [rad]"' in scenes
     assert '"minimum waypoint clearance"' in scenes
+    assert '"start sample shift"' in scenes
     assert "0.20 rad" in scenes
     assert "joint-space" in scenes.lower()
     for stem in (
@@ -363,6 +415,7 @@ def test_planning_scenes_and_guide_embed_three_accessible_studies():
     assert ":start-after: # [planning-study-start]" in guide
     assert "joint-space obstacle" in guide.lower()
     assert "does not certify between-waypoint interpolation" in guide.lower()
+    assert "shifts the first sampled configuration" in guide.lower()
 
 
 def test_control_runs_share_conditions_and_report_public_metrics():

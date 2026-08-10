@@ -900,7 +900,9 @@ and measures Euclidean joint-space waypoint clearance in radians. The public
 call does not certify between-waypoint interpolation; run a collision checker
 on any trajectory reconstructed from these samples. The figure therefore shows
 corrected samples rather than claiming a continuously safe path. This
-joint-space obstacle is not portrayed as physical workspace geometry.
+joint-space obstacle is not portrayed as physical workspace geometry. The same
+public call also shifts the first sampled configuration by 0.147 rad, so anchor
+the start explicitly before execution and collision-check that edited result.
 
 .. only:: html and not epub
 
@@ -929,10 +931,11 @@ joint-space obstacle is not portrayed as physical workspace geometry.
       A potential field shifts sampled joint configurations away from an obstacle.
 
 **What to notice:** the faint nominal interpolation passes through the exclusion
-region; the corrected samples retain the same start and goal while the
-independently measured minimum waypoint distance stays above 0.20 rad. This
-does not certify between-waypoint interpolation, which must be checked
-separately before execution.
+region; the corrected samples reach the same goal while the independently
+measured minimum waypoint distance stays above 0.20 rad. The public field shifts
+the first sample rather than retaining the requested start, and it does not
+certify between-waypoint interpolation. Both properties must be handled before
+execution.
 
 Multi-Robot Trajectory Coordination
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

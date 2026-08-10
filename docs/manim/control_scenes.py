@@ -18,7 +18,7 @@ from manim import (
     Rectangle,
     Scene,
     Text,
-    Transform,
+    ValueTracker,
     VGroup,
     VMobject,
     linear,
@@ -40,7 +40,7 @@ from scientific_scene import (  # noqa: E402
     TEAL,
     VIOLATION,
     metric_badge,
-    panda_chain,
+    sampled_panda_chain,
     scientific_legend,
     study_title,
 )
@@ -124,8 +124,10 @@ class PandaControllerComparison(Scene):
             "Feedback changes the same Panda step response",
             "Identical target, disturbance, plant, integration, and torque limits",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(result.runs["computed_torque"].theta[0])
-        final_chain = panda_chain(result.runs["computed_torque"].theta[-1])
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(
+            result.runs["computed_torque"].theta, progress
+        )
         legend = scientific_legend(
             (
                 ("reference", REFERENCE, False),
@@ -150,7 +152,7 @@ class PandaControllerComparison(Scene):
             Create(open_loop),
             Create(pid),
             Create(computed),
-            Transform(chain, final_chain),
+            progress.animate.set_value(1.0),
             run_time=3.65,
             rate_func=linear,
         )
@@ -237,8 +239,8 @@ class PandaControlMetrics(Scene):
             "Tracking quality needs more than one number",
             "Computed torque · public step metrics · ±2% settling tolerance",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(run.theta[0])
-        final_chain = panda_chain(run.theta[-1])
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(run.theta, progress)
         labels = VGroup(
             Text("response + tolerance", color=MUTED, font_size=14).next_to(
                 response_axes, UP, buff=0.07
@@ -254,7 +256,7 @@ class PandaControlMetrics(Scene):
             Create(response_curve),
             Create(error_curve),
             Create(effort_curve),
-            Transform(chain, final_chain),
+            progress.animate.set_value(1.0),
             run_time=3.55,
             rate_func=linear,
         )

@@ -18,6 +18,7 @@ from manim import (
     RoundedRectangle,
     Text,
     VGroup,
+    always_redraw,
     linear,
 )
 
@@ -93,6 +94,30 @@ def panda_chain(configuration: np.ndarray, center_x: float = -3.15) -> VGroup:
         Text("tool", color=MUTED, font_size=14).next_to(endpoint, DOWN, buff=0.15),
     )
     return VGroup(links, joints, tool)
+
+
+def sample_index(progress, sample_count: int) -> int:
+    """Map a normalized Manim tracker to the nearest computed sample."""
+    if sample_count < 1:
+        raise ValueError("sample_count must be positive")
+    normalized = min(max(float(progress.get_value()), 0.0), 1.0)
+    return min(int(round(normalized * (sample_count - 1))), sample_count - 1)
+
+
+def sampled_panda_chain(
+    configurations: np.ndarray,
+    progress,
+    center_x: float = -3.15,
+):
+    """Redraw the Panda from an actual computed state at each animation frame."""
+    samples = np.asarray(configurations, dtype=np.float64)
+    if samples.ndim != 2 or samples.shape[1] != 7 or len(samples) < 1:
+        raise ValueError("configurations must have shape (samples, 7)")
+    return always_redraw(
+        lambda: panda_chain(
+            samples[sample_index(progress, len(samples))], center_x=center_x
+        )
+    )
 
 
 def time_cursor(axes, time_value: float, color: str = TEAL) -> DashedLine:

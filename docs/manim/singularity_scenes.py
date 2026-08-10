@@ -18,7 +18,7 @@ from manim import (
     MathTex,
     Scene,
     Text,
-    Transform,
+    ValueTracker,
     VGroup,
     linear,
 )
@@ -38,7 +38,7 @@ from scientific_scene import (  # noqa: E402
     TEAL,
     VIOLATION,
     metric_badge,
-    panda_chain,
+    sampled_panda_chain,
     scientific_legend,
     study_title,
 )
@@ -48,7 +48,7 @@ SINGULARITY_THRESHOLD = 1e-4
 
 
 def _ellipsoid(radii: np.ndarray, scale: float) -> VGroup:
-    """Project the strongest and weakest linear velocity axes into one ellipse."""
+    """Show an abstract singular-value cross-section of the 6D twist ellipsoid."""
     width = max(0.06, 3.8 * float(radii[0]) / scale)
     height = max(0.04, 3.8 * float(radii[-1]) / scale)
     ellipse = Ellipse(
@@ -59,35 +59,35 @@ def _ellipsoid(radii: np.ndarray, scale: float) -> VGroup:
         fill_color=TEAL,
         fill_opacity=0.12,
     ).shift(RIGHT * 3.1 + DOWN * 0.2)
-    strong = MathTex(r"\sigma_{v,\max}", color=TEAL, font_size=20)
-    weak = MathTex(r"\sigma_{v,\min}", color=AMBER, font_size=20)
+    strong = MathTex(r"\sigma_{J,\max}", color=TEAL, font_size=20)
+    weak = MathTex(r"\sigma_{J,\min}", color=AMBER, font_size=20)
     strong.next_to(ellipse, RIGHT, buff=0.12)
     weak.next_to(ellipse, DOWN, buff=0.12)
     return VGroup(ellipse, strong, weak)
 
 
 class PandaManipulabilityCollapse(Scene):
-    """Show loss of linear velocity capability near a singular pose."""
+    """Show the full-Jacobian weakest twist mode collapsing near singularity."""
 
     def construct(self) -> None:
         result = compute_singularity_results()
-        scale = float(np.max(result.ellipsoid_radii))
+        scale = float(np.max(result.singular_values))
         title = study_title(
-            "Velocity capability collapses by direction",
-            "The weakest ellipsoid radius shrinks as the Panda nears singularity",
+            "A full-Jacobian twist mode collapses",
+            "Abstract singular-value cross-section · not a workspace ellipse",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(result.theta[0])
-        final_chain = panda_chain(result.theta[-1])
-        ellipsoid = _ellipsoid(result.ellipsoid_radii[0], scale)
-        final_ellipsoid = _ellipsoid(result.ellipsoid_radii[-1], scale)
-        ratio = result.ellipsoid_radii[-1, -1] / result.ellipsoid_radii[0, -1]
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(result.theta, progress)
+        ellipsoid = _ellipsoid(result.singular_values[0], scale)
+        final_ellipsoid = _ellipsoid(result.singular_values[-1], scale)
+        ratio = result.singular_values[-1, -1] / result.singular_values[0, -1]
         badge = metric_badge("weak-axis retention", f"{100.0 * ratio:.1f}", "%", "warning")
         badge.next_to(final_ellipsoid, DOWN, buff=0.16)
 
         self.add(title, chain, ellipsoid)
         self.play(
-            Transform(chain, final_chain),
-            Transform(ellipsoid, final_ellipsoid),
+            progress.animate.set_value(1.0),
+            ellipsoid.animate.become(final_ellipsoid),
             run_time=3.6,
             rate_func=linear,
         )
@@ -153,13 +153,13 @@ class PandaSingularityMonitor(Scene):
         )
         legend = scientific_legend(
             (("σ min", TEAL, False), ("condition", AMBER, True))
-        ).scale(0.85).next_to(condition_axes, RIGHT, buff=0.10)
+        ).scale(0.72).to_edge(RIGHT, buff=0.35).shift(DOWN * 0.70)
         title = study_title(
             "One path, two conditioning signals",
             "The public 1e-4 threshold marks the near-singular final pose",
         ).to_edge(UP, buff=0.28)
-        chain = panda_chain(result.theta[0])
-        final_chain = panda_chain(result.theta[-1])
+        progress = ValueTracker(0.0)
+        chain = sampled_panda_chain(result.theta, progress)
         final_badge = metric_badge(
             "status",
             "near singular",
@@ -179,7 +179,7 @@ class PandaSingularityMonitor(Scene):
         self.play(
             Create(sigma_curve),
             Create(condition_curve),
-            Transform(chain, final_chain),
+            progress.animate.set_value(1.0),
             run_time=3.55,
             rate_func=linear,
         )

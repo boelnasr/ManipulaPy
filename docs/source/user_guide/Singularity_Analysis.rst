@@ -165,6 +165,15 @@ Basic Singularity Analysis
 Manipulability Ellipsoid Visualization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+The executable study below uses the same public Jacobian path as the animated
+diagnostics:
+
+.. literalinclude:: ../../examples/robotics_motion_studies.py
+   :language: python
+   :start-after: # [singularity-study-start]
+   :end-before: # [singularity-study-end]
+   :caption: Full-Jacobian singularity study used by the figures
+
 .. code-block:: python
 
     import matplotlib.pyplot as plt
@@ -187,9 +196,9 @@ Manipulability Ellipsoid Visualization
     plt.tight_layout()
     plt.show()
 
-The velocity ellipsoid below is computed from the linear-velocity block of the
-Panda space Jacobian. Its radii are singular values, so a shrinking axis means
-the tool is losing velocity capability in that principal direction.
+The diagram below is an abstract singular-value cross-section of the complete
+Panda space Jacobian. It compares the strongest and weakest full-Jacobian
+twist-velocity modes; it is not a spatial projection or a workspace ellipsoid.
 
 .. only:: html and not epub
 
@@ -198,28 +207,29 @@ the tool is losing velocity capability in that principal direction.
       <figure class="mp-tutorial-study">
          <picture>
             <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/singularity/panda_manipulability_collapse.png">
-            <img src="../_static/tutorials/singularity/panda_manipulability_collapse.gif" width="960" height="540" loading="lazy" alt="A Panda arm approaches a near-singular pose while the weakest axis of its linear velocity manipulability ellipsoid contracts.">
+            <img src="../_static/tutorials/singularity/panda_manipulability_collapse.gif" width="960" height="540" loading="lazy" alt="A Panda arm approaches a near-singular pose while an abstract cross-section shows the weakest full-Jacobian twist mode collapsing.">
          </picture>
-         <figcaption>The linear velocity ellipsoid loses capability along its weakest direction.</figcaption>
+         <figcaption>The weakest full-Jacobian twist mode collapses toward singularity.</figcaption>
       </figure>
 
 .. only:: epub
 
    .. figure:: ../_static/tutorials/singularity/panda_manipulability_collapse.png
-      :alt: A Panda arm approaches a near-singular pose while the weakest axis of its linear velocity manipulability ellipsoid contracts.
+      :alt: A Panda arm approaches a near-singular pose while an abstract cross-section shows the weakest full-Jacobian twist mode collapsing.
 
-      The linear velocity ellipsoid loses capability along its weakest direction.
+      The weakest full-Jacobian twist mode collapses toward singularity.
 
 .. only:: latex
 
    .. figure:: ../_static/tutorials/singularity/panda_manipulability_collapse.png
-      :alt: A Panda arm approaches a near-singular pose while the weakest axis of its linear velocity manipulability ellipsoid contracts.
+      :alt: A Panda arm approaches a near-singular pose while an abstract cross-section shows the weakest full-Jacobian twist mode collapsing.
 
-      The linear velocity ellipsoid loses capability along its weakest direction.
+      The weakest full-Jacobian twist mode collapses toward singularity.
 
-**What to notice:** the strongest direction remains available while the weakest
-radius contracts. Singularity is directional; the robot does not lose every
-Cartesian velocity direction at once.
+**What to notice:** the largest singular value remains available while the
+smallest full-Jacobian value crosses the near-singular threshold. The 2D shape
+is deliberately schematic: the associated mode is a six-dimensional twist,
+not a literal direction drawn in the page plane.
 
 Module API Reference
 --------------------

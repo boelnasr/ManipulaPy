@@ -189,7 +189,7 @@ def compute_dynamics_results() -> DynamicsResults:
 
 @dataclass(frozen=True)
 class SingularityResults:
-    """Jacobian spectra and linear velocity ellipsoids along one Panda path."""
+    """Full Jacobian spectra and optional linear-block data along one Panda path."""
 
     time: NDArray[np.float64]
     theta: NDArray[np.float64]
@@ -203,8 +203,9 @@ class SingularityResults:
     threshold: float
 
 
+# [singularity-study-start]
 def compute_singularity_results() -> SingularityResults:
-    """Compute public singularity diagnostics and a linear velocity ellipsoid."""
+    """Compute public singularity diagnostics and Jacobian spectra."""
     fixture = load_panda_fixture()
     theta, _dtheta, _ddtheta = _quintic_reference(MID, NEAR_SINGULAR)
     analysis = Singularity(fixture.serial)
@@ -243,6 +244,7 @@ def compute_singularity_results() -> SingularityResults:
         public_status=np.asarray(statuses, dtype=np.bool_),
         threshold=SINGULARITY_THRESHOLD,
     )
+# [singularity-study-end]
 
 
 @dataclass(frozen=True)
@@ -267,6 +269,7 @@ class PlanningResults:
     nominal_path: NDArray[np.float64]
     corrected_path: NDArray[np.float64]
     obstacle_q: NDArray[np.float64]
+    initial_waypoint_shift: float
     minimum_joint_clearance: float
 
 
@@ -338,6 +341,7 @@ def compute_planning_results() -> PlanningResults:
         planner.plan_trajectory(start_full, goal_full, [obstacle_full]),
     )
     clearances = np.linalg.norm(corrected_full - obstacle_full, axis=1)
+    initial_waypoint_shift = float(np.linalg.norm(corrected_full[0] - start_full))
     minimum_clearance = float(np.min(clearances))
     if not np.allclose(corrected_full[-1], goal_full, atol=1e-8):
         raise CollisionStudyUnavailable("corrected path does not reach the goal")
@@ -356,6 +360,7 @@ def compute_planning_results() -> PlanningResults:
         nominal_path=np.linspace(START, GOAL, 6, dtype=np.float64),
         corrected_path=corrected_full[:, :7],
         obstacle_q=OBSTACLE_Q.copy(),
+        initial_waypoint_shift=initial_waypoint_shift,
         minimum_joint_clearance=minimum_clearance,
     )
 
