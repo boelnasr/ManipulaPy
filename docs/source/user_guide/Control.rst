@@ -263,6 +263,47 @@ Computed Torque Control
        Kp=Kp, Ki=Ki, Kd=Kd
    )
 
+The following experiment applies one Panda joint target under identical plant,
+disturbance, integration, and torque-limit conditions. ``open-loop`` means
+inverse-dynamics feedforward without state feedback; the comparison describes
+this deterministic experiment rather than a universal controller ranking.
+
+.. literalinclude:: ../../examples/robotics_motion_studies.py
+   :language: python
+   :dedent: 0
+   :start-after: # [control-study-start]
+   :end-before: # [control-study-end]
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/control/panda_controller_comparison.png">
+            <img src="../_static/tutorials/control/panda_controller_comparison.gif" width="960" height="540" loading="lazy" alt="Open-loop feedforward, PID, and computed-torque Panda responses track the same joint target under identical disturbance and torque limits.">
+         </picture>
+         <figcaption>Three controllers respond to the same Panda step experiment.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/control/panda_controller_comparison.png
+      :alt: Open-loop feedforward, PID, and computed-torque Panda responses track the same joint target under identical disturbance and torque limits.
+
+      Three controllers respond to the same Panda step experiment.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/control/panda_controller_comparison.png
+      :alt: Open-loop feedforward, PID, and computed-torque Panda responses track the same joint target under identical disturbance and torque limits.
+
+      Three controllers respond to the same Panda step experiment.
+
+**What to notice:** open-loop feedforward cannot correct accumulated state error.
+PID reduces the error using feedback; computed torque also compensates the
+nonlinear model in this specific, torque-limited run.
+
 Feedforward Control
 -------------------
 
@@ -562,6 +603,37 @@ Calculate control performance metrics:
    print(f"Overshoot: {overshoot:.2f}%")
    print(f"Settling Time: {settling_time:.3f}s")
    print(f"Steady-State Error: {steady_error:.4f}")
+
+.. only:: html and not epub
+
+   .. raw:: html
+
+      <figure class="mp-tutorial-study">
+         <picture>
+            <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/control/panda_control_metrics.png">
+            <img src="../_static/tutorials/control/panda_control_metrics.gif" width="960" height="540" loading="lazy" alt="A computed-torque Panda step response is synchronized with its two-percent tolerance band, tracking error, torque effort, rise time, overshoot, settling time, and steady-state error.">
+         </picture>
+         <figcaption>Tracking response, effort, error, and public performance metrics share one timeline.</figcaption>
+      </figure>
+
+.. only:: epub
+
+   .. figure:: ../_static/tutorials/control/panda_control_metrics.png
+      :alt: A computed-torque Panda step response is synchronized with its two-percent tolerance band, tracking error, torque effort, rise time, overshoot, settling time, and steady-state error.
+
+      Tracking response, effort, error, and public performance metrics share one timeline.
+
+.. only:: latex
+
+   .. figure:: ../_static/tutorials/control/panda_control_metrics.png
+      :alt: A computed-torque Panda step response is synchronized with its two-percent tolerance band, tracking error, torque effort, rise time, overshoot, settling time, and steady-state error.
+
+      Tracking response, effort, error, and public performance metrics share one timeline.
+
+**What to notice:** rise time and overshoot describe the transient, settling
+time requires the response to remain inside the ±2% tolerance band, and
+steady-state error uses the final sample. A metric that never becomes defined is
+shown as **not reached**, never as zero.
 
 Cartesian Space Control
 =======================

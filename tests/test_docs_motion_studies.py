@@ -391,3 +391,23 @@ def test_control_results_are_deterministic():
         assert np.array_equal(first.runs[mode].theta, second.runs[mode].theta)
         assert np.array_equal(first.runs[mode].torque, second.runs[mode].torque)
     assert first.metrics == second.metrics
+
+
+def test_control_scenes_and_guide_embed_two_accessible_studies():
+    scenes = (MANIM / "control_scenes.py").read_text(encoding="utf-8")
+    guide = (ROOT / "docs" / "source" / "user_guide" / "Control.rst").read_text(
+        encoding="utf-8"
+    )
+    for scene in ("PandaControllerComparison", "PandaControlMetrics"):
+        assert f"class {scene}(Scene):" in scenes
+    assert "compute_control_results" in scenes
+    assert "not reached" in scenes
+    assert "tolerance" in scenes.lower()
+    for stem in ("panda_controller_comparison", "panda_control_metrics"):
+        assert guide.count(f"{stem}.gif") == 1
+        assert guide.count(f"{stem}.png") == 3
+    assert guide.count("What to notice") >= 2
+    assert guide.count('width="960" height="540"') >= 2
+    assert ":start-after: # [control-study-start]" in guide
+    for metric in ("rise time", "overshoot", "settling time", "steady-state error"):
+        assert metric in guide.lower()
