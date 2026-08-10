@@ -13,7 +13,7 @@
 
 **A modern, GPU-accelerated Python package for robot manipulator kinematics, dynamics, planning, simulation, control, and perception.**
 
-[Quick start](#quick-start) • [Documentation](https://manipulapy.readthedocs.io/) • [Examples](Examples/) • [Changelog](CHANGELOG.md) • [Contributing](CONTRIBUTING.md)
+[Quick start](#quick-start) • [Documentation](https://manipulapy.readthedocs.io/) • [Examples](Examples/) • [Showcase](showcase/) • [Changelog](CHANGELOG.md) • [Contributing](CONTRIBUTING.md)
 
 <img src="https://raw.githubusercontent.com/boelnasr/ManipulaPy/main/docs/source/_static/gifs/ur5_pick_motion.gif" alt="UR5 executing a quintic-timed reach trajectory in PyBullet" width="540">
 
@@ -364,6 +364,7 @@ Full inventory and per-robot details in [`ManipulaPy/ManipulaPy_data/MANIFEST.md
 | **API reference** | [API docs](https://manipulapy.readthedocs.io/en/latest/api/index.html) |
 | **Installation matrix** | [`docs/source/Installation Guide.rst`](docs/source/Installation%20Guide.rst) |
 | **Runnable examples** | [`Examples/`](Examples/) — basic, intermediate, advanced tracks |
+| **Showcase** | [`showcase/`](showcase/) — flagship, shareable demos • [SHOWCASE.md](SHOWCASE.md) — v1.4 writeup |
 | **Package layout** | [README section](#package-layout) |
 | **Release history** | [`CHANGELOG.md`](CHANGELOG.md) |
 
@@ -452,6 +453,10 @@ dT_dtheta = jax.jacrev(robot.forward_kinematics)(theta)
   `jax_enable_x64` unconditionally, so TPU cannot satisfy its contract. This is
   a hardware/precision mismatch, not a tolerance question; supporting TPU needs
   a per-platform precision domain in the backend.
+- **See it in action** — [`showcase/differentiable_reach_showcase.py`](showcase/differentiable_reach_showcase.py)
+  gradient-optimizes a Panda's trajectory around an obstacle by differentiating
+  straight through `forward_kinematics` — an objective with no hand-derived
+  Jacobian. Full writeup in [SHOWCASE.md](SHOWCASE.md).
 - **Core math fixes that affect every backend** — building the gradient contract
   exposed three real defects in the shipped SE(3)/SO(3) code: `MatrixLog6`
   discarded small rotations, log gradients were NaN near the identity, and the
