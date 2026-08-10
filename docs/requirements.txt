@@ -24,7 +24,7 @@ matplotlib>=3.9.0,<4.0.0
 packaging>=26.2
 # Must stay inside Sphinx's own range: Sphinx 8.x requires docutils<0.22, so a
 # >=0.23 floor makes this file unresolvable rather than merely outdated.
-docutils>=0.20,<0.22
+docutils>=0.23,<0.24
 
 # For proper reStructuredText parsing
 Pygments>=2.20.0,<3.0.0
