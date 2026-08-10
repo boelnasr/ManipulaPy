@@ -11,17 +11,19 @@ on NumPy, CuPy, PyTorch, or JAX, and under the two autodiff backends it's
 differentiable.**
 
 ```bash
-pip install "ManipulaPy[jax-cpu]"
+pip install "ManipulaPy[pytorch]"      # or [jax-cpu] / [jax-cuda]
 ```
 
 ```python
 from ManipulaPy.backend import use_backend
-import jax
+import torch
 
-with use_backend("jax"):
-    T = robot.forward_kinematics(theta)   # same call, JAX arrays out
+with use_backend("torch"):
+    theta = torch.tensor(theta0, requires_grad=True)
+    T = robot.forward_kinematics(theta)   # same call, torch Tensor out
+    T[:3, 3].sum().backward()             # exact gradient, from autograd
 
-dT_dtheta = jax.jacrev(robot.forward_kinematics)(theta)   # exact, from autograd
+print(theta.grad)
 ```
 
 ## Why that's a bigger deal than it sounds
@@ -66,13 +68,15 @@ The naive straight-line joint trajectory plows the whole arm through the
 obstacle, not just the fingertip — forearm, wrist and gripper included. The
 script differentiates an objective — "keep every sampled point along the
 kinematic chain outside a combined robot+obstacle margin, stay smooth" —
-straight through every link's forward kinematics with `jax.value_and_grad`,
-and gradient-descends the path clear of it. Nobody wrote a Jacobian for that
-objective; JAX built it from the trace of ordinary ManipulaPy FK calls. It
-converges in about a second on CPU:
+straight through every link's forward kinematics with `torch.autograd`, and
+optimizes with `torch.optim.Adam` — its per-parameter adaptive step size
+converges to a noticeably more natural, minimal detour than hand-rolled
+momentum descent on a loss this sharply localized. Nobody wrote a Jacobian
+for the objective; PyTorch built it from the trace of ordinary ManipulaPy FK
+calls. It converges in under a minute on CPU:
 
 ```bash
-pip install "ManipulaPy[jax-cpu,simulation]"
+pip install "ManipulaPy[pytorch,simulation]"
 python showcase/differentiable_reach_showcase.py
 ```
 
@@ -102,7 +106,7 @@ Full details: [CHANGELOG.md](CHANGELOG.md#140--2026-08-09).
 
 ```bash
 pip install ManipulaPy                 # lightweight core — no GPU, no extras
-pip install "ManipulaPy[jax-cpu]"       # + differentiable backend
+pip install "ManipulaPy[pytorch]"       # + differentiable backend (or [jax-cpu])
 pip install "ManipulaPy[all]"           # everything except JAX GPU/TPU wheels
 ```
 

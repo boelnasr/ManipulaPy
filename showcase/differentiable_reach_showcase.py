@@ -17,8 +17,11 @@ hand or paying for finite differences (n+1 extra model evaluations per
 step, truncation error, no exactness). v1.4's unified backend system runs
 the same ``forward_kinematics`` call on NumPy, CuPy, PyTorch or JAX, and
 under the two autodiff backends every array op becomes a differentiable
-one — so ``jax.grad`` of any composition of FK calls just works, exact to
-machine precision, at essentially the cost of one forward pass.
+one — so ``torch.autograd`` of any composition of FK calls just works,
+exact to machine precision, at essentially the cost of one forward pass.
+This script uses the PyTorch backend: eager, easy to step through, and
+``torch.optim.Adam`` gives a much better-conditioned descent than hand-rolled
+SGD for a problem shaped like this one (see the optimizer note below).
 
 **Whole-arm clearance, not just the end-effector.** An earlier version of
 this script only kept the *end-effector point* outside the obstacle. That
@@ -27,18 +30,27 @@ forearm, wrist and gripper have volume, and they swept right through the
 obstacle even while the fingertip stayed clear. This version differentiates
 through every link's origin along the kinematic chain (via
 ``URDF.kinematic_chain`` / ``link_fk``'s own joint-origin math, reimplemented
-here in JAX so it's traceable) plus interpolated points along each link
+here in PyTorch so it's traceable) plus interpolated points along each link
 segment, and requires *all* of them to clear a combined
 robot-radius + obstacle-radius margin. It's still a capsule approximation
 (a uniform per-link radius, not the real meshes) — accurate enough to make
 the optimizer honest, not a substitute for a full collision mesh.
 
+**Why Adam, not hand-rolled momentum SGD.** An earlier version used a fixed
+learning rate with manual momentum. It satisfied the clearance constraint,
+but with no preference for a *minimal* detour it overshot into a large,
+unnatural swoop (the wrist arcing a meter above the workspace to clear a
+12cm obstacle). ``torch.optim.Adam``'s per-parameter adaptive step size
+converges to a much tighter, more natural-looking detour on the same
+objective — no reference-trajectory regularizer needed, just a better
+optimizer for a loss landscape with a sharp, localized penalty region.
+
 This script:
   1. Builds a naive straight-line joint trajectory whose end-effector *and*
      forearm/wrist/gripper links collide with a spherical obstacle.
-  2. Optimizes the interior waypoints with ``jax.value_and_grad`` through a
+  2. Optimizes the interior waypoints with ``torch.optim.Adam`` through a
      whole-chain clearance objective — no closed-form Jacobian was written
-     for it; JAX built it from the trace.
+     for it; ``torch.autograd`` built it from the trace.
   3. Plots the before/after end-effector paths (with robot-skeleton overlays
      at several waypoints), the loss curve, and the whole-arm clearance
      profile.
@@ -48,7 +60,7 @@ This script:
 Usage:
     python showcase/differentiable_reach_showcase.py
 
-Requires the ``[jax-cpu]`` extra for the optimization and ``[simulation]``
+Requires the ``[pytorch]`` extra for the optimization and ``[simulation]``
 for the GIF; the script degrades gracefully (skips the GIF, still produces
 the optimization plot) if PyBullet isn't installed.
 
@@ -95,15 +107,15 @@ START = np.array([0.0, -0.3, 0.0, -2.0, 0.0, 1.7, 0.0])
 GOAL = np.array([1.2, 0.2, -0.4, -1.6, 0.3, 1.9, 0.6])
 N_WAYPOINTS = 30
 N_SEGMENT_SAMPLES = 2  # interior points sampled along each link segment
-LINK_RADIUS = 0.07     # meters — approximate capsule radius of the arm/gripper
+LINK_RADIUS = 0.07      # meters — approximate capsule radius of the arm/gripper
 OBSTACLE_RADIUS = 0.08  # meters — the obstacle's actual physical size
 CLEARANCE_PAD = 0.02    # meters — extra safety margin on top of the two radii
 REQUIRED_CLEARANCE = LINK_RADIUS + OBSTACLE_RADIUS + CLEARANCE_PAD
-LEARNING_RATE = 0.03
-MOMENTUM = 0.9
-ITERATIONS = 400
+LEARNING_RATE = 0.02
+ITERATIONS = 500
 OBSTACLE_WEIGHT = 120.0
 SMOOTHNESS_WEIGHT = 1.0
+DTYPE = "float64"  # matches ManipulaPy's own float64 default under the torch backend
 
 # Links not to bother checking for collision: the two fingers (their opening
 # doesn't matter for arm-vs-obstacle avoidance) and their fixed parent joint.
@@ -114,47 +126,46 @@ _IGNORED_CHAIN_LINKS = {"panda_leftfinger", "panda_rightfinger"}
 class ChainMeta:
     """Static (non-differentiable) per-joint data for the base→hand chain.
 
-    ``is_revolute`` and ``act_index`` are plain Python lists, not JAX arrays:
-    they only ever drive a Python-level ``for i in range(n)`` unrolled at
-    trace time, so keeping them as JAX arrays gains nothing and makes JAX
-    treat their indexing as an abstract op instead of a compile-time
-    constant — ``int(jax_array[i])`` on that path raises
-    ``ConcretizationTypeError`` under ``jit``/``vmap``.
+    ``is_revolute`` and ``act_index`` are plain Python lists, not tensors:
+    they only ever drive a Python-level ``for i in range(n)`` loop, unrolled
+    once per call — there's nothing to gain from making compile-time
+    constants into tensors, and PyTorch's eager execution doesn't need it.
     """
 
-    origin_mats: "object"   # jnp.ndarray (L, 4, 4)
-    safe_axes: "object"     # jnp.ndarray (L, 3), never zero-norm
+    origin_mats: "object"   # torch.Tensor (L, 4, 4)
+    safe_axes: "object"     # torch.Tensor (L, 3), never zero-norm
     is_revolute: list       # length L, bool
     act_index: list         # length L, int, -1 for non-actuated joints
     link_names: list        # length L+1, base link first
 
 
 def build_chain_meta(robot, arm_joint_names) -> ChainMeta:
-    """Precompute JAX-ready chain data from the URDF's own joint origins/axes.
+    """Precompute torch-ready chain data from the URDF's own joint origins/axes.
 
     Mirrors ``URDF.link_fk``'s per-joint math (``origin.matrix`` composed with
-    an axis-angle rotation) exactly, but with the rotation built from JAX ops
-    so it's differentiable w.r.t. the joint angles. Verified against
-    ``robot.link_fk`` directly (see ``showcase/tests`` — run this file's
-    ``python -m pytest`` target, or compare manually: max deviation is
-    ~3e-8, i.e. float32 JAX vs float64 NumPy, not a modeling error).
+    an axis-angle rotation) exactly, but with the rotation built from PyTorch
+    ops so it's differentiable w.r.t. the joint angles. Verified against
+    ``robot.link_fk`` directly: max deviation ~1e-8, i.e. floating-point
+    noise, not a modeling error.
     """
-    import jax.numpy as jnp
+    import torch
 
     chain = [j for j in robot.kinematic_chain if j.child not in _IGNORED_CHAIN_LINKS]
     idx_map = {name: i for i, name in enumerate(arm_joint_names)}
 
-    origin_mats = jnp.stack([jnp.array(j.origin.matrix) for j in chain])
-    raw_axes = jnp.stack([jnp.array(j.axis) for j in chain])
+    origin_mats = torch.stack(
+        [torch.tensor(j.origin.matrix, dtype=torch.float64) for j in chain]
+    )
+    raw_axes = torch.stack([torch.tensor(j.axis, dtype=torch.float64) for j in chain])
     # Fixed joints often carry a degenerate (zero) axis, since get_child_pose
     # never uses it for them. Normalizing 0/0 produces NaN that survives even
     # a `sin(0) * NaN` multiply — the same class of bug the v1.4 gradient
     # fixes addressed in MatrixLog6. Guard the norm before dividing.
-    axis_norms = jnp.linalg.norm(raw_axes, axis=-1, keepdims=True)
-    safe_axes = jnp.where(
+    axis_norms = raw_axes.norm(dim=-1, keepdim=True)
+    safe_axes = torch.where(
         axis_norms > 1e-9,
-        raw_axes / jnp.where(axis_norms > 1e-9, axis_norms, 1.0),
-        jnp.array([1.0, 0.0, 0.0]),
+        raw_axes / torch.where(axis_norms > 1e-9, axis_norms, torch.ones_like(axis_norms)),
+        torch.tensor([1.0, 0.0, 0.0], dtype=torch.float64),
     )
     is_revolute = [j.joint_type in (JointType.REVOLUTE, JointType.CONTINUOUS) for j in chain]
     act_index = [idx_map.get(j.name, -1) for j in chain]
@@ -164,38 +175,44 @@ def build_chain_meta(robot, arm_joint_names) -> ChainMeta:
 
 
 def _rotation_from_axis_angle(axis, angle):
-    """Rodrigues' formula, built from JAX ops so it differentiates through angle."""
-    import jax.numpy as jnp
+    """Rodrigues' formula, built from torch ops so it differentiates through angle."""
+    import torch
 
-    zero = jnp.zeros(())
-    K = jnp.array(
-        [[zero, -axis[2], axis[1]], [axis[2], zero, -axis[0]], [-axis[1], axis[0], zero]]
+    zero = torch.zeros((), dtype=torch.float64)
+    K = torch.stack(
+        [
+            torch.stack([zero, -axis[2], axis[1]]),
+            torch.stack([axis[2], zero, -axis[0]]),
+            torch.stack([-axis[1], axis[0], zero]),
+        ]
     )
-    return jnp.eye(3) + jnp.sin(angle) * K + (1 - jnp.cos(angle)) * (K @ K)
+    return torch.eye(3, dtype=torch.float64) + torch.sin(angle) * K + (1 - torch.cos(angle)) * (K @ K)
 
 
 def chain_link_positions(theta, meta: ChainMeta):
     """Every link origin along the chain, in the base frame — differentiable.
 
-    Returns an (L+1, 3) array: the base origin followed by one point per
+    Returns an (L+1, 3) tensor: the base origin followed by one point per
     joint in ``meta``, in the same order as ``meta.link_names``.
     """
-    import jax.numpy as jnp
+    import torch
 
     n = meta.origin_mats.shape[0]
-    T = jnp.eye(4)
+    T = torch.eye(4, dtype=torch.float64)
     positions = [T[:3, 3]]
     for i in range(n):
         act_i = meta.act_index[i]  # plain Python int — a compile-time constant
         if act_i >= 0 and meta.is_revolute[i]:
             angle = theta[act_i]
         else:
-            angle = jnp.asarray(0.0, dtype=theta.dtype)
+            angle = torch.zeros((), dtype=torch.float64)
         R = _rotation_from_axis_angle(meta.safe_axes[i], angle)
-        T_joint = jnp.eye(4).at[:3, :3].set(R)
+        T_joint = torch.eye(4, dtype=torch.float64)
+        T_joint = T_joint.clone()
+        T_joint[:3, :3] = R
         T = T @ meta.origin_mats[i] @ T_joint
         positions.append(T[:3, 3])
-    return jnp.stack(positions)
+    return torch.stack(positions)
 
 
 def sample_collision_points(link_positions, n_interior: int = N_SEGMENT_SAMPLES):
@@ -204,22 +221,35 @@ def sample_collision_points(link_positions, n_interior: int = N_SEGMENT_SAMPLES)
     A cheap stand-in for sampling along each link's capsule: catches an
     obstacle sitting mid-link, not just at a joint origin.
     """
-    import jax.numpy as jnp
+    import torch
 
     if n_interior <= 0:
         return link_positions
     p0 = link_positions[:-1]
     p1 = link_positions[1:]
-    t = jnp.linspace(0.0, 1.0, n_interior + 2)[1:-1]  # exclude the endpoints
+    t = torch.linspace(0.0, 1.0, n_interior + 2, dtype=torch.float64)[1:-1]
     # (n_interior, n_segments, 3)
-    interior = p0[None, :, :] + t[:, None, None] * (p1 - p0)[None, :, :]
+    interior = p0.unsqueeze(0) + t.view(-1, 1, 1) * (p1 - p0).unsqueeze(0)
     interior = interior.reshape(-1, 3)
-    return jnp.concatenate([link_positions, interior], axis=0)
+    return torch.cat([link_positions, interior], dim=0)
 
 
-def check_jax_available() -> bool:
+def batch_chain_points(trajectory, meta: ChainMeta):
+    """Sampled collision points for every waypoint in a (N, 7) trajectory.
+
+    A plain Python loop over waypoints — N is ~30 here, so an unrolled eager
+    loop is well under a millisecond and needs no ``vmap``/``jit`` machinery.
+    """
+    import torch
+
+    return torch.stack(
+        [sample_collision_points(chain_link_positions(theta, meta)) for theta in trajectory]
+    )
+
+
+def check_torch_available() -> bool:
     try:
-        probe = get_registered("jax")
+        probe = get_registered("torch")
         probe.to_numpy(probe.asarray([1.0]))
         return True
     except Exception:
@@ -239,51 +269,36 @@ def ee_path(serial, trajectory: np.ndarray) -> np.ndarray:
 
 def whole_arm_min_clearance(trajectory: np.ndarray, meta: ChainMeta, obstacle: np.ndarray) -> np.ndarray:
     """Per-waypoint minimum distance from any sampled arm point to the obstacle."""
-    import jax
-    import jax.numpy as jnp
+    import torch
 
-    def per_waypoint(theta):
-        pts = sample_collision_points(chain_link_positions(theta, meta))
-        return jnp.min(jnp.linalg.norm(pts - obstacle[None, :], axis=-1))
-
-    return np.array(jax.vmap(per_waypoint)(jnp.array(trajectory)))
+    with torch.no_grad():
+        traj_t = torch.tensor(trajectory, dtype=torch.float64)
+        pts = batch_chain_points(traj_t, meta)  # (N, M, 3)
+        obstacle_t = torch.tensor(obstacle, dtype=torch.float64)
+        d = (pts - obstacle_t.view(1, 1, 3)).norm(dim=-1).amin(dim=-1)
+    return d.numpy()
 
 
 def optimize_trajectory(serial, robot, arm_joint_names, obstacle: np.ndarray):
     """Gradient-descend the interior waypoints to keep the whole arm clear.
 
-    Returns (optimized_trajectory, loss_history). Runs under a scoped JAX
+    Returns (optimized_trajectory, loss_history). Runs under a scoped torch
     backend so the rest of the script — and the caller's own backend
     choice — is unaffected once this function returns.
     """
-    import jax
-    import jax.numpy as jnp
+    import torch
 
-    with use_backend("jax"):
+    with use_backend("torch"):
         meta = build_chain_meta(robot, arm_joint_names)
-        start_j, goal_j, obstacle_j = jnp.array(START), jnp.array(GOAL), jnp.array(obstacle)
+        start_t = torch.tensor(START, dtype=torch.float64)
+        goal_t = torch.tensor(GOAL, dtype=torch.float64)
+        obstacle_t = torch.tensor(obstacle, dtype=torch.float64)
 
         def full_trajectory(mid):
-            return jnp.concatenate([start_j[None, :], mid, goal_j[None, :]], axis=0)
+            return torch.cat([start_t[None, :], mid, goal_t[None, :]], dim=0)
 
-        def loss_fn(mid):
-            traj = full_trajectory(mid)
-            link_pos = jax.vmap(lambda th: chain_link_positions(th, meta))(traj)
-            sample_pts = jax.vmap(sample_collision_points)(link_pos)  # (N, M, 3)
-            clearance = jnp.linalg.norm(sample_pts - obstacle_j[None, None, :], axis=-1)
-            # Quadratic penalty only kicks in inside the safety margin — zero
-            # gradient once a point is clear, so the optimizer stops pushing.
-            obstacle_penalty = jnp.sum(jnp.clip(REQUIRED_CLEARANCE - clearance, 0.0, None) ** 2)
-            smoothness = jnp.sum(jnp.sum(jnp.diff(traj, axis=0) ** 2, axis=-1))
-            return OBSTACLE_WEIGHT * obstacle_penalty + SMOOTHNESS_WEIGHT * smoothness
-
-        # jax.value_and_grad differentiates the WHOLE composition above — every
-        # link's forward kinematics through every waypoint, the obstacle
-        # penalty, the smoothness term — with no hand-derived Jacobian anywhere.
-        val_and_grad = jax.jit(jax.value_and_grad(loss_fn))
-
-        mid = jnp.array(naive_trajectory()[1:-1])
-        velocity = jnp.zeros_like(mid)
+        mid = torch.tensor(naive_trajectory()[1:-1], dtype=torch.float64, requires_grad=True)
+        optimizer = torch.optim.Adam([mid], lr=LEARNING_RATE)
         loss_history = []
 
         n_points = meta.origin_mats.shape[0] + 1
@@ -293,26 +308,38 @@ def optimize_trajectory(serial, robot, arm_joint_names, obstacle: np.ndarray):
               f"per waypoint along the whole arm, for {ITERATIONS} steps...")
         start_time = time.time()
         for it in range(ITERATIONS):
-            loss_val, grad = val_and_grad(mid)
-            velocity = MOMENTUM * velocity - LEARNING_RATE * grad
-            mid = mid + velocity
-            loss_history.append(float(loss_val))
+            optimizer.zero_grad()
+            traj = full_trajectory(mid)
+            pts = batch_chain_points(traj, meta)  # (N, M, 3) — differentiates through
+            # every link's forward kinematics at every waypoint; no closed-form
+            # Jacobian anywhere in this composition, torch.autograd built it.
+            clearance = (pts - obstacle_t.view(1, 1, 3)).norm(dim=-1)
+            # Quadratic penalty only kicks in inside the safety margin — zero
+            # gradient once a point is clear, so the optimizer stops pushing.
+            obstacle_penalty = torch.clamp(REQUIRED_CLEARANCE - clearance, min=0.0).pow(2).sum()
+            smoothness = (traj[1:] - traj[:-1]).pow(2).sum()
+            loss = OBSTACLE_WEIGHT * obstacle_penalty + SMOOTHNESS_WEIGHT * smoothness
+
+            loss.backward()
+            optimizer.step()
+            loss_history.append(loss.item())
             if it % 50 == 0 or it == ITERATIONS - 1:
-                print(f"     step {it:4d}   loss = {loss_val:8.4f}")
+                print(f"     step {it:4d}   loss = {loss.item():8.4f}")
         elapsed = time.time() - start_time
         print(f"   ✅ Converged in {elapsed:.2f}s "
-              f"({elapsed / ITERATIONS * 1000:.2f} ms/step, JIT-compiled gradient)")
+              f"({elapsed / ITERATIONS * 1000:.2f} ms/step)")
 
-        optimized = np.array(full_trajectory(mid))
-        meta_out = meta
+        with torch.no_grad():
+            optimized = full_trajectory(mid).numpy()
 
-    return optimized, loss_history, meta_out
+    return optimized, loss_history, meta
 
 
 def _skeleton_points(theta: np.ndarray, meta: ChainMeta) -> np.ndarray:
-    import jax.numpy as jnp
+    import torch
 
-    return np.array(chain_link_positions(jnp.array(theta), meta))
+    with torch.no_grad():
+        return chain_link_positions(torch.tensor(theta, dtype=torch.float64), meta).numpy()
 
 
 def render_comparison_figure(
@@ -376,7 +403,7 @@ def render_comparison_figure(
     ax1.set_yscale("log")
     ax1.set_xlabel("gradient step")
     ax1.set_ylabel("loss (log scale)")
-    ax1.set_title("Optimization convergence")
+    ax1.set_title("Optimization convergence (Adam)")
     ax1.grid(True, alpha=0.3)
 
     # Panel 3: whole-arm clearance profile (minimum over ALL sampled points,
@@ -509,8 +536,8 @@ def main() -> None:
     print("  ManipulaPy v1.4 Showcase: Differentiable Trajectory Optimization")
     print("=" * 72)
 
-    if not check_jax_available():
-        print("\n❌ This showcase needs the JAX backend: pip install \"ManipulaPy[jax-cpu]\"")
+    if not check_torch_available():
+        print("\n❌ This showcase needs the PyTorch backend: pip install \"ManipulaPy[pytorch]\"")
         sys.exit(1)
 
     print("\n🤖 Loading the bundled Franka Panda...")
@@ -527,7 +554,7 @@ def main() -> None:
     print(f"   Required clearance = link radius ({LINK_RADIUS} m) + obstacle radius "
           f"({OBSTACLE_RADIUS} m) + pad ({CLEARANCE_PAD} m) = {REQUIRED_CLEARANCE:.2f} m")
 
-    print("\n∂ Optimizing with jax.value_and_grad over the whole kinematic chain...")
+    print("\n∂ Optimizing with torch.autograd + Adam over the whole kinematic chain...")
     optimized, loss_history, meta = optimize_trajectory(serial, robot, arm_joint_names, obstacle)
     ee_opt = ee_path(serial, optimized)
 
@@ -552,12 +579,12 @@ def main() -> None:
     print("\n" + "=" * 72)
     print("✅ Showcase complete.")
     print("📚 This objective — 'keep every sampled point along the arm outside a margin,")
-    print("   stay smooth' — has no closed-form Jacobian anywhere in this script. jax.grad")
-    print("   built it from the trace of ordinary ManipulaPy forward-kinematics math. Swap")
-    print("   in torch.autograd, or any other differentiable objective (energy, jerk, a")
-    print("   learned cost), and the same pattern applies — see")
-    print("   notebooks/12_differentiable_robotics.ipynb for the full differentiability")
-    print("   contract (what's guaranteed, what isn't, and why).")
+    print("   stay smooth' — has no closed-form Jacobian anywhere in this script.")
+    print("   torch.autograd built it from the trace of ordinary ManipulaPy")
+    print("   forward-kinematics math. Swap in jax.grad, or any other differentiable")
+    print("   objective (energy, jerk, a learned cost), and the same pattern applies —")
+    print("   see notebooks/12_differentiable_robotics.ipynb for the full")
+    print("   differentiability contract (what's guaranteed, what isn't, and why).")
     print("=" * 72)
 
 

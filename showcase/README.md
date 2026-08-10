@@ -27,12 +27,15 @@ accurate enough to keep the optimizer honest, not a substitute for one.
 That's the pitch for ManipulaPy v1.4's unified backend system: the same
 `forward_kinematics` call runs on NumPy, CuPy, PyTorch, or JAX, and under the
 two autodiff backends every array op it does becomes a differentiable one.
-`jax.grad`/`jax.value_and_grad` of *any* composition of FK calls just works —
-exact to machine precision, no finite differences, no second implementation
-to keep in sync with the first.
+The script uses the PyTorch backend — `torch.autograd` of *any* composition
+of FK calls just works, exact to machine precision, no finite differences, no
+second implementation to keep in sync with the first — and optimizes with
+`torch.optim.Adam`, whose per-parameter adaptive step size converges to a
+noticeably more natural, minimal detour than hand-rolled momentum SGD on this
+kind of sharply-localized obstacle penalty.
 
 ```bash
-pip install "ManipulaPy[jax-cpu,simulation]"
+pip install "ManipulaPy[pytorch,simulation]"
 python showcase/differentiable_reach_showcase.py
 ```
 
@@ -42,10 +45,12 @@ Produces:
 - `differentiable_reach_showcase.gif` — the optimized motion, rendered
   headlessly through PyBullet (no GPU or display needed).
 
-Runs in under a second of optimization time on CPU (JAX JIT-compiles the
-gradient once, then it's ~3 ms/step for a 28-waypoint, 7-DOF trajectory). No
-GPU required for the demo itself; swap `use_backend("jax")` for a CUDA-backed
-JAX install and the identical code traces onto the GPU.
+Runs in under a minute on CPU (eager PyTorch, no GPU required for the demo
+itself). The same pattern — differentiate an objective through
+`forward_kinematics` — works identically with `jax.grad` under
+`use_backend("jax")`; see
+[`notebooks/12_differentiable_robotics.ipynb`](../notebooks/12_differentiable_robotics.ipynb)
+for that version and for JIT-compiled, sub-second timings.
 
 The differentiable contract this relies on — which modules carry a gradient
 guarantee and which don't — is documented in depth in
