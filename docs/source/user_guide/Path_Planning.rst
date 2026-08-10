@@ -895,9 +895,12 @@ Optimized trajectory planning for industrial pick-and-place operations:
    pick_place_traj, segments = optimized_pick_and_place()
 
 The public potential field accepts obstacles as joint configurations. This
-example keeps the Panda gripper fixed, corrects the seven arm joints, and
-measures Euclidean joint-space clearance in radians. It does not portray the
-configuration-space obstacle as physical workspace geometry.
+example keeps the Panda gripper fixed, corrects six sampled arm configurations,
+and measures Euclidean joint-space waypoint clearance in radians. The public
+call does not certify between-waypoint interpolation; run a collision checker
+on any trajectory reconstructed from these samples. The figure therefore shows
+corrected samples rather than claiming a continuously safe path. This
+joint-space obstacle is not portrayed as physical workspace geometry.
 
 .. only:: html and not epub
 
@@ -908,7 +911,7 @@ configuration-space obstacle as physical workspace geometry.
             <source media="(prefers-reduced-motion: reduce)" srcset="../_static/tutorials/path_planning/panda_collision_correction.png">
             <img src="../_static/tutorials/path_planning/panda_collision_correction.gif" width="960" height="540" loading="lazy" alt="A nominal Panda joint-space path intersects a configuration exclusion region, then a public potential field moves six waypoints outside a 0.20-radian clearance margin.">
          </picture>
-         <figcaption>A potential field corrects the nominal path around a joint-space obstacle.</figcaption>
+         <figcaption>A potential field shifts sampled joint configurations away from an obstacle.</figcaption>
       </figure>
 
 .. only:: epub
@@ -916,18 +919,20 @@ configuration-space obstacle as physical workspace geometry.
    .. figure:: ../_static/tutorials/path_planning/panda_collision_correction.png
       :alt: A nominal Panda joint-space path intersects a configuration exclusion region, then a public potential field moves six waypoints outside a 0.20-radian clearance margin.
 
-      A potential field corrects the nominal path around a joint-space obstacle.
+      A potential field shifts sampled joint configurations away from an obstacle.
 
 .. only:: latex
 
    .. figure:: ../_static/tutorials/path_planning/panda_collision_correction.png
       :alt: A nominal Panda joint-space path intersects a configuration exclusion region, then a public potential field moves six waypoints outside a 0.20-radian clearance margin.
 
-      A potential field corrects the nominal path around a joint-space obstacle.
+      A potential field shifts sampled joint configurations away from an obstacle.
 
-**What to notice:** the faint nominal path passes through the exclusion region;
-the corrected waypoints retain the same start and goal while the independently
-measured minimum joint-space distance stays above 0.20 rad.
+**What to notice:** the faint nominal interpolation passes through the exclusion
+region; the corrected samples retain the same start and goal while the
+independently measured minimum waypoint distance stays above 0.20 rad. This
+does not certify between-waypoint interpolation, which must be checked
+separately before execution.
 
 Multi-Robot Trajectory Coordination
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

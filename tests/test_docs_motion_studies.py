@@ -342,6 +342,13 @@ def test_planning_scenes_and_guide_embed_three_accessible_studies():
     ):
         assert f"class {scene}(Scene):" in scenes
     assert "compute_planning_results" in scenes
+    assert "def _polyline(" in scenes
+    assert "set_points_as_corners" in scenes
+    assert "plot_line_graph" not in scenes
+    assert "projection = (1, 6)" in scenes
+    assert '"joint 2 [rad]"' in scenes
+    assert '"joint 7 [rad]"' in scenes
+    assert '"minimum waypoint clearance"' in scenes
     assert "0.20 rad" in scenes
     assert "joint-space" in scenes.lower()
     for stem in (
@@ -355,6 +362,7 @@ def test_planning_scenes_and_guide_embed_three_accessible_studies():
     assert guide.count('width="960" height="540"') >= 3
     assert ":start-after: # [planning-study-start]" in guide
     assert "joint-space obstacle" in guide.lower()
+    assert "does not certify between-waypoint interpolation" in guide.lower()
 
 
 def test_control_runs_share_conditions_and_report_public_metrics():
@@ -401,6 +409,9 @@ def test_control_scenes_and_guide_embed_two_accessible_studies():
     for scene in ("PandaControllerComparison", "PandaControlMetrics"):
         assert f"class {scene}(Scene):" in scenes
     assert "compute_control_results" in scenes
+    assert "def _polyline(" in scenes
+    assert "set_points_as_corners" in scenes
+    assert "plot_line_graph" not in scenes
     assert "not reached" in scenes
     assert "tolerance" in scenes.lower()
     for stem in ("panda_controller_comparison", "panda_control_metrics"):
@@ -411,3 +422,12 @@ def test_control_scenes_and_guide_embed_two_accessible_studies():
     assert ":start-after: # [control-study-start]" in guide
     for metric in ("rise time", "overshoot", "settling time", "steady-state error"):
         assert metric in guide.lower()
+
+
+def test_committed_motion_study_media_pairs_are_valid():
+    renderer = load_motion_renderer()
+    for scene in renderer.SCENES.values():
+        gif = renderer._asset_path(scene, ".gif")
+        png = renderer._asset_path(scene, ".png")
+        renderer._validate_media_pair(gif, png)
+    renderer._validate_total_gif_budget()

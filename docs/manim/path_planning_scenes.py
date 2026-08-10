@@ -22,6 +22,7 @@ from manim import (
     Text,
     Transform,
     VGroup,
+    VMobject,
     linear,
 )
 
@@ -46,6 +47,23 @@ from scientific_scene import (  # noqa: E402
 )
 
 
+def _polyline(
+    axes: Axes,
+    x_values: np.ndarray,
+    y_values: np.ndarray,
+    color: str,
+    stroke_width: float,
+) -> VMobject:
+    """Build one continuous vector path through scientific samples."""
+    points = [
+        axes.coords_to_point(float(x), float(y))
+        for x, y in zip(x_values, y_values)
+    ]
+    return VMobject(color=color, stroke_width=stroke_width).set_points_as_corners(
+        points
+    )
+
+
 def _mini_plot(
     time: np.ndarray,
     cubic: np.ndarray,
@@ -62,22 +80,9 @@ def _mini_plot(
         axis_config={"color": RULE, "stroke_width": 1.1, "font_size": 11},
     )
     cubic_line = DashedVMobject(
-        axes.plot_line_graph(
-            time,
-            cubic,
-            add_vertex_dots=False,
-            line_color=AMBER,
-            stroke_width=2.0,
-        ),
-        num_dashes=30,
+        _polyline(axes, time, cubic, AMBER, 2.0), num_dashes=30
     )
-    quintic_line = axes.plot_line_graph(
-        time,
-        quintic,
-        add_vertex_dots=False,
-        line_color=TEAL,
-        stroke_width=2.4,
-    )
+    quintic_line = _polyline(axes, time, quintic, TEAL, 2.4)
     name = Text(label, color=MUTED, font_size=13).next_to(axes, UP, buff=0.05)
     return VGroup(axes, cubic_line, quintic_line, name)
 
@@ -153,21 +158,21 @@ class PandaInterpolationDomains(Scene):
             axis_config={"color": RULE, "stroke_width": 1.3, "font_size": 14},
         ).shift(RIGHT * 2.35 + DOWN * 0.35)
         joint_curve = DashedVMobject(
-            axes.plot_line_graph(
+            _polyline(
+                axes,
                 result.joint_tool_path[:, 0],
                 result.joint_tool_path[:, 1],
-                add_vertex_dots=False,
-                line_color=AMBER,
-                stroke_width=3,
+                AMBER,
+                3,
             ),
             num_dashes=36,
         )
-        cartesian_curve = axes.plot_line_graph(
+        cartesian_curve = _polyline(
+            axes,
             result.cartesian_tool_path[:, 0],
             result.cartesian_tool_path[:, 1],
-            add_vertex_dots=False,
-            line_color=TEAL,
-            stroke_width=3,
+            TEAL,
+            3,
         )
         endpoints = VGroup(
             Dot(axes.coords_to_point(*result.joint_tool_path[0, :2]), color=INK),
@@ -207,30 +212,34 @@ class PandaCollisionCorrection(Scene):
 
     def construct(self) -> None:
         result = compute_planning_results()
+        projection = (1, 6)
         axes = Axes(
-            x_range=[-0.7, 0.3, 0.2],
-            y_range=[-0.5, 0.5, 0.2],
+            x_range=[-0.4, 0.4, 0.2],
+            y_range=[-0.6, 1.0, 0.4],
             x_length=6.0,
             y_length=4.0,
             tips=False,
             axis_config={"color": RULE, "stroke_width": 1.3, "font_size": 14},
         ).shift(RIGHT * 2.4 + DOWN * 0.35)
         nominal = DashedVMobject(
-            axes.plot_line_graph(
-                result.nominal_path[:, 0],
-                result.nominal_path[:, 1],
-                add_vertex_dots=False,
-                line_color=MUTED,
-                stroke_width=2.2,
+            _polyline(
+                axes,
+                result.nominal_path[:, projection[0]],
+                result.nominal_path[:, projection[1]],
+                MUTED,
+                2.2,
             ),
             num_dashes=24,
         )
-        corrected = axes.plot_line_graph(
-            result.corrected_path[:, 0],
-            result.corrected_path[:, 1],
-            add_vertex_dots=True,
-            line_color=TEAL,
-            stroke_width=3,
+        corrected_dots = VGroup(
+            *(
+                Dot(
+                    axes.coords_to_point(*point[list(projection)]),
+                    color=TEAL,
+                    radius=0.035,
+                )
+                for point in result.corrected_path
+            )
         )
         obstacle = Ellipse(
             width=2.0 * 0.20 * axes.x_axis.unit_size,
@@ -239,33 +248,54 @@ class PandaCollisionCorrection(Scene):
             fill_color=VIOLATION,
             fill_opacity=0.12,
             stroke_width=2,
-        ).move_to(axes.coords_to_point(*result.obstacle_q[:2]))
+        ).move_to(axes.coords_to_point(*result.obstacle_q[list(projection)]))
         obstacle_label = Text(
-            "joint-space exclusion · 0.20 rad",
+            "waypoint exclusion · 0.20 rad",
             color=VIOLATION,
             font_size=14,
         ).next_to(obstacle, UP, buff=0.08)
         title = study_title(
-            "Potential fields correct a joint-space path",
-            "The obstacle is a configuration-space input, not workspace geometry",
+            "Potential fields shift colliding waypoints",
+            "q2–q7 projection · sampled configurations, not workspace geometry",
         ).to_edge(UP, buff=0.28)
         chain = panda_chain(result.nominal_path[0])
         final_chain = panda_chain(result.corrected_path[-1])
         badge = metric_badge(
-            "minimum clearance",
+            "minimum waypoint clearance",
             f"{result.minimum_joint_clearance:.3f}",
             "rad",
         ).next_to(axes, DOWN, buff=0.10).align_to(axes, RIGHT)
         legend = scientific_legend(
-            (("nominal", MUTED, True), ("corrected", TEAL, False))
+            (("nominal interpolation", MUTED, True), ("corrected samples", TEAL, False))
         ).next_to(axes, UP, buff=0.12).align_to(axes, RIGHT)
+        labels = VGroup(
+            Text("joint 2 [rad]", color=MUTED, font_size=14).next_to(
+                axes.x_axis, DOWN, buff=0.12
+            ),
+            Text("joint 7 [rad]", color=MUTED, font_size=14)
+            .rotate(np.pi / 2)
+            .next_to(axes.y_axis, LEFT, buff=0.12),
+        )
 
-        self.add(title, chain, axes, nominal, obstacle, obstacle_label, legend)
+        self.add(
+            title,
+            chain,
+            axes,
+            labels,
+            nominal,
+            obstacle,
+            obstacle_label,
+            legend,
+        )
         self.play(
-            Create(corrected),
+            FadeIn(corrected_dots),
             Transform(chain, final_chain),
             run_time=3.6,
             rate_func=linear,
         )
-        self.play(FadeIn(badge), run_time=0.35, rate_func=linear)
+        self.play(
+            FadeIn(badge),
+            run_time=0.35,
+            rate_func=linear,
+        )
         self.wait(0.35)

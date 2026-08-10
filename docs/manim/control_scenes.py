@@ -20,6 +20,7 @@ from manim import (
     Text,
     Transform,
     VGroup,
+    VMobject,
     linear,
 )
 
@@ -48,6 +49,23 @@ from scientific_scene import (  # noqa: E402
 REFERENCE = "#FFFFFF"
 
 
+def _polyline(
+    axes: Axes,
+    x_values: np.ndarray,
+    y_values: np.ndarray,
+    color: str,
+    stroke_width: float,
+) -> VMobject:
+    """Build one continuous vector path through scientific samples."""
+    points = [
+        axes.coords_to_point(float(x), float(y))
+        for x, y in zip(x_values, y_values)
+    ]
+    return VMobject(color=color, stroke_width=stroke_width).set_points_as_corners(
+        points
+    )
+
+
 def _metric_display(value: float, unit: str) -> tuple[str, str]:
     if not np.isfinite(value):
         return "not reached", "warning"
@@ -72,39 +90,35 @@ class PandaControllerComparison(Scene):
             tips=False,
             axis_config={"color": RULE, "stroke_width": 1.3, "font_size": 14},
         ).shift(RIGHT * 2.35 + DOWN * 0.25)
-        reference = axes.plot_line_graph(
-            result.time,
-            result.reference[:, joint],
-            add_vertex_dots=False,
-            line_color=REFERENCE,
-            stroke_width=2.0,
+        reference = _polyline(
+            axes, result.time, result.reference[:, joint], REFERENCE, 2.0
         )
         open_loop = DashedVMobject(
-            axes.plot_line_graph(
+            _polyline(
+                axes,
                 result.time,
                 result.runs["open_loop"].theta[:, joint],
-                add_vertex_dots=False,
-                line_color=VIOLATION,
-                stroke_width=2.2,
+                VIOLATION,
+                2.2,
             ),
             num_dashes=34,
         )
         pid = DashedVMobject(
-            axes.plot_line_graph(
+            _polyline(
+                axes,
                 result.time,
                 result.runs["pid"].theta[:, joint],
-                add_vertex_dots=False,
-                line_color=AMBER,
-                stroke_width=2.5,
+                AMBER,
+                2.5,
             ),
             num_dashes=42,
         )
-        computed = axes.plot_line_graph(
+        computed = _polyline(
+            axes,
             result.time,
             result.runs["computed_torque"].theta[:, joint],
-            add_vertex_dots=False,
-            line_color=TEAL,
-            stroke_width=3.0,
+            TEAL,
+            3.0,
         )
         title = study_title(
             "Feedback changes the same Panda step response",
@@ -179,39 +193,29 @@ class PandaControlMetrics(Scene):
             fill_opacity=0.10,
             stroke_width=1,
         ).move_to(response_axes.coords_to_point(2.0, float(reference[-1])))
-        response_curve = response_axes.plot_line_graph(
-            result.time,
-            response,
-            add_vertex_dots=False,
-            line_color=TEAL,
-            stroke_width=3,
+        response_curve = _polyline(
+            response_axes, result.time, response, TEAL, 3
         )
         reference_curve = DashedVMobject(
-            response_axes.plot_line_graph(
-                result.time,
-                reference,
-                add_vertex_dots=False,
-                line_color=REFERENCE,
-                stroke_width=2,
-            ),
+            _polyline(response_axes, result.time, reference, REFERENCE, 2),
             num_dashes=36,
         )
         error_scale = max(float(np.max(np.abs(error))), 1e-12)
         effort_scale = max(float(np.max(effort)), 1e-12)
-        error_curve = signal_axes.plot_line_graph(
+        error_curve = _polyline(
+            signal_axes,
             result.time,
             np.abs(error) / error_scale,
-            add_vertex_dots=False,
-            line_color=AMBER,
-            stroke_width=2.4,
+            AMBER,
+            2.4,
         )
         effort_curve = DashedVMobject(
-            signal_axes.plot_line_graph(
+            _polyline(
+                signal_axes,
                 result.time,
                 effort / effort_scale,
-                add_vertex_dots=False,
-                line_color=VIOLATION,
-                stroke_width=2.2,
+                VIOLATION,
+                2.2,
             ),
             num_dashes=36,
         )
