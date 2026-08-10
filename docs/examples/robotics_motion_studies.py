@@ -10,6 +10,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from ManipulaPy.ManipulaPy_data import get_robot_urdf
+from ManipulaPy.control import ManipulatorController
 from ManipulaPy.dynamics import ManipulatorDynamics
 from ManipulaPy.kinematics import SerialManipulator
 from ManipulaPy.path_planning import TrajectoryPlanning
@@ -360,3 +361,183 @@ def compute_planning_results() -> PlanningResults:
 
 
 # [planning-study-end]
+
+
+CONTROL_KP = np.array(
+    [80.0, 80.0, 60.0, 60.0, 40.0, 40.0, 30.0], dtype=np.float64
+)
+CONTROL_KI = np.ones(7, dtype=np.float64)
+CONTROL_KD = np.array(
+    [18.0, 18.0, 14.0, 14.0, 10.0, 10.0, 8.0], dtype=np.float64
+)
+TORQUE_LIMITS = np.array(
+    [87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0], dtype=np.float64
+)
+CONTROL_SUBSTEPS = 2
+
+
+@dataclass(frozen=True)
+class ControlRun:
+    """One controller response under the shared deterministic conditions."""
+
+    time: NDArray[np.float64]
+    reference: NDArray[np.float64]
+    theta: NDArray[np.float64]
+    velocity: NDArray[np.float64]
+    torque: NDArray[np.float64]
+    rms_error: float
+
+
+@dataclass(frozen=True)
+class ControlResults:
+    """Three controller responses and public step-response metrics."""
+
+    time: NDArray[np.float64]
+    reference: NDArray[np.float64]
+    runs: dict[str, ControlRun]
+    target_joint: int
+    metrics: dict[str, float]
+    torque_limits: NDArray[np.float64]
+
+
+def _disturbance(time_value: float) -> NDArray[np.float64]:
+    disturbance = np.zeros(7, dtype=np.float64)
+    disturbance[5] = 0.3 * np.sin(2.0 * np.pi * time_value / 4.0)
+    return disturbance
+
+
+def simulate_control(mode: str) -> ControlRun:
+    """Simulate one public controller against the shared Panda dynamics plant."""
+    if mode not in {"open_loop", "pid", "computed_torque"}:
+        raise ValueError(f"unknown control study mode: {mode}")
+    fixture = load_panda_fixture()
+    controller = ManipulatorController(fixture.dynamics)
+    reference = np.repeat(MID[np.newaxis, :], len(STUDY_TIME), axis=0)
+    zero = np.zeros(7, dtype=np.float64)
+    limits = np.asarray(fixture.joint_limits, dtype=np.float64)
+    theta = START.copy()
+    velocity = zero.copy()
+    theta_rows = []
+    velocity_rows = []
+    torque_rows = []
+    interval = float(STUDY_TIME[1] - STUDY_TIME[0])
+    substep = interval / CONTROL_SUBSTEPS
+
+    for index, time_value in enumerate(STUDY_TIME):
+        theta_rows.append(theta.copy())
+        velocity_rows.append(velocity.copy())
+        command = zero.copy()
+        if index < len(STUDY_TIME) - 1:
+            for substep_index in range(CONTROL_SUBSTEPS):
+                if mode == "open_loop":
+                    command = np.asarray(
+                        controller.feedforward_control(
+                            MID, zero, zero, GRAVITY, TOOL_WRENCH
+                        ),
+                        dtype=np.float64,
+                    )
+                elif mode == "pid":
+                    command = np.asarray(
+                        controller.pid_control(
+                            MID,
+                            zero,
+                            theta,
+                            velocity,
+                            substep,
+                            CONTROL_KP,
+                            CONTROL_KI,
+                            CONTROL_KD,
+                            i_clamp=0.5,
+                        ),
+                        dtype=np.float64,
+                    )
+                else:
+                    command = np.asarray(
+                        controller.computed_torque_control(
+                            MID,
+                            zero,
+                            zero,
+                            theta,
+                            velocity,
+                            GRAVITY,
+                            substep,
+                            CONTROL_KP,
+                            CONTROL_KI,
+                            CONTROL_KD,
+                            i_clamp=0.5,
+                        ),
+                        dtype=np.float64,
+                    )
+                substep_time = time_value + substep_index * substep
+                command = np.clip(
+                    command + _disturbance(substep_time),
+                    -TORQUE_LIMITS,
+                    TORQUE_LIMITS,
+                )
+                acceleration = assert_finite(
+                    f"{mode} plant acceleration",
+                    fixture.dynamics.forward_dynamics(
+                        theta,
+                        velocity,
+                        command,
+                        GRAVITY,
+                        TOOL_WRENCH,
+                    ),
+                )
+                velocity = velocity + acceleration * substep
+                proposed = theta + velocity * substep
+                theta = np.clip(proposed, limits[:, 0], limits[:, 1])
+                velocity = np.where(theta == proposed, velocity, 0.0)
+        torque_rows.append(command.copy())
+
+    theta_array = assert_finite(f"{mode} joint history", np.stack(theta_rows))
+    velocity_array = assert_finite(
+        f"{mode} velocity history", np.stack(velocity_rows)
+    )
+    torque_array = assert_finite(f"{mode} torque history", np.stack(torque_rows))
+    return ControlRun(
+        time=STUDY_TIME.copy(),
+        reference=reference,
+        theta=theta_array,
+        velocity=velocity_array,
+        torque=torque_array,
+        rms_error=float(np.sqrt(np.mean((theta_array - reference) ** 2))),
+    )
+
+
+# [control-study-start]
+def compute_control_results() -> ControlResults:
+    """Compute equal-condition controller responses and public metrics."""
+    runs = {
+        mode: simulate_control(mode)
+        for mode in ("open_loop", "pid", "computed_torque")
+    }
+    target_joint = 0
+    response = runs["computed_torque"].theta[:, target_joint]
+    set_point = float(MID[target_joint])
+    metrics_controller = ManipulatorController(load_panda_fixture().dynamics)
+    metrics = {
+        "rise_time": metrics_controller.calculate_rise_time(
+            STUDY_TIME, response, set_point
+        ),
+        "percent_overshoot": metrics_controller.calculate_percent_overshoot(
+            response, set_point
+        ),
+        "settling_time": metrics_controller.calculate_settling_time(
+            STUDY_TIME, response, set_point
+        ),
+        "steady_state_error": metrics_controller.calculate_steady_state_error(
+            response, set_point
+        ),
+    }
+    return ControlResults(
+        time=STUDY_TIME.copy(),
+        reference=runs["computed_torque"].reference.copy(),
+        runs=runs,
+        target_joint=target_joint,
+        metrics=metrics,
+        torque_limits=TORQUE_LIMITS.copy(),
+    )
+
+
+# [control-study-end]

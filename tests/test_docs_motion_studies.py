@@ -355,3 +355,39 @@ def test_planning_scenes_and_guide_embed_three_accessible_studies():
     assert guide.count('width="960" height="540"') >= 3
     assert ":start-after: # [planning-study-start]" in guide
     assert "joint-space obstacle" in guide.lower()
+
+
+def test_control_runs_share_conditions_and_report_public_metrics():
+    studies = load_studies()
+    result = studies.compute_control_results()
+    assert set(result.runs) == {"open_loop", "pid", "computed_torque"}
+    assert result.target_joint == 0
+    for run in result.runs.values():
+        assert run.theta.shape == run.velocity.shape == run.torque.shape == (61, 7)
+        assert run.reference.shape == (61, 7)
+        assert np.isfinite(run.theta).all()
+        assert np.isfinite(run.velocity).all()
+        assert np.isfinite(run.torque).all()
+        assert np.array_equal(run.reference, result.reference)
+        assert np.all(
+            np.max(np.abs(run.torque), axis=0) <= result.torque_limits + 1e-12
+        )
+    assert result.runs["computed_torque"].rms_error < result.runs["pid"].rms_error
+    assert result.runs["pid"].rms_error < result.runs["open_loop"].rms_error
+    assert result.metrics.keys() == {
+        "rise_time",
+        "percent_overshoot",
+        "settling_time",
+        "steady_state_error",
+    }
+    assert all(np.isfinite(value) or np.isinf(value) for value in result.metrics.values())
+
+
+def test_control_results_are_deterministic():
+    studies = load_studies()
+    first = studies.compute_control_results()
+    second = studies.compute_control_results()
+    for mode in first.runs:
+        assert np.array_equal(first.runs[mode].theta, second.runs[mode].theta)
+        assert np.array_equal(first.runs[mode].torque, second.runs[mode].torque)
+    assert first.metrics == second.metrics
