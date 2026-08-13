@@ -365,6 +365,7 @@ norecursedirs = [
 source = ["ManipulaPy"]
 branch = true
 parallel = true
+relative_files = true
 context = "${COVERAGE_CONTEXT}"
 omit = [
     "*/tests/*",

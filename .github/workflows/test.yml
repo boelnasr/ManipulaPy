@@ -373,6 +373,51 @@ jobs:
           print("no dependency-gated skips")
           PY
 
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    permissions:
+      # Forked pull_request runs are downgraded to read-only by GitHub, so
+      # these do not grant write access to untrusted code.
+      pull-requests: write # Publish/update the coverage comment on trusted PRs
+      contents: write # Push the coverage data to the data branch
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run the non-TPU regression suite with coverage
+        run: |
+          python -m pytest tests --ignore=tests/test_tpu_contract.py \
+            -m "not (tpu or cuda or gpu or vision or simulation)" \
+            --cov=ManipulaPy --cov-report= -q
+
+      - name: Coverage comment
+        id: coverage_comment
+        uses: py-cov-action/python-coverage-comment-action@a05be3d2e8a6272d3ef5fb2840ab20368bb2eb71 # v4.3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Store Pull Request comment to be posted
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
+        with:
+          name: python-coverage-comment-action
+          path: python-coverage-comment-action.txt
+
   build-check:
     name: build-check
     runs-on: ubuntu-latest
