@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 # ------------------------------------------------------------------
 [project]
 name = "ManipulaPy"
-version = "1.4.0"
+version = "1.4.1"
 authors = [
     { name = "Mohamed Aboelnasr", email = "aboelnasr1997@gmail.com" },
 ]
@@ -68,7 +68,7 @@ dependencies = [
     "numpy>=2.0,<3.0",
     "scipy>=1.13",
     "matplotlib>=3.9",
-    "numba>=0.60",
+    "numba>=0.60,<0.67",
     "pillow>=8.0.0",
 ]
 
@@ -80,7 +80,7 @@ minimal = [
     "numpy>=2.0,<3.0",
     "scipy>=1.13",
     "matplotlib>=3.9",
-    "numba>=0.60",
+    "numba>=0.60,<0.67",
     "pybullet>=3.2.5,<4.0",
 ]
 

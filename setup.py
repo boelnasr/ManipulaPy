@@ -19,7 +19,7 @@ setup(
     # Version is canonical in pyproject.toml; this duplicate is kept synced
     # for any legacy tooling that still parses setup.py directly. pip and
     # `python -m build` use pyproject.toml's [project] table, not this.
-    version="1.4.0",
+    version="1.4.1",
     author="Mohamed Aboelnasr",
     author_email="aboelnasr1997@gmail.com",
     description="A comprehensive, GPU-accelerated Python framework for robotic manipulation, perception, and control",
@@ -36,7 +36,7 @@ setup(
         "numpy>=2.0,<3.0",
         "scipy>=1.13",
         "matplotlib>=3.9",
-        "numba>=0.60",
+        "numba>=0.60,<0.67",
         "pillow>=8.0.0",
     ],
 
@@ -47,7 +47,7 @@ setup(
             "numpy>=2.0,<3.0",
             "scipy>=1.13",
             "matplotlib>=3.9",
-            "numba>=0.60",
+            "numba>=0.60,<0.67",
             "pybullet>=3.2.5,<4.0",
         ],
         "simulation": [
