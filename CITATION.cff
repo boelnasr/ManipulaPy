@@ -8,8 +8,8 @@ authors:
     email: aboelnasr1997@gmail.com
     orcid: "https://orcid.org/0000-0002-1768-2031"
     affiliation: "Universität Duisburg-Essen"
-version: 1.4.0
-date-released: "2026-05-31"
+version: 1.4.1
+date-released: "2026-08-14"
 license: AGPL-3.0-or-later
 repository-code: "https://github.com/boelnasr/ManipulaPy"
 url: "https://manipulapy.readthedocs.io/"
