@@ -226,7 +226,7 @@ jobs:
       - name: Run Torch and gradient contracts without skips
         run: |
           python -m pytest tests/test_torch_call_sites.py tests/test_gradient_contract.py \
-            -k torch --junitxml=torch-cuda.xml -q
+            -k torch -m "not cross_framework" --junitxml=torch-cuda.xml -q
           python scripts/assert_junit_no_skips.py torch-cuda.xml
 
   jax-cuda:
@@ -268,8 +268,51 @@ jobs:
       - name: Run JAX and gradient contracts without skips
         run: |
           python -m pytest tests/test_jax_call_sites.py tests/test_gradient_contract.py \
-            -k jax --junitxml=jax-cuda.xml -q
+            -k jax -m "not cross_framework" --junitxml=jax-cuda.xml -q
           python scripts/assert_junit_no_skips.py jax-cuda.xml
+
+  # Tests marked `cross_framework` need two backends resident at once, so no
+  # single-backend axis can run them: torch-cuda has no JAX and jax-cuda has no
+  # Torch, and each axis asserts zero skips. Before this job they were selected
+  # by both axes and skipped in both, which failed the no-skips gate and so kept
+  # gpu-axes-passed -- and with it the release gate -- permanently unreachable,
+  # while the assertions themselves never actually ran anywhere.
+  #
+  # Hosted CPU is sufficient: these compare gradients between backends, not
+  # device behaviour. Deliberately NOT part of gpu-axes-passed, which gates the
+  # release on CUDA correctness and must not start depending on a CPU job.
+  cross-framework-parity:
+    name: cross-framework-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install both backends
+        run: python -m pip install -e ".[dev,pytorch,jax-cpu]"
+
+      - name: Assert both backends are importable
+        env:
+          JAX_PLATFORMS: cpu
+        run: |
+          python - <<'PY'
+          import jax, torch
+          print("torch", torch.__version__, "| jax", jax.__version__, jax.devices())
+          PY
+
+      - name: Run cross-backend parity tests without skips
+        env:
+          JAX_PLATFORMS: cpu
+        run: |
+          python -m pytest tests -m cross_framework \
+            --junitxml=cross-framework.xml -q
+          python scripts/assert_junit_no_skips.py cross-framework.xml
 
   # OpenCV, scikit-learn and PyBullet are in no hosted job's install, so 13
   # tests that need the real libraries skip everywhere and contribute nothing.

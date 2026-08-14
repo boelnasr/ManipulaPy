@@ -306,6 +306,7 @@ markers = [
     "parametrize: marks parametrized tests",
     "functional: marks functional tests",
     "tpu: marks fail-closed tests requiring a real Google Cloud TPU",
+    "cross_framework: marks tests needing two backends installed at once (e.g. Torch and JAX together). Single-backend CI axes must deselect these with -m 'not cross_framework' or they skip and fail the no-skips gate; the cross-framework-parity job runs them.",
 ]
 
 filterwarnings = [

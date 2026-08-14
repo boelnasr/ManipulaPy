@@ -1218,6 +1218,7 @@ class TestJaxProductionGradientContract:
 
         assert np.all(np.isfinite(actual)), f"non-finite gradient at pi - {gap}"
 
+    @pytest.mark.cross_framework
     @pytest.mark.parametrize("theta_val", [0.0, 5e-7, 1e-6, 0.01, 0.1, 0.1001, 1.5])
     def test_matrix_log6_translational_gradient_matches_torch(self, theta_val):
         """Torch reaches the same translational gradient as JAX.
