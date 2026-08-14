@@ -8,7 +8,7 @@
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 ![CI](https://github.com/boelnasr/ManipulaPy/actions/workflows/test.yml/badge.svg?branch=main)
-[![codecov](https://codecov.io/gh/boelnasr/ManipulaPy/branch/main/graph/badge.svg)](https://codecov.io/gh/boelnasr/ManipulaPy)
+[![Coverage badge](https://raw.githubusercontent.com/boelnasr/ManipulaPy/python-coverage-comment-action-data/badge.svg)](https://github.com/boelnasr/ManipulaPy/tree/python-coverage-comment-action-data)
 [![status](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa/status.svg)](https://joss.theoj.org/papers/e0e68c2dcd8ac9dfc1354c7ee37eb7aa)
 
 **A modern, GPU-accelerated Python package for robot manipulator kinematics, dynamics, planning, simulation, control, and perception.**
