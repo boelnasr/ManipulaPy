@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] — 2026-08-14
+
+> **Summary:** Restores this project's control over its own NumPy ceiling.
+> `numba` was pinned `>=0.60` with no upper bound, so the highest NumPy that
+> ManipulaPy would install was decided by whatever numba published next, not by
+> anything in this repository. numba 0.67.0 (2026-08-11) raised its own NumPy
+> ceiling from `<2.5` to `<2.6`, which moved fresh installs of the already
+> published 1.4.0 onto NumPy 2.5.2 with no ManipulaPy release, review, or
+> changelog entry involved.
+>
+> **Impact:** No functional defect was found under NumPy 2.5.2 — the CUDA
+> kernels, kinematics, dynamics, planning and control all behave identically,
+> and only the golden-signature meta-tests reacted, to a cosmetic change in how
+> NumPy renders `NDArray` annotations. This release is therefore a precaution
+> that makes the resolved dependency set deterministic and reviewable again,
+> not a fix for broken behaviour. Support for NumPy 2.5 is planned as a
+> follow-up that raises the bound deliberately.
+
+### Changed
+- **`numba` is now bounded `>=0.60,<0.67`** in `pyproject.toml` (core and
+  `minimal` extras), `setup.py`, and `requirements.txt`. This fixes the
+  resolved NumPy to the `<2.5` range that every published ManipulaPy release
+  has been tested against. The bound will be raised deliberately, with a
+  release behind it, rather than left open for a dependency to move on our
+  behalf.
+
 ## [1.4.0] — 2026-08-09
 
 > **Summary:** The unified compute backend system. The same kinematics,
