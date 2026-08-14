@@ -8,12 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.1] — 2026-08-14
 
 > **Summary:** Restores this project's control over its own NumPy ceiling.
-> `numba` was pinned `>=0.60` with no upper bound, so the highest NumPy that
-> ManipulaPy would install was decided by whatever numba published next, not by
-> anything in this repository. numba 0.67.0 (2026-08-11) raised its own NumPy
-> ceiling from `<2.5` to `<2.6`, which moved fresh installs of the already
-> published 1.4.0 onto NumPy 2.5.2 with no ManipulaPy release, review, or
-> changelog entry involved.
+> This repository declares `numpy>=2.0,<3.0`, but `numba` was pinned `>=0.60`
+> with no upper bound and carries a tighter NumPy pin of its own. numba's
+> ceiling was the binding one, so the NumPy version actually installed was
+> decided by whatever numba published next rather than by a bound this project
+> declared and reviewed. numba 0.67.0 (2026-08-11) raised its own ceiling from
+> `<2.5` to `<2.6`, which moved fresh installs of the already published 1.4.0
+> onto NumPy 2.5.2 with no ManipulaPy release, review, or changelog entry
+> involved.
 >
 > **Impact:** No functional defect was found under NumPy 2.5.2 — the CUDA
 > kernels, kinematics, dynamics, planning and control all behave identically,
