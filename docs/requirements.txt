@@ -27,4 +27,4 @@ packaging>=26.3
 docutils>=0.20,<0.22
 
 # For proper reStructuredText parsing
-Pygments>=2.20.0,<3.0.0
+Pygments>=2.21.0,<3.0.0
