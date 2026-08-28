@@ -44,7 +44,7 @@
 | ManipulaPy/sim/controllers.py                   |       63 |        3 |       16 |        3 |     92.4% |32-39, 61-\>exit, 86-\>99, 96 |
 | ManipulaPy/perception.py                        |       70 |        3 |       14 |        3 |     92.9% |216-217, 256, 279-\>exit |
 | ManipulaPy/kinematics/serial\_manipulator.py    |       47 |        2 |       10 |        2 |     93.0% |  105, 113 |
-| ManipulaPy/kinematics/trac\_ik.py               |      271 |       10 |       76 |        9 |     94.5% |167-\>exit, 207-\>220, 211-\>207, 221-235, 265-273, 278, 343, 371-\>499, 562 |
+| ManipulaPy/kinematics/trac\_ik.py               |      271 |       10 |       76 |       10 |     94.2% |167-\>exit, 207-\>220, 211-\>207, 221-235, 248-\>264, 265-273, 278, 343, 371-\>499, 562 |
 | ManipulaPy/control/metrics.py                   |      123 |        3 |       26 |        4 |     95.3% |175, 179-\>183, 184, 346 |
 | ManipulaPy/planning/collision\_host.py          |       46 |        1 |       20 |        2 |     95.5% |76-\>86, 143 |
 | ManipulaPy/potential\_field/collision.py        |       97 |        2 |       38 |        4 |     95.6% |99-\>102, 107, 114-\>116, 130 |
@@ -83,7 +83,7 @@
 | ManipulaPy/utils/\_\_init\_\_.py                |        4 |        0 |        0 |        0 |    100.0% |           |
 | ManipulaPy/utils/screw.py                       |       53 |        0 |       14 |        0 |    100.0% |           |
 | ManipulaPy/utils/time\_scaling.py               |        4 |        0 |        0 |        0 |    100.0% |           |
-| **TOTAL**                                       | **7729** | **2496** | **2110** |  **276** | **64.3%** |           |
+| **TOTAL**                                       | **7729** | **2496** | **2110** |  **277** | **64.3%** |           |
 
 
 ## Setup coverage badge
