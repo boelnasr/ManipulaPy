@@ -36,7 +36,7 @@ setup(
         "numpy>=2.0,<3.0",
         "scipy>=1.13",
         "matplotlib>=3.9",
-        "numba>=0.60,<0.68",
+        "numba>=0.60,<0.67",  # deliberate: 0.67 admits NumPy 2.5 (CHANGELOG 1.4.1)
         "pillow>=8.0.0",
     ],
 
@@ -47,7 +47,7 @@ setup(
             "numpy>=2.0,<3.0",
             "scipy>=1.13",
             "matplotlib>=3.9",
-            "numba>=0.60,<0.68",
+            "numba>=0.60,<0.67",  # deliberate: 0.67 admits NumPy 2.5 (CHANGELOG 1.4.1)
             "pybullet>=3.2.5,<4.0",
         ],
         "simulation": [
