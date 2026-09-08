@@ -85,6 +85,7 @@ def _get_available_features() -> Dict[str, bool]:
         "vision": False,
         "simulation": False,
         "ml": False,
+        "jepa": False,
     }
 
     # Check CUDA/GPU support (without importing)
@@ -118,6 +119,9 @@ def _get_available_features() -> Dict[str, bool]:
     ]
     ml_available = all(_check_dependency(mod, pkg, "ml") for mod, pkg in ml_deps)
     _available_features["ml"] = ml_available
+
+    # JEPA needs PyTorch alone, not the full ml stack.
+    _available_features["jepa"] = _check_dependency("torch", "torch", "jepa")
 
     return _available_features
 
@@ -155,6 +159,7 @@ def _lazy_import(module_name: str) -> Any:
             "sim": "simulation",
             "urdf_processor": "simulation",
             "cuda_kernels": "cuda",
+            "jepa": "jepa",
         }
 
         feature = feature_map.get(module_name)
@@ -193,6 +198,7 @@ def __getattr__(name: str) -> Any:
         "singularity": "singularity",
         "potential_field": "potential_field",
         # Optional modules
+        "jepa": "jepa",
         "vision": "vision",
         "perception": "perception",
         "sim": "sim",
@@ -203,6 +209,8 @@ def __getattr__(name: str) -> Any:
         "ManipulatorDynamics": ("dynamics", "ManipulatorDynamics"),
         "ManipulatorController": ("control", "ManipulatorController"),
         "Vision": ("vision", "Vision"),
+        "ManipulatorJEPA": ("jepa", "ManipulatorJEPA"),
+        "JEPAConfig": ("jepa", "JEPAConfig"),
         "TracIKSolver": ("trac_ik", "TracIKSolver"),
         # Backend selection API
         "set_backend": ("backend", "set_backend"),
@@ -272,6 +280,8 @@ def __dir__() -> List[str]:
         base.extend(["sim", "urdf_processor"])
     if features.get("cuda", False):
         base.append("cuda_kernels")
+    if features.get("jepa", False):
+        base.extend(["jepa", "ManipulatorJEPA", "JEPAConfig"])
 
     return base
 
@@ -324,6 +334,8 @@ def check_dependencies(verbose: bool = True) -> Dict[str, bool]:
             print("  Simulation:       pip install pybullet")
         if not features["ml"]:
             print("  ML features:      pip install torch scikit-learn")
+        if not features["jepa"]:
+            print("  JEPA world model: pip install torch")
 
     return features.copy()
 

@@ -13,6 +13,7 @@ Copyright (c) 2025 Mohamed Aboelnasr
 Licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)
 """
 
+import importlib.machinery
 import numbers
 import os
 import shutil
@@ -126,6 +127,17 @@ class MockModule:
     def __init__(self, name=None) -> None:
         """Initialize the mock module with an optional dotted name."""
         self._name = name or "MockModule"
+        # A real ModuleSpec with origin=None, because __getattr__ would
+        # otherwise hand out a MockModule for __spec__ and any caller that
+        # inspects it would choke on the nested mock. PyTorch does exactly
+        # that: importing torch._dynamo (which torch.optim triggers on the
+        # first add_param_group) walks its third-party skiplist through
+        # importlib.util.find_spec and calls os.path.normpath on
+        # spec.origin. sklearn is on that skiplist and is stood in for here
+        # whenever scikit-learn is absent, so without a real spec every test
+        # that builds a Torch optimizer dies inside the import. origin=None
+        # makes those callers take their "nothing to locate" branch.
+        self.__spec__ = importlib.machinery.ModuleSpec(self._name, None)
 
     def __getattr__(self, name) -> "MockModule":
         """Return a nested mock for any attribute access."""

@@ -95,6 +95,10 @@ vision = [
     "torch>=2.7.1",
 ]
 ml = ["torch>=2.7.1", "scikit-learn>=1.5.0"]
+# JEPA world model (1.4.2). Torch only - the module builds its training
+# data from ManipulaPy's own dynamics, so it needs no simulator or
+# scikit-learn, and is deliberately a narrower extra than [ml].
+jepa = ["torch>=2.7.1"]
 # Default GPU extra targets CUDA 12.x — that's what Ubuntu 22.04 ships
 # with current NVIDIA apt repos (driver 525+), what the [cuda] section
 # of our docs assumes, and what the v1.3.2 patch was validated against
