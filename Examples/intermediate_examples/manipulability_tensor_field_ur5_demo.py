@@ -46,6 +46,16 @@ if "MPLBACKEND" not in os.environ:
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (registers 3-D projection)
 
+# LaTeX-style (Computer Modern) text via matplotlib's bundled cmr10 font, so
+# the figure renders the same everywhere without requiring a system LaTeX install.
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["cmr10", "STIXGeneral", "DejaVu Serif"],
+    "mathtext.fontset": "cm",
+    "axes.formatter.use_mathtext": True,
+    "axes.unicode_minus": False,
+})
+
 try:
     import ManipulaPy
 except ImportError:
@@ -204,12 +214,14 @@ def plot_index_tensor_fields(field_data, sweep_labels, ellipsoid_stride=4):
     extent = [q1_vals[0], q1_vals[-1], q2_vals[0], q2_vals[-1]]
 
     fig = plt.figure(figsize=(14, 12))
-    fig.suptitle("UR5 Manipulability Index Tensor Fields", fontsize=15, fontweight="bold")
+    fig.suptitle(r"UR5 Manipulability Index Tensor Fields", fontsize=16, fontweight="bold")
 
     # --- Scalar index heatmaps (joint-space slice) -------------------------------
     for pos, index_field, title, cmap in (
-        (1, field_data["pos_index"], "Position index  w_pos = sqrt(det(J_v J_v^T))", "viridis"),
-        (2, field_data["ori_index"], "Orientation index  w_ori = sqrt(det(J_w J_w^T))", "magma"),
+        (1, field_data["pos_index"],
+         r"Position index $\;w_{\mathrm{pos}} = \sqrt{\det(J_v J_v^{\mathsf{T}})}$", "viridis"),
+        (2, field_data["ori_index"],
+         r"Orientation index $\;w_{\mathrm{ori}} = \sqrt{\det(J_\omega J_\omega^{\mathsf{T}})}$", "magma"),
     ):
         ax = fig.add_subplot(2, 2, pos)
         im = ax.imshow(
@@ -224,17 +236,19 @@ def plot_index_tensor_fields(field_data, sweep_labels, ellipsoid_stride=4):
     ee_positions = field_data["ee_positions"]
     for pos, tensor_field, index_field, title, cmap in (
         (3, field_data["pos_tensor_field"], field_data["pos_index"],
-         "Position tensor field (ellipsoid = J_v J_v^T @ EE position)", "viridis"),
+         r"Position tensor field $\left(\mathrm{ellipsoid} = J_v J_v^{\mathsf{T}}\;@\;\mathrm{EE\ position}\right)$",
+         "viridis"),
         (4, field_data["ori_tensor_field"], field_data["ori_index"],
-         "Orientation tensor field (ellipsoid = J_w J_w^T @ EE position)", "magma"),
+         r"Orientation tensor field $\left(\mathrm{ellipsoid} = J_\omega J_\omega^{\mathsf{T}}\;@\;\mathrm{EE\ position}\right)$",
+         "magma"),
     ):
         ax = fig.add_subplot(2, 2, pos, projection="3d")
         mappable = plot_3d_tensor_field(
             ax, ee_positions, tensor_field, index_field, cmap, stride=ellipsoid_stride,
         )
-        ax.set_xlabel("X (m)")
-        ax.set_ylabel("Y (m)")
-        ax.set_zlabel("Z (m)")
+        ax.set_xlabel(r"$X$ (m)")
+        ax.set_ylabel(r"$Y$ (m)")
+        ax.set_zlabel(r"$Z$ (m)")
         ax.set_title(title, fontweight="bold")
         fig.colorbar(mappable, ax=ax, shrink=0.6, label="Manipulability index")
 
@@ -278,7 +292,9 @@ def main() -> None:
 
     plot_index_tensor_fields(
         field_data,
-        sweep_labels=("shoulder_lift (rad)", "elbow (rad)"),
+        # Computer Modern's OT1 encoding has no plain-text underscore glyph
+        # (it renders as a stray mark), so avoid underscores outside math mode.
+        sweep_labels=("shoulder lift (rad)", "elbow (rad)"),
     )
 
     print("\nDone.")

@@ -49,6 +49,16 @@ if "MPLBACKEND" not in os.environ:
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (registers 3-D projection)
 
+# LaTeX-style (Computer Modern) text via matplotlib's bundled cmr10 font, so
+# the figure renders the same everywhere without requiring a system LaTeX install.
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.serif": ["cmr10", "STIXGeneral", "DejaVu Serif"],
+    "mathtext.fontset": "cm",
+    "axes.formatter.use_mathtext": True,
+    "axes.unicode_minus": False,
+})
+
 try:
     import ManipulaPy
 except ImportError:
@@ -285,11 +295,13 @@ def main() -> None:
 
     fig = plt.figure(figsize=(14, 7.5))
     fig.patch.set_facecolor("white")
-    fig.suptitle("UR5 Manipulability Tensor Field -- Hyperstreamlines", fontsize=15, fontweight="bold")
+    fig.suptitle(r"UR5 Manipulability Tensor Field --- Hyperstreamlines", fontsize=16, fontweight="bold")
 
     for pos, tensor_key, color, title in (
-        (1, "pos_tensor", "#c9a227", "Position tensor field  M_pos = J_v^T J_v"),
-        (2, "ori_tensor", "#b5651d", "Orientation tensor field  M_ori = J_w^T J_w"),
+        (1, "pos_tensor", "#c9a227",
+         r"Position tensor field $\;M_{\mathrm{pos}} = J_v^{\mathsf{T}} J_v$"),
+        (2, "ori_tensor", "#b5651d",
+         r"Orientation tensor field $\;M_{\mathrm{ori}} = J_\omega^{\mathsf{T}} J_\omega$"),
     ):
         print(f"Integrating hyperstreamlines for: {title}")
         streamlines_3d = build_hyperstreamlines(field_data, tensor_key, sweep_joints)
