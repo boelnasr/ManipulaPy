@@ -203,6 +203,18 @@ def plot_3d_tensor_field(ax, centers, tensor_field, index_field, cmap_name,
         color="gray", linewidth=0.3, alpha=0.3,
     )
 
+    # A near-degenerate axis (e.g. this sweep's fixed shoulder_pan keeps Y
+    # almost constant) would otherwise make matplotlib auto-zoom to the
+    # ellipsoids' own tiny extent along it; floor every axis's shown span so
+    # the box stays legibly proportioned instead of looking clipped/broken.
+    centers_flat = centers.reshape(-1, 3)
+    mins, maxs = centers_flat.min(axis=0), centers_flat.max(axis=0)
+    mids = (mins + maxs) / 2
+    half_spans = np.maximum((maxs - mins) / 2, 2 * target_radius)
+    ax.set_xlim(mids[0] - half_spans[0], mids[0] + half_spans[0])
+    ax.set_ylim(mids[1] - half_spans[1], mids[1] + half_spans[1])
+    ax.set_zlim(mids[2] - half_spans[2], mids[2] + half_spans[2])
+
     mappable = plt.cm.ScalarMappable(norm=norm, cmap=colormap)
     mappable.set_array([])
     return mappable
