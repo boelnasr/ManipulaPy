@@ -33,6 +33,19 @@ Most Python robotics packages cover one slice well — kinematics, simulation, o
 
 ---
 
+## Updated during the submission period
+
+Fixes shipped in [1.4.2](CHANGELOG.md#142--2026-10-11):
+
+- **Deterministic default end effector**: no longer depends on `PYTHONHASHSEED`, and it follows a documented rule. ([7c7c27f](https://github.com/boelnasr/ManipulaPy/commit/7c7c27f09b9d8c756d7191fe9c77fc8ac4d82043))
+- **`tip_link` validated against the joint chain**: an unreachable link, or one with no actuated joint to the root, raises `ValueError`. ([7c7c27f](https://github.com/boelnasr/ManipulaPy/commit/7c7c27f09b9d8c756d7191fe9c77fc8ac4d82043))
+- **`extract_screw_axes(tip_link=...)` uses only the root → tip chain**: a Panda to `panda_grasptarget` now gives 7 columns, not 8, and the new `joint_names` key lists them. ([7c7c27f](https://github.com/boelnasr/ManipulaPy/commit/7c7c27f09b9d8c756d7191fe9c77fc8ac4d82043))
+- **`near_singularity_detection` fixed**: it used to report every configuration as near-singular. The default threshold is now 1e3 on the condition number. ([7e686ee](https://github.com/boelnasr/ManipulaPy/commit/7e686ee003fba28ffe2b3fac443ac6375e22f6eb))
+- **`import ManipulaPy` no longer prints**: this fixes the crash on Windows cp1252 consoles. ([847b963](https://github.com/boelnasr/ManipulaPy/commit/847b9639d6599a296f4d1299d671eccce3b39d42))
+- **`extract_omega_list` returns 3 × n rotation axes for 6 × n screws**: this fixes `omega_list` in `URDF.to_serial_manipulator()`. ([1bf3b1e](https://github.com/boelnasr/ManipulaPy/commit/1bf3b1ecf860ffc18f85bd98a269eb4fe9a1a577))
+
+---
+
 ## Quick start
 
 ### Install

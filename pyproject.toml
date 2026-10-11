@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 # ------------------------------------------------------------------
 [project]
 name = "ManipulaPy"
-version = "1.4.1"
+version = "1.4.2"
 authors = [
     { name = "Mohamed Aboelnasr", email = "aboelnasr1997@gmail.com" },
 ]

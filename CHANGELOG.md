@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] — 2026-10-11
+
+> **Summary:** Five correctness fixes in URDF conversion, singularity
+> detection and import behaviour, found while integrating ManipulaPy into a
+> downstream planner. Two of them change outputs that existing code may rely
+> on; both are flagged **Behaviour change** below.
+
+### Fixed
+- **Default end effector no longer depends on `PYTHONHASHSEED`.** Leaf and
+  root links were taken from a `set`, so `URDF.end_effector_link` (and every
+  `extract_screw_axes()` / `to_serial_manipulator()` call without `tip_link`)
+  could pick a different link from run to run, e.g. either Panda finger, or a
+  UR5's `base` frame instead of `tool0`. The rule is now documented and
+  deterministic: among leaves whose chain from the root has at least one
+  actuated joint, the first by sorted name. A `UserWarning` is emitted (once
+  per URDF) when several leaves qualify; pass `tip_link` to choose.
+- **`tip_link` is validated against the joint chain.** A link that exists but
+  is unreachable from the root, or has no actuated joint between it and the
+  root, now raises `ValueError` instead of being accepted silently.
+- **`extract_screw_axes(tip_link=...)` only uses joints on the root → tip
+  chain.** Previously every actuated joint in the URDF became a column, so a
+  Panda with `tip_link="panda_grasptarget"` got an extra prismatic finger
+  column. `S_list`, `B_list`, `omega_list`, `r_list`, `G_list`,
+  `Mlist_per_link` and `joint_limits` now have one entry per chain joint, in
+  chain order, and the new `joint_names` key lists those joints.
+  **Behaviour change:** callers that passed `tip_link` on a branched robot get
+  fewer columns (Panda to `panda_grasptarget`: 8 → 7; to `panda_link3`:
+  8 → 3). Single-chain robots are unaffected.
+- **`Singularity.near_singularity_detection` returned True for every
+  configuration.** It compares the Jacobian condition number (always ≥ 1)
+  with `threshold`, whose default was `1e-2`. The default is now `1e3`; the
+  docstring states the compared quantity and direction. A singular Jacobian
+  still returns True without floating-point warnings.
+  **Behaviour change:** calls relying on the default now return False away
+  from singularities. Calls that pass their own threshold are unaffected.
+- **`import ManipulaPy` crashed on Windows consoles using cp1252.** The import
+  greeting printed emoji to stdout (`UnicodeEncodeError`). Nothing is printed
+  at import any more; the greeting goes to the `ManipulaPy` logger at INFO.
+  `MANIPULAPY_QUIET=1` is still accepted.
+- **`utils.extract_omega_list` sliced a 6 × n screw matrix as the first three
+  screws.** It now returns the 3 × n rotation axes for a 6 × n input (square
+  6 × 6 included) and still accepts the legacy n × 6 layout; other shapes raise
+  `ValueError`. This also corrects `omega_list` on robots built by
+  `URDF.to_serial_manipulator()` and `URDF.to_manipulator_dynamics()`.
+
 ## [1.4.1] — 2026-08-14
 
 > **Summary:** Restores this project's control over its own NumPy ceiling.
