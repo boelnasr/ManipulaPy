@@ -2126,7 +2126,7 @@ def test_singularity_default_backend_numeric_and_return_contract():
     np.testing.assert_allclose(
         results["condition_number"], np.linalg.cond(J), rtol=1e-12
     )
-    assert bool(results["near_singularity"]) == bool(np.linalg.cond(J) > 1e-2)
+    assert bool(results["near_singularity"]) == bool(np.linalg.cond(J) > 1e3)
 
 
 def test_condition_number_singular_jacobian_is_infinite():

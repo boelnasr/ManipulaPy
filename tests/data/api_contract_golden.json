@@ -454,7 +454,7 @@
       "dtype": "bool",
       "type": "numpy.bool"
     },
-    "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], threshold: float = 0.01) -> bool"
+    "signature": "(thetalist: Union[numpy.ndarray[tuple[int, ...], numpy.dtype[numpy.float64]], List[float]], threshold: float = 1000.0) -> bool"
   },
   "Singularity.singularity_analysis": {
     "annotations": {
