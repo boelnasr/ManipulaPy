@@ -102,7 +102,8 @@ Once a ``URDF`` is loaded, two conversion helpers produce ManipulaPy objects:
    manipulator = robot.to_serial_manipulator()       # SerialManipulator
    dynamics = robot.to_manipulator_dynamics()        # ManipulatorDynamics
 
-   # Optional: pick a custom tip link instead of the first end link
+   # Optional: pick the tip link explicitly instead of the default
+   # (see "Choosing the end effector" in the URDF API reference)
    manipulator = robot.to_serial_manipulator(tip_link="tool0")
 
    # Sanity-check kinematics + dynamics

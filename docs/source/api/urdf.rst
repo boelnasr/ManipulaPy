@@ -48,6 +48,41 @@ limits)::
    serial = robot.to_serial_manipulator()
    dynamics = robot.to_manipulator_dynamics()
 
+Choosing the end effector
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionchanged:: 1.4.2
+   The default end effector no longer depends on ``PYTHONHASHSEED``,
+   ``tip_link`` is validated, and only the joints on the root → tip chain
+   become screw-axis columns.
+
+:meth:`URDF.extract_screw_axes`, :meth:`URDF.to_serial_manipulator` and
+:meth:`URDF.to_manipulator_dynamics` build the robot up to one tip link:
+
+- **Explicit tip.** Pass ``tip_link="<link name>"``. A ``ValueError`` is
+  raised if the link does not exist, is not reachable from the root link, or
+  has no actuated joint between it and the root.
+- **Default tip** (:attr:`URDF.end_effector_link`). Among the leaf links
+  whose chain from the root contains at least one actuated joint, ManipulaPy
+  picks the first by sorted name. A leaf attached to the base by fixed joints
+  only, such as a UR5 ``base`` frame, never qualifies. When several leaves
+  qualify, as with a Panda's two fingers, a ``UserWarning`` names them once
+  per URDF. Pass ``tip_link`` to choose one explicitly.
+
+Only the actuated, non-mimic joints on the chain from the root to the tip
+become columns, in chain order. ``S_list``, ``B_list``, ``omega_list``,
+``r_list``, ``G_list``, ``Mlist_per_link`` and ``joint_limits`` have one
+entry per chain joint. ``params["joint_names"]`` lists those joints in
+column order::
+
+   params = robot.extract_screw_axes(tip_link="panda_grasptarget")
+   params["S_list"].shape    # (6, 7): the finger joints are not on this chain
+   params["joint_names"]     # ['panda_joint1', ..., 'panda_joint7']
+
+Use ``joint_names`` to map columns to joints. Don't use
+:attr:`URDF.actuated_joints` for that, because it lists every actuated
+joint in the URDF, including those on other branches.
+
 PackageResolver class
 ---------------------
 

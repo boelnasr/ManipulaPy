@@ -97,6 +97,8 @@ import ManipulaPy
 ManipulaPy.check_dependencies()    # ✅/❌ for each feature
 ```
 
+`import ManipulaPy` prints nothing (since 1.4.2). The version greeting goes to the `ManipulaPy` logger at INFO level. To see it, enable logging before you import: `logging.basicConfig(level=logging.INFO)`.
+
 ### 30-second demo
 
 ```python
