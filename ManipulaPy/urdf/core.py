@@ -93,7 +93,9 @@ class URDF:
         )
         self._root_link_names: Optional[List[str]] = None  # all roots
         self._end_link_names: Optional[List[str]] = None
-        self._warned_ambiguous_end_effector = False
+        # (id(self), candidate names) of the last ambiguity warning; keyed on
+        # id so copies and modified clones warn on their own.
+        self._warned_end_effector: Optional[Tuple[int, Tuple[str, ...]]] = None
         self._cfg: Dict[str, float] = {}
         self._fk_cache: Dict[str, np.ndarray] = {}
 
@@ -394,11 +396,13 @@ class URDF:
         at least one actuated joint, the first by sorted name. A leaf hanging
         off the base on fixed joints (e.g. a UR5 ``base`` frame) never
         qualifies. When more than one leaf qualifies (e.g. a Panda's two
-        fingers) a ``UserWarning`` is emitted once per URDF; pass ``tip_link``
+        fingers) a ``UserWarning`` is emitted once per URDF object; pass ``tip_link``
         to choose explicitly. If no leaf qualifies, the first leaf by name is
         returned, or the root link if there are no leaves.
         """
-        end_links = self.end_links
+        # Sorted here, not only at build time: rename_link edits the cached
+        # leaf list in place.
+        end_links = sorted(self.end_links, key=lambda link: link.name)
         if not end_links:
             return self.root_link
         candidates = []
@@ -408,10 +412,11 @@ class URDF:
             except ValueError:
                 continue
             candidates.append(link)
-        if len(candidates) > 1 and not self._warned_ambiguous_end_effector:
+        warn_key = (id(self), tuple(link.name for link in candidates))
+        if len(candidates) > 1 and self._warned_end_effector != warn_key:
             import warnings
 
-            self._warned_ambiguous_end_effector = True
+            self._warned_end_effector = warn_key
             warnings.warn(
                 f"URDF has several end-effector candidates "
                 f"{[link.name for link in candidates]}; using "

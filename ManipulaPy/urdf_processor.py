@@ -116,7 +116,9 @@ class URDFToSerialManipulator:
         # 1. Load URDF data (Slist, Blist, M, etc.) using native parser
         self.robot_data = self._extract_robot_data()
 
-        # 2. Optionally retrieve limits from PyBullet and override
+        # 2. Optionally retrieve limits from PyBullet and override. Step 1
+        # already set the URDF limits of the chain joints (one per screw
+        # column); robot.joint_limits would add joints on other branches.
         if use_pybullet_limits:
             if not PYBULLET_AVAILABLE:
                 import warnings
@@ -125,13 +127,9 @@ class URDFToSerialManipulator:
                     "PyBullet not available, using URDF joint limits instead.",
                     UserWarning,
                 )
-                self.robot_data["joint_limits"] = self.robot.joint_limits
             else:
                 pyb_joint_limits = self._get_joint_limits_from_pybullet()
                 self.robot_data["joint_limits"] = pyb_joint_limits
-        else:
-            # Use limits from URDF parser or default to (-π, π)
-            self.robot_data["joint_limits"] = self.robot.joint_limits
 
         # 3. Create SerialManipulator and dynamics
         self.serial_manipulator = self.initialize_serial_manipulator()
@@ -190,7 +188,8 @@ class URDFToSerialManipulator:
             "Slist": params["S_list"],
             "Blist": params["B_list"],
             "Glist": params["G_list"],
-            "actuated_joints_num": self.robot.num_dofs,
+            "actuated_joints_num": len(params["joint_names"]),
+            "joint_names": params["joint_names"],
             "joint_limits": params["joint_limits"],
             "Mlist_per_link": params.get("Mlist_per_link"),
         }
@@ -220,10 +219,15 @@ class URDFToSerialManipulator:
     def _get_joint_limits_from_pybullet(self) -> List[Tuple[float, float]]:
         """
         Connect to PyBullet (in DIRECT mode, so no GUI),
-        load the URDF, and retrieve per-joint limits for all revolute joints.
+        load the URDF, and retrieve the limits of the screw-axis chain joints.
+
+        Limits are matched to ``robot_data["joint_names"]`` by joint name, so
+        joints on other branches and mimic joints are ignored. A chain joint
+        PyBullet does not report keeps its URDF limit.
 
         Returns:
-            List of (lower, upper) tuples in the order they appear as revolute in the URDF.
+            List of (lower, upper) tuples, one per screw-axis column, in
+            column order.
 
         Raises:
             RuntimeError: If PyBullet is not available.
@@ -241,7 +245,7 @@ class URDFToSerialManipulator:
             # Load the URDF in PyBullet
             robot_id = p.loadURDF(self.urdf_name, useFixedBase=True)
 
-            joint_limits = []
+            limits_by_name = {}
 
             total_joints = p.getNumJoints(robot_id)
             for i in range(total_joints):
@@ -254,12 +258,17 @@ class URDFToSerialManipulator:
                     if lower_limit > upper_limit:
                         lower_limit = -np.pi
                         upper_limit = np.pi
-                    joint_limits.append((lower_limit, upper_limit))
+                    limits_by_name[joint_info[1].decode()] = (lower_limit, upper_limit)
 
         finally:
             p.disconnect(cid)
 
-        return joint_limits
+        return [
+            limits_by_name.get(name, urdf_limit)
+            for name, urdf_limit in zip(
+                self.robot_data["joint_names"], self.robot_data["joint_limits"]
+            )
+        ]
 
     def initialize_serial_manipulator(self) -> SerialManipulator:
         """

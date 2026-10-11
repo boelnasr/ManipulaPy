@@ -67,7 +67,7 @@ Choosing the end effector
   picks the first by sorted name. A leaf attached to the base by fixed joints
   only, such as a UR5 ``base`` frame, never qualifies. When several leaves
   qualify, as with a Panda's two fingers, a ``UserWarning`` names them once
-  per URDF. Pass ``tip_link`` to choose one explicitly.
+  per URDF object. Pass ``tip_link`` to choose one explicitly.
 
 Only the actuated, non-mimic joints on the chain from the root to the tip
 become columns, in chain order. ``S_list``, ``B_list``, ``omega_list``,

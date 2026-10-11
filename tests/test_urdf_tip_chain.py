@@ -100,6 +100,31 @@ def grasptarget_panda(isolated_dir):
     return path
 
 
+# base -> link1 -> link2 is the default chain (j1, j2). "side" hangs off link1
+# on j_side, which comes BETWEEN j1 and j2 in file order and has its own
+# limits, so assigning limits by position instead of by name is visible.
+SIDE_BRANCH_URDF = """<?xml version="1.0"?>
+<robot name="side_branch">
+  <link name="base_link"/><link name="link1"/><link name="link2"/><link name="side"/>
+  <joint name="j1" type="revolute">
+    <parent link="base_link"/><child link="link1"/>
+    <origin xyz="0 0 0.5"/><axis xyz="0 0 1"/>
+    <limit lower="-1" upper="1" effort="1" velocity="1"/>
+  </joint>
+  <joint name="j_side" type="revolute">
+    <parent link="link1"/><child link="side"/>
+    <origin xyz="0 0.2 0"/><axis xyz="1 0 0"/>
+    <limit lower="-0.25" upper="0.25" effort="1" velocity="1"/>
+  </joint>
+  <joint name="j2" type="revolute">
+    <parent link="link1"/><child link="link2"/>
+    <origin xyz="0.3 0 0"/><axis xyz="0 1 0"/>
+    <limit lower="-2" upper="2" effort="1" velocity="1"/>
+  </joint>
+</robot>
+"""
+
+
 def _load_quiet(path):
     from ManipulaPy.urdf import URDF
 
@@ -387,3 +412,103 @@ class TestChainRestrictedScrews:
             ]
             np.testing.assert_allclose(Jv_tip, np.asarray(lin)[:, arm_cols], atol=1e-6)
             np.testing.assert_allclose(Jw, np.asarray(ang)[:, arm_cols], atol=1e-6)
+
+
+# ------------------------------- URDFProcessor on a branched robot (Jaco)
+
+
+JACO_6DOF = (
+    REPO_ROOT / "ManipulaPy" / "ManipulaPy_data" / "kinova" / "jaco" / "jaco_6dof.urdf"
+)
+JACO_ARM = [f"j2s6s300_joint_{i}" for i in range(1, 7)]
+
+
+@pytest.fixture(scope="module")
+def jaco(isolated_dir):
+    """Jaco 6-DOF: three actuated finger joints hang off the default chain."""
+    return Path(shutil.copy(JACO_6DOF, isolated_dir / "jaco_6dof.urdf"))
+
+
+class TestProcessorDimensions:
+    """robot_data must describe the same joints as the screw-axis columns."""
+
+    @staticmethod
+    def _processor(path, **kwargs):
+        from ManipulaPy.urdf_processor import URDFToSerialManipulator
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return URDFToSerialManipulator(str(path), **kwargs)
+
+    def test_jaco_has_finger_joints_off_the_chain(self, jaco) -> None:
+        """Guard: the fixture really is branched, or the tests below prove nothing."""
+        robot = _load_quiet(jaco)
+        assert len(robot.actuated_joints) == 9
+        assert robot.extract_screw_axes()["joint_names"] == JACO_ARM
+
+    def test_robot_data_matches_screw_columns(self, jaco) -> None:
+        data = self._processor(jaco).robot_data
+        n = data["Slist"].shape[1]
+        assert n == 6
+        assert data["actuated_joints_num"] == n
+        assert len(data["joint_limits"]) == n
+        assert len(data["Glist"]) == n
+        assert data["joint_names"] == JACO_ARM
+
+    def test_limits_are_the_chain_joints_limits(self, jaco) -> None:
+        robot = _load_quiet(jaco)
+        data = self._processor(jaco).robot_data
+        expected = [robot._joint_limit(robot.joint_map[n]) for n in JACO_ARM]
+        assert data["joint_limits"] == expected
+
+    def test_serial_manipulator_accepts_a_home_vector(self, jaco) -> None:
+        proc = self._processor(jaco)
+        n = proc.robot_data["actuated_joints_num"]
+        T = np.asarray(proc.serial_manipulator.forward_kinematics(np.zeros(n)))
+        np.testing.assert_allclose(T, proc.robot_data["M"], atol=1e-12)
+
+    @pytest.mark.simulation
+    def test_pybullet_limits_follow_chain_joints(self, isolated_dir) -> None:
+        """PyBullet limits are matched to the chain by joint name, not position."""
+        path = isolated_dir / "side_branch.urdf"
+        path.write_text(SIDE_BRANCH_URDF)
+        data = self._processor(path, use_pybullet_limits=True).robot_data
+        assert data["joint_names"] == ["j1", "j2"]
+        assert data["joint_limits"] == [(-1.0, 1.0), (-2.0, 2.0)]
+
+
+# ------------------------------------- default tip after copy / rename
+
+
+class TestDefaultTipAfterModification:
+    def test_rename_keeps_sorted_rule(self) -> None:
+        """After renaming link2 -> zz_tip, z_tip is the first candidate by name.
+
+        rename_link edits the cached leaf list in place, so the rule must not
+        depend on that list staying sorted.
+        """
+        from ManipulaPy.urdf import URDF, URDFModifier
+
+        xml = BRANCHED_URDF.replace(
+            '<link name="sensor"/>',
+            '<link name="sensor"/><link name="z_tip"/>',
+        ).replace(
+            "</robot>",
+            '<joint name="j3" type="revolute"><parent link="link1"/>'
+            '<child link="z_tip"/><axis xyz="1 0 0"/>'
+            '<limit lower="-1" upper="1" effort="1" velocity="1"/></joint></robot>',
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            robot = URDF.from_xml_string(xml)
+            assert robot.end_effector_link.name == "link2"
+            renamed = URDFModifier(robot).rename_link("link2", "zz_tip").urdf
+            assert renamed.end_effector_link.name == "z_tip"
+
+    def test_copy_of_warned_urdf_still_warns(self, bundled_panda) -> None:
+        robot = _load_quiet(bundled_panda)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            robot.end_effector_link  # consume the warning on the original
+        with pytest.warns(UserWarning, match="several end-effector candidates"):
+            robot.copy().end_effector_link

@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   UR5's `base` frame instead of `tool0`. The rule is now documented and
   deterministic: among leaves whose chain from the root has at least one
   actuated joint, the first by sorted name. A `UserWarning` is emitted (once
-  per URDF) when several leaves qualify; pass `tip_link` to choose.
+  per URDF object) when several leaves qualify; pass `tip_link` to choose.
 - **`tip_link` is validated against the joint chain.** A link that exists but
   is unreachable from the root, or has no actuated joint between it and the
   root, now raises `ValueError` instead of being accepted silently.
@@ -30,9 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   column. `S_list`, `B_list`, `omega_list`, `r_list`, `G_list`,
   `Mlist_per_link` and `joint_limits` now have one entry per chain joint, in
   chain order, and the new `joint_names` key lists those joints.
-  **Behaviour change:** callers that passed `tip_link` on a branched robot get
-  fewer columns (Panda to `panda_grasptarget`: 8 → 7; to `panda_link3`:
-  8 → 3). Single-chain robots are unaffected.
+  **Behaviour change:** on a branched robot, joints on other branches no
+  longer become columns, with or without `tip_link` (Panda to
+  `panda_grasptarget`: 8 → 7; to `panda_link3`: 8 → 3; the bundled Kinova
+  Jaco by default: 9 → 6 and 10 → 7, finger joints excluded). Single-chain
+  robots are unaffected.
+- **`URDFToSerialManipulator` describes the same joints as its screw axes.**
+  `robot_data["actuated_joints_num"]` and `robot_data["joint_limits"]` now
+  follow the screw-axis chain (new `robot_data["joint_names"]`), and
+  `use_pybullet_limits=True` matches PyBullet's limits to those joints by
+  name instead of by position.
 - **`Singularity.near_singularity_detection` returned True for every
   configuration.** It compares the Jacobian condition number (always ≥ 1)
   with `threshold`, whose default was `1e-2`. The default is now `1e3`; the
