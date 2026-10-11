@@ -78,6 +78,28 @@ def bundled_panda(isolated_dir):
     return Path(shutil.copy(BUNDLED_PANDA, isolated_dir / "bundled_panda.urdf"))
 
 
+# PyBullet's panda.urdf hangs panda_grasptarget 0.105 m along panda_hand's z.
+# Injecting the same joint into the bundled Panda gives the chain-shape tests
+# a grasptarget without needing pybullet installed.
+GRASPTARGET_XML = """
+  <link name="panda_grasptarget"/>
+  <joint name="panda_grasptarget_hand" type="fixed">
+    <parent link="panda_hand"/>
+    <child link="panda_grasptarget"/>
+    <origin rpy="0 0 0" xyz="0 0 0.105"/>
+  </joint>
+</robot>"""
+
+
+@pytest.fixture(scope="module")
+def grasptarget_panda(isolated_dir):
+    xml = BUNDLED_PANDA.read_text()
+    assert xml.count("</robot>") == 1
+    path = isolated_dir / "grasptarget_panda.urdf"
+    path.write_text(xml.replace("</robot>", GRASPTARGET_XML))
+    return path
+
+
 def _load_quiet(path):
     from ManipulaPy.urdf import URDF
 
@@ -239,6 +261,7 @@ class TestTipLinkValidation:
         with pytest.raises(ValueError, match=tip):
             _branched().extract_screw_axes(tip_link=tip)
 
+    @pytest.mark.simulation
     def test_grasptarget_home_matches_pybullet(self, pb_panda) -> None:
         params = _load_quiet(pb_panda["path"]).extract_screw_axes(
             tip_link="panda_grasptarget"
@@ -252,8 +275,8 @@ class TestTipLinkValidation:
 
 
 class TestChainRestrictedScrews:
-    def test_grasptarget_has_seven_arm_columns(self, pb_panda) -> None:
-        params = _load_quiet(pb_panda["path"]).extract_screw_axes(
+    def test_grasptarget_has_seven_arm_columns(self, grasptarget_panda) -> None:
+        params = _load_quiet(grasptarget_panda).extract_screw_axes(
             tip_link="panda_grasptarget"
         )
         assert params["joint_names"] == ARM_JOINTS
@@ -265,16 +288,16 @@ class TestChainRestrictedScrews:
         assert len(params["G_list"]) == 7
         assert len(params["Mlist_per_link"]) == 7
 
-    def test_link3_has_three_columns(self, pb_panda) -> None:
-        params = _load_quiet(pb_panda["path"]).extract_screw_axes(
+    def test_link3_has_three_columns(self, grasptarget_panda) -> None:
+        params = _load_quiet(grasptarget_panda).extract_screw_axes(
             tip_link="panda_link3"
         )
         assert params["joint_names"] == ARM_JOINTS[:3]
         assert params["S_list"].shape == (6, 3)
         assert len(params["joint_limits"]) == 3
 
-    def test_limits_follow_chain_order(self, pb_panda) -> None:
-        robot = _load_quiet(pb_panda["path"])
+    def test_limits_follow_chain_order(self, grasptarget_panda) -> None:
+        robot = _load_quiet(grasptarget_panda)
         params = robot.extract_screw_axes(tip_link="panda_grasptarget")
         expected = [
             (robot.joint_map[n].limit.lower, robot.joint_map[n].limit.upper)
@@ -304,6 +327,7 @@ class TestChainRestrictedScrews:
         )
         return robot, params
 
+    @pytest.mark.simulation
     def test_fk_matches_pybullet_at_random_q(self, pb_panda) -> None:
         robot, params = self._manipulator(pb_panda)
         for q in _random_q(params["joint_limits"], 20, seed=17):
@@ -313,6 +337,7 @@ class TestChainRestrictedScrews:
                 np.testing.assert_allclose(T[:3, 3], T_pb[:3, 3], atol=1e-6)
                 assert _rotation_error_rad(T[:3, :3], T_pb[:3, :3]) < 1e-6
 
+    @pytest.mark.simulation
     def test_to_serial_manipulator_matches_pybullet_at_home(self, pb_panda) -> None:
         """FK ignores omega_list when S/B are given, so check it directly too."""
         urdf = _load_quiet(pb_panda["path"])
@@ -327,6 +352,7 @@ class TestChainRestrictedScrews:
         np.testing.assert_allclose(T[:3, 3], T_pb[:3, 3], atol=1e-6)
         assert _rotation_error_rad(T[:3, :3], T_pb[:3, :3]) < 1e-6
 
+    @pytest.mark.simulation
     def test_space_jacobian_matches_pybullet(self, pb_panda) -> None:
         """PyBullet's J is [linear at the tip point; angular], world frame.
 
