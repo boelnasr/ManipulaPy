@@ -481,7 +481,14 @@ def get_version() -> str:
 # ---------------------------------------------------------------------
 # Minimal startup (optional, can be disabled)
 # ---------------------------------------------------------------------
+# A library must not print at import: stdout belongs to the application, and
+# non-ASCII output crashed the import on Windows cp1252 consoles. The greeting
+# goes to the logger instead (silent unless the application enables INFO).
 if not os.getenv("MANIPULAPY_QUIET", "0") == "1":
-    # Lightweight greeting, no heavy imports
-    print(f"🤖 ManipulaPy v{__version__} loaded (lazy imports enabled)")
-    print("   💡 Use ManipulaPy.check_dependencies() to see available features")
+    import logging
+
+    logging.getLogger(__name__).info(
+        "ManipulaPy v%s loaded (lazy imports enabled). "
+        "Use ManipulaPy.check_dependencies() to see available features.",
+        __version__,
+    )
