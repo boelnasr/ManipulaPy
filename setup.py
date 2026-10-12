@@ -2,10 +2,10 @@
 
 pyproject.toml's [project] table is canonical. pip and `python -m build`
 (PEP 517) read it and ignore the metadata below; only a direct
-`python setup.py sdist` uses these values, and they are known to diverge —
-description, keywords and the optional-dependency extras all differ. Building
-a release with `setup.py sdist` therefore publishes stale metadata and omits
-the backend extras entirely.
+`python setup.py sdist` uses these values. They mirror pyproject.toml's
+metadata (version, description, license, dependencies, extras, keywords,
+classifiers, URLs); tests/test_packaging_metadata.py fails if they drift.
+Package data still follows the legacy MANIFEST.in layout.
 
 Build releases with `python -m build`, via the publish workflow.
 """
@@ -22,125 +22,155 @@ setup(
     version="1.4.2",
     author="Mohamed Aboelnasr",
     author_email="aboelnasr1997@gmail.com",
-    description="A comprehensive, GPU-accelerated Python framework for robotic manipulation, perception, and control",
+    description='Differentiable, GPU-accelerated robotic manipulator analysis and control — kinematics, dynamics, planning and control on NumPy, CuPy, PyTorch, or JAX',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/boelnasr/ManipulaPy",
+    license='AGPL-3.0-or-later',
     
     # FIXED: Properly find all packages including ManipulaPy_data
-    packages=find_packages(include=['ManipulaPy', 'ManipulaPy.*']),
+    packages=find_packages(
+        include=["ManipulaPy", "ManipulaPy.*"],
+        exclude=["ManipulaPy.ManipulaPy_data._source*"],
+    ),
     
     # Legacy setup.py path mirrors pyproject.toml's lightweight core install.
     # Heavy/platform-specific dependencies live in extras below.
     install_requires=[
-        "numpy>=2.0,<3.0",
-        "scipy>=1.13",
-        "matplotlib>=3.9",
-        "numba>=0.60,<0.67",
-        "pillow>=8.0.0",
+        'numpy>=2.0,<3.0',
+        'scipy>=1.13',
+        'matplotlib>=3.9',
+        'numba>=0.60,<0.67',
+        'pillow>=8.0.0',
     ],
 
     # Optional dependencies for enhanced functionality. Keep ultralytics at
     # 8.4.0+ so the vision extra works with the NumPy 2.x runtime range.
     extras_require={
-        "minimal": [
-            "numpy>=2.0,<3.0",
-            "scipy>=1.13",
-            "matplotlib>=3.9",
-            "numba>=0.60,<0.67",
-            "pybullet>=3.2.5,<4.0",
+        'minimal': [
+            'numpy>=2.0,<3.0',
+            'scipy>=1.13',
+            'matplotlib>=3.9',
+            'numba>=0.60,<0.67',
+            'pybullet>=3.2.5,<4.0',
         ],
-        "simulation": [
-            "pybullet>=3.2.5,<4.0",
+        'simulation': [
+            'pybullet>=3.2.5,<4.0',
         ],
-        "urdf": [
-            "trimesh>=3.9.14",
+        'urdf': [
+            'trimesh>=3.9.14',
         ],
-        "vision": [
-            "opencv-python>=4.8.1.78",
-            "ultralytics>=8.4.0",
-            "torch>=2.7.1",
+        'vision': [
+            'opencv-python>=4.8.1.78',
+            'ultralytics>=8.4.0',
+            'torch>=2.7.1',
         ],
-        "ml": [
-            "torch>=2.7.1",
-            "scikit-learn>=1.5.0",
+        'ml': [
+            'torch>=2.7.1',
+            'scikit-learn>=1.5.0',
         ],
-        # Default GPU extra targets CUDA 12.x (Ubuntu 22.04 + modern
-        # NVIDIA apt repos, driver 525+). Pinned to 13.x because CuPy
-        # 14.x raised its numpy floor to 2.2 and breaks ultralytics.
-        "cuda": [
+        'cuda': [
             "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
         ],
-        "all": [
-            "pybullet>=3.2.5,<4.0",
-            "trimesh>=3.9.14",
-            "opencv-python>=4.8.1.78",
-            "ultralytics>=8.4.0",
-            "torch>=2.7.1",
-            "scikit-learn>=1.5.0",
-            "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+        'pytorch': [
+            'torch>=2.7.1',
         ],
-        "gpu-cuda11": [
+        'jax-cpu': [
+            "jax[cpu]>=0.6.0; python_version >= '3.10'",
+        ],
+        'jax-cuda': [
+            "jax[cuda12]>=0.6.0; sys_platform == 'linux' and python_version >= '3.10'",
+        ],
+        'all': [
+            'pybullet>=3.2.5,<4.0',
+            'trimesh>=3.9.14',
+            'opencv-python>=4.8.1.78',
+            'ultralytics>=8.4.0',
+            'torch>=2.7.1',
+            'scikit-learn>=1.5.0',
+            "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
+            "jax[cpu]>=0.6.0; python_version >= '3.10'",
+        ],
+        'gpu-cuda11': [
             "cupy-cuda11x>=13.0,<14.0; sys_platform != 'darwin'",
         ],
-        "gpu-cuda12": [
+        'gpu-cuda12': [
             "cupy-cuda12x>=13.0,<14.0; sys_platform != 'darwin'",
         ],
-        "gpu-rocm": [
-            "cupy-rocm-4-3>=10.0.0",
+        'gpu-rocm': [
+            'cupy-rocm-4-3>=10.0.0',
         ],
-        "gpu-pycuda": [
-            "pycuda>=2021.1",
+        'gpu-pycuda': [
+            'pycuda>=2021.1',
         ],
-        "vision-headless": [
-            "opencv-python-headless>=4.8.1.78",
-            "ultralytics>=8.4.0",
-            "pillow>=8.0.0",
+        'vision-headless': [
+            'opencv-python-headless>=4.8.1.78',
+            'ultralytics>=8.4.0',
+            'pillow>=8.0.0',
         ],
-        "dev": [
-            "pytest>=6.0.0",
-            "pytest-cov>=3.0.0",
-            "pytest-mock>=3.6.0",
-            "pytest-xvfb>=2.0.0",
-            "pytest-timeout>=2.1.0",
-            "pytest-benchmark>=4.0.0",
-            "coverage[toml]>=6.0.0",
-            "black>=22.0.0",
-            "flake8>=4.0.0",
-            "isort>=5.10.0",
-            "mypy>=0.950",
-            "pre-commit>=2.15.0",
-            "tox>=4.0.0",
+        'dev': [
+            'pytest>=6.0.0',
+            'pytest-cov>=3.0.0',
+            'pytest-mock>=3.6.0',
+            'pytest-xvfb>=2.0.0',
+            'pytest-timeout>=2.1.0',
+            'pytest-benchmark>=4.0.0',
+            'coverage[toml]>=6.0.0',
+            'black>=22.0.0',
+            'flake8>=4.0.0',
+            'isort>=5.10.0',
+            'mypy>=0.950',
+            'pre-commit>=2.15.0',
+            'tox>=4.0.0',
+            "tomli>=1.2.0;python_version<'3.11'",
         ],
-        "docs": [
-            "sphinx>=4.0.0",
-            "sphinx-rtd-theme>=1.0.0",
-            "myst-parser>=0.15.0",
-            "sphinx-autodoc-typehints>=1.12.0",
-            "nbsphinx>=0.8.0",
-            "jupyter>=1.0.0",
+        'docs': [
+            'sphinx>=8.0.0,<9.0.0',
+            'pydata-sphinx-theme>=0.18.0,<0.20.0',
+            'sphinx-rtd-theme>=3.0.0,<4.0.0',
+            'myst-parser>=4.0.0,<5.0.0',
+            'sphinx-autodoc-typehints>=3.0.0,<4.0.0',
+            'nbsphinx>=0.8.0',
+            'jupyter>=1.0.0',
+        ],
+        'ci': [
+            'pytest>=6.0.0',
+            'pytest-cov>=3.0.0',
+            'pytest-mock>=3.6.0',
+            'pytest-xvfb>=2.0.0',
+            'pytest-timeout>=2.1.0',
+            'coverage[toml]>=6.0.0',
+            'opencv-python-headless>=4.8.1.78',
+            "tomli>=1.2.0;python_version<'3.11'",
+        ],
+        'test-minimal': [
+            'ManipulaPy[minimal,dev]',
+        ],
+        'test-full': [
+            'ManipulaPy[dev]',
+        ],
+        'test-ci': [
+            'ManipulaPy[ci,vision-headless]',
         ],
     },
     
     # Package classification
     classifiers=[
-        "Development Status :: 4 - Beta",
-        "Intended Audience :: Science/Research",
-        "Intended Audience :: Developers",
-        "Intended Audience :: Education",
-        "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
-        "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.9", 
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-        "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "Topic :: Scientific/Engineering :: Physics",
-        "Topic :: Scientific/Engineering :: Mathematics",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-        "Topic :: Multimedia :: Graphics :: 3D Modeling",
-        "Topic :: System :: Hardware :: Hardware Drivers",
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Science/Research',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
+        'License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+        'Topic :: Scientific/Engineering :: Physics',
+        'Topic :: Scientific/Engineering :: Mathematics',
+        'Topic :: Software Development :: Libraries :: Python Modules',
+        'Operating System :: OS Independent',
+        'Intended Audience :: Developers',
+        'Intended Audience :: Education',
     ],
     
     # Python version requirements
@@ -160,39 +190,34 @@ setup(
     
     # Project URLs for PyPI
     project_urls={
-        "Homepage": "https://github.com/boelnasr/ManipulaPy",
-        "Documentation": "https://manipulapy.readthedocs.io/",
-        "Repository": "https://github.com/boelnasr/ManipulaPy.git",
-        "Issues": "https://github.com/boelnasr/ManipulaPy/issues",
-        "Discussions": "https://github.com/boelnasr/ManipulaPy/discussions",
-        "Changelog": "https://github.com/boelnasr/ManipulaPy/blob/main/CHANGELOG.md",
-        "Paper": "https://joss.theoj.org/papers/10.21105/joss.xxxxx",  # Update when published
+        'Homepage': 'https://github.com/boelnasr/ManipulaPy',
+        'Documentation': 'https://manipulapy.readthedocs.io/',
+        'Repository': 'https://github.com/boelnasr/ManipulaPy.git',
+        'Bug Tracker': 'https://github.com/boelnasr/ManipulaPy/issues',
+        'Changelog': 'https://github.com/boelnasr/ManipulaPy/blob/main/CHANGELOG.md',
+        'Funding': 'https://github.com/sponsors/boelnasr',
     },
     
     # Keywords for discoverability
     keywords=[
-        # Core robotics
-        "robotics", "manipulator", "robot-arm", "kinematics", "dynamics",
-        "jacobian", "forward-kinematics", "inverse-kinematics", 
-        
-        # Planning and control
-        "trajectory-planning", "path-planning", "motion-planning",
-        "control-systems", "pid-control", "computed-torque",
-        
-        # Simulation and modeling
-        "simulation", "pybullet", "physics-simulation", "urdf",
-        "robot-modeling", "serial-manipulator",
-        
-        # Computer vision and perception
-        "computer-vision", "perception", "stereo-vision", "yolo",
-        "object-detection", "point-cloud", "obstacle-detection",
-        
-        # Performance and acceleration
-        "cuda", "gpu-acceleration", "high-performance", "real-time",
-        "parallel-computing", "scientific-computing",
-        
-        # File formats and standards
-        "urdf-parser", "se3", "lie-groups", "screw-theory",
+        'robotics',
+        'kinematics',
+        'inverse-kinematics',
+        'dynamics',
+        'manipulator',
+        'trajectory-planning',
+        'motion-planning',
+        'simulation',
+        'control-systems',
+        'differentiable-robotics',
+        'differentiable-simulation',
+        'autodiff',
+        'jax',
+        'pytorch',
+        'cupy',
+        'gpu',
+        'cuda',
+        'computer-vision',
     ],
     
     # Entry points for command-line tools (if any)
