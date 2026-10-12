@@ -15,3 +15,11 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "deps"
+    ignore:
+      # numba carries a tighter NumPy pin than this project declares, so its
+      # ceiling — not ours — decides the NumPy actually installed. 0.67 raised
+      # that ceiling to admit NumPy 2.5, which breaks the golden-signature
+      # tests (NumPy 2.5 respells NDArray annotations). Raising this bound is a
+      # deliberate release decision, not a routine bump; see CHANGELOG 1.4.1.
+      - dependency-name: "numba"
+        versions: [">=0.67"]
