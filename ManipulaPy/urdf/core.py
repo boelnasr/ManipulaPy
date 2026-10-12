@@ -395,9 +395,14 @@ class URDF:
         Rule: among the leaf links whose chain from the primary root contains
         at least one actuated joint, the first by sorted name. A leaf hanging
         off the base on fixed joints (e.g. a UR5 ``base`` frame) never
-        qualifies. When more than one leaf qualifies (e.g. a Panda's two
-        fingers) a ``UserWarning`` is emitted once per URDF object; pass ``tip_link``
-        to choose explicitly. If no leaf qualifies, the first leaf by name is
+        qualifies. Leaves whose chain has no mimic joint are preferred (e.g.
+        a Panda's ``panda_leftfinger`` over ``panda_rightfinger``). When more
+        than one preferred leaf qualifies a ``UserWarning`` is emitted once
+        per URDF object; pass ``tip_link`` to choose explicitly. If every
+        qualifying leaf is behind a mimic joint (e.g. Robotiq 2F grippers),
+        the first by name is still returned, with a ``UserWarning``: the
+        screw-axis model holds those mimic joints at 0, so its kinematics
+        past them are wrong. If no leaf qualifies, the first leaf by name is
         returned, or the root link if there are no leaves.
         """
         # Sorted here, not only at build time: rename_link edits the cached
@@ -408,33 +413,57 @@ class URDF:
         candidates = []
         for link in end_links:
             try:
-                self._actuated_chain(link.name)
+                self._actuated_chain(link.name, allow_mimic=True)
             except ValueError:
                 continue
             candidates.append(link)
+        preferred = [link for link in candidates if not self._mimic_joints(link)]
         warn_key = (id(self), tuple(link.name for link in candidates))
-        if len(candidates) > 1 and self._warned_end_effector != warn_key:
+        message = None
+        if len(preferred) > 1:
+            message = (
+                f"URDF has several end-effector candidates "
+                f"{[link.name for link in preferred]}; using "
+                f"'{preferred[0].name}' (first by name). Pass tip_link to "
+                "choose explicitly."
+            )
+        elif candidates and not preferred:
+            message = (
+                f"Default end effector '{candidates[0].name}' depends on "
+                f"{self._describe_mimics(self._mimic_joints(candidates[0]))}; "
+                "the screw-axis model holds mimic joints at 0, so kinematics "
+                "past them are wrong. Pass tip_link to select a link whose "
+                "chain has no mimic joints."
+            )
+        if message is not None and self._warned_end_effector != warn_key:
             import warnings
 
             self._warned_end_effector = warn_key
-            warnings.warn(
-                f"URDF has several end-effector candidates "
-                f"{[link.name for link in candidates]}; using "
-                f"'{candidates[0].name}' (first by name). Pass tip_link to "
-                "choose explicitly.",
-                UserWarning,
-                stacklevel=2,
-            )
+            warnings.warn(message, UserWarning, stacklevel=2)
+        if preferred:
+            return preferred[0]
         return candidates[0] if candidates else end_links[0]
 
-    def _actuated_chain(self, tip_link: str) -> List[Joint]:
+    def _mimic_joints(self, link: Link) -> List[Joint]:
+        """Mimic joints on the chain from the primary root to ``link``."""
+        return [j for j in self.get_chain(self.root_link.name, link.name) if j.is_mimic]
+
+    @staticmethod
+    def _describe_mimics(joints: List[Joint]) -> str:
+        return "mimic joint " + ", ".join(
+            f"'{j.name}' (driven by '{j.mimic.joint}')" for j in joints
+        )
+
+    def _actuated_chain(self, tip_link: str, allow_mimic: bool = False) -> List[Joint]:
         """Actuated, non-mimic joints from the primary root to ``tip_link``.
 
-        Joints are in chain order (root first).
+        Joints are in chain order (root first). With ``allow_mimic``, mimic
+        joints on the chain are skipped (held at 0) instead of rejected.
 
         Raises:
             ValueError: if ``tip_link`` is unknown, unreachable from the
-                primary root, or has no actuated joint on its chain.
+                primary root, has no actuated joint on its chain, or (unless
+                ``allow_mimic``) has a mimic joint on its chain.
         """
         if tip_link not in self._links:
             raise ValueError(f"tip_link '{tip_link}' not found among links")
@@ -445,6 +474,16 @@ class URDF:
             raise ValueError(
                 f"tip_link '{tip_link}' has no actuated joint on its chain "
                 f"from root '{root}'"
+            )
+        mimics = [j for j in chain if j.is_mimic]
+        if mimics and not allow_mimic:
+            # One PoE column per independent joint cannot express a joint
+            # that moves with its driver; it would silently stay at 0.
+            raise ValueError(
+                f"tip_link '{tip_link}' depends on "
+                f"{self._describe_mimics(mimics)}; mimic joints are not "
+                "supported in the screw-axis model. Choose a tip whose chain "
+                "has no mimic joints."
             )
         return actuated
 
@@ -745,10 +784,15 @@ class URDF:
             joint_limits, Mlist_per_link, joint_names (chain joint names, in
             column order)
 
+        Mimic joints have no column. An explicit ``tip_link`` behind a mimic
+        joint is rejected. The default tip avoids mimic chains where it can;
+        otherwise it warns and the mimic joints are held at 0 (see
+        ``end_effector_link``).
+
         Raises:
             ValueError: if the robot has no actuated joints, or ``tip_link``
-                is unknown, unreachable from the root, or has no actuated
-                joint on its chain.
+                is unknown, unreachable from the root, has no actuated joint
+                on its chain, or has a mimic joint on its chain.
         """
         from ..utils import adjoint_transform
 
@@ -756,8 +800,13 @@ class URDF:
             raise ValueError("No actuated joints found")
 
         # End-effector selectable; the chain to it defines the columns
-        ee_link = tip_link if tip_link is not None else self.end_effector_link.name
-        actuated = self._actuated_chain(ee_link)
+        if tip_link is None:
+            # The default warns (never raises) when it must use a mimic chain.
+            ee_link = self.end_effector_link.name
+            actuated = self._actuated_chain(ee_link, allow_mimic=True)
+        else:
+            ee_link = tip_link
+            actuated = self._actuated_chain(ee_link)
         n = len(actuated)
 
         # Compute FK at home position (all zeros)

@@ -248,15 +248,18 @@ class TestDefaultEndEffector:
         assert len(outputs) == 1, outputs
         assert outputs.pop().startswith("RESULT panda_leftfinger ")
 
-    def test_ambiguous_default_warns_and_picks_sorted_first(
-        self, bundled_panda
-    ) -> None:
+    def test_ambiguous_default_warns_and_picks_sorted_first(self) -> None:
+        """Two mimic-free leaves (link2, side) -> warn and pick link2.
+
+        (The Panda is no longer ambiguous: panda_rightfinger sits behind a
+        mimic joint, so panda_leftfinger is the only preferred candidate.)
+        """
         from ManipulaPy.urdf import URDF
 
-        with pytest.warns(UserWarning, match="panda_leftfinger.*panda_rightfinger"):
-            robot = URDF.load(bundled_panda)
+        robot = URDF.from_xml_string(SIDE_BRANCH_URDF)
+        with pytest.warns(UserWarning, match="link2.*side"):
             ee = robot.end_effector_link
-        assert ee.name == "panda_leftfinger"
+        assert ee.name == "link2"
 
     def test_leaf_without_actuated_joints_is_not_a_candidate(self) -> None:
         """'sensor' sorts after 'link2' but must never win; only one candidate."""
@@ -505,8 +508,10 @@ class TestDefaultTipAfterModification:
             renamed = URDFModifier(robot).rename_link("link2", "zz_tip").urdf
             assert renamed.end_effector_link.name == "z_tip"
 
-    def test_copy_of_warned_urdf_still_warns(self, bundled_panda) -> None:
-        robot = _load_quiet(bundled_panda)
+    def test_copy_of_warned_urdf_still_warns(self) -> None:
+        from ManipulaPy.urdf import URDF
+
+        robot = URDF.from_xml_string(SIDE_BRANCH_URDF)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             robot.end_effector_link  # consume the warning on the original
