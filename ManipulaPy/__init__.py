@@ -481,14 +481,13 @@ def get_version() -> str:
 # ---------------------------------------------------------------------
 # Minimal startup (optional, can be disabled)
 # ---------------------------------------------------------------------
-# A library must not print at import: stdout belongs to the application, and
-# non-ASCII output crashed the import on Windows cp1252 consoles. The greeting
-# goes to the logger instead (silent unless the application enables INFO).
+# The greeting goes to stderr, never stdout (stdout belongs to the application,
+# e.g. piped output), and is plain ASCII: the emoji banner this replaced raised
+# UnicodeEncodeError on Windows cp1252 consoles and crashed the import.
 if not os.getenv("MANIPULAPY_QUIET", "0") == "1":
-    import logging
-
-    logging.getLogger(__name__).info(
-        "ManipulaPy v%s loaded (lazy imports enabled). "
-        "Use ManipulaPy.check_dependencies() to see available features.",
-        __version__,
+    print(
+        f"ManipulaPy {__version__} loaded - "
+        "run ManipulaPy.check_dependencies() for available features "
+        "(set MANIPULAPY_QUIET=1 to hide this message)",
+        file=sys.stderr,
     )

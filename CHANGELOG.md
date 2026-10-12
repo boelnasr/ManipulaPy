@@ -62,9 +62,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   **Behaviour change:** calls relying on the default now return False away
   from singularities. Calls that pass their own threshold are unaffected.
 - **`import ManipulaPy` crashed on Windows consoles using cp1252.** The import
-  greeting printed emoji to stdout (`UnicodeEncodeError`). Nothing is printed
-  at import any more; the greeting goes to the `ManipulaPy` logger at INFO.
-  `MANIPULAPY_QUIET=1` is still accepted.
+  greeting printed emoji to stdout (`UnicodeEncodeError`). It is now plain
+  ASCII and goes to stderr, so stdout stays clean at import;
+  `MANIPULAPY_QUIET=1` still hides it.
 - **`utils.extract_omega_list` sliced a 6 × n screw matrix as the first three
   screws.** It now returns the 3 × n rotation axes for a 6 × n input (square
   6 × 6 included) and still accepts the legacy n × 6 layout; other shapes raise
