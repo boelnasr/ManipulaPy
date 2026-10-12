@@ -400,9 +400,11 @@ class URDF:
         than one preferred leaf qualifies a ``UserWarning`` is emitted once
         per URDF object; pass ``tip_link`` to choose explicitly. If every
         qualifying leaf is behind a mimic joint (e.g. Robotiq 2F grippers),
-        the first by name is still returned, with a ``UserWarning``: the
-        screw-axis model holds those mimic joints at 0, so its kinematics
-        past them are wrong. If no leaf qualifies, the first leaf by name is
+        the first by name is still returned; every conversion that uses it
+        (``extract_screw_axes`` and the ``to_*`` methods without
+        ``tip_link``) warns that the screw-axis model holds those mimic
+        joints at 0, so its kinematics past them are wrong. If no leaf
+        qualifies, the first leaf by name is
         returned, or the root link if there are no leaves.
         """
         # Sorted here, not only at build time: rename_link edits the cached
@@ -419,27 +421,18 @@ class URDF:
             candidates.append(link)
         preferred = [link for link in candidates if not self._mimic_joints(link)]
         warn_key = (id(self), tuple(link.name for link in candidates))
-        message = None
-        if len(preferred) > 1:
-            message = (
-                f"URDF has several end-effector candidates "
-                f"{[link.name for link in preferred]}; using "
-                f"'{preferred[0].name}' (first by name). Pass tip_link to "
-                "choose explicitly."
-            )
-        elif candidates and not preferred:
-            message = (
-                f"Default end effector '{candidates[0].name}' depends on "
-                f"{self._describe_mimics(self._mimic_joints(candidates[0]))}; "
-                "the screw-axis model holds mimic joints at 0, so kinematics "
-                "past them are wrong. Pass tip_link to select a link whose "
-                "chain has no mimic joints."
-            )
-        if message is not None and self._warned_end_effector != warn_key:
+        if len(preferred) > 1 and self._warned_end_effector != warn_key:
             import warnings
 
             self._warned_end_effector = warn_key
-            warnings.warn(message, UserWarning, stacklevel=2)
+            warnings.warn(
+                f"URDF has several end-effector candidates "
+                f"{[link.name for link in preferred]}; using "
+                f"'{preferred[0].name}' (first by name). Pass tip_link to "
+                "choose explicitly.",
+                UserWarning,
+                stacklevel=2,
+            )
         if preferred:
             return preferred[0]
         return candidates[0] if candidates else end_links[0]
@@ -786,7 +779,7 @@ class URDF:
 
         Mimic joints have no column. An explicit ``tip_link`` behind a mimic
         joint is rejected. The default tip avoids mimic chains where it can;
-        otherwise it warns and the mimic joints are held at 0 (see
+        otherwise every call warns and the mimic joints are held at 0 (see
         ``end_effector_link``).
 
         Raises:
@@ -801,9 +794,23 @@ class URDF:
 
         # End-effector selectable; the chain to it defines the columns
         if tip_link is None:
-            # The default warns (never raises) when it must use a mimic chain.
+            # The default never raises, but a model built across mimic joints
+            # is wrong, so every such conversion warns (not once per object).
             ee_link = self.end_effector_link.name
             actuated = self._actuated_chain(ee_link, allow_mimic=True)
+            mimics = self._mimic_joints(self._links[ee_link])
+            if mimics:
+                import warnings
+
+                warnings.warn(
+                    f"Default end effector '{ee_link}' depends on "
+                    f"{self._describe_mimics(mimics)}; the screw-axis model "
+                    "holds mimic joints at 0, so kinematics past them are "
+                    "wrong. Pass tip_link to select a link whose chain has no "
+                    "mimic joints.",
+                    UserWarning,
+                    stacklevel=2,
+                )
         else:
             ee_link = tip_link
             actuated = self._actuated_chain(ee_link)

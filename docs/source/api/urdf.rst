@@ -76,8 +76,8 @@ follows:
   ``panda_leftfinger``. When several preferred leaves qualify, a
   ``UserWarning`` names them once per URDF object. If every leaf is behind a
   mimic joint (Robotiq 2F grippers, xArm6 with gripper), the first by name is
-  still used and a ``UserWarning`` says that the model holds those mimic
-  joints at 0. Pass ``tip_link`` to choose a tip explicitly.
+  still used, and every conversion of it emits a ``UserWarning`` that the
+  model holds those mimic joints at 0. Pass ``tip_link`` to choose a tip explicitly.
 
 Only the actuated, non-mimic joints on the chain from the root to the tip
 become columns, in chain order. ``S_list``, ``B_list``, ``omega_list``,

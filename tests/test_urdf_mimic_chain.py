@@ -136,6 +136,18 @@ class TestDefaultFallsBackToMimicChain:
         assert robot.end_effector_link.name == "tip"
         assert list(params["joint_names"]) == ["j1"]
 
+    def test_every_default_conversion_warns(self) -> None:
+        """The wrong model must never be returned silently, not even on a
+        second conversion of the same URDF object."""
+        from ManipulaPy.urdf import URDF
+
+        robot = URDF.from_xml_string(MIMIC_ONLY_URDF)
+        for _ in range(2):
+            with pytest.warns(UserWarning, match="holds mimic joints at 0"):
+                robot.extract_screw_axes()
+        with pytest.warns(UserWarning, match="holds mimic joints at 0"):
+            robot.to_serial_manipulator()
+
     def test_robotiq_85_default_unchanged_with_mimic_warning(
         self, robotiq_85_path
     ) -> None:

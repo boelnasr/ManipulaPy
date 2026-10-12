@@ -51,9 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValueError` naming the joint and its driver (e.g. Panda
   `panda_rightfinger`). The default end effector prefers leaves without
   mimic joints on their chain; when none exists (Robotiq 2F-85/140, xArm6
-  with gripper) it keeps the previous tip and emits a `UserWarning` that the
-  model is wrong past the mimic joints. These defaults were already wrong in
-  1.4.1, without a warning.
+  with gripper) it keeps the previous tip, and every conversion of it emits a
+  `UserWarning` that the model is wrong past the mimic joints. These defaults
+  were already wrong in 1.4.1, without a warning.
 - **`Singularity.near_singularity_detection` returned True for every
   configuration.** It compares the Jacobian condition number (always ≥ 1)
   with `threshold`, whose default was `1e-2`. The default is now `1e3`; the
