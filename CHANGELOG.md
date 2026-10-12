@@ -36,10 +36,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Jaco by default: 9 → 6 and 10 → 7, finger joints excluded). Single-chain
   robots are unaffected.
 - **`URDFToSerialManipulator` describes the same joints as its screw axes.**
-  `robot_data["actuated_joints_num"]` and `robot_data["joint_limits"]` now
-  follow the screw-axis chain (new `robot_data["joint_names"]`), and
-  `use_pybullet_limits=True` matches PyBullet's limits to those joints by
-  name instead of by position.
+  Its configuration vector is the screw-axis chain, in
+  `robot_data["joint_names"]` order: `robot_data["actuated_joints_num"]`,
+  `robot_data["joint_limits"]`, `num_dofs`, `joint_names`,
+  `joint_limits_array` and the IK initial guess all follow it, and
+  `use_pybullet_limits=True` matches PyBullet's limits to those joints by name
+  instead of by position. Batch FK, `link_fk`, `get_transform` and the
+  visualisation helpers take chain configurations and set joints on other
+  branches to 0 by name. **Behaviour change** on branched robots only:
+  whole-robot-width arrays passed to these methods now raise `ValueError`.
+- **Mimic joints on the tip chain are no longer silently held at 0.** The
+  screw-axis model has no column for a joint that moves with its driver, so
+  an explicit `tip_link` whose chain contains a mimic joint now raises
+  `ValueError` naming the joint and its driver (e.g. Panda
+  `panda_rightfinger`). The default end effector prefers leaves without
+  mimic joints on their chain; when none exists (Robotiq 2F-85/140, xArm6
+  with gripper) it keeps the previous tip and emits a `UserWarning` that the
+  model is wrong past the mimic joints. These defaults were already wrong in
+  1.4.1, without a warning.
 - **`Singularity.near_singularity_detection` returned True for every
   configuration.** It compares the Jacobian condition number (always ≥ 1)
   with `threshold`, whose default was `1e-2`. The default is now `1e3`; the
