@@ -35,7 +35,7 @@ Most Python robotics packages cover one slice well — kinematics, simulation, o
 
 ## Updated during the submission period
 
-Fixes shipped in [1.4.2](CHANGELOG.md#142--2026-10-11):
+Fixes shipped in [1.4.2](CHANGELOG.md#142--2026-10-13):
 
 - **Deterministic default end effector**: no longer depends on `PYTHONHASHSEED`, and it follows a documented rule. ([7c7c27f](https://github.com/boelnasr/ManipulaPy/commit/7c7c27f09b9d8c756d7191fe9c77fc8ac4d82043))
 - **`tip_link` validated against the joint chain**: an unreachable link, or one with no actuated joint to the root, raises `ValueError`. ([7c7c27f](https://github.com/boelnasr/ManipulaPy/commit/7c7c27f09b9d8c756d7191fe9c77fc8ac4d82043))

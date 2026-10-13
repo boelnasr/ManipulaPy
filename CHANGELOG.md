@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.2] — 2026-10-11
+## [1.4.2] — 2026-10-13
 
 > **Summary:** Five correctness fixes in URDF conversion, singularity
 > detection and import behaviour, found while integrating ManipulaPy into a
@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   6 × 6 included) and still accepts the legacy n × 6 layout; other shapes raise
   `ValueError`. This also corrects `omega_list` on robots built by
   `URDF.to_serial_manipulator()` and `URDF.to_manipulator_dynamics()`.
+  **Behaviour change:** a legacy n × 6 input now also returns 3 × n (one
+  column per screw); it returned n × 3 before.
 
 ## [1.4.1] — 2026-08-14
 
