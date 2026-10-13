@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for ManipulaPy/__init__.py: 40.4%</title>
+    <title>Coverage for ManipulaPy/__init__.py: 40.1%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
-    <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
+    <script src="coverage_html_cb_15cffcd0.js" defer></script>
 </head>
 <body class="pyfile">
 <header>
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>ManipulaPy<span class="sep">/</span>__init__.py</b>:
-            <span class="pc_cov">40.4%</span>
+            <span class="pc_cov">40.1%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,8 +55,8 @@
             </div>
         </aside>
         <h2>
-            <span class="text">146 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">70<span class="text"> run</span></button>
+            <span class="text">145 statements &nbsp;</span>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">69<span class="text"> run</span></button>
             <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">76<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">25<span class="text"> excluded</span></button>
             <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">6<span class="text"> partial</span></button>
@@ -66,8 +66,8 @@
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a id="nextFileLink" class="nav" href="z_2f2fd5884e5563ec___init___py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-09-02 07:49 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
+            created at 2026-10-13 20:05 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -104,7 +104,7 @@
     <p class="run"><span class="n"><a id="t20" href="#t20">20</a></span><span class="t"><span class="key">from</span> <span class="nam">typing</span> <span class="key">import</span> <span class="nam">Any</span><span class="op">,</span> <span class="nam">Dict</span><span class="op">,</span> <span class="nam">List</span><span class="op">,</span> <span class="nam">Optional</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t21" href="#t21">21</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t22" href="#t22">22</a></span><span class="t"><span class="com"># Package metadata (always available, no imports)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t"><span class="nam">__version__</span> <span class="op">=</span> <span class="str">&quot;1.4.1&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t23" href="#t23">23</a></span><span class="t"><span class="nam">__version__</span> <span class="op">=</span> <span class="str">&quot;1.4.2&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t24" href="#t24">24</a></span><span class="t"><span class="nam">__author__</span> <span class="op">=</span> <span class="str">&quot;Mohamed Aboelnasr&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t25" href="#t25">25</a></span><span class="t"><span class="nam">__license__</span> <span class="op">=</span> <span class="str">&quot;AGPL-3.0-or-later&quot;</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t26" href="#t26">26</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -565,10 +565,16 @@
     <p class="pln"><span class="n"><a id="t481" href="#t481">481</a></span><span class="t"><span class="com"># ---------------------------------------------------------------------</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t482" href="#t482">482</a></span><span class="t"><span class="com"># Minimal startup (optional, can be disabled)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t483" href="#t483">483</a></span><span class="t"><span class="com"># ---------------------------------------------------------------------</span>&nbsp;</span><span class="r"></span></p>
-    <p class="par run show_par"><span class="n"><a id="t484" href="#t484">484</a></span><span class="t"><span class="key">if</span> <span class="key">not</span> <span class="nam">os</span><span class="op">.</span><span class="nam">getenv</span><span class="op">(</span><span class="str">&quot;MANIPULAPY_QUIET&quot;</span><span class="op">,</span> <span class="str">&quot;0&quot;</span><span class="op">)</span> <span class="op">==</span> <span class="str">&quot;1&quot;</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">484&#x202F;&#x219B;&#x202F;exit</span><span class="annotate long">line 484 didn't exit the module because the condition on line 484 was always true</span></span></p>
-    <p class="pln"><span class="n"><a id="t485" href="#t485">485</a></span><span class="t">    <span class="com"># Lightweight greeting, no heavy imports</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t486" href="#t486">486</a></span><span class="t">    <span class="nam">print</span><span class="op">(</span><span class="fst">f&quot;</span><span class="fst">&#129302; ManipulaPy v</span><span class="op">{</span><span class="nam">__version__</span><span class="op">}</span><span class="fst"> loaded (lazy imports enabled)</span><span class="fst">&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t487" href="#t487">487</a></span><span class="t">    <span class="nam">print</span><span class="op">(</span><span class="str">&quot;   &#128161; Use ManipulaPy.check_dependencies() to see available features&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t484" href="#t484">484</a></span><span class="t"><span class="com"># The greeting goes to stderr, never stdout (stdout belongs to the application,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t485" href="#t485">485</a></span><span class="t"><span class="com"># e.g. piped output), and is plain ASCII: the emoji banner this replaced raised</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t486" href="#t486">486</a></span><span class="t"><span class="com"># UnicodeEncodeError on Windows cp1252 consoles and crashed the import.</span>&nbsp;</span><span class="r"></span></p>
+    <p class="par run show_par"><span class="n"><a id="t487" href="#t487">487</a></span><span class="t"><span class="key">if</span> <span class="key">not</span> <span class="nam">os</span><span class="op">.</span><span class="nam">getenv</span><span class="op">(</span><span class="str">&quot;MANIPULAPY_QUIET&quot;</span><span class="op">,</span> <span class="str">&quot;0&quot;</span><span class="op">)</span> <span class="op">==</span> <span class="str">&quot;1&quot;</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">487&#x202F;&#x219B;&#x202F;exit</span><span class="annotate long">line 487 didn't exit the module because the condition on line 487 was always true</span></span></p>
+    <p class="run"><span class="n"><a id="t488" href="#t488">488</a></span><span class="t">    <span class="nam">print</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t489" href="#t489">489</a></span><span class="t">        <span class="fst">f&quot;</span><span class="fst">ManipulaPy </span><span class="op">{</span><span class="nam">__version__</span><span class="op">}</span><span class="fst"> loaded - </span><span class="fst">&quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t490" href="#t490">490</a></span><span class="t">        <span class="str">&quot;run ManipulaPy.check_dependencies() for available features &quot;</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t491" href="#t491">491</a></span><span class="t">        <span class="str">&quot;(set MANIPULAPY_QUIET=1 to hide this message)&quot;</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t492" href="#t492">492</a></span><span class="t">        <span class="nam">file</span><span class="op">=</span><span class="nam">sys</span><span class="op">.</span><span class="nam">stderr</span><span class="op">,</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t493" href="#t493">493</a></span><span class="t">    <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
 </main>
 <footer>
     <div class="content">
@@ -577,8 +583,8 @@
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a class="nav" href="z_2f2fd5884e5563ec___init___py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-09-02 07:49 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
+            created at 2026-10-13 20:05 +0000
         </p>
     </div>
 </footer>

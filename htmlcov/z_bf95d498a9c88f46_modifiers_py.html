@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for ManipulaPy/urdf/modifiers.py: 44.1%</title>
+    <title>Coverage for ManipulaPy/urdf/modifiers.py: 48.6%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
     <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
-    <script src="coverage_html_cb_dd2e7eb5.js" defer></script>
+    <script src="coverage_html_cb_15cffcd0.js" defer></script>
 </head>
 <body class="pyfile">
 <header>
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>ManipulaPy<span class="sep">/</span>urdf<span class="sep">/</span>modifiers.py</b>:
-            <span class="pc_cov">44.1%</span>
+            <span class="pc_cov">48.6%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -56,18 +56,18 @@
         </aside>
         <h2>
             <span class="text">296 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">148<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">148<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">161<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">135<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">21<span class="text"> excluded</span></button>
-            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">29<span class="text"> partial</span></button>
+            <button type="button" class="par run show_par button_toggle_par" value="par" data-shortcut="p" title="Toggle lines partially run">32<span class="text"> partial</span></button>
         </h2>
         <p class="text">
             <a id="prevFileLink" class="nav" href="z_29b6cb72fcd8e8eb_primitives_py.html">&#xab; prev</a> &nbsp; &nbsp;
             <a id="indexLink" class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a id="nextFileLink" class="nav" href="z_bf95d498a9c88f46_parser_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-09-02 07:49 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
+            created at 2026-10-13 20:05 +0000
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -567,31 +567,31 @@
     <p class="pln"><span class="n"><a id="t483" href="#t483">483</a></span><span class="t"><span class="str">        Returns:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t484" href="#t484">484</a></span><span class="t"><span class="str">            self for method chaining</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t485" href="#t485">485</a></span><span class="t"><span class="str">        &quot;&quot;&quot;</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t486" href="#t486">486</a></span><span class="t">        <span class="key">if</span> <span class="nam">old_name</span> <span class="key">not</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_links</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t486" href="#t486">486</a></span><span class="t">        <span class="key">if</span> <span class="nam">old_name</span> <span class="key">not</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_links</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t487" href="#t487">487</a></span><span class="t">            <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="fst">f&quot;</span><span class="fst">Link &#x27;</span><span class="op">{</span><span class="nam">old_name</span><span class="op">}</span><span class="fst">&#x27; not found</span><span class="fst">&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t488" href="#t488">488</a></span><span class="t">        <span class="key">if</span> <span class="nam">new_name</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_links</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t488" href="#t488">488</a></span><span class="t">        <span class="key">if</span> <span class="nam">new_name</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_links</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="exc show_exc"><span class="n"><a id="t489" href="#t489">489</a></span><span class="t">            <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="fst">f&quot;</span><span class="fst">Link &#x27;</span><span class="op">{</span><span class="nam">new_name</span><span class="op">}</span><span class="fst">&#x27; already exists</span><span class="fst">&quot;</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t490" href="#t490">490</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t491" href="#t491">491</a></span><span class="t">        <span class="nam">link</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_links</span><span class="op">.</span><span class="nam">pop</span><span class="op">(</span><span class="nam">old_name</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t492" href="#t492">492</a></span><span class="t">        <span class="nam">link</span><span class="op">.</span><span class="nam">name</span> <span class="op">=</span> <span class="nam">new_name</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t493" href="#t493">493</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_links</span><span class="op">[</span><span class="nam">new_name</span><span class="op">]</span> <span class="op">=</span> <span class="nam">link</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t491" href="#t491">491</a></span><span class="t">        <span class="nam">link</span> <span class="op">=</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_links</span><span class="op">.</span><span class="nam">pop</span><span class="op">(</span><span class="nam">old_name</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t492" href="#t492">492</a></span><span class="t">        <span class="nam">link</span><span class="op">.</span><span class="nam">name</span> <span class="op">=</span> <span class="nam">new_name</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t493" href="#t493">493</a></span><span class="t">        <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_links</span><span class="op">[</span><span class="nam">new_name</span><span class="op">]</span> <span class="op">=</span> <span class="nam">link</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t494" href="#t494">494</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t495" href="#t495">495</a></span><span class="t">        <span class="com"># Update joint references</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t496" href="#t496">496</a></span><span class="t">        <span class="key">for</span> <span class="nam">joint</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_joints</span><span class="op">.</span><span class="nam">values</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t497" href="#t497">497</a></span><span class="t">            <span class="key">if</span> <span class="nam">joint</span><span class="op">.</span><span class="nam">parent</span> <span class="op">==</span> <span class="nam">old_name</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t496" href="#t496">496</a></span><span class="t">        <span class="key">for</span> <span class="nam">joint</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_joints</span><span class="op">.</span><span class="nam">values</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="par run show_par"><span class="n"><a id="t497" href="#t497">497</a></span><span class="t">            <span class="key">if</span> <span class="nam">joint</span><span class="op">.</span><span class="nam">parent</span> <span class="op">==</span> <span class="nam">old_name</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">497&#x202F;&#x219B;&#x202F;498</span><span class="annotate long">line 497 didn't jump to line 498 because the condition on line 497 was never true</span></span></p>
     <p class="mis show_mis"><span class="n"><a id="t498" href="#t498">498</a></span><span class="t">                <span class="nam">joint</span><span class="op">.</span><span class="nam">parent</span> <span class="op">=</span> <span class="nam">new_name</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t499" href="#t499">499</a></span><span class="t">            <span class="key">if</span> <span class="nam">joint</span><span class="op">.</span><span class="nam">child</span> <span class="op">==</span> <span class="nam">old_name</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t500" href="#t500">500</a></span><span class="t">                <span class="nam">joint</span><span class="op">.</span><span class="nam">child</span> <span class="op">=</span> <span class="nam">new_name</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t499" href="#t499">499</a></span><span class="t">            <span class="key">if</span> <span class="nam">joint</span><span class="op">.</span><span class="nam">child</span> <span class="op">==</span> <span class="nam">old_name</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t500" href="#t500">500</a></span><span class="t">                <span class="nam">joint</span><span class="op">.</span><span class="nam">child</span> <span class="op">=</span> <span class="nam">new_name</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t501" href="#t501">501</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t502" href="#t502">502</a></span><span class="t">        <span class="com"># Update cached names</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t503" href="#t503">503</a></span><span class="t">        <span class="key">if</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_root_link_name</span> <span class="op">==</span> <span class="nam">old_name</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="par run show_par"><span class="n"><a id="t503" href="#t503">503</a></span><span class="t">        <span class="key">if</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_root_link_name</span> <span class="op">==</span> <span class="nam">old_name</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">503&#x202F;&#x219B;&#x202F;504</span><span class="annotate long">line 503 didn't jump to line 504 because the condition on line 503 was never true</span></span></p>
     <p class="mis show_mis"><span class="n"><a id="t504" href="#t504">504</a></span><span class="t">            <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_root_link_name</span> <span class="op">=</span> <span class="nam">new_name</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t505" href="#t505">505</a></span><span class="t">        <span class="key">if</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_end_link_names</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t506" href="#t506">506</a></span><span class="t">            <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_end_link_names</span> <span class="op">=</span> <span class="op">[</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t507" href="#t507">507</a></span><span class="t">                <span class="nam">new_name</span> <span class="key">if</span> <span class="nam">n</span> <span class="op">==</span> <span class="nam">old_name</span> <span class="key">else</span> <span class="nam">n</span> <span class="key">for</span> <span class="nam">n</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_end_link_names</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis mis2 show_mis"><span class="n"><a id="t508" href="#t508">508</a></span><span class="t">            <span class="op">]</span>&nbsp;</span><span class="r"></span></p>
+    <p class="par run show_par"><span class="n"><a id="t505" href="#t505">505</a></span><span class="t">        <span class="key">if</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_end_link_names</span><span class="op">:</span>&nbsp;</span><span class="r"><span class="annotate short">505&#x202F;&#x219B;&#x202F;510</span><span class="annotate long">line 505 didn't jump to line 510 because the condition on line 505 was always true</span></span></p>
+    <p class="run"><span class="n"><a id="t506" href="#t506">506</a></span><span class="t">            <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_end_link_names</span> <span class="op">=</span> <span class="op">[</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t507" href="#t507">507</a></span><span class="t">                <span class="nam">new_name</span> <span class="key">if</span> <span class="nam">n</span> <span class="op">==</span> <span class="nam">old_name</span> <span class="key">else</span> <span class="nam">n</span> <span class="key">for</span> <span class="nam">n</span> <span class="key">in</span> <span class="nam">self</span><span class="op">.</span><span class="nam">_urdf</span><span class="op">.</span><span class="nam">_end_link_names</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run run2"><span class="n"><a id="t508" href="#t508">508</a></span><span class="t">            <span class="op">]</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t509" href="#t509">509</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t510" href="#t510">510</a></span><span class="t">        <span class="key">return</span> <span class="nam">self</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t510" href="#t510">510</a></span><span class="t">        <span class="key">return</span> <span class="nam">self</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t511" href="#t511">511</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t512" href="#t512">512</a></span><span class="t">    <span class="com"># ==================== Export ====================</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t513" href="#t513">513</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
@@ -887,8 +887,8 @@
             <a class="nav" href="index.html">&Hat; index</a> &nbsp; &nbsp;
             <a class="nav" href="z_bf95d498a9c88f46_parser_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
-            <a class="nav" href="https://coverage.readthedocs.io/en/7.15.4">coverage.py v7.15.4</a>,
-            created at 2026-09-02 07:49 +0000
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.16.2">coverage.py v7.16.2</a>,
+            created at 2026-10-13 20:05 +0000
         </p>
     </div>
 </footer>
