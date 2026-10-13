@@ -288,14 +288,25 @@ class Singularity:
     def near_singularity_detection(
         self,
         thetalist: Union[NDArray[np.float64], List[float]],
-        threshold: float = 1e-2,
+        threshold: float = 1e3,
     ) -> bool:
         """
-        Detect if the manipulator is near a singularity by comparing the condition number with a threshold.
+        Detect if the manipulator is near a singularity.
+
+        Compares the condition number of the space Jacobian,
+        ``sigma_max / sigma_min`` (always >= 1), with ``threshold`` and
+        returns ``cond > threshold``. A singular Jacobian (``sigma_min = 0``)
+        has an infinite condition number and always returns True.
+
+        The condition number mixes linear (m/s) and angular (rad/s) rows, so
+        its value depends on the length unit. As a reference, a Franka Panda
+        at its usual home pose has a condition number of about 9.4.
 
         Parameters:
             thetalist (numpy.ndarray): Array of joint angles in radians.
-            threshold (float, optional): Threshold value for the condition number. Defaults to 1e-2.
+            threshold (float, optional): Condition-number threshold. Defaults
+                to 1e3. (Before 1.4.2 the default was 1e-2, which made every
+                configuration count as near-singular.)
 
         Returns:
             bool: True if the manipulator is near a singularity, False otherwise.

@@ -68,7 +68,7 @@ Primary Detection Methods
    **Parameters:**
    
    - **thetalist** (*numpy.ndarray*) -- Array of joint angles in radians
-   - **threshold** (*float, optional*) -- Condition number threshold (default: 1e-2)
+   - **threshold** (*float, optional*) -- Condition number threshold (default: 1e3; was 1e-2 before 1.4.2)
 
    **Returns:**
    

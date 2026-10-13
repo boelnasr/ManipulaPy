@@ -48,6 +48,52 @@ limits)::
    serial = robot.to_serial_manipulator()
    dynamics = robot.to_manipulator_dynamics()
 
+Choosing the end effector
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. versionchanged:: 1.4.2
+   The default end effector no longer depends on ``PYTHONHASHSEED``,
+   ``tip_link`` is validated, and only the joints on the root → tip chain
+   become screw-axis columns.
+
+:meth:`URDF.extract_screw_axes`, :meth:`URDF.to_serial_manipulator` and
+:meth:`URDF.to_manipulator_dynamics` build the robot up to one tip link.
+Only the first two accept ``tip_link``; :meth:`URDF.to_manipulator_dynamics`
+takes no arguments and always uses the default tip. The tip is chosen as
+follows:
+
+- **Explicit tip.** Pass ``tip_link="<link name>"`` to
+  :meth:`URDF.extract_screw_axes` or :meth:`URDF.to_serial_manipulator`. A
+  ``ValueError`` is raised if the link does not exist, is not reachable from
+  the root link, has no actuated joint between it and the root, or has a
+  mimic joint on that chain. The screw-axis model has no column for a joint
+  that moves with its driver, such as a Panda's ``panda_rightfinger``.
+- **Default tip** (:attr:`URDF.end_effector_link`). Among the leaf links
+  whose chain from the root contains at least one actuated joint, ManipulaPy
+  picks the first by sorted name. A leaf attached to the base by fixed joints
+  only, such as a UR5 ``base`` frame, never qualifies. Leaves without mimic
+  joints on their chain are preferred, so a Panda defaults to
+  ``panda_leftfinger``. When several preferred leaves qualify, a
+  ``UserWarning`` names them once per URDF object. If every leaf is behind a
+  mimic joint (Robotiq 2F grippers, xArm6 with gripper), the first by name is
+  still used, and every conversion of it emits a ``UserWarning`` that the
+  model holds those mimic joints at 0. Pass ``tip_link`` to choose a tip explicitly.
+
+Only the actuated, non-mimic joints on the chain from the root to the tip
+become columns, in chain order. ``S_list``, ``B_list``, ``omega_list``,
+``r_list``, ``G_list``, ``Mlist_per_link`` and ``joint_limits`` have one
+entry per chain joint. ``params["joint_names"]`` lists those joints in
+column order::
+
+   panda = URDF.load(get_robot_urdf("panda"))
+   params = panda.extract_screw_axes(tip_link="panda_hand")
+   params["S_list"].shape    # (6, 7): the finger joints are not on this chain
+   params["joint_names"]     # ['panda_joint1', ..., 'panda_joint7']
+
+Use ``joint_names`` to map columns to joints. Don't use
+:attr:`URDF.actuated_joints` for that, because it lists every actuated
+joint in the URDF, including those on other branches.
+
 PackageResolver class
 ---------------------
 

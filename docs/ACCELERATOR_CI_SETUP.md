@@ -85,8 +85,18 @@ compute capability â‰¥ 6.0, Python 3.12 available, and roughly 20 GB free disk â
 the three jobs install `.[dev,cuda]`, `.[dev,pytorch]` and `.[dev,jax-cuda]`
 into separate environments.
 
-You do **not** need the CUDA toolkit or `nvcc`. CuPy, PyTorch and JAX each ship
-their own CUDA runtime in their wheels; the driver is what matters.
+PyTorch and JAX ship their own CUDA runtime in their wheels; for them the
+driver is what matters. **CuPy does not.** `cupy-cuda12x` loads NVRTC
+(`libnvrtc.so.12`) and the CUDA headers from a system **CUDA 12 toolkit** to
+compile its kernels at run time. Without one, `cupy-gpu` fails at "Assert a live
+CUDA device" with `CuPy failed to load libnvrtc.so.12`. Install toolkit 12.x,
+version 12.8 or newer for Blackwell (sm_120) GPUs. CuPy finds `/usr/local/cuda`
+automatically. On WSL use NVIDIA's **WSL-Ubuntu** repository and install only
+`cuda-toolkit-12-<minor>`, never the `cuda` or `cuda-drivers` meta-packages:
+the Windows driver provides `libcuda` there.
+
+`optional-deps` builds pybullet from source when no wheel matches the runner's
+Python, so the host also needs `g++` (`build-essential`).
 
 > **Verified on the primary dev machine (2026-08-08):** RTX 3060 Laptop, driver
 > 580.173.02, compute capability 8.6, `/dev/nvidia*` present,

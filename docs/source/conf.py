@@ -58,7 +58,7 @@ try:
     import ManipulaPy
     version = release = ManipulaPy.__version__
 except Exception:
-    version = release = "1.4.1"
+    version = release = "1.4.2"
 
 # ── Core Extensions (always available) ──────────────────
 extensions = [

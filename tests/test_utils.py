@@ -89,6 +89,27 @@ class TestUtilsScrewTheory(unittest.TestCase):
 
         np.testing.assert_array_almost_equal(omega_list, expected, decimal=6)
 
+    def test_extract_omega_list_6xn_returns_3xn(self) -> None:
+        """Canonical 6xn screws (columns) -> 3xn rotation axes, n != 3."""
+        S = np.zeros((6, 2))
+        S[:, 0] = [0, 0, 1, 0, 0, 0]
+        S[:, 1] = [0, 1, 0, -0.5, 0, 0]
+        np.testing.assert_array_equal(utils.extract_omega_list(S), S[:3, :])
+
+    def test_extract_omega_list_legacy_nx6_returns_3xn(self) -> None:
+        S = np.zeros((6, 2))
+        S[:, 0] = [0, 0, 1, 0, 0, 0]
+        S[:, 1] = [0, 1, 0, -0.5, 0, 0]
+        np.testing.assert_array_equal(utils.extract_omega_list(S.T), S[:3, :])
+
+    def test_extract_omega_list_square_is_treated_as_6xn(self) -> None:
+        S = np.arange(36.0).reshape(6, 6)
+        np.testing.assert_array_equal(utils.extract_omega_list(S), S[:3, :])
+
+    def test_extract_omega_list_rejects_other_shapes(self) -> None:
+        with self.assertRaises(ValueError):
+            utils.extract_omega_list(np.zeros((5, 4)))
+
     def test_extract_screw_list(self) -> None:
         """Test construction of screw axes from omega and r."""
         omega_list = np.array([[0, 0, 1], [0, 1, 0]]).T

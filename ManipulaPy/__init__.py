@@ -20,7 +20,7 @@ import sys
 from typing import Any, Dict, List, Optional
 
 # Package metadata (always available, no imports)
-__version__ = "1.4.1"
+__version__ = "1.4.2"
 __author__ = "Mohamed Aboelnasr"
 __license__ = "AGPL-3.0-or-later"
 
@@ -481,7 +481,13 @@ def get_version() -> str:
 # ---------------------------------------------------------------------
 # Minimal startup (optional, can be disabled)
 # ---------------------------------------------------------------------
+# The greeting goes to stderr, never stdout (stdout belongs to the application,
+# e.g. piped output), and is plain ASCII: the emoji banner this replaced raised
+# UnicodeEncodeError on Windows cp1252 consoles and crashed the import.
 if not os.getenv("MANIPULAPY_QUIET", "0") == "1":
-    # Lightweight greeting, no heavy imports
-    print(f"🤖 ManipulaPy v{__version__} loaded (lazy imports enabled)")
-    print("   💡 Use ManipulaPy.check_dependencies() to see available features")
+    print(
+        f"ManipulaPy {__version__} loaded - "
+        "run ManipulaPy.check_dependencies() for available features "
+        "(set MANIPULAPY_QUIET=1 to hide this message)",
+        file=sys.stderr,
+    )

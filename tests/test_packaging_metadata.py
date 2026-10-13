@@ -61,3 +61,43 @@ def test_every_jax_requirement_is_gated_off_unsupported_pythons() -> None:
     assert jax_requirements, "expected JAX to appear in at least one extra"
     for dependency in jax_requirements:
         assert "python_version >= '3.10'" in dependency, dependency
+
+
+SETUP_PY = Path(__file__).parents[1] / "setup.py"
+
+
+def _setup_py_literals() -> dict:
+    """Literal keyword arguments of the setup() call in setup.py.
+
+    Parsed with ast, so setup.py is never executed.
+    """
+    import ast
+
+    tree = ast.parse(SETUP_PY.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "setup":
+            literals = {}
+            for keyword in node.keywords:
+                try:
+                    literals[keyword.arg] = ast.literal_eval(keyword.value)
+                except ValueError:
+                    pass  # computed values such as find_packages(...)
+            return literals
+    raise AssertionError("setup() call not found in setup.py")
+
+
+def test_legacy_setup_py_matches_pyproject() -> None:
+    """setup.py is a legacy shim, but anything that still reads it must get
+    the same metadata pyproject.toml publishes."""
+    project = _project_metadata()
+    setup = _setup_py_literals()
+
+    assert setup["version"] == project["version"]
+    assert setup["description"] == project["description"]
+    assert setup["python_requires"] == project["requires-python"]
+    assert setup["license"] == project["license"]["text"]
+    assert setup["install_requires"] == project["dependencies"]
+    assert setup["extras_require"] == project["optional-dependencies"]
+    assert setup["keywords"] == project["keywords"]
+    assert sorted(setup["classifiers"]) == sorted(project["classifiers"])
+    assert setup["project_urls"] == project["urls"]

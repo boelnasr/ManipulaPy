@@ -297,13 +297,13 @@ Core Analysis Methods
    - κ > 100: Ill-conditioned, approaching singularity
    - κ → ∞: At singularity
 
-.. py:method:: near_singularity_detection(thetalist, threshold=100) -> bool
+.. py:method:: near_singularity_detection(thetalist, threshold=1000.0) -> bool
    :no-index:
 
    Detect proximity to singularities using condition number threshold.
 
    :param np.ndarray thetalist: Joint angles in radians
-   :param float threshold: Condition number threshold (default: 100)
+   :param float threshold: Condition number threshold (default: 1000; returns cond > threshold)
    :return: True if near singularity
    :rtype: bool
 

@@ -29,8 +29,22 @@ def extract_r_list(Slist) -> NDArray:
 
 
 def extract_omega_list(Slist) -> NDArray:
-    """Extract the first three entries from each input screw."""
-    return get_backend().asarray(Slist)[:, :3]
+    """Extract the rotation axes of a screw-axis matrix as a 3 x n array.
+
+    ``Slist`` is 6 x n (one screw [w; v] per column, the layout used
+    throughout ManipulaPy), including the square 6 x 6 case. A legacy n x 6
+    input (one screw per row) is also accepted. Before 1.4.2 a 6 x n input
+    was sliced as ``Slist[:, :3]``, i.e. the first three screws.
+
+    Raises:
+        ValueError: if ``Slist`` is not 2-D with a dimension of size 6.
+    """
+    screws = get_backend().asarray(Slist)
+    if screws.ndim == 2 and screws.shape[0] == 6:
+        return screws[:3, :]
+    if screws.ndim == 2 and screws.shape[1] == 6:
+        return screws[:, :3].T
+    raise ValueError(f"Slist must be 6 x n (or n x 6), got shape {tuple(screws.shape)}")
 
 
 def _repeat_columns(array, count: int):

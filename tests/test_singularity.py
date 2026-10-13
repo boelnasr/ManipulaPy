@@ -63,9 +63,78 @@ def test_condition_number(singularity_analyzer) -> None:
 
 
 def test_near_singularity_detection(singularity_analyzer) -> None:
-    """Near-singularity detection flags both test configurations."""
+    """Singular J (cond = inf) is flagged; a well-conditioned J (cond = 2) is not."""
     assert singularity_analyzer.near_singularity_detection(np.zeros(6))
-    assert singularity_analyzer.near_singularity_detection(np.ones(6))
+    assert not singularity_analyzer.near_singularity_detection(np.ones(6))
+
+
+class _RankDeficientManipulator:
+    """Non-zero rank-5 Jacobian: sigma_min = 0 exactly."""
+
+    def jacobian(self, thetalist, frame: str = "space") -> np.ndarray:
+        J = np.eye(6)
+        J[5] = J[4]
+        return J
+
+
+def test_near_singularity_rank_deficient_without_warnings() -> None:
+    import warnings
+
+    analyzer = Singularity(_RankDeficientManipulator())
+    with warnings.catch_warnings(), np.errstate(all="raise"):
+        warnings.simplefilter("error")
+        assert analyzer.near_singularity_detection(np.zeros(6))
+
+
+@pytest.fixture(scope="module")
+def panda_analyzer(tmp_path_factory) -> Singularity:
+    """Panda arm (panda_joint1..7, tip panda_hand) from an isolated URDF copy.
+
+    The copy keeps package:// discovery from scanning the checkout.
+    """
+    import shutil
+    import warnings
+    from pathlib import Path
+
+    from ManipulaPy.kinematics import SerialManipulator
+    from ManipulaPy.urdf import URDF
+
+    src = (
+        Path(__file__).resolve().parent.parent
+        / "ManipulaPy"
+        / "ManipulaPy_data"
+        / "franka_panda"
+        / "panda.urdf"
+    )
+    path = shutil.copy(src, tmp_path_factory.mktemp("urdf") / "panda.urdf")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        params = URDF.load(path).extract_screw_axes(tip_link="panda_hand")
+    S = params["S_list"]
+    robot = SerialManipulator(
+        M_list=params["M"],
+        omega_list=S[:3, :],
+        S_list=S,
+        B_list=params["B_list"],
+        joint_limits=params["joint_limits"],
+    )
+    return Singularity(robot)
+
+
+PANDA_HOME = np.array([0.0, -np.pi / 4, 0.0, -3 * np.pi / 4, 0.0, np.pi / 2, np.pi / 4])
+
+
+def test_panda_home_is_not_near_singular(panda_analyzer) -> None:
+    assert panda_analyzer.condition_number(PANDA_HOME) == pytest.approx(9.40, abs=0.01)
+    assert not panda_analyzer.near_singularity_detection(PANDA_HOME)
+
+
+def test_panda_straight_arm_is_near_singular(panda_analyzer) -> None:
+    """q = 0: straight arm (q4 = 0 is just past its -0.0698 rad limit; math check)."""
+    q = np.zeros(7)
+    J = np.asarray(panda_analyzer.serial_manipulator.jacobian(q, frame="space"))
+    assert np.linalg.svd(J, compute_uv=False)[-1] < 1e-9  # confirm the case first
+    assert panda_analyzer.near_singularity_detection(q)
 
 
 def test_manipulability_ellipsoid_plot(singularity_analyzer) -> None:

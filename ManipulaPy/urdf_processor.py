@@ -75,6 +75,8 @@ class URDFToSerialManipulator:
         >>> T_ee = manipulator.forward_kinematics([0, 0, 0, 0, 0, 0])
 
         >>> # Batch FK for trajectory
+        >>> # Configurations are always the screw-axis chain vector:
+        >>> # num_dofs values in joint_names order (robot_data["joint_names"]).
         >>> configs = np.random.uniform(-np.pi, np.pi, (100, 6))
         >>> transforms = processor.batch_forward_kinematics(configs)
     """
@@ -116,7 +118,9 @@ class URDFToSerialManipulator:
         # 1. Load URDF data (Slist, Blist, M, etc.) using native parser
         self.robot_data = self._extract_robot_data()
 
-        # 2. Optionally retrieve limits from PyBullet and override
+        # 2. Optionally retrieve limits from PyBullet and override. Step 1
+        # already set the URDF limits of the chain joints (one per screw
+        # column); robot.joint_limits would add joints on other branches.
         if use_pybullet_limits:
             if not PYBULLET_AVAILABLE:
                 import warnings
@@ -125,13 +129,9 @@ class URDFToSerialManipulator:
                     "PyBullet not available, using URDF joint limits instead.",
                     UserWarning,
                 )
-                self.robot_data["joint_limits"] = self.robot.joint_limits
             else:
                 pyb_joint_limits = self._get_joint_limits_from_pybullet()
                 self.robot_data["joint_limits"] = pyb_joint_limits
-        else:
-            # Use limits from URDF parser or default to (-π, π)
-            self.robot_data["joint_limits"] = self.robot.joint_limits
 
         # 3. Create SerialManipulator and dynamics
         self.serial_manipulator = self.initialize_serial_manipulator()
@@ -190,7 +190,8 @@ class URDFToSerialManipulator:
             "Slist": params["S_list"],
             "Blist": params["B_list"],
             "Glist": params["G_list"],
-            "actuated_joints_num": self.robot.num_dofs,
+            "actuated_joints_num": len(params["joint_names"]),
+            "joint_names": params["joint_names"],
             "joint_limits": params["joint_limits"],
             "Mlist_per_link": params.get("Mlist_per_link"),
         }
@@ -220,10 +221,15 @@ class URDFToSerialManipulator:
     def _get_joint_limits_from_pybullet(self) -> List[Tuple[float, float]]:
         """
         Connect to PyBullet (in DIRECT mode, so no GUI),
-        load the URDF, and retrieve per-joint limits for all revolute joints.
+        load the URDF, and retrieve the limits of the screw-axis chain joints.
+
+        Limits are matched to ``robot_data["joint_names"]`` by joint name, so
+        joints on other branches and mimic joints are ignored. A chain joint
+        PyBullet does not report keeps its URDF limit.
 
         Returns:
-            List of (lower, upper) tuples in the order they appear as revolute in the URDF.
+            List of (lower, upper) tuples, one per screw-axis column, in
+            column order.
 
         Raises:
             RuntimeError: If PyBullet is not available.
@@ -241,7 +247,7 @@ class URDFToSerialManipulator:
             # Load the URDF in PyBullet
             robot_id = p.loadURDF(self.urdf_name, useFixedBase=True)
 
-            joint_limits = []
+            limits_by_name = {}
 
             total_joints = p.getNumJoints(robot_id)
             for i in range(total_joints):
@@ -254,12 +260,17 @@ class URDFToSerialManipulator:
                     if lower_limit > upper_limit:
                         lower_limit = -np.pi
                         upper_limit = np.pi
-                    joint_limits.append((lower_limit, upper_limit))
+                    limits_by_name[joint_info[1].decode()] = (lower_limit, upper_limit)
 
         finally:
             p.disconnect(cid)
 
-        return joint_limits
+        return [
+            limits_by_name.get(name, urdf_limit)
+            for name, urdf_limit in zip(
+                self.robot_data["joint_names"], self.robot_data["joint_limits"]
+            )
+        ]
 
     def initialize_serial_manipulator(self) -> SerialManipulator:
         """
@@ -301,6 +312,38 @@ class URDFToSerialManipulator:
         )
         return self.manipulator_dynamics
 
+    def _robot_cfgs(self, cfgs: Union[np.ndarray, List[float]]) -> np.ndarray:
+        """
+        Expand chain configurations to whole-robot configurations.
+
+        Columns are matched by joint name; actuated joints off the chain
+        (other branches) are set to 0.
+
+        Parameters:
+            cfgs: (num_dofs,) or (N, num_dofs) chain configuration(s)
+
+        Returns:
+            (N, robot.num_dofs) array in robot.actuated_joint_names order
+        """
+        cfgs = np.atleast_2d(np.asarray(cfgs, dtype=np.float64))
+        if cfgs.ndim != 2 or cfgs.shape[1] != self.num_dofs:
+            raise ValueError(
+                f"Expected configurations with {self.num_dofs} columns "
+                f"({self.joint_names}), got shape {cfgs.shape}"
+            )
+        robot_names = self.robot.actuated_joint_names
+        full = np.zeros((cfgs.shape[0], len(robot_names)), dtype=np.float64)
+        full[:, [robot_names.index(name) for name in self.joint_names]] = cfgs
+        return full
+
+    def _robot_cfg(
+        self, cfg: Optional[Union[np.ndarray, List[float], Dict[str, float]]]
+    ) -> Optional[Union[np.ndarray, Dict[str, float]]]:
+        """Map one chain configuration to a whole-robot one; dicts/None pass."""
+        if cfg is None or isinstance(cfg, dict):
+            return cfg
+        return self._robot_cfgs(cfg)[0]
+
     def visualize_robot(
         self, cfg: Optional[Union[np.ndarray, Dict[str, Any]]] = None
     ) -> None:
@@ -308,9 +351,10 @@ class URDFToSerialManipulator:
         Visualizes the URDF model.
 
         Parameters:
-            cfg: Optional joint configuration (array or dict)
+            cfg: Optional joint configuration: (num_dofs,) chain array, or
+                dict {joint_name: value}
         """
-        self.robot.show(cfg=cfg)
+        self.robot.show(cfg=self._robot_cfg(cfg))
 
     def visualize_trajectory(
         self,
@@ -322,7 +366,8 @@ class URDFToSerialManipulator:
         Animate robot along a trajectory.
 
         Parameters:
-            cfg_trajectory: Joint trajectories as (N, DOF) array or dict {joint_name: array}
+            cfg_trajectory: Joint trajectories as (N, num_dofs) chain array or
+                dict {joint_name: array} over all actuated joints
             loop_time: Animation duration in seconds
             use_collision: Use collision geometry instead of visual
         """
@@ -331,15 +376,15 @@ class URDFToSerialManipulator:
         # If a NumPy array, convert to a dictionary of joint_name -> configurations
         if cfg_trajectory is not None:
             if isinstance(cfg_trajectory, np.ndarray):
-                expected_columns = len(actuated_joints)
+                expected_columns = self.num_dofs
                 if cfg_trajectory.shape[1] != expected_columns:
                     raise ValueError(
                         f"Expected cfg_trajectory with {expected_columns} cols, got {cfg_trajectory.shape[1]}"
                     )
+                # Joints off the chain are absent and animate at 0.
                 cfg_trajectory = {
-                    joint.name: cfg_trajectory[:, i]
-                    for i, joint in enumerate(actuated_joints)
-                    if i < cfg_trajectory.shape[1]
+                    name: cfg_trajectory[:, i]
+                    for i, name in enumerate(self.joint_names)
                 }
             elif isinstance(cfg_trajectory, dict):
                 if len(cfg_trajectory) != len(actuated_joints):
@@ -424,13 +469,14 @@ class URDFToSerialManipulator:
         This is faster for getting transforms of all links, not just end-effector.
 
         Parameters:
-            cfg: Joint configuration (None uses current config)
+            cfg: (num_dofs,) chain configuration (joints off the chain at 0),
+                dict {joint_name: value}, or None (uses current config)
             use_names: Return dict with string keys (always True for compatibility)
 
         Returns:
             Dict mapping link names to 4x4 transformation matrices
         """
-        return self.robot.link_fk(cfg, use_names=use_names)
+        return self.robot.link_fk(self._robot_cfg(cfg), use_names=use_names)
 
     def batch_forward_kinematics(
         self,
@@ -443,7 +489,8 @@ class URDFToSerialManipulator:
         This is 50x+ faster than calling forward_kinematics in a loop.
 
         Parameters:
-            cfgs: Array of configurations with shape (N, num_dofs)
+            cfgs: Chain configurations with shape (N, num_dofs), columns in
+                joint_names order; joints off the chain are held at 0
             link_name: If provided, return only transforms for this link.
                        If None, return transforms for all links.
 
@@ -456,7 +503,7 @@ class URDFToSerialManipulator:
             >>> ee_transforms = processor.batch_forward_kinematics(configs, "ee_link")
             >>> all_transforms = processor.batch_forward_kinematics(configs)
         """
-        batch_fk = self.robot.link_fk_batch(cfgs)
+        batch_fk = self.robot.link_fk_batch(self._robot_cfgs(cfgs))
 
         if link_name is not None:
             if link_name not in batch_fk:
@@ -519,7 +566,7 @@ class URDFToSerialManipulator:
             Tuple of (theta, success, iterations)
         """
         if initial_guess is None:
-            initial_guess = np.zeros(self.robot.num_dofs)
+            initial_guess = np.zeros(self.num_dofs)
 
         if method == "robust":
             theta, success, iters, _ = (
@@ -535,13 +582,17 @@ class URDFToSerialManipulator:
 
     @property
     def num_dofs(self) -> int:
-        """Number of actuated degrees of freedom."""
-        return self.robot.num_dofs
+        """Number of screw-axis chain joints (Slist columns).
+
+        Joints on other branches are excluded; this is the length of every
+        configuration vector the processor accepts.
+        """
+        return len(self.robot_data["joint_names"])
 
     @property
     def joint_names(self) -> List[str]:
-        """Names of actuated joints in order."""
-        return self.robot.actuated_joint_names
+        """Names of the screw-axis chain joints, in configuration order."""
+        return self.robot_data["joint_names"]
 
     @property
     def link_names(self) -> List[str]:
@@ -559,9 +610,10 @@ class URDFToSerialManipulator:
         Joint limits as (N, 2) array.
 
         Returns:
-            Array with shape (num_dofs, 2) where [:, 0] is lower and [:, 1] is upper
+            Array with shape (num_dofs, 2) where [:, 0] is lower and [:, 1] is upper,
+            rows in joint_names order
         """
-        return np.array(self.robot.joint_limits)
+        return np.array(self.robot_data["joint_limits"])
 
     def get_transform(
         self,
@@ -575,12 +627,13 @@ class URDFToSerialManipulator:
         Parameters:
             frame_to: Target frame (link name)
             frame_from: Source frame (link name or "world")
-            cfg: Joint configuration (None = current config)
+            cfg: (num_dofs,) chain configuration (joints off the chain at 0),
+                dict {joint_name: value}, or None (current config)
 
         Returns:
             4x4 transformation matrix from frame_from to frame_to
         """
-        return self.robot.get_transform(frame_to, frame_from, cfg)
+        return self.robot.get_transform(frame_to, frame_from, self._robot_cfg(cfg))
 
     def create_modifier(self) -> URDFModifier:
         """

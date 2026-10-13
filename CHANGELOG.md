@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] — 2026-10-13
+
+> **Summary:** Five correctness fixes in URDF conversion, singularity
+> detection and import behaviour, found while integrating ManipulaPy into a
+> downstream planner. Two of them change outputs that existing code may rely
+> on; both are flagged **Behaviour change** below.
+
+### Fixed
+- **Default end effector no longer depends on `PYTHONHASHSEED`.** Leaf and
+  root links were taken from a `set`, so `URDF.end_effector_link` (and every
+  `extract_screw_axes()` / `to_serial_manipulator()` call without `tip_link`)
+  could pick a different link from run to run, e.g. either Panda finger, or a
+  UR5's `base` frame instead of `tool0`. The rule is now documented and
+  deterministic: among leaves whose chain from the root has at least one
+  actuated joint, the first by sorted name. A `UserWarning` is emitted (once
+  per URDF object) when several leaves qualify; pass `tip_link` to choose.
+- **`tip_link` is validated against the joint chain.** A link that exists but
+  is unreachable from the root, or has no actuated joint between it and the
+  root, now raises `ValueError` instead of being accepted silently.
+- **`extract_screw_axes(tip_link=...)` only uses joints on the root → tip
+  chain.** Previously every actuated joint in the URDF became a column, so a
+  Panda with `tip_link="panda_grasptarget"` got an extra prismatic finger
+  column. `S_list`, `B_list`, `omega_list`, `r_list`, `G_list`,
+  `Mlist_per_link` and `joint_limits` now have one entry per chain joint, in
+  chain order, and the new `joint_names` key lists those joints.
+  **Behaviour change:** on a branched robot, joints on other branches no
+  longer become columns, with or without `tip_link` (Panda to
+  `panda_grasptarget`: 8 → 7; to `panda_link3`: 8 → 3; the bundled Kinova
+  Jaco by default: 9 → 6 and 10 → 7, finger joints excluded). Single-chain
+  robots are unaffected.
+- **`URDFToSerialManipulator` describes the same joints as its screw axes.**
+  Its configuration vector is the screw-axis chain, in
+  `robot_data["joint_names"]` order: `robot_data["actuated_joints_num"]`,
+  `robot_data["joint_limits"]`, `num_dofs`, `joint_names`,
+  `joint_limits_array` and the IK initial guess all follow it, and
+  `use_pybullet_limits=True` matches PyBullet's limits to those joints by name
+  instead of by position. Batch FK, `link_fk`, `get_transform` and the
+  visualisation helpers take chain configurations and set joints on other
+  branches to 0 by name. **Behaviour change** on branched robots only:
+  whole-robot-width arrays passed to these methods now raise `ValueError`.
+- **Mimic joints on the tip chain are no longer silently held at 0.** The
+  screw-axis model has no column for a joint that moves with its driver, so
+  an explicit `tip_link` whose chain contains a mimic joint now raises
+  `ValueError` naming the joint and its driver (e.g. Panda
+  `panda_rightfinger`). The default end effector prefers leaves without
+  mimic joints on their chain; when none exists (Robotiq 2F-85/140, xArm6
+  with gripper) it keeps the previous tip, and every conversion of it emits a
+  `UserWarning` that the model is wrong past the mimic joints. These defaults
+  were already wrong in 1.4.1, without a warning.
+- **`Singularity.near_singularity_detection` returned True for every
+  configuration.** It compares the Jacobian condition number (always ≥ 1)
+  with `threshold`, whose default was `1e-2`. The default is now `1e3`; the
+  docstring states the compared quantity and direction. A singular Jacobian
+  still returns True without floating-point warnings.
+  **Behaviour change:** calls relying on the default now return False away
+  from singularities. Calls that pass their own threshold are unaffected.
+- **`import ManipulaPy` crashed on Windows consoles using cp1252.** The import
+  greeting printed emoji to stdout (`UnicodeEncodeError`). It is now plain
+  ASCII and goes to stderr, so stdout stays clean at import;
+  `MANIPULAPY_QUIET=1` still hides it.
+- **`utils.extract_omega_list` sliced a 6 × n screw matrix as the first three
+  screws.** It now returns the 3 × n rotation axes for a 6 × n input (square
+  6 × 6 included) and still accepts the legacy n × 6 layout; other shapes raise
+  `ValueError`. This also corrects `omega_list` on robots built by
+  `URDF.to_serial_manipulator()` and `URDF.to_manipulator_dynamics()`.
+  **Behaviour change:** a legacy n × 6 input now also returns 3 × n (one
+  column per screw); it returned n × 3 before.
+
 ## [1.4.1] — 2026-08-14
 
 > **Summary:** Restores this project's control over its own NumPy ceiling.
